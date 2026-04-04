@@ -59,13 +59,13 @@ export function CourseBuilderApp() {
       ) : null}
 
       {course ? (
-        <section className="spaced">
-          <article className="panel">
+        <section className="course-shell">
+          <article className="panel course-panel">
             <header className="panel-header">
               <h2>{course.learningPath.title}</h2>
               <p>{course.learningPath.reasoning}</p>
             </header>
-            <div className="chips">
+            <div className="chip-row">
               <span className="chip">Level: {course.profile.experience_level}</span>
               <span className="chip">Goal: {course.profile.goal}</span>
               <span className="chip">Quality: {course.qualityScore}/100</span>

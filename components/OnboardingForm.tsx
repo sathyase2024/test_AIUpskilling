@@ -57,8 +57,11 @@ export function OnboardingForm({ onGenerate, loading }: Props) {
     await onGenerate(form);
   };
 
+  const roleLabel =
+    form.current_role === "Other" ? "Other role" : form.current_role;
+
   return (
-    <section className="panel">
+    <section className="designer-form-card">
       <header className="brand-header">
         <div className="logo-block">
           <div className="logo-mark">SV</div>
@@ -79,30 +82,41 @@ export function OnboardingForm({ onGenerate, loading }: Props) {
 
       {step === 1 && (
         <div className="flow">
-          <label htmlFor="first-name">First name</label>
+          <label htmlFor="first-name" className="field-label">
+            <span className="field-icon">👤</span> First name
+          </label>
           <input
+            className="field-input"
             id="first-name"
             value={form.first_name}
             onChange={(e) => update("first_name", e.target.value)}
             placeholder="e.g., Rahul"
           />
-          <label htmlFor="last-name">Last name</label>
+          <label htmlFor="last-name" className="field-label">
+            <span className="field-icon">👤</span> Last name
+          </label>
           <input
+            className="field-input"
             id="last-name"
             value={form.last_name}
             onChange={(e) => update("last_name", e.target.value)}
             placeholder="e.g., Sharma"
           />
-          <label htmlFor="email">Work or personal email</label>
+          <label htmlFor="email" className="field-label">
+            <span className="field-icon">✉️</span> Work or personal email
+          </label>
           <input
+            className="field-input"
             id="email"
             type="email"
             value={form.email}
             onChange={(e) => update("email", e.target.value)}
             placeholder="you@example.com"
           />
-          <small className="helper-text">We'll only use this to enhance your learning.</small>
-          <label>Current role</label>
+          <small className="field-hint">We'll only use this to enhance your learning.</small>
+          <label className="field-label">
+            <span className="field-icon">💼</span> Current role
+          </label>
           <div className="grid-select">
             {(
               [
@@ -118,32 +132,37 @@ export function OnboardingForm({ onGenerate, loading }: Props) {
               <button
                 key={role}
                 type="button"
-                className={form.current_role === role ? "select active" : "select"}
+                className={form.current_role === role ? "step-option active" : "step-option"}
                 onClick={() => update("current_role", role)}
               >
                 {role}
               </button>
             ))}
           </div>
-          <small className="helper-text">Helps us tailor skills to your role.</small>
+          <small className="field-hint">
+            Helps us tailor skills to your role. Selected: {roleLabel}
+          </small>
         </div>
       )}
 
       {step === 2 && (
         <div className="flow">
-          <label htmlFor="interest">What do you want to learn?</label>
+          <label htmlFor="interest" className="field-label">
+            What do you want to learn?
+          </label>
           <input
+            className="field-input"
             id="interest"
             value={form.interest}
             onChange={(e) => update("interest", e.target.value)}
             placeholder="e.g., Prompt engineering for AI products"
           />
-          <div className="chips">
+          <div className="suggestion-row">
             {interests.map((interest) => (
               <button
                 key={interest}
                 type="button"
-                className="chip"
+                className="suggestion-chip"
                 onClick={() => update("interest", interest)}
               >
                 {interest}
@@ -155,13 +174,13 @@ export function OnboardingForm({ onGenerate, loading }: Props) {
 
       {step === 3 && (
         <div className="flow">
-          <label>Experience level</label>
+          <label className="field-label">Experience level</label>
           <div className="grid-select">
             {levels.map((level) => (
               <button
                 key={level}
                 type="button"
-                className={form.experience_level === level ? "select active" : "select"}
+                className={form.experience_level === level ? "step-option active" : "step-option"}
                 onClick={() => update("experience_level", level)}
               >
                 {level}
@@ -173,13 +192,13 @@ export function OnboardingForm({ onGenerate, loading }: Props) {
 
       {step === 4 && (
         <div className="flow">
-          <label>Primary goal</label>
+          <label className="field-label">Primary goal</label>
           <div className="grid-select">
             {goals.map((goal) => (
               <button
                 key={goal}
                 type="button"
-                className={form.goal === goal ? "select active" : "select"}
+                className={form.goal === goal ? "step-option active" : "step-option"}
                 onClick={() => update("goal", goal)}
               >
                 {goal}
@@ -191,8 +210,11 @@ export function OnboardingForm({ onGenerate, loading }: Props) {
 
       {step === 5 && (
         <div className="flow">
-          <label htmlFor="hours">Hours per week</label>
+          <label htmlFor="hours" className="field-label">
+            Hours per week
+          </label>
           <input
+            className="field-input"
             id="hours"
             type="number"
             min={1}
@@ -203,21 +225,21 @@ export function OnboardingForm({ onGenerate, loading }: Props) {
         </div>
       )}
 
-      <footer className="actions">
-        <button type="button" onClick={back} disabled={step === 1 || loading}>
+      <footer className="cta-row">
+        <button type="button" className="btn-secondary" onClick={back} disabled={step === 1 || loading}>
           Back
         </button>
         {step < 5 ? (
-          <button type="button" onClick={next} disabled={!canContinue || loading}>
+          <button type="button" className="btn-primary" onClick={next} disabled={!canContinue || loading}>
             Continue
           </button>
         ) : (
-          <button type="button" className="cta" onClick={submit} disabled={!canContinue || loading}>
+          <button type="button" className="btn-primary" onClick={submit} disabled={!canContinue || loading}>
             {loading ? "Generating..." : "Next: Build My Skill Profile"}
           </button>
         )}
       </footer>
-      <p className="privacy-note">Your data stays private and secure.</p>
+      <p className="trust-note">🔒 Your data stays private and secure.</p>
     </section>
   );
 }
