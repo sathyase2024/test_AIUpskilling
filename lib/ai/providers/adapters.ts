@@ -39,6 +39,32 @@ export class OpenAICompatibleProvider implements AIProvider {
     const content = payload.choices?.[0]?.message?.content ?? "";
     return tryParseJson<T>(content);
   }
+
+  async generateText(request: PromptRequest): Promise<{ text: string }> {
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: request.model ?? this.defaultModel,
+        temperature: request.temperature ?? 0.4,
+        messages: [
+          { role: "system", content: request.systemPrompt },
+          { role: "user", content: request.userPrompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const details = await response.text();
+      throw new Error(`${this.name} provider request failed (${response.status}): ${details}`);
+    }
+
+    const payload = (await response.json()) as OpenAIChatCompletionsPayload;
+    return { text: payload.choices?.[0]?.message?.content?.trim() ?? "" };
+  }
 }
 
 const feedbackSummary = (feedback?: string): string =>
@@ -150,5 +176,34 @@ export class MockAIProvider implements AIProvider {
       notes: `Key takeaway for ${learnerName}: connect each concept to your ${role} responsibilities, practice with realistic scenarios, and iterate using feedback.`,
     };
     return result as T;
+  }
+
+  async generateText(request: PromptRequest): Promise<{ text: string }> {
+    const prompt = request.userPrompt.toLowerCase();
+    const firstName = safeFirstNameFromPrompt(request.userPrompt);
+    const role = safeRoleFromPrompt(request.userPrompt);
+    const topic = /"interest":\s*"([^"]+)"/i.exec(request.userPrompt)?.[1] ?? "AI";
+    const question = /Learner message:\s*([\s\S]*)$/i.exec(request.userPrompt)?.[1]?.trim();
+
+    return {
+      text: [
+      `### Concept`,
+      `${firstName}, ${topic} for a ${role} means converting abstract ideas into reliable, repeatable actions. ${
+        question ? `For your question ("${question.slice(0, 120)}"), focus on outcome first, then technique.` : ""
+      }`,
+      ``,
+      `### Analogy`,
+      `${topic} is like giving a GPS a destination and constraints: better instructions create better routes.`,
+      ``,
+      `### Example`,
+      `A ${role} defines acceptance criteria before writing prompts, then evaluates outputs against those criteria in each iteration.`,
+      ``,
+      `### Exercise`,
+      `Take one task you do weekly, write a baseline prompt, improve it in 2 iterations, and compare output quality.`,
+      ``,
+      `### Quick Check`,
+      `What part of your current workflow should we optimize first: clarity of instructions, evaluation criteria, or iteration speed?`,
+      ].join("\n"),
+    };
   }
 }

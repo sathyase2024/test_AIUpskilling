@@ -101,3 +101,29 @@ export type GeneratedCourse = {
     model: string;
   };
 };
+
+export type TutorMessageRole = "user" | "assistant";
+
+export type TutorMessage = {
+  role: TutorMessageRole;
+  content: string;
+  createdAt: string;
+};
+
+export const tutorRequestSchema = z.object({
+  profile: intakeSchema,
+  moduleTitle: z.string().min(2).max(160),
+  moduleConcept: z.string().min(8),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(4000),
+      }),
+    )
+    .max(30)
+    .optional(),
+  question: z.string().min(2).max(4000),
+});
+
+export type TutorRequest = z.infer<typeof tutorRequestSchema>;

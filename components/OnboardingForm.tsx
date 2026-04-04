@@ -71,7 +71,8 @@ export function OnboardingForm({ onGenerate, loading }: Props) {
         </div>
         <h3 className="welcome-title">Let's get you started</h3>
         <p className="welcome-subtitle">
-          Tell us a bit about yourself. This helps personalize your AI-powered skill journey.
+          Tell us a <strong>bit about yourself</strong>. This helps personalize your AI-powered
+          skill journey.
         </p>
         <p className="step-label">Step {step} of 5</p>
       </header>

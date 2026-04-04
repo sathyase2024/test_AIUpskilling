@@ -14,6 +14,7 @@ export interface AIProvider {
   readonly name: string;
   readonly defaultModel: string;
   generateJSON<T>(request: PromptRequest): Promise<T>;
+  generateText(request: PromptRequest): Promise<{ text: string }>;
 }
 
 export type AIProviderMetadata = {

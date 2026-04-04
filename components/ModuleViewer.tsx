@@ -141,6 +141,7 @@ export function ModuleViewer({ module }: Props) {
           Quality score: {module.validation.score}/100 (iterations: {module.iterations})
         </p>
       </footer>
+
     </article>
   );
 }

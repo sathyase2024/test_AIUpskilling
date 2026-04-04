@@ -4,6 +4,7 @@ import { getCourseByFingerprint, saveCourseGeneration } from "@/lib/courseReposi
 import { buildFingerprint } from "@/lib/utils/hash";
 import { generateCourse } from "@/lib/agents/courseOrchestrator";
 import { intakeSchema } from "@/lib/types";
+import { isRealProviderReady } from "@/lib/ai/providers/factory";
 
 const requestSchema = z.object({
   userId: z.string().min(1).optional(),
@@ -64,5 +65,11 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     source: "generated",
     generatedCourse: saved,
+    realtime_engine: {
+      ready: isRealProviderReady(),
+      provider: saved.metadata.provider,
+      model: saved.metadata.model,
+      mode: isRealProviderReady() ? "live" : "mock",
+    },
   });
 }
