@@ -6,6 +6,10 @@ export const hashProfileInput = (input: string): string =>
 
 export const buildFingerprint = (profile: UserProfile): string => {
   const normalized = JSON.stringify({
+    first_name: profile.first_name.trim().toLowerCase(),
+    last_name: profile.last_name.trim().toLowerCase(),
+    email: profile.email.trim().toLowerCase(),
+    current_role: profile.current_role.trim().toLowerCase(),
     interest: profile.interest.trim().toLowerCase(),
     experience_level: profile.experience_level.toLowerCase(),
     goal: profile.goal.toLowerCase(),

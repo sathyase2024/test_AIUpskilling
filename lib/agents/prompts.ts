@@ -23,9 +23,12 @@ Output schema:
 export const CONTENT_PROMPT_TEMPLATE = `
 Generate a learning module for:
 
+Learner: {{first_name}} {{last_name}}
+Role: {{current_role}}
 Topic: {{interest}}
 User Level: {{experience_level}}
 Goal: {{goal}}
+Time Commitment: {{time_commitment}} hours/week
 Module Title: {{module_title}}
 Module Objective: {{module_objective}}
 
@@ -61,6 +64,8 @@ Evaluate this module:
 {{module_content}}
 
 For learner context:
+Learner: {{first_name}} {{last_name}}
+Role: {{current_role}}
 Topic: {{interest}}
 User level: {{experience_level}}
 Goal: {{goal}}
@@ -100,9 +105,13 @@ export function buildContentPrompt(
   module: LearningPathModule,
   feedback?: string
 ): string {
-  const prompt = CONTENT_PROMPT_TEMPLATE.replace("{{interest}}", profile.interest)
+  const prompt = CONTENT_PROMPT_TEMPLATE.replace("{{first_name}}", profile.first_name)
+    .replace("{{last_name}}", profile.last_name)
+    .replace("{{current_role}}", profile.current_role)
+    .replace("{{interest}}", profile.interest)
     .replace("{{experience_level}}", profile.experience_level)
     .replace("{{goal}}", profile.goal)
+    .replace("{{time_commitment}}", String(profile.time_commitment))
     .replace("{{module_title}}", module.title)
     .replace("{{module_objective}}", module.objective);
 
@@ -122,6 +131,9 @@ export function buildValidationPrompt(
     "{{module_content}}",
     JSON.stringify(moduleContent, null, 2)
   )
+    .replace("{{first_name}}", profile.first_name)
+    .replace("{{last_name}}", profile.last_name)
+    .replace("{{current_role}}", profile.current_role)
     .replace("{{interest}}", profile.interest)
     .replace("{{experience_level}}", profile.experience_level)
     .replace("{{goal}}", profile.goal)

@@ -12,7 +12,21 @@ export const goalSchema = z.enum([
   "Project",
 ]);
 
+export const roleSchema = z.enum([
+  "Software Engineer",
+  "Data Analyst",
+  "Product Manager",
+  "Designer",
+  "Student",
+  "Founder",
+  "Other",
+]);
+
 export const intakeSchema = z.object({
+  first_name: z.string().min(2).max(40),
+  last_name: z.string().min(2).max(40),
+  email: z.email(),
+  current_role: roleSchema,
   interest: z.string().min(2).max(120),
   experience_level: experienceLevelSchema,
   goal: goalSchema,
@@ -21,6 +35,7 @@ export const intakeSchema = z.object({
 
 export type ExperienceLevel = z.infer<typeof experienceLevelSchema>;
 export type LearningGoal = z.infer<typeof goalSchema>;
+export type CurrentRole = z.infer<typeof roleSchema>;
 export type IntakeProfile = z.infer<typeof intakeSchema>;
 export type UserProfile = IntakeProfile;
 

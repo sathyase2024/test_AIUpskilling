@@ -12,7 +12,8 @@ import { buildFingerprint } from "@/lib/utils/hash";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const parsed = intakeSchema.safeParse(await req.json());
+  const body = await req.json();
+  const parsed = intakeSchema.safeParse(body.profile ?? body);
   if (!parsed.success) {
     return new Response(
       JSON.stringify({ error: "Invalid request body", details: parsed.error.flatten() }),
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
   }
 
   const profile = parsed.data;
-  const userId = req.headers.get("x-user-id") ?? "stream-user";
+  const userId = req.headers.get("x-user-id") ?? body.userId ?? "stream-user";
   const fingerprint = buildFingerprint(profile);
 
   const cachedCourse = await getCourseByFingerprint(userId, fingerprint);
@@ -50,10 +51,7 @@ export async function POST(req: NextRequest) {
 
   const modulesFromCache: Record<string, GeneratedModule> = {};
   const profileHash = buildFingerprint(profile);
-  const moduleTitles = Array.from(
-    { length: 8 },
-    (_, index) => `${profile.interest} module ${index + 1}`,
-  );
+  const moduleTitles = Array.from({ length: 8 }, (_, index) => `${profile.interest} module ${index + 1}`);
   for (const title of moduleTitles) {
     const cachedModule = await getCachedModule(userId, profileHash, title);
     if (cachedModule) {

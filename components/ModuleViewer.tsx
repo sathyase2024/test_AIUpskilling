@@ -55,8 +55,11 @@ export function ModuleViewer({ module }: Props) {
   return (
     <article className="panel">
       <header className="panel-header">
-        <h3>{module.title}</h3>
-        <p>{module.objective}</p>
+        <div>
+          <h3>{module.title}</h3>
+          <p>{module.objective}</p>
+        </div>
+        <span className="quality-pill">Validation: {module.validation.score}/100</span>
       </header>
 
       <nav className="tabs">

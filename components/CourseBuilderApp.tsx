@@ -9,9 +9,11 @@ export function CourseBuilderApp() {
   const [loading, setLoading] = useState(false);
   const [course, setCourse] = useState<GeneratedCourse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeModuleIndex, setActiveModuleIndex] = useState(0);
   async function generateCourse(profile: IntakeProfile) {
     setLoading(true);
     setError(null);
+    setActiveModuleIndex(0);
 
     try {
       const response = await fetch("/api/course/generate", {
@@ -68,9 +70,22 @@ export function CourseBuilderApp() {
               <span className="chip">Goal: {course.profile.goal}</span>
               <span className="chip">Quality: {course.qualityScore}/100</span>
               <span className="chip">Model: {course.metadata.model}</span>
+              <span className="chip">Learner: {course.profile.first_name}</span>
+            </div>
+            <div className="module-switcher">
+              {course.modules.map((module, index) => (
+                <button
+                  key={module.id}
+                  type="button"
+                  className={index === activeModuleIndex ? "module-btn active" : "module-btn"}
+                  onClick={() => setActiveModuleIndex(index)}
+                >
+                  {index + 1}. {module.title}
+                </button>
+              ))}
             </div>
           </article>
-          <ModuleViewer module={course.modules[0]} />
+          <ModuleViewer module={course.modules[activeModuleIndex]} />
         </section>
       ) : null}
     </main>
