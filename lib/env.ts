@@ -3,7 +3,7 @@ import { z } from "zod";
 const envSchema = z.object({
   DATABASE_URL: z
     .string()
-    .default("postgresql://postgres:postgres@localhost:5432/upskilling?schema=public"),
+    .default("file:./dev.db"),
   AI_PROVIDER: z.enum(["mock", "openai", "claude"]).default("mock"),
   AI_MODEL: z.string().default("gpt-4o-mini"),
   AI_API_KEY: z.string().optional(),

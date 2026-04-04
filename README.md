@@ -18,7 +18,7 @@ Production-ready Next.js application for personalized AI upskilling using a modu
 - Module structure:
   - Concept, Analogy, Example, Exercise, Quiz, Notes
 - Interactive dark UI with tabbed progressive reveal and quiz scoring
-- PostgreSQL persistence via Prisma
+- SQLite persistence via Prisma for local development
 - Two-level caching:
   - Course cache per `userId + profile fingerprint`
   - Module cache per `userId + profile + module`
@@ -67,7 +67,7 @@ prisma/
 Create `.env`:
 
 ```bash
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/upskilling?schema=public"
+DATABASE_URL="file:./prisma/dev.db"
 AI_PROVIDER="mock" # mock | openai | claude
 AI_API_KEY=""
 AI_MODEL="gpt-4o-mini"
@@ -87,7 +87,7 @@ CLAUDE_BASE_URL="https://api.openai.com/v1"
 ```bash
 npm install
 npm run prisma:generate
-npx prisma migrate dev --name init
+npx prisma db push
 npm run dev
 ```
 
