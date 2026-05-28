@@ -19,7 +19,9 @@ import {
   User,
   Award,
   Star,
+  Brain,
 } from "lucide-react";
+import LessonRenderer from "@/components/LessonRenderer";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -98,6 +100,8 @@ export default function LearnTopicPage({
 
   const [selectedLesson, setSelectedLesson] = useState<string>(CURRENT_LESSON_DEFAULT);
   const [completedLessons, setCompletedLessons] = useState<string[]>(COMPLETED_DEFAULT);
+  const [lessonContent, setLessonContent] = useState<any>(null);
+  const [loadingContent, setLoadingContent] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showXpWidget, setShowXpWidget] = useState(false);
@@ -115,6 +119,19 @@ export default function LearnTopicPage({
   const prevLesson = currentLessonIndex > 0 ? allLessons[currentLessonIndex - 1] : null;
   const nextLesson = currentLessonIndex < allLessons.length - 1 ? allLessons[currentLessonIndex + 1] : null;
   const totalLessons = allLessons.length;
+
+  // Fetch lesson content when selected lesson changes
+  useEffect(() => {
+    if (!selectedLesson) return;
+    setLoadingContent(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ai/lessons/${selectedLesson}/content`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        setLessonContent(data?.contentJson || null);
+        setLoadingContent(false);
+      })
+      .catch(() => setLoadingContent(false));
+  }, [selectedLesson]);
 
   // Scroll progress tracking
   useEffect(() => {

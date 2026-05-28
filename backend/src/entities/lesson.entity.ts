@@ -38,6 +38,9 @@ export class Lesson {
   @Column({ type: 'text', nullable: true })
   content: string;
 
+  @Column({ type: 'jsonb', nullable: true })
+  contentJson: Record<string, any> | null;
+
   @Column({ type: 'text', nullable: true })
   summary: string;
 

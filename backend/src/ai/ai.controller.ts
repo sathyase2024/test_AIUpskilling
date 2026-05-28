@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -30,6 +30,18 @@ export class AiController {
   @ApiOperation({ summary: 'AI review of submitted code' })
   reviewCode(@Body() body: { code: string; language: string }) {
     return this.aiService.reviewCode(body.code, body.language);
+  }
+
+  @Patch('lessons/:id/content')
+  @ApiOperation({ summary: 'Save pre-generated lesson content (called by AI worker)' })
+  saveLessonContent(@Param('id') id: string, @Body() body: { contentJson: any; isGenerated?: boolean }) {
+    return this.aiService.saveLessonContent(id, body);
+  }
+
+  @Post('pregenerate-all')
+  @ApiOperation({ summary: 'Trigger background pre-generation of all ungenerated lessons' })
+  pregenerateAll() {
+    return this.aiService.pregenerateAll();
   }
 
   // ── Legacy routes ────────────────────────────────────────────────────────────

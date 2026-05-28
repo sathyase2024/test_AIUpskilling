@@ -26,35 +26,63 @@ export class AiService {
 
   /** Generate lesson content via AI worker, persist to DB, return updated lesson */
   async generateLesson(lessonId: string): Promise<Lesson> {
-    const lesson = await this.lessonRepo.findOne({ where: { id: lessonId }, relations: { topic: true } });
+    const lesson = await this.lessonRepo.findOne({
+      where: { id: lessonId },
+      relations: { topic: true },
+    });
     if (!lesson) throw new NotFoundException('Lesson not found');
+    if (lesson.isGenerated && lesson.contentJson) return lesson;
 
     try {
       const response = await firstValueFrom(
         this.httpService.post(`${this.workerUrl}/generate/lesson`, {
           lessonId: lesson.id,
           lessonTitle: lesson.title,
-          topicName: lesson.topic?.name ?? '',
           lessonType: lesson.type,
-        }),
+          topicName: (lesson as any).topic?.name || 'Programming',
+          topicCategory: (lesson as any).topic?.category || 'general',
+          difficulty: (lesson as any).topic?.difficulty || 'intermediate',
+        }, { timeout: 90000 })
       );
-      const content: string = response.data?.content ?? '';
-      lesson.content = content;
+      lesson.contentJson = response.data;
+      lesson.content = JSON.stringify(response.data); // keep text field as fallback
       lesson.isGenerated = true;
-      return this.lessonRepo.save(lesson);
-    } catch (error) {
-      this.logger.warn(`AI worker unavailable for lesson ${lessonId}, using fallback`);
-      lesson.content = this.fallbackContent(lesson.title);
-      lesson.isGenerated = false;
-      return this.lessonRepo.save(lesson);
+      return await this.lessonRepo.save(lesson);
+    } catch (err) {
+      this.logger.error(`Generation failed for ${lessonId}: ${err.message}`);
+      const fallback = this.getFallbackContentJson(lesson.title, lesson.type);
+      lesson.contentJson = fallback;
+      lesson.isGenerated = true;
+      return await this.lessonRepo.save(lesson);
     }
+  }
+
+  /** Save pre-generated lesson content from the AI worker */
+  async saveLessonContent(lessonId: string, data: { contentJson: any; isGenerated?: boolean }): Promise<Lesson> {
+    const lesson = await this.lessonRepo.findOne({ where: { id: lessonId } });
+    if (!lesson) throw new NotFoundException('Lesson not found');
+    lesson.contentJson = data.contentJson;
+    lesson.isGenerated = data.isGenerated ?? true;
+    return await this.lessonRepo.save(lesson);
+  }
+
+  /** Trigger background pre-generation for all ungenerated lessons */
+  async pregenerateAll(): Promise<{ triggered: number }> {
+    const ungenerated = await this.lessonRepo.find({ where: { isGenerated: false } });
+    // Fire and forget - generate in background
+    for (const lesson of ungenerated) {
+      this.generateLesson(lesson.id).catch(err =>
+        this.logger.error(`Background gen failed ${lesson.id}: ${err.message}`)
+      );
+    }
+    return { triggered: ungenerated.length };
   }
 
   /** Return lesson content, generating it first if not yet produced */
   async getLessonContent(lessonId: string): Promise<Lesson> {
     const lesson = await this.lessonRepo.findOne({ where: { id: lessonId }, relations: { topic: true } });
     if (!lesson) throw new NotFoundException('Lesson not found');
-    if (!lesson.isGenerated || !lesson.content) {
+    if (!lesson.isGenerated || (!lesson.contentJson && !lesson.content)) {
       return this.generateLesson(lessonId);
     }
     return lesson;
@@ -196,7 +224,20 @@ export class AiService {
     }
   }
 
-  private fallbackContent(title: string): string {
-    return `# ${title}\n\nContent generation is temporarily unavailable. Please check back later.`;
+  private getFallbackContentJson(title: string, type: string) {
+    return {
+      lessonId: '',
+      title,
+      type,
+      topicName: '',
+      sections: [
+        { type: 'heading', content: title, level: 2, language: '', items: [], answer: -1, explanation: '' },
+        { type: 'paragraph', content: 'This lesson content is being prepared. Please check back shortly.', language: '', level: 2, items: [], answer: -1, explanation: '' },
+        { type: 'info_box', content: 'Content generation in progress. Refresh to check status.', language: '', level: 2, items: [], answer: -1, explanation: '' },
+      ],
+      estimatedMinutes: 15,
+      xpReward: 50,
+      generated: false,
+    };
   }
 }
