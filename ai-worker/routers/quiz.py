@@ -4,11 +4,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Any
 
-from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS
+from config import MODEL, MAX_TOKENS, get_client
 
 router = APIRouter(prefix="/quiz", tags=["quiz"])
-
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 class QuizGenerateRequest(BaseModel):
@@ -48,7 +46,7 @@ async def generate_quiz(req: QuizGenerateRequest):
     )
 
     try:
-        response = client.messages.create(
+        response = get_client().messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=[
@@ -78,6 +76,8 @@ async def generate_quiz(req: QuizGenerateRequest):
 
         return questions
 
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse quiz JSON: {str(e)}")
     except anthropic.AuthenticationError:

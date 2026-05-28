@@ -4,11 +4,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 
-from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS
+from config import MODEL, MAX_TOKENS, get_client
 
 router = APIRouter(prefix="/generate", tags=["generate"])
-
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 class LessonRequest(BaseModel):
@@ -203,7 +201,7 @@ async def generate_lesson(req: LessonRequest) -> LessonContentResponse:
     user_prompt = _build_lesson_prompt(req)
 
     try:
-        response = client.messages.create(
+        response = get_client().messages.create(
             model="claude-sonnet-4-6",
             max_tokens=MAX_TOKENS,
             system=[
@@ -250,6 +248,8 @@ async def generate_lesson(req: LessonRequest) -> LessonContentResponse:
 
         return LessonContentResponse(**lesson_data)
 
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse lesson JSON from Claude: {str(e)}")
     except anthropic.AuthenticationError:
@@ -325,7 +325,7 @@ async def generate_curriculum(req: CurriculumRequest):
     )
 
     try:
-        response = client.messages.create(
+        response = get_client().messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=[
@@ -352,6 +352,8 @@ async def generate_curriculum(req: CurriculumRequest):
         curriculum_data = json.loads(raw_text)
         return curriculum_data
 
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse curriculum JSON: {str(e)}")
     except anthropic.AuthenticationError:

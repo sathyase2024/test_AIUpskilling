@@ -8,11 +8,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List
 
-from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS
+from config import MODEL, MAX_TOKENS, get_client
 
 router = APIRouter(prefix="/review", tags=["review"])
-
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 class CodeReviewRequest(BaseModel):
@@ -64,7 +62,7 @@ async def review_code(req: CodeReviewRequest):
     )
 
     try:
-        response = client.messages.create(
+        response = get_client().messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=[
@@ -105,6 +103,8 @@ async def review_code(req: CodeReviewRequest):
             explanation=review_data.get("explanation", ""),
         )
 
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse review JSON: {str(e)}")
     except anthropic.AuthenticationError:
