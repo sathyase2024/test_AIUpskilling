@@ -26,7 +26,7 @@ export class AiService {
 
   /** Generate lesson content via AI worker, persist to DB, return updated lesson */
   async generateLesson(lessonId: string): Promise<Lesson> {
-    const lesson = await this.lessonRepo.findOne({ where: { id: lessonId }, relations: ['topic'] });
+    const lesson = await this.lessonRepo.findOne({ where: { id: lessonId }, relations: { topic: true } });
     if (!lesson) throw new NotFoundException('Lesson not found');
 
     try {
@@ -52,7 +52,7 @@ export class AiService {
 
   /** Return lesson content, generating it first if not yet produced */
   async getLessonContent(lessonId: string): Promise<Lesson> {
-    const lesson = await this.lessonRepo.findOne({ where: { id: lessonId }, relations: ['topic'] });
+    const lesson = await this.lessonRepo.findOne({ where: { id: lessonId }, relations: { topic: true } });
     if (!lesson) throw new NotFoundException('Lesson not found');
     if (!lesson.isGenerated || !lesson.content) {
       return this.generateLesson(lessonId);

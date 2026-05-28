@@ -19,7 +19,7 @@ import {
   Plane,
   TrendingUp,
   UtensilsCrossed,
-  Cricket,
+  Trophy,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ function strengthWidth(s: PasswordStrength) {
 
 const HOBBIES = [
   { label: 'Gaming', icon: Gamepad2 },
-  { label: 'Cricket', icon: Cricket },
+  { label: 'Cricket', icon: Trophy },
   { label: 'Music', icon: Music },
   { label: 'Fitness', icon: Dumbbell },
   { label: 'Photography', icon: Camera },
