@@ -1,0 +1,84 @@
+databases:
+  - name: skillforge-db
+    databaseName: skillforge
+    user: postgres
+    plan: free
+
+services:
+  # ── Backend (NestJS) ──────────────────────────────────────────────────────
+  - type: web
+    name: skillforge-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/main
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DB_HOST
+        fromDatabase:
+          name: skillforge-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: skillforge-db
+          property: port
+      - key: DB_USERNAME
+        fromDatabase:
+          name: skillforge-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: skillforge-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: skillforge-db
+          property: database
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AI_WORKER_URL
+        fromService:
+          name: skillforge-ai-worker
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+  # ── AI Worker (FastAPI + Claude) ─────────────────────────────────────────
+  - type: web
+    name: skillforge-ai-worker
+    runtime: python
+    plan: free
+    rootDir: ai-worker
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+  # ── Frontend (Next.js standalone) ────────────────────────────────────────
+  - type: web
+    name: skillforge-frontend
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: node .next/standalone/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: HOSTNAME
+        value: 0.0.0.0
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: skillforge-backend
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
