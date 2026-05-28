@@ -341,287 +341,302 @@ export default function LearnTopicPage({
             {/* ── Lesson Content ── */}
             <div className="prose prose-invert max-w-none space-y-6 text-white/80 leading-relaxed">
 
-              {/* Section 1 */}
-              <section>
-                <h2 className="text-xl font-bold text-white mb-3 mt-0">What is Spring Boot?</h2>
-                <p className="text-white/70 leading-7">
-                  Spring Boot is an opinionated extension of the Spring Framework that removes the need for extensive XML
-                  configuration. It uses <span className="font-mono text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded text-sm">auto-configuration</span> to
-                  detect dependencies on the classpath and automatically configure them, letting you focus on writing
-                  business logic instead of wiring beans.
-                </p>
-                <p className="text-white/70 leading-7 mt-3">
-                  At its core, Spring Boot embeds a servlet container (Tomcat by default), packages your application as
-                  an executable JAR, and provides production-ready features like health checks and metrics out of the box
-                  via <span className="font-mono text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded text-sm">spring-boot-actuator</span>.
-                </p>
-              </section>
-
-              {/* Info Box */}
-              <div className="flex gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/25">
-                <div className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-blue-500/30 flex items-center justify-center">
-                  <span className="text-blue-300 text-xs font-bold">i</span>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-blue-300 mb-1">Why Spring Boot over plain Spring?</p>
-                  <p className="text-sm text-blue-200/70 leading-relaxed">
-                    Traditional Spring requires dozens of configuration files. Spring Boot's convention-over-configuration
-                    philosophy reduces boilerplate by ~70%, so a production-ready REST API can be running in under 5 minutes.
-                  </p>
-                </div>
-              </div>
-
-              {/* Section 2 */}
-              <section>
-                <h2 className="text-xl font-bold text-white mb-3">Key Annotations</h2>
-                <p className="text-white/70 leading-7">
-                  Spring Boot uses annotations extensively to define behavior. Here are the most important ones you'll
-                  encounter when building REST APIs:
-                </p>
-
-                <div className="mt-4 space-y-3">
-                  {[
-                    { name: "@SpringBootApplication", desc: "Entry point annotation. Combines @Configuration, @EnableAutoConfiguration, and @ComponentScan." },
-                    { name: "@RestController", desc: "Marks a class as a REST controller. Combines @Controller and @ResponseBody so every method returns JSON." },
-                    { name: "@GetMapping / @PostMapping", desc: "Map HTTP GET/POST requests to handler methods. Part of the @RequestMapping family." },
-                    { name: "@Autowired", desc: "Tells Spring to inject a dependency automatically from the application context." },
-                    { name: "@Service / @Repository", desc: "Stereotype annotations that mark beans as service or data-access layer components." },
-                  ].map((ann) => (
-                    <div key={ann.name} className="flex gap-3 p-3.5 rounded-lg bg-white/5 border border-white/8">
-                      <code className="text-purple-300 font-mono text-sm shrink-0 leading-6">{ann.name}</code>
-                      <p className="text-sm text-white/60 leading-relaxed">{ann.desc}</p>
+              {loadingContent ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-center space-y-4">
+                    <div className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center mx-auto animate-pulse">
+                      <Brain className="w-6 h-6 text-purple-400" />
                     </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* Warning Box */}
-              <div className="flex gap-3 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/25">
-                <div className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-yellow-500/30 flex items-center justify-center">
-                  <span className="text-yellow-300 text-xs font-bold">!</span>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-yellow-300 mb-1">Field injection vs Constructor injection</p>
-                  <p className="text-sm text-yellow-200/70 leading-relaxed">
-                    Although <code className="font-mono text-yellow-300 bg-yellow-500/10 px-1 rounded">@Autowired</code> on fields
-                    is convenient, constructor injection is preferred in production code. It makes dependencies explicit,
-                    simplifies unit testing without a Spring context, and avoids circular dependency issues.
-                  </p>
-                </div>
-              </div>
-
-              {/* Section 3 — Code block */}
-              <section>
-                <h2 className="text-xl font-bold text-white mb-3">Building Your First REST Controller</h2>
-                <p className="text-white/70 leading-7 mb-4">
-                  Let's build a complete REST controller that exposes CRUD endpoints for a{" "}
-                  <span className="font-mono text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded text-sm">User</span> resource.
-                  The controller delegates to a service layer which in turn uses a JPA repository.
-                </p>
-
-                {/* Code block */}
-                <div className="rounded-xl overflow-hidden border border-white/10">
-                  <div className="flex items-center justify-between bg-[#1a1a2e] px-4 py-2.5 border-b border-white/10">
-                    <span className="text-xs text-white/40 font-mono">UserController.java</span>
-                    <span className="text-xs text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">Java</span>
+                    <p className="text-white/50 text-sm">Loading lesson content...</p>
                   </div>
-                  <pre className="bg-[#0d0d1a] p-5 overflow-x-auto text-sm leading-relaxed">
-                    <code>
-                      <span className="text-purple-400">@RestController</span>{"\n"}
-                      <span className="text-purple-400">@RequestMapping</span>
-                      <span className="text-white/70">("/api/users")</span>{"\n"}
-                      <span className="text-blue-400">public class </span>
-                      <span className="text-cyan-300">UserController </span>
-                      <span className="text-white/70">{"{"}</span>{"\n"}
-                      {"\n"}
-                      {"    "}
-                      <span className="text-purple-400">@Autowired</span>{"\n"}
-                      {"    "}
-                      <span className="text-blue-400">private </span>
-                      <span className="text-cyan-300">UserService </span>
-                      <span className="text-white/80">userService</span>
-                      <span className="text-white/70">;</span>{"\n"}
-                      {"\n"}
-                      {"    "}
-                      <span className="text-green-400">// GET all users</span>{"\n"}
-                      {"    "}
-                      <span className="text-purple-400">@GetMapping</span>{"\n"}
-                      {"    "}
-                      <span className="text-blue-400">public </span>
-                      <span className="text-cyan-300">List</span>
-                      <span className="text-white/70">{"<"}</span>
-                      <span className="text-cyan-300">UserDTO</span>
-                      <span className="text-white/70">{">"} </span>
-                      <span className="text-yellow-300">getAllUsers</span>
-                      <span className="text-white/70">() {"{"}</span>{"\n"}
-                      {"        "}
-                      <span className="text-blue-400">return </span>
-                      <span className="text-white/80">userService</span>
-                      <span className="text-white/70">.</span>
-                      <span className="text-yellow-300">findAll</span>
-                      <span className="text-white/70">();</span>{"\n"}
-                      {"    "}
-                      <span className="text-white/70">{"}"}</span>{"\n"}
-                      {"\n"}
-                      {"    "}
-                      <span className="text-green-400">// GET user by ID</span>{"\n"}
-                      {"    "}
-                      <span className="text-purple-400">@GetMapping</span>
-                      <span className="text-white/70">("/{"{"}id{"}"}")</span>{"\n"}
-                      {"    "}
-                      <span className="text-blue-400">public </span>
-                      <span className="text-cyan-300">ResponseEntity</span>
-                      <span className="text-white/70">{"<"}</span>
-                      <span className="text-cyan-300">UserDTO</span>
-                      <span className="text-white/70">{">"} </span>
-                      <span className="text-yellow-300">getUserById</span>
-                      <span className="text-white/70">(</span>
-                      <span className="text-purple-400">@PathVariable </span>
-                      <span className="text-blue-400">Long </span>
-                      <span className="text-white/80">id</span>
-                      <span className="text-white/70">) {"{"}</span>{"\n"}
-                      {"        "}
-                      <span className="text-blue-400">return </span>
-                      <span className="text-white/80">userService</span>
-                      <span className="text-white/70">.</span>
-                      <span className="text-yellow-300">findById</span>
-                      <span className="text-white/70">(</span>
-                      <span className="text-white/80">id</span>
-                      <span className="text-white/70">)</span>{"\n"}
-                      {"            "}
-                      <span className="text-white/70">.</span>
-                      <span className="text-yellow-300">map</span>
-                      <span className="text-white/70">(</span>
-                      <span className="text-cyan-300">ResponseEntity</span>
-                      <span className="text-white/70">::</span>
-                      <span className="text-yellow-300">ok</span>
-                      <span className="text-white/70">)</span>{"\n"}
-                      {"            "}
-                      <span className="text-white/70">.</span>
-                      <span className="text-yellow-300">orElse</span>
-                      <span className="text-white/70">(</span>
-                      <span className="text-cyan-300">ResponseEntity</span>
-                      <span className="text-white/70">.</span>
-                      <span className="text-yellow-300">notFound</span>
-                      <span className="text-white/70">().</span>
-                      <span className="text-yellow-300">build</span>
-                      <span className="text-white/70">());</span>{"\n"}
-                      {"    "}
-                      <span className="text-white/70">{"}"}</span>{"\n"}
-                      {"\n"}
-                      {"    "}
-                      <span className="text-green-400">// POST create user</span>{"\n"}
-                      {"    "}
-                      <span className="text-purple-400">@PostMapping</span>{"\n"}
-                      {"    "}
-                      <span className="text-blue-400">public </span>
-                      <span className="text-cyan-300">ResponseEntity</span>
-                      <span className="text-white/70">{"<"}</span>
-                      <span className="text-cyan-300">UserDTO</span>
-                      <span className="text-white/70">{">"} </span>
-                      <span className="text-yellow-300">createUser</span>
-                      <span className="text-white/70">(</span>
-                      <span className="text-purple-400">@RequestBody </span>
-                      <span className="text-cyan-300">CreateUserRequest </span>
-                      <span className="text-white/80">req</span>
-                      <span className="text-white/70">) {"{"}</span>{"\n"}
-                      {"        "}
-                      <span className="text-cyan-300">UserDTO </span>
-                      <span className="text-white/80">created </span>
-                      <span className="text-white/70">= </span>
-                      <span className="text-white/80">userService</span>
-                      <span className="text-white/70">.</span>
-                      <span className="text-yellow-300">create</span>
-                      <span className="text-white/70">(</span>
-                      <span className="text-white/80">req</span>
-                      <span className="text-white/70">);</span>{"\n"}
-                      {"        "}
-                      <span className="text-blue-400">return </span>
-                      <span className="text-cyan-300">ResponseEntity</span>
-                      <span className="text-white/70">.</span>
-                      <span className="text-yellow-300">status</span>
-                      <span className="text-white/70">(</span>
-                      <span className="text-green-300">201</span>
-                      <span className="text-white/70">).</span>
-                      <span className="text-yellow-300">body</span>
-                      <span className="text-white/70">(</span>
-                      <span className="text-white/80">created</span>
-                      <span className="text-white/70">);</span>{"\n"}
-                      {"    "}
-                      <span className="text-white/70">{"}"}</span>{"\n"}
-                      <span className="text-white/70">{"}"}</span>
-                    </code>
-                  </pre>
                 </div>
-              </section>
+              ) : lessonContent ? (
+                <LessonRenderer content={lessonContent} />
+              ) : (
+                <>
+                  {/* Section 1 */}
+                  <section>
+                    <h2 className="text-xl font-bold text-white mb-3 mt-0">What is Spring Boot?</h2>
+                    <p className="text-white/70 leading-7">
+                      Spring Boot is an opinionated extension of the Spring Framework that removes the need for extensive XML
+                      configuration. It uses <span className="font-mono text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded text-sm">auto-configuration</span> to
+                      detect dependencies on the classpath and automatically configure them, letting you focus on writing
+                      business logic instead of wiring beans.
+                    </p>
+                    <p className="text-white/70 leading-7 mt-3">
+                      At its core, Spring Boot embeds a servlet container (Tomcat by default), packages your application as
+                      an executable JAR, and provides production-ready features like health checks and metrics out of the box
+                      via <span className="font-mono text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded text-sm">spring-boot-actuator</span>.
+                    </p>
+                  </section>
 
-              {/* Quiz / Exercise */}
-              <section className="mt-10">
-                <div className="rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-900/20 to-violet-900/10 p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
-                      <Award size={16} className="text-purple-400" />
+                  {/* Info Box */}
+                  <div className="flex gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/25">
+                    <div className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-blue-500/30 flex items-center justify-center">
+                      <span className="text-blue-300 text-xs font-bold">i</span>
                     </div>
-                    <h3 className="font-bold text-lg">Knowledge Check</h3>
-                  </div>
-
-                  <p className="text-sm text-white/60 mb-5">
-                    Test your understanding before moving to the next lesson.
-                  </p>
-
-                  <div className="space-y-4">
                     <div>
-                      <p className="text-sm font-medium mb-3">
-                        1. Which annotation combination does <code className="font-mono text-purple-300 bg-purple-500/10 px-1 rounded">@RestController</code> combine?
+                      <p className="text-sm font-semibold text-blue-300 mb-1">Why Spring Boot over plain Spring?</p>
+                      <p className="text-sm text-blue-200/70 leading-relaxed">
+                        Traditional Spring requires dozens of configuration files. Spring Boot&apos;s convention-over-configuration
+                        philosophy reduces boilerplate by ~70%, so a production-ready REST API can be running in under 5 minutes.
                       </p>
-                      <div className="space-y-2">
-                        {[
-                          "@Controller + @RequestMapping",
-                          "@Controller + @ResponseBody",
-                          "@Component + @ResponseBody",
-                          "@Service + @RequestMapping",
-                        ].map((option, i) => (
-                          <button
-                            key={i}
-                            className={`w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-all ${
-                              i === 1
-                                ? "border-green-500/40 bg-green-500/10 text-green-300"
-                                : "border-white/10 bg-white/5 text-white/60 hover:bg-white/8 hover:border-white/20"
-                            }`}
-                          >
-                            <span className="font-mono text-white/30 mr-2">{String.fromCharCode(65 + i)}.</span>
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="text-sm font-medium mb-3">
-                        2. What HTTP method does <code className="font-mono text-purple-300 bg-purple-500/10 px-1 rounded">@PostMapping</code> handle?
-                      </p>
-                      <div className="space-y-2">
-                        {["GET", "PUT", "POST", "DELETE"].map((option, i) => (
-                          <button
-                            key={i}
-                            className="w-full text-left px-4 py-2.5 rounded-lg border border-white/10 bg-white/5 text-white/60 hover:bg-white/8 hover:border-white/20 text-sm transition-all"
-                          >
-                            <span className="font-mono text-white/30 mr-2">{String.fromCharCode(65 + i)}.</span>
-                            {option}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   </div>
 
-                  <button
-                    onClick={markComplete}
-                    className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-semibold hover:opacity-90 transition-all shadow-lg shadow-purple-500/20"
-                  >
-                    Mark Complete & Continue
-                  </button>
-                </div>
-              </section>
+                  {/* Section 2 */}
+                  <section>
+                    <h2 className="text-xl font-bold text-white mb-3">Key Annotations</h2>
+                    <p className="text-white/70 leading-7">
+                      Spring Boot uses annotations extensively to define behavior. Here are the most important ones you&apos;ll
+                      encounter when building REST APIs:
+                    </p>
+
+                    <div className="mt-4 space-y-3">
+                      {[
+                        { name: "@SpringBootApplication", desc: "Entry point annotation. Combines @Configuration, @EnableAutoConfiguration, and @ComponentScan." },
+                        { name: "@RestController", desc: "Marks a class as a REST controller. Combines @Controller and @ResponseBody so every method returns JSON." },
+                        { name: "@GetMapping / @PostMapping", desc: "Map HTTP GET/POST requests to handler methods. Part of the @RequestMapping family." },
+                        { name: "@Autowired", desc: "Tells Spring to inject a dependency automatically from the application context." },
+                        { name: "@Service / @Repository", desc: "Stereotype annotations that mark beans as service or data-access layer components." },
+                      ].map((ann) => (
+                        <div key={ann.name} className="flex gap-3 p-3.5 rounded-lg bg-white/5 border border-white/8">
+                          <code className="text-purple-300 font-mono text-sm shrink-0 leading-6">{ann.name}</code>
+                          <p className="text-sm text-white/60 leading-relaxed">{ann.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Warning Box */}
+                  <div className="flex gap-3 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/25">
+                    <div className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-yellow-500/30 flex items-center justify-center">
+                      <span className="text-yellow-300 text-xs font-bold">!</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-yellow-300 mb-1">Field injection vs Constructor injection</p>
+                      <p className="text-sm text-yellow-200/70 leading-relaxed">
+                        Although <code className="font-mono text-yellow-300 bg-yellow-500/10 px-1 rounded">@Autowired</code> on fields
+                        is convenient, constructor injection is preferred in production code. It makes dependencies explicit,
+                        simplifies unit testing without a Spring context, and avoids circular dependency issues.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Section 3 — Code block */}
+                  <section>
+                    <h2 className="text-xl font-bold text-white mb-3">Building Your First REST Controller</h2>
+                    <p className="text-white/70 leading-7 mb-4">
+                      Let&apos;s build a complete REST controller that exposes CRUD endpoints for a{" "}
+                      <span className="font-mono text-cyan-300 bg-cyan-500/10 px-1.5 py-0.5 rounded text-sm">User</span> resource.
+                      The controller delegates to a service layer which in turn uses a JPA repository.
+                    </p>
+
+                    {/* Code block */}
+                    <div className="rounded-xl overflow-hidden border border-white/10">
+                      <div className="flex items-center justify-between bg-[#1a1a2e] px-4 py-2.5 border-b border-white/10">
+                        <span className="text-xs text-white/40 font-mono">UserController.java</span>
+                        <span className="text-xs text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">Java</span>
+                      </div>
+                      <pre className="bg-[#0d0d1a] p-5 overflow-x-auto text-sm leading-relaxed">
+                        <code>
+                          <span className="text-purple-400">@RestController</span>{"\n"}
+                          <span className="text-purple-400">@RequestMapping</span>
+                          <span className="text-white/70">(&quot;/api/users&quot;)</span>{"\n"}
+                          <span className="text-blue-400">public class </span>
+                          <span className="text-cyan-300">UserController </span>
+                          <span className="text-white/70">{"{"}</span>{"\n"}
+                          {"\n"}
+                          {"    "}
+                          <span className="text-purple-400">@Autowired</span>{"\n"}
+                          {"    "}
+                          <span className="text-blue-400">private </span>
+                          <span className="text-cyan-300">UserService </span>
+                          <span className="text-white/80">userService</span>
+                          <span className="text-white/70">;</span>{"\n"}
+                          {"\n"}
+                          {"    "}
+                          <span className="text-green-400">// GET all users</span>{"\n"}
+                          {"    "}
+                          <span className="text-purple-400">@GetMapping</span>{"\n"}
+                          {"    "}
+                          <span className="text-blue-400">public </span>
+                          <span className="text-cyan-300">List</span>
+                          <span className="text-white/70">{"<"}</span>
+                          <span className="text-cyan-300">UserDTO</span>
+                          <span className="text-white/70">{">"} </span>
+                          <span className="text-yellow-300">getAllUsers</span>
+                          <span className="text-white/70">() {"{"}</span>{"\n"}
+                          {"        "}
+                          <span className="text-blue-400">return </span>
+                          <span className="text-white/80">userService</span>
+                          <span className="text-white/70">.</span>
+                          <span className="text-yellow-300">findAll</span>
+                          <span className="text-white/70">();</span>{"\n"}
+                          {"    "}
+                          <span className="text-white/70">{"}"}</span>{"\n"}
+                          {"\n"}
+                          {"    "}
+                          <span className="text-green-400">// GET user by ID</span>{"\n"}
+                          {"    "}
+                          <span className="text-purple-400">@GetMapping</span>
+                          <span className="text-white/70">(&quot;/{"{"}id{"}"}&quot;)</span>{"\n"}
+                          {"    "}
+                          <span className="text-blue-400">public </span>
+                          <span className="text-cyan-300">ResponseEntity</span>
+                          <span className="text-white/70">{"<"}</span>
+                          <span className="text-cyan-300">UserDTO</span>
+                          <span className="text-white/70">{">"} </span>
+                          <span className="text-yellow-300">getUserById</span>
+                          <span className="text-white/70">(</span>
+                          <span className="text-purple-400">@PathVariable </span>
+                          <span className="text-blue-400">Long </span>
+                          <span className="text-white/80">id</span>
+                          <span className="text-white/70">) {"{"}</span>{"\n"}
+                          {"        "}
+                          <span className="text-blue-400">return </span>
+                          <span className="text-white/80">userService</span>
+                          <span className="text-white/70">.</span>
+                          <span className="text-yellow-300">findById</span>
+                          <span className="text-white/70">(</span>
+                          <span className="text-white/80">id</span>
+                          <span className="text-white/70">)</span>{"\n"}
+                          {"            "}
+                          <span className="text-white/70">.</span>
+                          <span className="text-yellow-300">map</span>
+                          <span className="text-white/70">(</span>
+                          <span className="text-cyan-300">ResponseEntity</span>
+                          <span className="text-white/70">::</span>
+                          <span className="text-yellow-300">ok</span>
+                          <span className="text-white/70">)</span>{"\n"}
+                          {"            "}
+                          <span className="text-white/70">.</span>
+                          <span className="text-yellow-300">orElse</span>
+                          <span className="text-white/70">(</span>
+                          <span className="text-cyan-300">ResponseEntity</span>
+                          <span className="text-white/70">.</span>
+                          <span className="text-yellow-300">notFound</span>
+                          <span className="text-white/70">().</span>
+                          <span className="text-yellow-300">build</span>
+                          <span className="text-white/70">());</span>{"\n"}
+                          {"    "}
+                          <span className="text-white/70">{"}"}</span>{"\n"}
+                          {"\n"}
+                          {"    "}
+                          <span className="text-green-400">// POST create user</span>{"\n"}
+                          {"    "}
+                          <span className="text-purple-400">@PostMapping</span>{"\n"}
+                          {"    "}
+                          <span className="text-blue-400">public </span>
+                          <span className="text-cyan-300">ResponseEntity</span>
+                          <span className="text-white/70">{"<"}</span>
+                          <span className="text-cyan-300">UserDTO</span>
+                          <span className="text-white/70">{">"} </span>
+                          <span className="text-yellow-300">createUser</span>
+                          <span className="text-white/70">(</span>
+                          <span className="text-purple-400">@RequestBody </span>
+                          <span className="text-cyan-300">CreateUserRequest </span>
+                          <span className="text-white/80">req</span>
+                          <span className="text-white/70">) {"{"}</span>{"\n"}
+                          {"        "}
+                          <span className="text-cyan-300">UserDTO </span>
+                          <span className="text-white/80">created </span>
+                          <span className="text-white/70">= </span>
+                          <span className="text-white/80">userService</span>
+                          <span className="text-white/70">.</span>
+                          <span className="text-yellow-300">create</span>
+                          <span className="text-white/70">(</span>
+                          <span className="text-white/80">req</span>
+                          <span className="text-white/70">);</span>{"\n"}
+                          {"        "}
+                          <span className="text-blue-400">return </span>
+                          <span className="text-cyan-300">ResponseEntity</span>
+                          <span className="text-white/70">.</span>
+                          <span className="text-yellow-300">status</span>
+                          <span className="text-white/70">(</span>
+                          <span className="text-green-300">201</span>
+                          <span className="text-white/70">).</span>
+                          <span className="text-yellow-300">body</span>
+                          <span className="text-white/70">(</span>
+                          <span className="text-white/80">created</span>
+                          <span className="text-white/70">);</span>{"\n"}
+                          {"    "}
+                          <span className="text-white/70">{"}"}</span>{"\n"}
+                          <span className="text-white/70">{"}"}</span>
+                        </code>
+                      </pre>
+                    </div>
+                  </section>
+
+                  {/* Quiz / Exercise */}
+                  <section className="mt-10">
+                    <div className="rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-900/20 to-violet-900/10 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
+                          <Award size={16} className="text-purple-400" />
+                        </div>
+                        <h3 className="font-bold text-lg">Knowledge Check</h3>
+                      </div>
+
+                      <p className="text-sm text-white/60 mb-5">
+                        Test your understanding before moving to the next lesson.
+                      </p>
+
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm font-medium mb-3">
+                            1. Which annotation combination does <code className="font-mono text-purple-300 bg-purple-500/10 px-1 rounded">@RestController</code> combine?
+                          </p>
+                          <div className="space-y-2">
+                            {[
+                              "@Controller + @RequestMapping",
+                              "@Controller + @ResponseBody",
+                              "@Component + @ResponseBody",
+                              "@Service + @RequestMapping",
+                            ].map((option, i) => (
+                              <button
+                                key={i}
+                                className={`w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-all ${
+                                  i === 1
+                                    ? "border-green-500/40 bg-green-500/10 text-green-300"
+                                    : "border-white/10 bg-white/5 text-white/60 hover:bg-white/8 hover:border-white/20"
+                                }`}
+                              >
+                                <span className="font-mono text-white/30 mr-2">{String.fromCharCode(65 + i)}.</span>
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-medium mb-3">
+                            2. What HTTP method does <code className="font-mono text-purple-300 bg-purple-500/10 px-1 rounded">@PostMapping</code> handle?
+                          </p>
+                          <div className="space-y-2">
+                            {["GET", "PUT", "POST", "DELETE"].map((option, i) => (
+                              <button
+                                key={i}
+                                className="w-full text-left px-4 py-2.5 rounded-lg border border-white/10 bg-white/5 text-white/60 hover:bg-white/8 hover:border-white/20 text-sm transition-all"
+                              >
+                                <span className="font-mono text-white/30 mr-2">{String.fromCharCode(65 + i)}.</span>
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={markComplete}
+                        className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-semibold hover:opacity-90 transition-all shadow-lg shadow-purple-500/20"
+                      >
+                        Mark Complete & Continue
+                      </button>
+                    </div>
+                  </section>
+                </>
+              )}
 
             </div>
 
