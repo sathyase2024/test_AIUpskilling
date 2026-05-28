@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import {
@@ -19,7 +19,15 @@ import {
   TrendingUp,
 } from 'lucide-react'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ApiTopicsResponse {
+  data: Topic[]
+  total: number
+  page: number
+}
 
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced'
 type Category =
@@ -35,6 +43,7 @@ type Category =
 
 interface Topic {
   id: number
+  slug?: string
   name: string
   category: Category
   difficulty: Difficulty
@@ -433,11 +442,12 @@ function TopicCard({ topic }: { topic: Topic }) {
 
         {/* CTA */}
         <div className="mt-auto pt-1">
-          <button
-            className={`w-full py-2.5 rounded-xl bg-gradient-to-r ${topic.gradient} text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-md`}
+          <Link
+            href={`/topics/${topic.slug ?? topic.id}`}
+            className={`block w-full py-2.5 rounded-xl bg-gradient-to-r ${topic.gradient} text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-md text-center`}
           >
             Start Learning
-          </button>
+          </Link>
         </div>
       </div>
     </div>
@@ -619,6 +629,32 @@ function SidebarFilters({
   )
 }
 
+// ─── Skeleton Card ────────────────────────────────────────────────────────────
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col animate-pulse">
+      <div className="h-1.5 w-full bg-white/10" />
+      <div className="h-32 bg-white/5" />
+      <div className="p-4 flex flex-col gap-3">
+        <div className="flex gap-2">
+          <div className="h-4 w-20 rounded-full bg-white/10" />
+          <div className="h-4 w-16 rounded-full bg-white/10" />
+        </div>
+        <div className="h-5 w-3/4 rounded bg-white/10" />
+        <div className="h-4 w-full rounded bg-white/5" />
+        <div className="h-4 w-2/3 rounded bg-white/5" />
+        <div className="flex gap-2 mt-1">
+          <div className="h-5 w-12 rounded bg-white/10" />
+          <div className="h-5 w-12 rounded bg-white/10" />
+          <div className="h-5 w-12 rounded bg-white/10" />
+        </div>
+        <div className="h-9 w-full rounded-xl bg-white/10 mt-auto" />
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TopicsPage() {
@@ -627,10 +663,47 @@ export default function TopicsPage() {
   const [difficultyFilter, setDifficultyFilter] = useState<Set<Difficulty>>(new Set())
   const [selectedDurations, setSelectedDurations] = useState<Set<number>>(new Set())
   const [selectedHobbies, setSelectedHobbies] = useState<Set<string>>(new Set())
+  const [apiTopics, setApiTopics] = useState<Topic[] | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Determine active topic list: API data if available, else local mock
+  const baseTopics = apiTopics ?? TOPICS
+
+  // Fetch from API whenever filters change
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function fetchTopics() {
+      setIsLoading(true)
+      try {
+        const params = new URLSearchParams()
+        if (activeCategory !== 'All') params.set('category', activeCategory)
+        if (difficultyFilter.size === 1) params.set('difficulty', [...difficultyFilter][0])
+        if (searchQuery) params.set('search', searchQuery)
+
+        const res = await fetch(`${API_URL}/topics?${params.toString()}`, {
+          signal: controller.signal,
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json: ApiTopicsResponse = await res.json()
+        setApiTopics(json.data)
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          // API unavailable — fall back to local mock data
+          setApiTopics(null)
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchTopics()
+    return () => controller.abort()
+  }, [activeCategory, searchQuery, difficultyFilter])
 
   // Filter logic
   const filteredTopics = useMemo(() => {
-    return TOPICS.filter((topic) => {
+    return baseTopics.filter((topic) => {
       // Search
       if (
         searchQuery &&
