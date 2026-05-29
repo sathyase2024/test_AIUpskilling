@@ -65,129 +65,284 @@ class CurriculumResponse(BaseModel):
     modules: List[CurriculumModule]
 
 
-def _build_lesson_prompt(req: LessonRequest) -> str:
-    """Build a lesson-type-specific prompt requesting JSON output."""
-    base_context = (
-        f"Topic: {req.topicName}\n"
-        f"Category: {req.topicCategory}\n"
-        f"Lesson Title: {req.lessonTitle}\n"
-        f"Lesson ID: {req.lessonId}\n"
-        f"Difficulty: {req.difficulty}\n\n"
-    )
-
-    schema_description = (
-        "Return a JSON object matching this schema exactly:\n"
+def _schema() -> str:
+    return (
+        "Return a JSON object with this exact schema:\n"
         "{\n"
-        '  "lessonId": "<the lessonId provided>",\n'
+        '  "lessonId": "<provided lessonId>",\n'
         '  "title": "<lesson title>",\n'
         '  "type": "<lesson type>",\n'
         '  "topicName": "<topic name>",\n'
         '  "estimatedMinutes": <integer>,\n'
         '  "xpReward": <integer>,\n'
         '  "generated": true,\n'
-        '  "sections": [\n'
-        "    {\n"
-        '      "type": "<section type>",\n'
-        '      "content": "<text content>",\n'
-        '      "language": "<optional: programming language for code blocks>",\n'
-        '      "level": <optional: heading level, default 2>,\n'
-        '      "items": [<optional: list of strings for key_points, or list of option strings for quiz>],\n'
-        '      "answer": <optional: integer index of correct answer for quiz, default -1>,\n'
-        '      "explanation": "<optional: explanation for quiz answers>"\n'
-        "    }\n"
-        "  ]\n"
+        '  "sections": [ { "type": "...", "content": "...", "language": "...", "level": 2, "items": [], "answer": -1, "explanation": "" } ]\n'
         "}\n\n"
-        'Section types: "heading", "paragraph", "code", "info_box", "warning_box", "quiz", "exercise", "key_points"\n\n'
+        "Section types and their required fields:\n"
+        '- "heading": content=heading text, level=2 or 3\n'
+        '- "paragraph": content=rich explanatory text (minimum 80 words per paragraph, explain WHY not just WHAT)\n'
+        '- "analogy": content=interest-based analogy starting with "🏏 Think of it like [interest]:" that maps the concept just explained to the learner\'s interest domain. Only used when a hobby is specified.\n'
+        '- "code": content=full working code, language=language name (e.g. "python","java","typescript","bash")\n'
+        '- "info_box": content=pro tip or important note starting with "Pro Tip:" or "Note:"\n'
+        '- "warning_box": content=common mistake or pitfall starting with "Warning:" or "Common Mistake:"\n'
+        '- "key_points": items=array of 5-7 detailed bullet strings (each 15-25 words)\n'
+        '- "quiz": content=question, items=4 answer options, answer=correct index (0-3), explanation=why correct (30+ words)\n\n'
+        "QUALITY REQUIREMENTS:\n"
+        "- Every paragraph must be at least 80 words with real technical depth\n"
+        "- Every code block must be complete, runnable, and well-commented\n"
+        "- Include real-world context: where is this used in production, why does it matter\n"
+        "- Do NOT use vague phrases like 'this is important' — explain WHY with specifics\n"
+        "- Use precise technical language appropriate for the difficulty level\n\n"
+        "Return only valid JSON. No markdown fences. No text outside the JSON.\n\n"
+    )
+
+
+def _build_lesson_prompt(req: LessonRequest) -> str:
+    hobby = req.hobby.strip() if req.hobby and req.hobby.lower() not in ("general", "", "none") else ""
+
+    # The golden rule: concept → analogy → code (when hobby is set).
+    # Every technical paragraph is immediately followed by an analogy box,
+    # then the code example uses hobby-themed variable names/data to reinforce both.
+    analogy_rule = (
+        f"\n=== PERSONALISATION RULE (interest: {hobby}) ===\n"
+        f"The learning pattern for EVERY concept must follow this exact 3-step sequence:\n"
+        f"  STEP 1 — PARAGRAPH: Explain the technical concept precisely. Pure technical content. No {hobby} in the paragraph.\n"
+        f"  STEP 2 — ANALOGY: Immediately after the paragraph, add an 'analogy' section. This is the most important step.\n"
+        f"             The analogy must be DEEP and DETAILED — not a one-liner. Follow this structure:\n"
+        f"             a) First, describe the {hobby} scenario in specific detail (2-3 sentences). Name real players, real situations, real mechanics.\n"
+        f"             b) Then explicitly draw the parallel — map EACH part of the technical concept to its {hobby} equivalent (3-4 sentences).\n"
+        f"             c) End with the insight — what does understanding this {hobby} parallel reveal about the technical concept? (1-2 sentences).\n"
+        f"             Total length: 6-10 sentences. Start with '🏏 Think of it like {hobby}:'.\n"
+        f"             Use precise {hobby} terminology: innings, over, delivery, wicket, run rate, economy, DRS, powerplay,\n"
+        f"             fielding positions, batting order, bowling spell, maiden over, scorecard, duckworth-lewis, etc.\n"
+        f"             The analogy must make someone say 'oh NOW I understand why it works that way' — not just 'that's a bit like cricket'.\n"
+        f"  STEP 3 — CODE: The code example that follows uses {hobby}-themed class names, variable names, and sample data\n"
+        f"             (e.g. CricketPlayer, innings_count, match_id, Rohit Sharma, Jasprit Bumrah) to reinforce BOTH the concept and the analogy.\n"
+        f"The paragraph teaches the concept. The analogy makes it click. The code makes it concrete.\n"
+        f"Do NOT mix {hobby} into the paragraph text — keep the 3 steps cleanly separated.\n"
+        f"=== END PERSONALISATION RULE ===\n"
+    ) if hobby else ""
+
+    ctx = (
+        f"Topic: {req.topicName}\n"
+        f"Category: {req.topicCategory}\n"
+        f"Lesson Title: {req.lessonTitle}\n"
+        f"Lesson ID: {req.lessonId}\n"
+        f"Difficulty: {req.difficulty}\n"
+        + analogy_rule + "\n"
     )
 
     if req.lessonType == "reading":
-        return (
-            base_context
-            + "Generate a comprehensive reading lesson as JSON.\n\n"
-            + schema_description
-            + f"Include these sections in order:\n"
-            f'1. heading (level 2): "What is {req.topicName}?"\n'
-            f"2. paragraph: 2-3 sentence explanation of {req.lessonTitle}\n"
-            f'3. heading (level 2): "Key Concepts"\n'
-            f"4. paragraph: detailed explanation of key concepts\n"
-            f"5. code: relevant code example (set language field appropriately)\n"
-            f'6. info_box: content starting with "Pro Tip:" followed by practical advice\n'
-            f'7. heading (level 2): "How It Works"\n'
-            f"8. paragraph: deeper explanation of the mechanics\n"
-            f"9. code: second illustrative example (set language field)\n"
-            f'10. key_points: items array with 4-5 key takeaway bullet points\n\n'
-            f"Set estimatedMinutes to 10-15 and xpReward to 50-100.\n"
-            f"Return only valid JSON, no markdown fences."
-        )
+        if hobby:
+            sections = f"""Include ALL of the following sections in EXACTLY this order:
+
+1.  heading (level 2): Overview
+2.  paragraph: Motivating context — the problem this topic solves, why it was invented. Minimum 100 words. Pure technical.
+3.  analogy: Map the motivation to {hobby} — why does {hobby} need this concept too? 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+4.  heading (level 2): Core Concepts
+5.  paragraph: The first core concept — theory, mechanics, mental model. Minimum 120 words. Pure technical.
+6.  analogy: Map this concept to {hobby} using specific {hobby} terminology. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+7.  code: First complete, commented code example using {hobby}-themed class/variable names and sample data.
+8.  paragraph: Walk through the code — explain each part, why it was written that way, runtime behaviour. Minimum 80 words.
+9.  heading (level 2): How It Works Under the Hood
+10. paragraph: Internal mechanics — what the runtime/compiler/framework actually does. Performance, memory model, execution flow. Minimum 120 words. Pure technical.
+11. analogy: Map the internals to {hobby} — e.g. how the JVM is like a cricket umpire enforcing rules. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+12. code: Second code example — advanced usage, using {hobby}-themed data.
+13. info_box: Pro Tip — a non-obvious production insight. Start with "Pro Tip:".
+14. heading (level 2): Common Patterns & Best Practices
+15. paragraph: 2-3 established patterns with reasoning — why pattern A over B. Minimum 100 words. Pure technical.
+16. analogy: Map the best practice to {hobby} — e.g. why following a good batting technique matters even when improvising. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+17. code: Third code example — best practice vs anti-pattern, using {hobby}-themed objects.
+18. warning_box: Most common beginner mistake and exactly how to avoid it. Start with "Warning:".
+19. heading (level 2): Real-World Application
+20. paragraph: How this is used in production at scale — specific companies, frameworks, systems. Minimum 80 words.
+21. key_points: 6-7 detailed takeaway bullets — complete, specific insights.
+22. quiz: Conceptual question on the core mechanism. 4 options, correct index, 40+ word explanation.
+23. quiz: Applied scenario question. 4 options, correct index, 40+ word explanation."""
+        else:
+            sections = """Include ALL of the following sections in order:
+
+1. heading (level 2): Overview
+2. paragraph: Motivating context — the problem this topic solves, why it was invented. Minimum 100 words.
+3. heading (level 2): Core Concepts
+4. paragraph: The first core concept — theory, mechanics, mental model. Minimum 120 words.
+5. code: First complete, commented code example demonstrating the core concept.
+6. paragraph: Walk through the code — explain each part, why it was written that way, runtime behaviour. Minimum 80 words.
+7. heading (level 2): How It Works Under the Hood
+8. paragraph: Internal mechanics — runtime/compiler/framework internals. Performance, memory, execution flow. Minimum 120 words.
+9. code: Second code example — advanced usage.
+10. info_box: Pro Tip — a non-obvious production insight. Start with "Pro Tip:".
+11. heading (level 2): Common Patterns & Best Practices
+12. paragraph: 2-3 established patterns with reasoning — why pattern A over B. Minimum 100 words.
+13. code: Third code example — best practice vs anti-pattern.
+14. warning_box: Most common beginner mistake and exactly how to avoid it. Start with "Warning:".
+15. heading (level 2): Real-World Application
+16. paragraph: How this is used in production at scale — specific companies, frameworks, systems. Minimum 80 words.
+17. key_points: 6-7 detailed takeaway bullets — complete, specific insights.
+18. quiz: Conceptual question on the core mechanism. 4 options, correct index, 40+ word explanation.
+19. quiz: Applied scenario question. 4 options, correct index, 40+ word explanation."""
+
+        return ctx + _schema() + f"""Generate a DEEP, comprehensive reading lesson on "{req.lessonTitle}" for the topic "{req.topicName}".
+
+This lesson must be equivalent to a high-quality textbook chapter.
+{sections}
+
+Set estimatedMinutes to 25-35. Set xpReward to 75."""
+
     elif req.lessonType == "exercise":
-        return (
-            base_context
-            + "Generate a hands-on exercise lesson as JSON.\n\n"
-            + schema_description
-            + "Include these sections in order:\n"
-            '1. heading (level 2): "Exercise Overview"\n'
-            f"2. paragraph: description of what the learner will build related to {req.lessonTitle}\n"
-            '3. heading (level 2): "Prerequisites"\n'
-            "4. key_points: items array listing 3-4 prerequisite skills/knowledge\n"
-            '5. heading (level 2): "Step-by-Step Instructions"\n'
-            "6. paragraph: introduction to step 1 with instructions\n"
-            "7. code: code for step 1 (set language field)\n"
-            "8. paragraph: introduction to step 2 with instructions\n"
-            "9. code: code for step 2 (set language field)\n"
-            "10. paragraph: introduction to step 3 with instructions\n"
-            "11. code: code for step 3 (set language field)\n"
-            '12. heading (level 2): "Expected Output"\n'
-            "13. code: the expected output when running the completed exercise\n"
-            "14. info_box: a helpful hint for completing the exercise\n\n"
-            "Set estimatedMinutes to 20-30 and xpReward to 75-150.\n"
-            "Return only valid JSON, no markdown fences."
-        )
+        if hobby:
+            sections = f"""Include ALL sections in EXACTLY this order:
+
+1.  heading (level 2): What You'll Build
+2.  paragraph: What the learner builds — a {hobby}-themed project, its purpose, skills reinforced. Minimum 80 words. Pure technical.
+3.  analogy: Why this project maps perfectly to {hobby} — the domain connection. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+4.  heading (level 2): Prerequisites
+5.  key_points: 4-5 specific prerequisites.
+6.  heading (level 2): Setup & Project Structure
+7.  paragraph: Project setup, directory structure, dependencies. Minimum 60 words.
+8.  code: Setup commands / file structure (language: bash) — use {hobby}-themed project/file names.
+9.  heading (level 2): Step 1 — Foundation
+10. paragraph: What Step 1 accomplishes and the concept behind it. Minimum 60 words. Pure technical.
+11. analogy: Map Step 1's concept to {hobby}. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+12. code: Complete code for Step 1 — use {hobby}-themed class/variable names and real sample data.
+13. heading (level 2): Step 2 — Core Logic
+14. paragraph: What Step 2 builds on Step 1 and what new concept it introduces. Minimum 60 words. Pure technical.
+15. analogy: Map Step 2's concept to {hobby}. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+16. code: Complete code for Step 2 with {hobby}-themed data.
+17. heading (level 2): Step 3 — Integration & Enhancement
+18. paragraph: How Step 3 brings everything together. Minimum 60 words. Pure technical.
+19. analogy: Map Step 3's integration to {hobby}. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+20. code: Complete code for Step 3.
+21. heading (level 2): Step 4 — Testing & Verification
+22. paragraph: How to run and verify the solution. Minimum 40 words.
+23. code: Run commands + expected output using realistic {hobby} data (language: bash).
+24. warning_box: Most common error and fix. Start with "Warning:".
+25. info_box: Extension challenge specific to {hobby} domain. Start with "Extension Challenge:".
+26. key_points: 5-6 key concepts reinforced."""
+        else:
+            sections = """Include ALL sections in order:
+
+1. heading (level 2): What You'll Build
+2. paragraph: What the learner builds, its purpose, skills reinforced. Minimum 80 words.
+3. heading (level 2): Prerequisites
+4. key_points: 4-5 specific prerequisites.
+5. heading (level 2): Setup & Project Structure
+6. paragraph: Project setup, directory structure, dependencies. Minimum 60 words.
+7. code: Setup commands / file structure (language: bash).
+8. heading (level 2): Step 1 — Foundation
+9. paragraph: What Step 1 accomplishes and the concept behind it. Minimum 60 words.
+10. code: Complete code for Step 1 with comments.
+11. heading (level 2): Step 2 — Core Logic
+12. paragraph: What Step 2 builds and what new concept it introduces. Minimum 60 words.
+13. code: Complete code for Step 2.
+14. heading (level 2): Step 3 — Integration & Enhancement
+15. paragraph: How Step 3 brings everything together. Minimum 60 words.
+16. code: Complete code for Step 3.
+17. heading (level 2): Step 4 — Testing & Verification
+18. paragraph: How to run and verify the solution. Minimum 40 words.
+19. code: Run commands + expected output (language: bash).
+20. warning_box: Most common error and fix. Start with "Warning:".
+21. info_box: Extension challenge. Start with "Extension Challenge:".
+22. key_points: 5-6 key concepts reinforced."""
+
+        return ctx + _schema() + f"""Generate a DETAILED hands-on exercise for "{req.lessonTitle}" in "{req.topicName}".
+
+This must be a fully guided, step-by-step exercise building real, functional software.
+{sections}
+
+Set estimatedMinutes to 50-60. Set xpReward to 100."""
+
     elif req.lessonType == "quiz":
-        return (
-            base_context
-            + "Generate a quiz lesson as JSON.\n\n"
-            + schema_description
-            + "Include these sections in order:\n"
-            '1. heading (level 2): "Test Your Knowledge"\n'
-            f"2. paragraph: brief intro explaining this quiz tests understanding of {req.lessonTitle}\n"
-            "3-7. Five quiz sections (type: \"quiz\"), each with:\n"
-            "   - content: the question text\n"
-            "   - items: array of exactly 4 answer option strings\n"
-            "   - answer: integer 0-3 indicating the correct option index\n"
-            "   - explanation: brief explanation of why the answer is correct\n"
-            '8. key_points: items array summarizing the 4-5 main topics that were tested\n\n'
-            "Make questions progressively harder. Set estimatedMinutes to 10-15, xpReward to 60-100.\n"
-            "Return only valid JSON, no markdown fences."
-        )
+        applied_framing = (
+            f"Questions 5-6: Applied scenarios framed as decisions a developer building a {hobby} app must make"
+        ) if hobby else "Questions 5-6: Applied scenarios — given X situation, what should you do?"
+        return ctx + _schema() + f"""Generate a RIGOROUS quiz for "{req.lessonTitle}" in "{req.topicName}".
+
+The quiz must test genuine understanding — not just recall. Include:
+
+1. heading (level 2): Knowledge Check — {req.lessonTitle}
+2. paragraph: Intro — what this quiz covers and how it tests understanding{f", mention applied questions use {hobby} scenarios" if hobby else ""}. 40+ words.
+3-10. Eight quiz sections progressing from foundational to advanced:
+   - Questions 1-2: Foundational conceptual understanding
+   - Questions 3-4: How things work mechanically / under the hood
+   - {applied_framing}
+   - Questions 7-8: Tricky edge cases or common misconceptions
+
+   Each quiz section must have:
+   - content: A clear, specific question (not trivially obvious)
+   - items: Exactly 4 answer options (plausible distractors)
+   - answer: Integer 0-3 (correct option index)
+   - explanation: 40+ word explanation of WHY the correct answer is right and the others wrong
+
+11. key_points: 6 detailed summary bullets of key concepts tested.
+
+Set estimatedMinutes to 20. Set xpReward to 50."""
+
     elif req.lessonType == "project":
-        return (
-            base_context
-            + "Generate a mini-project lesson as JSON.\n\n"
-            + schema_description
-            + "Include these sections in order:\n"
-            f'1. heading (level 2): "Project: {req.lessonTitle}"\n'
-            f"2. paragraph: description of the project and its learning goals\n"
-            '3. heading (level 2): "Requirements"\n'
-            "4. key_points: items array with 5-6 functional requirements\n"
-            '5. heading (level 2): "Architecture"\n'
-            "6. paragraph: overview of the key components and how they fit together\n"
-            "7. code: starter code / skeleton structure (set language field)\n"
-            '8. heading (level 2): "Implementation Steps"\n'
-            "9. key_points: items array with 5-7 implementation checklist items\n"
-            '10. heading (level 2): "Evaluation Criteria"\n'
-            "11. key_points: items array with 4-5 criteria for a good solution\n\n"
-            "Set estimatedMinutes to 45-60, xpReward to 150-200.\n"
-            "Return only valid JSON, no markdown fences."
-        )
+        if hobby:
+            sections = f"""Include ALL sections in EXACTLY this order:
+
+1.  heading (level 2): Project Overview
+2.  paragraph: The project — a {hobby}-themed app showcasing {req.topicName} skills. Purpose, what it demonstrates, portfolio value. Minimum 100 words. Pure technical.
+3.  analogy: Why building this in the {hobby} domain is a great fit for these technologies. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+4.  heading (level 2): Learning Objectives
+5.  key_points: 5-6 specific skills the learner will demonstrate.
+6.  heading (level 2): Technical Requirements
+7.  key_points: 7-8 specific requirements grounded in the {hobby} use case.
+8.  heading (level 2): Architecture & Design
+9.  paragraph: Architecture — components, interactions, data flow, design decisions. Minimum 120 words. Pure technical.
+10. analogy: Map the architecture to {hobby} — e.g. how API Gateway is like the stadium entrance turnstile. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+11. code: Architecture skeleton / project structure with {hobby}-themed file/class names.
+12. heading (level 2): Phase 1 — Core Implementation
+13. paragraph: What Phase 1 builds and why this foundation matters. Minimum 60 words. Pure technical.
+14. analogy: Map Phase 1's core concept to {hobby}. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+15. code: Phase 1 implementation — use {hobby}-themed class names and realistic sample data.
+16. heading (level 2): Phase 2 — Feature Completion
+17. paragraph: What Phase 2 adds and how it builds on Phase 1. Minimum 60 words. Pure technical.
+18. analogy: Map Phase 2's new feature to {hobby}. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+19. code: Phase 2 code with {hobby}-themed data.
+20. heading (level 2): Phase 3 — Polish & Production Readiness
+21. paragraph: Error handling, edge cases, testing, production considerations. Minimum 60 words.
+22. code: Error handling / validation / test code.
+23. heading (level 2): Evaluation Rubric
+24. key_points: 6-7 specific evaluation criteria — what "excellent" looks like for each.
+25. info_box: Extension challenges — 3 {hobby}-specific ways to extend the project. Start with "Extension Challenges:"."""
+        else:
+            sections = """Include ALL sections in order:
+
+1. heading (level 2): Project Overview
+2. paragraph: The project, its real-world purpose, what it demonstrates, portfolio value. Minimum 100 words.
+3. heading (level 2): Learning Objectives
+4. key_points: 5-6 specific skills demonstrated.
+5. heading (level 2): Technical Requirements
+6. key_points: 7-8 specific requirements — precise ("must handle X").
+7. heading (level 2): Architecture & Design
+8. paragraph: Architecture — components, interactions, data flow, trade-offs. Minimum 120 words.
+9. code: Architecture skeleton / project structure.
+10. heading (level 2): Phase 1 — Core Implementation
+11. paragraph: What Phase 1 builds and why it matters. Minimum 60 words.
+12. code: Phase 1 implementation with detailed comments.
+13. heading (level 2): Phase 2 — Feature Completion
+14. paragraph: What Phase 2 adds. Minimum 60 words.
+15. code: Phase 2 code.
+16. heading (level 2): Phase 3 — Polish & Production Readiness
+17. paragraph: Error handling, testing, production considerations. Minimum 60 words.
+18. code: Error handling / test code.
+19. heading (level 2): Evaluation Rubric
+20. key_points: 6-7 evaluation criteria.
+21. info_box: Extension challenges. Start with "Extension Challenges:"."""
+
+        return ctx + _schema() + f"""Generate a COMPREHENSIVE capstone mini-project for "{req.lessonTitle}" in "{req.topicName}".
+
+This must be a real, non-trivial project impressive in a portfolio.
+{sections}
+
+Set estimatedMinutes to 60. Set xpReward to 150."""
+
     else:
-        return (
-            base_context
-            + "Generate educational lesson content as JSON.\n\n"
-            + schema_description
-            + "Include a heading, paragraph with an explanation, a code example, and key_points.\n"
-            "Set estimatedMinutes to 15 and xpReward to 50.\n"
-            "Return only valid JSON, no markdown fences."
-        )
+        return ctx + _schema() + f"""Generate educational content for "{req.lessonTitle}" in "{req.topicName}".
+Include: heading, a detailed 100-word paragraph{f", analogy mapping it to {hobby}" if hobby else ""}, a complete code example{f" with {hobby}-themed variable names" if hobby else ""}, an info_box with a pro tip, and key_points with 5 detailed bullets.
+Set estimatedMinutes to 20. Set xpReward to 50."""
 
 
 @router.post("/lesson", response_model=LessonContentResponse)
