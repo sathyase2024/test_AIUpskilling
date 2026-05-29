@@ -1,0 +1,311 @@
+{
+  "lessonId": "retrieval-augmented-generation-01",
+  "title": "Lesson 2: Retrieval-Augmented Generation Part 2",
+  "type": "reading",
+  "topicName": "Retrieval-Augmented Generation",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Retrieval-Augmented Generation (RAG) represents a fundamental shift in how large language models access and utilize external knowledge. While base LLMs contain fixed knowledge encoded during training (a snapshot frozen in time), they suffer from critical limitations: knowledge cutoff dates, inability to access proprietary or real-time information, and tendency to hallucinate when facing unfamiliar domains. RAG architectures address these constraints by integrating a retrieval system that dynamically fetches relevant context from external sources before generation, transforming the LLM from an isolated knowledge repository into an adaptive information processor. This lesson explores the sophisticated mechanisms that power production RAG systems: ranking strategies that determine which retrieved documents matter most, re-ranking techniques that refine initial retrieval results, query transformation methods that improve semantic matching, and hybrid search approaches combining dense vector similarity with sparse keyword matching. Understanding these mechanisms is essential because they directly impact both accuracy (reducing hallucination and improving factual grounding) and latency (the retrieval-generation pipeline introduces computational overhead that must be optimized). Production systems at companies like OpenAI, Anthropic, and Google rely on these techniques to maintain information freshness, ensure compliance in regulated domains, and provide verifiable, source-attributed responses that users can trust.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma preparing for the second innings of a test match where he's already lost the first innings. His coaching team (the retrieval system) hasn't just prepared him once before the match—they're now continuously updating his strategy throughout the innings by dynamically analyzing the opposition's bowling patterns, the pitch condition changes happening in real-time, and the specific deliveries Jasprit Bumrah has already bowled from the same end. As each over progresses, the coaching team ranks which pieces of information matter most (the bowler's economy rate in this spell vs. his career statistics) and re-ranks their recommendations based on what's actually happening in the middle (if the pitch suddenly turns, historical dry-spell data becomes more relevant than morning's fast-bowling intelligence). Rohit's actual batting execution (generation) is now grounded in continuously refreshed, dynamically ranked information rather than relying solely on pre-match preparation (pre-training). This reveals why RAG matters: just as a batsman can't rely on fixed pre-match analysis when conditions shift dramatically, language models can't generate accurate, current responses from frozen training data—they need a living information system that ranks, refines, and delivers the most contextually relevant knowledge at generation time. The retrieval system is the coaching team; ranking is their triage of which insights to prioritize; and generation is the batsman's informed decision-making at the crease.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Dense Vector Retrieval and Embedding Spaces",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Dense vector retrieval forms the backbone of modern RAG systems by representing both queries and documents as high-dimensional embedding vectors in a continuous space where semantic similarity translates to geometric proximity. Rather than matching keywords (sparse matching), dense retrievers use transformer-based encoders like BERT, DPR (Dense Passage Retrieval), or specialized models like contrastive learners to map text into a shared embedding space where semantically similar content clusters together regardless of exact word overlap. The retrieval process becomes a nearest-neighbor search problem: given a query embedding, find the k document embeddings with highest cosine similarity. This approach excels at semantic matching—understanding that 'vehicle' and 'automobile' are similar even without keyword overlap—and scales to massive corpora through approximate nearest-neighbor (ANN) algorithms like HNSW, IVF, or learned indices that avoid exhaustive similarity computation. However, dense retrieval has critical limitations: it requires embedding all documents beforehand (high memory overhead), struggles with out-of-domain or highly technical terminology, and depends on the quality of the embedding model which may not align perfectly with your specific domain or task. Production RAG systems therefore often use dense retrieval as the primary candidate retrieval stage, fetching perhaps 100 candidate documents efficiently, then applying re-ranking and filtering to refine results.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: In a T20 World Cup, the fielding captain (the dense retriever) must quickly position 11 fielders across the ground based on the batsman's playing patterns and the bowler's strengths, all in a continuous semantic space where similar batting profiles cluster together. When Virat Kohli walks to the crease, the captain doesn't just match the exact player to the exact field—he finds the k most geometrically similar historical innings from the embedding space of all past centuries (the corpus). Kohli's 2016 Champions Trophy performance and his 2015 World Cup form aren't identical keyword matches, but they're semantically close in the 'aggressive strokeplay in high-pressure matches' dimension, so both cluster near his current embedding. The captain uses a fast indexing system (HNSW) to avoid checking all 5000 past centuries, instead jumping through a hierarchical structure to the nearest neighbors. However, this geometric approach fails when the batsman's recent form is completely out-of-domain—say Kohli suddenly plays left-handed (new embedding space)—and the captain's pre-embedded knowledge of right-handed centuries becomes less relevant. This reveals why dense retrieval is fast and semantic-aware but needs safeguards: speed comes from geometric shortcuts, not comprehensive analysis, just as the captain's quick field placement captures broad patterns but may miss unusual situations. The embedding space is the geometric field-positioning space; similarity search is finding the k most geometrically similar past innings; and the ANN index is the captain's mental shortcut system for fast nearest-neighbor placement.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Ranking and Re-ranking Mechanisms",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Ranking and re-ranking mechanisms are critical quality gates in RAG pipelines that transform raw retrieval results into highly relevant context for the generator. Initial retrieval typically returns many candidates (100-1000) optimized for recall rather than precision—the goal is 'don't miss potentially useful documents,' not 'return only the perfect ones.' Re-ranking then applies a more sophisticated, computationally expensive scorer to the candidate set, filtering and ordering them by relevance to the specific query and generation task. Common re-ranking strategies include: cross-encoder models that jointly encode the query and document together (e.g., 'how relevant is this document to this query?') achieving better precision than dense models at the cost of latency; learning-to-rank (LTR) models that combine multiple relevance signals (embedding similarity, keyword overlap, document authority, recency) into a learned ranking function; and task-specific scorers that penalize documents containing factual contradictions or outdated information. The re-ranking stage is where domain expertise gets applied: financial RAG systems might rank recent earnings reports higher than archived ones; medical RAG systems might boost documents from peer-reviewed journals over blog posts; legal RAG systems might prioritize jurisdiction-specific statutes. This two-stage architecture (retrieve many → re-rank few) balances recall and precision: the first stage is broad and fast, the second is narrow and precise. Without effective re-ranking, LLMs receive noisy context where a highly relevant document might be buried below irrelevant ones, degrading generation quality.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The India cricket team's selection process mirrors RAG's two-stage ranking pipeline. First, the selection committee (initial retriever) screens the entire national talent pool of 1.4 billion people, using rapid criteria like 'domestic cricket performance' and 'physical fitness benchmarks' to identify 500 candidates—the recall stage where missing talent is the cardinal sin. Nobody cares if third-tier domestic players are included at this stage; the goal is 'catch everyone potentially useful.' Then the team's Head Coach Rahul Dravid and his expert assessment panel (re-ranker) apply sophisticated, nuanced evaluation to these 500, interviewing each, analyzing their temperament against pace bowling at the Gabba, evaluating their strike rotation against quality spinners like Nathan Lyon, checking injury history, and assessing fit within the current batting order. A player like KL Rahul might rank lower than Rishabh Pant in raw domestic statistics (initial retrieval ranking) but higher after re-ranking because his technical soundness against short-pitched bowling specifically addresses India's current weakness. The re-ranking stage also incorporates domain expertise: the Coach won't include a brilliant Test batsman if the squad is T20-focused (task-specific scoring). This reveals why re-ranking is non-negotiable: initial retrieval is recall-optimized (cast a wide net), but generation quality depends on precision—the LLM must receive the genuinely relevant 15 documents, not 15 randomly selected from 500. The initial retriever is rapid but coarse; the re-ranker is expensive but expert-informed. Together they achieve both breadth and depth that either alone cannot.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Query Transformation and Expansion",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Query transformation techniques address a fundamental mismatch in RAG systems: user queries are often ambiguous, incomplete, or phrased differently from the target documents they should match, leading to retrieval failures where the relevant document exists but isn't found. Common transformation strategies include: query expansion, where a single user query is transformed into multiple reformulated queries that capture different phrasings or interpretations (e.g., 'How do I fix my laptop?' becomes ['laptop troubleshooting,' 'computer repair guide,' 'hardware diagnostics']); question decomposition, where complex multi-part questions are broken into sub-questions that are retrieved and answered separately then composed (e.g., 'What is the revenue and profitability of Tesla in 2023?' becomes separate queries for revenue and profitability); hypothetical document embeddings (HyDE), where the query is used to generate hypothetical relevant documents which are then embedded and used to find real similar documents, bridging the query-document language gap; and pseudo-relevance feedback, where initial retrieval results are used to refine and re-issue the query automatically. These techniques are particularly valuable for complex reasoning tasks where no single document directly answers the question but multiple documents together do. Query transformation adds a pre-retrieval reasoning stage that improves both recall (finding documents under different phrasings) and precision (generating multiple perspectives helps filter noise). The trade-off is latency: each transformation requires additional LLM calls or retrieval iterations, so production systems implement caching and batching to amortize this cost.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: When a sports commentator (user) asks 'How should Babar Azam adjust his technique against the new ball?', a single query fails to capture all relevant expertise. Instead, a comprehensive cricket knowledge system (RAG with query transformation) decomposes this into sub-queries: 'What are Babar's current weaknesses against short-pitched deliveries?' (hypothetical document about pace analysis), 'How have other batsmen like Steve Smith adjusted their stance in similar conditions?' (query expansion variant), 'What does Babar's footwork look like in video analysis?' (document decomposition). The system also generates a hypothetical relevant document: 'Babar should adopt a more closed stance with quicker trigger movements and leave deliveries outside off-stump—this is how Steve Smith handles reverse swing,' then uses this synthetic document's embedding to find real, similar coaching articles. None of these individual queries exactly matches the coach's original question, but together they create a multi-perspective understanding. Compare this to a naive approach: a single query 'Babar technique new ball' might only return match highlights, missing the actual technical coaching manual. Query expansion is like asking the same question in Hindi, Urdu, and English to find documents in different languages; question decomposition is like asking the physiotherapist AND the batting coach AND the video analyst instead of just the team captain. This reveals why query transformation matters: users rarely phrase questions exactly as documents are written, so reasoning about the query itself—before retrieval—multiplies the chance of finding correct documents. The transformation stage is active reasoning; naive retrieval is passive matching.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Hybrid Search: Combining Dense and Sparse Retrieval",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Hybrid search combines dense vector retrieval (semantic, recall-oriented) with sparse keyword-based retrieval (exact match, precision-oriented) to achieve strengths of both while mitigating weaknesses of each. Sparse retrieval systems like BM25 excel at finding documents containing exact keywords or domain-specific terminology but fail at semantic understanding—a search for 'vehicle' won't match 'automobile.' Dense retrieval excels at semantic matching but struggles with rare technical terms or out-of-vocabulary concepts where vector embeddings have never been trained. Hybrid approaches typically retrieve from both systems independently, then merge results using techniques like reciprocal rank fusion (RRF) or learned fusion weights, ensuring that documents matching either semantic intent OR exact terminology rank highly. This is particularly valuable in specialized domains: legal RAG must find the exact statute name ('Section 504 of the Rehabilitation Act') which sparse retrieval guarantees, alongside semantically similar case law that dense retrieval finds; medical RAG must find the precise drug name ('Lisinopril') via sparse matching while also finding conceptually related medications via dense matching. Advanced hybrid systems learn adaptive weights for dense vs. sparse contributions per query—some queries benefit from 80% semantic, 20% keyword (open-ended 'explain photosynthesis'); others benefit from 20% semantic, 80% keyword (precise 'find the 2024 earnings report'). Implementation trade-offs include: dual index maintenance (both vector database and inverted index), computational cost of dual retrieval, and parameter tuning for result fusion. Modern vector databases like Weaviate and Milvus support hybrid search natively, abstracting away infrastructure complexity.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A cricket analyst researching 'How does fast bowling affect modern batting averages?' needs both dense and sparse retrieval perspectives, like a team scout evaluating fast bowlers. The sparse retrieval specialist searches for exact terminology: 'Jasprit Bumrah,' 'reverse swing,' 'yorker execution'—keywords that guarantee precision but might miss conceptually related fast bowlers. The dense retrieval specialist understands semantic intent: 'finds the ball through tight lines,' 'excellent death bowling,' 'consistently bowls under 130 kmph'—matching batsmen's struggles and fear factors without exact keyword overlap. A batsman might fear Bumrah's precision despite not fearing other 'fast bowlers' because Bumrah's vector embedding places him in a unique cluster of 'thinking bowlers with flawless lines' (dense match) even though he's not literally named in the search query. Now, the hybrid system retrieves from both: the sparse index returns documents mentioning 'Bumrah,' 'short-pitched,' 'yorker' explicitly; the dense index returns documents about 'bowlers with uncanny accuracy' and 'psychological pressure through precision.' Results are fused using reciprocal rank fusion: if a document ranks #1 in sparse (exact keyword match) and #50 in dense (semantic match), hybrid ranking boosts it because both systems identified its relevance through different lenses. This reveals why hybrid search is non-negotiable: pure dense retrieval might miss the exact player name or specific statistic number the analyst searched for, while pure sparse retrieval would miss the conceptual understanding that 'bowlers like Bumrah' includes future emerging talents who share his philosophical approach to bowling. The fusion point is where precision (sparse) meets semantic understanding (dense).",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import json\nfrom typing import List, Dict, Tuple\nfrom dataclasses import dataclass\nfrom datetime import datetime\nimport math\n\n# Simulate embedding vectors for dense retrieval\n@dataclass\nclass CricketDocument:\n    \"\"\"Represents a cricket knowledge document in the corpus\"\"\"\n    doc_id: str\n    content: str\n    cricket_player: str\n    match_type: str  # Test, ODI, T20\n    embedding: List[float]  # Dense vector representation\n    keywords: List[str]  # Sparse keywords for BM25\n    recency_score: float  # 0-1, higher = more recent\n    authority_score: float  # 0-1, higher = from official sources\n\n@dataclass\nclass InningsContext:\n    \"\"\"Represents a batting innings for context\"\"\"\n    batter_name: str\n    innings_number: int\n    runs_scored: int\n    balls_faced: int\n    match_id: str\n    publication_date: str\n\nclass CricketRAGSystem:\n    \"\"\"Complete RAG system demonstrating ranking, re-ranking, query transformation, hybrid search\"\"\"\n    \n    def __init__(self):\n        # Simulated document corpus\n        self.documents = [\n            CricketDocument(\n                doc_id=\"doc_001\",\n                content=\"Rohit Sharma's aggressive batting in powerplay overs: analysis of strike rotation and boundary placement\",\n                cricket_player=\"Rohit Sharma\",\n                match_type=\"T20\",\n                embedding=[0.8, 0.3, 0.5, 0.9, 0.2],  # Semantic space: batting, aggressive, T20, powerplay\n                keywords=[\"Rohit Sharma\", \"powerplay\", \"strike rotation\", \"T20\", \"aggressive\"],\n                recency_score=0.95,  # Very recent publication\n                authority_score=0.9  # Official cricket board source\n            ),\n            CricketDocument(\n                doc_id=\"doc_002\",\n                content=\"Jasprit Bumrah's yorker mastery and reverse swing bowling techniques in death overs\",\n                cricket_player=\"Jasprit Bumrah\",\n                match_type=\"Test\",\n                embedding=[0.2, 0.9, 0.1, 0.3, 0.8],  # Semantic space: bowling, precision, yorker, death overs\n                keywords=[\"Jasprit Bumrah\", \"yorker\", \"reverse swing\", \"death bowling\", \"precision\"],\n                recency_score=0.88,\n                authority_score=0.95\n            ),\n            CricketDocument(\n                doc_id=\"doc_003\",\n                content=\"Fast bowlers' impact on batting averages: statistical analysis of pace bowling trends\",\n                cricket_player=\"Generic Fast Bowlers\",\n                match_type=\"Test\",\n                embedding=[0.5, 0.85, 0.4, 0.2, 0.7],  # Semantic space: fast bowling analysis\n                keywords=[\"fast bowling\", \"batting averages\", \"pace attack\", \"bowling impact\"],\n                recency_score=0.75,\n                authority_score=0.85\n            ),\n            CricketDocument(\n                doc_id=\"doc_004\",\n                content=\"Babar Azam's technical adjustments against short-pitched deliveries and bouncers\",\n                cricket_player=\"Babar Azam\",\n                match_type=\"ODI\",\n                embedding=[0.7, 0.4, 0.6, 0.8, 0.3],  # Semantic space: batting technique, short ball handling\n                keywords=[\"Babar Azam\", \"short-pitched\", \"technique\", \"bouncer\", \"stance adjustment\"],\n                recency_score=0.92,\n                authority_score=0.88\n            ),\n            CricketDocument(\n                doc_id=\"doc_005\",\n                content=\"Historical comparison: Steve Smith vs other elite Test batsmen - footwork and positioning\",\n                cricket_player=\"Steve Smith\",\n                match_type=\"Test\",\n                embedding=[0.75, 0.35, 0.65, 0.75, 0.25],  # Semantic space: elite batting technique\n                keywords=[\"Steve Smith\", \"footwork\", \"Test cricket\", \"elite batsmen\", \"positioning\"],\n                recency_score=0.80,\n                authority_score=0.92\n            )\n        ]\n    \n    def dense_retrieval(self",
+      "query_embedding": "List[float]",
+      "k": "int = 3) -> List[Tuple[CricketDocument, float]]:\n        \"\"\"\n        Dense vector retrieval using cosine similarity.\n        Returns k most similar documents based on embedding space.\n        \"\"\"\n        def cosine_similarity(vec1: List[float]",
+      "vec2": "List[float]) -> float:\n            \"\"\"Calculate cosine similarity between two vectors\"\"\"\n            dot_product = sum(a * b for a, b in zip(vec1, vec2))\n            magnitude1 = math.sqrt(sum(a ** 2 for a in vec1))\n            magnitude2 = math.sqrt(sum(b ** 2 for b in vec2))\n            return dot_product / (magnitude1 * magnitude2 + 1e-9)\n        \n        # Score all documents by similarity\n        scores = []\n        for doc in self.documents:\n            sim = cosine_similarity(query_embedding, doc.embedding)\n            scores.append((doc, sim))\n        \n        # Sort by similarity and return top k\n        scores.sort(key=lambda x: x[1], reverse=True)\n        return scores[:k]\n    \n    def sparse_retrieval(self",
+      "query_keywords": "List[str]",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "k": "int = 3) -> List[Tuple[CricketDocument, float]]:\n        \"\"\"\n        Sparse retrieval using BM25-like keyword matching.\n        Returns k documents with highest keyword overlap.\n        \"\"\"\n        scores = []\n        for doc in self.documents:\n            # Simple BM25 approximation: count keyword matches\n            matches = sum(1 for keyword in query_keywords if keyword.lower() in [kw.lower() for kw in doc.keywords])\n            bm25_score = matches / (len(doc.keywords) + 0.1)  # Normalize by doc length\n            scores.append((doc, bm25_score))\n        \n        scores.sort(key=lambda x: x[1], reverse=True)\n        return scores[:k]\n    \n    def hybrid_retrieval(self",
+      "query_embedding": "List[float]",
+      "query_keywords": "List[str]",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "k": "int = 3) -> List[Tuple[CricketDocument, float]]:\n        \"\"\"\n        Hybrid retrieval combining dense and sparse results.\n        Uses reciprocal rank fusion to merge results.\n        \"\"\"\n        dense_results = self.dense_retrieval(query_embedding, k=5)  # Retrieve more candidates\n        sparse_results = self.sparse_retrieval(query_keywords, k=5)\n        \n        # Reciprocal Rank Fusion: score = 1/(rank + 60)\n        fused_scores = {}\n        for rank, (doc, _) in enumerate(dense_results, 1):\n            fused_scores[doc.doc_id] = fused_scores.get(doc.doc_id, 0) + 1 / (rank + 60)\n        \n        for rank, (doc, _) in enumerate(sparse_results, 1):\n            fused_scores[doc.doc_id] = fused_scores.get(doc.doc_id, 0) + 1 / (rank + 60)\n        \n        # Sort by fused score\n        all_docs = {doc.doc_id: doc for doc in self.documents}\n        hybrid_results = [(all_docs[doc_id], score) for doc_id, score in fused_scores.items()]\n        hybrid_results.sort(key=lambda x: x[1], reverse=True)\n        \n        return hybrid_results[:k]\n    \n    def rerank_with_cross_encoder(self",
+      "candidates": "List[Tuple[CricketDocument, float]], \n                                   query: str",
+      "top_k": "int = 2) -> List[Tuple[CricketDocument, float]]:\n        \"\"\"\n        Re-ranking candidates using task-specific scores.\n        Simulates a cross-encoder that evaluates: relevance, recency, authority.\n        \"\"\"\n        reranked = []\n        for doc, initial_score in candidates:\n            # Multi-factor re-ranking score\n            relevance_factor = initial_score * 0.5  # Original retrieval score\n            recency_bonus = doc.recency_score * 0.3  # Favor recent documents\n            authority_bonus = doc.authority_score * 0.2  # Trust authoritative sources\n            \n            final_score = relevance_factor + recency_bonus + authority_bonus\n            reranked.append((doc, final_score))\n        \n        reranked.sort(key=lambda x: x[1], reverse=True)\n        return reranked[:top_k]\n    \n    def expand_query(self",
+      "original_query": "str) -> List[str]:\n        \"\"\"\n        Query transformation: expand original query into multiple perspectives.\n        Simulates LLM-based query expansion.\n        \"\"\"\n        expansion_map = {\n            \"How should Babar Azam adjust\": [\n                \"Babar Azam technique against short ball\",\n                \"fast bowlers impact on batting\",\n                \"elite batsmen footwork analysis\",\n                \"stance adjustment short pitched\"\n            ],\n            \"Rohit Sharma powerplay\": [\n                \"Rohit Sharma aggressive T20 batting\",\n                \"strike rotation boundary placement\",\n                \"powerplay batting strategy\",\n                \"T20 opening batsman techniques\"\n            ]\n        }\n        \n        # Find matching expansion key\n        for key, expansions in expansion_map.items():\n            if key.lower() in original_query.lower():\n                return [original_query] + expansions\n        \n        return [original_query]  # Fallback: return original if no expansion found\n    \n    def process_query(self",
+      "user_query": "str",
+      "use_hybrid": "bool = True) -> Dict:\n        \"\"\"\n        Complete RAG pipeline: transform query → retrieve → rerank → return context.\n        \"\"\"\n        # STEP 1: Query Transformation (expansion)\n        expanded_queries = self.expand_query(user_query)\n        print(f\"\\n📋 Original Query: {user_query}\")\n        print(f\"📋 Expanded Queries: {expanded_queries}\")\n        \n        # STEP 2: Simulate query embedding (in production, use embedding model)\n        # For demo, use predefined embeddings based on query type\n        if \"Babar\" in user_query.lower():\n            query_embedding = [0.7, 0.4, 0.6, 0.8, 0.3]  # Similar to Babar doc\n            query_keywords = [\"Babar Azam\", \"technique\", \"short ball\", \"adjustment\"]\n        elif \"Rohit\" in user_query.lower():\n            query_embedding = [0.8, 0.3, 0.5, 0.9, 0.2]  # Similar to Rohit doc\n            query_keywords = [\"Rohit Sharma\", \"powerplay\", \"aggressive\", \"T20\"]\n        else:\n            query_embedding = [0.5, 0.5, 0.5, 0.5, 0.5]  # Neutral embedding\n            query_keywords = user_query.split()\n        \n        # STEP 3: Retrieve candidates\n        if use_hybrid:\n            print(\"\\n🔍 Hybrid Retrieval (Dense + Sparse):\")\n            candidates = self.hybrid_retrieval(query_embedding, query_keywords, k=4)\n        else:\n            print(\"\\n🔍 Dense Retrieval Only:\")\n            candidates = self.dense_retrieval(query_embedding, k=4)\n        \n        print(f\"   Retrieved {len(candidates)} candidates\")\n        for doc, score in candidates:\n            print(f\"   - [{doc.doc_id}] {doc.cricket_player}: {score:.3f}\")\n        \n        # STEP 4: Re-rank candidates\n        print(\"\\n⭐ Re-ranking with Task-Specific Scorer:\")\n        final_results = self.rerank_with_cross_encoder(candidates, user_query, top_k=2)\n        \n        print(f\"   Final ranked documents:\")\n        for doc, score in final_results:\n            print(f\"   - [{doc.doc_id}] {doc.cricket_player}: {score:.3f}\")\n            print(f\"     Content: {doc.content[:60]}...\")\n        \n        return {\n            \"query\": user_query,\n            \"expanded_queries\": expanded_queries,\n            \"retrieved_documents\": [(doc.doc_id, doc.cricket_player, doc.content) for doc, _ in final_results],\n            \"rankings\": final_results\n        }\n\n# USAGE EXAMPLE\nif __name__ == \"__main__\":\n    rag = CricketRAGSystem()\n    \n    # Test query 1: With query expansion\n    result1 = rag.process_query(\"How should Babar Azam adjust his technique against fast bowlers?\", use_hybrid=True)\n    \n    print(\"\\n\" + \"=\"*80)\n    \n    # Test query 2: Different player\n    result2 = rag.process_query(\"Rohit Sharma powerplay strategy\", use_hybrid=True)\n    \n    print(\"\\n\" + \"=\"*80)\n    \n    # Test dense-only vs hybrid\n    print(\"\\n📊 Comparison: Dense-Only vs Hybrid Retrieval\")\n    print(\"\\nDense-Only Retrieval:\")\n    rag.process_query(\"Fast bowlers impact on batting\", use_hybrid=False)\n    \n    print(\"\\n\" + \"-\"*80)\n    print(\"\\nHybrid Retrieval:\")\n    rag.process_query(\"Fast bowlers impact on batting\", use_hybrid=True)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The code demonstrates all four core RAG mechanisms integrated in a cohesive system. The CricketRAGSystem simulates a document corpus of five cricket-related documents, each containing dense embeddings (semantic vectors), sparse keywords, and metadata (recency, authority). When `process_query()` is called, the system executes the complete pipeline: first, query_expansion transforms the user's question into multiple reformulations (expanding 'Babar adjustment' to include 'stance adjustment,' 'footwork analysis,' 'elite batting technique'). Next, hybrid_retrieval retrieves candidates from both dense and sparse indexes separately—the dense retriever scores documents by cosine similarity in embedding space (finding semantically related content like Steve Smith's footwork even if not explicitly mentioned), while the sparse retriever scores by keyword overlap (ensuring exact terms like 'Babar Azam' are matched). Results are fused using reciprocal rank fusion, a technique that assigns each document a score inversely proportional to its rank in each index: a document ranked #1 in dense but #5 in sparse gets an aggregate score combining both perspectives. Finally, rerank_with_cross_encoder applies task-specific scoring: it re-weights candidates based not only on retrieval score but also on recency (favoring recent 2024 analyses over outdated ones) and authority (prioritizing official cricket board sources). The output shows that hybrid retrieval retrieves 4 candidate documents through combined dense-sparse logic, then re-ranking filters to the top 2 most relevant for final context delivery to the LLM. This simulates production behavior where retrieval is broad (recall-optimized) but generation receives only high-precision context (precision-optimized after re-ranking).",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The internal mechanics of production RAG systems involve sophisticated coordination between three computational layers: the embedding layer that transforms text into vectors, the retrieval layer that performs similarity search at scale, and the ranking layer that filters and orders results. The embedding layer typically uses transformer-based models (BERT, sentence-transformers, OpenAI's text-embedding-3) that compress semantic meaning into fixed-dimension vectors (typically 384-4096 dimensions). These embeddings are precomputed for all documents and stored in vector databases (Pinecone, Weaviate, Qdrant, Milvus) with specialized data structures like HNSW (Hierarchical Navigable Small World graphs) or IVF (Inverted File) indexes that enable approximate nearest-neighbor search in sub-linear time. When a query arrives, it's embedded using the same model, then the vector database returns the k most similar document embeddings in milliseconds by traversing the HNSW graph hierarchy rather than computing similarity against all millions of documents. Simultaneously or subsequently, the sparse retrieval layer maintains an inverted index (like Elasticsearch, BM25) where documents are indexed by keywords, enabling rapid keyword matching. The ranking layer then combines scores from both pathways using fusion algorithms: reciprocal rank fusion treats both systems as independent rankers and combines their rankings mathematically; learned fusion learns weights during fine-tuning that maximize retrieval quality on a labeled dataset; semantic fusion uses an additional neural scorer (cross-encoder) to jointly evaluate query-document pairs. The memory footprint is substantial: storing full document embeddings (1M documents × 1536 dimensions × 4 bytes = 6GB) plus maintaining sparse indexes requires careful engineering. Latency trade-offs exist: dense retrieval is fast (HNSW traversal ≈ 10-100ms for 1M documents) but less precise; sparse retrieval is slower for large indexes (BM25 scoring ≈ 50-500ms) but catches exact matches; re-ranking with cross-encoders adds latency (10-100ms per document scored) but dramatically improves precision. Production systems implement caching (query results are cached if identical queries arrive), batching (multiple documents scored together), and approximate re-ranking (score only top-50 candidates rather than all 1000) to manage latency budgets under 500ms for user-facing applications.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A professional cricket team's information pipeline mirrors RAG's internal mechanics across three layers. The embedding layer is like the team's video analysis department converting raw match footage into standardized 'semantic vectors'—specific numerical representations of each bowler's 'line and length tendency' (a 50-dimensional embedding might include: average bounce height, line consistency score, pace variation, swing angle). All 5000 past bowlers' performances are pre-embedded into this standardized space and stored in the team's hierarchical video database (HNSW index) organized by semantic similarity—fast bowlers cluster together, spinners elsewhere. When analyzing the next opponent (query embedding), the system traverses this hierarchy in milliseconds: 'Find bowlers similar to our next opponent Starc' doesn't check all 5000 performances but hops through the hierarchy like climbing a decision tree ('Is he fast? Yes → Go to fast bowlers subtree → Is he Australian? Yes → Narrow further'). Simultaneously, the sparse retrieval layer maintains a keyword index: 'Starc,' 'left-arm pace,' 'yorker specialist'—exact tactical keywords searchable in seconds. The ranking layer now fuses insights: HNSW found semantic cousins like Boult (similar vector space) who Starc might bowl from, while the keyword index found Starc's own stats explicitly. A cross-encoder (expert coach) then jointly evaluates 'How relevant is Boult's footage to understanding Starc in this specific match?'—pure numbers might rank Boult #5, but expert judgment considering 'This game is on a fast pitch, making Boult's techniques more applicable than normal' re-ranks Boult to #2. Caching works because yesterday's 'Starc analysis' is reused today if another match prep needs it. This reveals why layered architecture matters: hierarchical indexing provides speed (tree traversal beats exhaustive search), fusion provides coverage (dense catches 'bowlers similar to Starc' even if never explicitly mentioned; sparse catches 'Starc by name'), and learned ranking provides expert filtering. The embedding space is the semantic foundation; HNSW is the fast search structure; keyword index is the precision safety net.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom typing import List, Dict, Tuple\nfrom collections import defaultdict\nimport heapq\nfrom dataclasses import dataclass\n\n# Simulate advanced indexing structures for production RAG\n@dataclass\nclass IndexedCricketDocument:\n    \"\"\"Document with precomputed embeddings and metadata\"\"\"\n    doc_id: str\n    content: str\n    embedding: np.ndarray  # High-dimensional vector\n    sparse_tokens: Dict[str, float]  # BM25 term frequencies\n    player_name: str\n    timestamp: int  # Unix timestamp for recency scoring\n    source_authority: float  # 0-1 score\n\nclass HSNWIndex:\n    \"\"\"\n    Simplified Hierarchical Navigable Small World (HNSW) implementation.\n    Demonstrates how production vector databases enable fast approximate nearest-neighbor search.\n    \"\"\"\n    \n    def __init__(self",
+      "embedding_dim": "int",
+      "max_connections": "int = 5",
+      "ef_construction": "int = 200):\n        self.embedding_dim = embedding_dim\n        self.max_connections = max_connections  # Max neighbors per node\n        self.ef_construction = ef_construction  # Search width during construction\n        self.graph = {}  # node_id -> list of neighbor node_ids\n        self.embeddings = {}  # node_id -> embedding vector\n        self.entry_point = None\n    \n    def add_vector(self",
+      "node_id": "str",
+      "embedding": "np.ndarray):\n        \"\"\"Add a vector to the HNSW graph\"\"\"\n        self.embeddings[node_id] = embedding\n        \n        if self.entry_point is None:\n            # First vector becomes entry point\n            self.entry_point = node_id\n            self.graph[node_id] = []\n            return\n        \n        # Find nearest neighbors using greedy search\n        nearest = self._greedy_search(embedding, ef=self.ef_construction)\n        self.graph[node_id] = []\n        \n        # Connect to nearest neighbors\n        for neighbor_id, _ in nearest[:self.max_connections]:\n            self.graph[node_id].append(neighbor_id)\n            # Bidirectional connection\n            if len(self.graph[neighbor_id]) < self.max_connections:\n                self.graph[neighbor_id].append(node_id)\n    \n    def _greedy_search(self",
+      "query_embedding": "np.ndarray",
+      "ef": "int = 10) -> List[Tuple[str, float]]:\n        \"\"\"Greedy nearest-neighbor search starting from entry point\"\"\"\n        visited = set()\n        candidates = [(self._cosine_distance(query_embedding, self.embeddings[self.entry_point]), self.entry_point)]\n        nearest = [(self._cosine_distance(query_embedding, self.embeddings[self.entry_point]), self.entry_point)]\n        \n        while candidates:\n            lowerbound, current = heapq.heappop(candidates)\n            \n            if lowerbound > -nearest[0][0]:\n                break\n            \n            visited.add(current)\n            \n            # Explore neighbors\n            for neighbor_id in self.graph.get(current, []):\n                if neighbor_id not in visited:\n                    distance = self._cosine_distance(query_embedding, self.embeddings[neighbor_id])\n                    \n                    if distance < -nearest[0][0] or len(nearest) < ef:\n                        heapq.heappush(candidates, (distance, neighbor_id))\n                        heapq.heapreplace(nearest, (-distance, neighbor_id)) if len(nearest) > ef else None\n        \n        return [(node_id, -distance) for distance, node_id in sorted(nearest, key=lambda x: -x[0])]\n    \n    def search(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query_embedding": "np.ndarray",
+      "k": "int = 5) -> List[Tuple[str, float]]:\n        \"\"\"Search k nearest neighbors\"\"\"\n        results = self._greedy_search(query_embedding, ef=max(k, 50))\n        return results[:k]\n    \n    @staticmethod\n    def _cosine_distance(vec1: np.ndarray",
+      "vec2": "np.ndarray) -> float:\n        \"\"\"Cosine distance (negative similarity for heap)\"\"\"\n        return -np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2) + 1e-9)\n\nclass BM25Index:\n    \"\"\"\n    BM25 sparse retrieval index with inverted index structure.\n    Demonstrates efficient exact-match retrieval in production RAG.\n    \"\"\"\n    \n    def __init__(self",
+      "k1": "float = 1.5",
+      "b": "float = 0.75):\n        self.k1 = k1  # Term frequency saturation parameter\n        self.b = b  # Length normalization parameter\n        self.inverted_index = defaultdict(list)  # token -> [(doc_id, term_frequency)]\n        self.doc_lengths = {}  # doc_id -> token count\n        self.idf_scores = {}  # token -> idf score\n        self.avg_doc_length = 0\n        self.total_docs = 0\n    \n    def index_document(self",
+      "doc_id": "str",
+      "tokens": "List[str]):\n        \"\"\"Index a document's tokens\"\"\"\n        self.total_docs += 1\n        self.doc_lengths[doc_id] = len(tokens)\n        \n        # Calculate term frequencies\n        token_counts = defaultdict(int)\n        for token in tokens:\n            token_counts[token] += 1\n        \n        # Build inverted index\n        for token, count in token_counts.items():\n            self.inverted_index[token].append((doc_id, count))\n        \n        # Update average document length\n        self.avg_doc_length = sum(self.doc_lengths.values()) / self.total_docs\n    \n    def finalize_index(self):\n        \"\"\"Compute IDF scores for all tokens\"\"\"\n        for token, postings in self.inverted_index.items():\n            # IDF = log((N - n + 0.5) / (n + 0.5)) + 1\n            n = len(postings)  # Number of documents containing token\n            idf = np.log((self.total_docs - n + 0.5) / (n + 0.5)) + 1\n            self.idf_scores[token] = idf\n    \n    def search(self",
+      "query_tokens": "List[str]",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "k": "int = 5) -> List[Tuple[str, float]]:\n        \"\"\"BM25 ranking and retrieval\"\"\"\n        scores = defaultdict(float)\n        \n        for token in query_tokens:\n            if token not in self.inverted_index:\n                continue\n            \n            idf = self.idf_scores.get(token, 0)\n            \n            for doc_id, term_frequency in self.inverted_index[token]:\n                doc_length = self.doc_lengths[doc_id]\n                # BM25 formula\n                bm25_score = idf * (self.k1 + 1) * term_frequency / (\n                    self.k1 * (1 - self.b + self.b * (doc_length / self.avg_doc_length)) + term_frequency\n                )\n                scores[doc_id] += bm25_score\n        \n        # Return top k\n        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)\n        return ranked[:k]\n\nclass ProductionRAGIndexing:\n    \"\"\"Demonstrates production-grade RAG indexing and retrieval with advanced data structures\"\"\"\n    \n    def __init__(self):\n        self.hnsw_index = HSNWIndex(embedding_dim=8, max_connections=4)\n        self.bm25_index = BM25Index()\n        self.documents = {}  # doc_id -> IndexedCricketDocument\n        self.current_time = 1704067200  # Jan 1, 2024\n    \n    def index_cricket_documents(self):\n        \"\"\"Index sample cricket documents with embeddings and tokens\"\"\"\n        docs_data = [\n            {\n                \"doc_id\": \"rohit_powerplay_001\",\n                \"content\": \"Rohit Sharma aggressive batting strategy powerplay T20 cricket\",\n                \"embedding\": np.array([0.9, 0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4]),\n                \"tokens\": [\"rohit\", \"sharma\", \"aggressive\", \"batting\", \"powerplay\", \"t20\"],\n                \"player\": \"Rohit Sharma\",\n                \"age_days\": 0,\n                \"authority\": 0.95\n            },\n            {\n                \"doc_id\": \"bumrah_yorker_002\",\n                \"content\": \"Jasprit Bumrah yorker bowling technique reverse swing mastery death overs\",\n                \"embedding\": np.array([0.2, 0.9, 0.1, 0.8, 0.3, 0.7, 0.4, 0.6]),\n                \"tokens\": [\"bumrah\", \"yorker\", \"bowling\", \"technique\", \"death\", \"overs\"],\n                \"player\": \"Jasprit Bumrah\",\n                \"age_days\": 10,\n                \"authority\": 0.98\n            },\n            {\n                \"doc_id\": \"babar_technique_003\",\n                \"content\": \"Babar Azam stance footwork adjustment short-pitched deliveries elite batsman\",\n                \"embedding\": np.array([0.8, 0.3, 0.9, 0.1, 0.6, 0.4, 0.7, 0.2]),\n                \"tokens\": [\"babar\", \"azam\", \"stance\", \"footwork\", \"short\", \"pitched\"],\n                \"player\": \"Babar Azam\",\n                \"age_days\": 5,\n                \"authority\": 0.92\n            },\n            {\n                \"doc_id\": \"smith_positioning_004\",\n                \"content\": \"Steve Smith footwork positioning Test cricket elite batsman technique analysis\",\n                \"embedding\": np.array([0.85, 0.2, 0.7, 0.3, 0.8, 0.15, 0.75, 0.25]),\n                \"tokens\": [\"steve\", \"smith\", \"footwork\", \"test\", \"cricket\", \"elite\"],\n                \"player\": \"Steve Smith\",\n                \"age_days\": 30,\n                \"authority\": 0.96\n            },\n            {\n                \"doc_id\": \"fast_bowling_impact_005\",\n                \"content\": \"Fast bowling impact on batting averages pace attack strategy wicket-taking\",\n                \"embedding\": np.array([0.6, 0.7, 0.5, 0.8, 0.4, 0.9, 0.3, 0.8]),\n                \"tokens\": [\"fast\", \"bowling\", \"impact\", \"batting\", \"averages\", \"pace\"],\n                \"player\": \"Generic Fast Bowler\",\n                \"age_days\": 15,\n                \"authority\": 0.88\n            }\n        ]\n        \n        # Index all documents\n        for doc_data in docs_data:\n            doc_id = doc_data[\"doc_id\"]\n            embedding = doc_data[\"embedding\"]\n            tokens = doc_data[\"tokens\"]\n            \n            # Add to HNSW index\n            self.hnsw_index.add_vector(doc_id, embedding)\n            \n            # Add to BM25 index\n            self.bm25_index.index_document(doc_id, tokens)\n            \n            # Store document metadata\n            self.documents[doc_id] = IndexedCricketDocument(\n                doc_id=doc_id,\n                content=doc_data[\"content\"],\n                embedding=embedding,\n                sparse_tokens={token: 1.0 for token in tokens},\n                player_name=doc_data[\"player\"],\n                timestamp=self.current_time - (doc_data[\"age_days\"] * 86400),\n                source_authority=doc_data[\"authority\"]\n            )\n        \n        # Finalize BM25 indexing (compute IDF scores)\n        self.bm25_index.finalize_index()\n        print(\"✅ Indexed 5 cricket documents with HNSW + BM25 indices\")\n    \n    def retrieve_with_latency_tracking(self",
+      "query_embedding": "np.ndarray",
+      "query_tokens": "List[str]) -> Dict:\n        \"\"\"\n        Demonstrate retrieval with latency tracking for each component.\n        \"\"\"\n        import time\n        \n        # Dense retrieval with timing\n        dense_start = time.time()\n        dense_results = self.hnsw_index.search(query_embedding, k=3)\n        dense_latency = (time.time() - dense_start) * 1000  # Convert to ms\n        \n        # Sparse retrieval with timing\n        sparse_start = time.time()\n        sparse_results = self.bm25_index.search(query_tokens, k=3)\n        sparse_latency = (time.time() - sparse_start) * 1000\n        \n        # Fusion with recency and authority scoring\n        fusion_start = time.time()\n        \n        # Reciprocal rank fusion + multi-factor scoring\n        fused_scores = {}\n        \n        # Dense contribution\n        for rank, (doc_id, dense_score) in enumerate(dense_results, 1):\n            rrf_score = 1.0 / (50 + rank)  # Reciprocal rank fusion constant\n            fused_scores[doc_id] = fused_scores.get(doc_id, 0) + rrf_score * 0.5\n        \n        # Sparse contribution\n        for rank, (doc_id, sparse_score) in enumerate(sparse_results, 1):\n            rrf_score = 1.0 / (50 + rank)\n            fused_scores[doc_id] = fused_scores.get(doc_id, 0) + rrf_score * 0.5\n        \n        # Multi-factor re-ranking\n        current_time = self.current_time\n        for doc_id, fused_score in list(fused_scores.items()):\n            doc = self.documents[doc_id]\n            \n            # Recency boost: documents from last 7 days get higher score\n            age_days = (current_time - doc.timestamp) / 86400\n            recency_factor = 1.0 if age_days <= 7 else 0.5 + 0.5 * np.exp(-age_days / 30)\n            \n            # Authority factor from source\n            authority_factor = doc.source_authority\n            \n            # Combined re-ranking\n            fused_scores[doc_id] = fused_score * 0.6 + recency_factor * 0.2 + authority_factor * 0.2\n        \n        fusion_latency = (time.time() - fusion_start) * 1000\n        \n        # Sort final results\n        final_results = sorted(fused_scores.items(), key=lambda x: x[1], reverse=True)\n        \n        return {\n            \"dense_results\": [(doc_id, self.documents[doc_id].player_name, score) for doc_id, score in dense_results],\n            \"sparse_results\": [(doc_id, self.documents[doc_id].player_name, score) for doc_id, score in sparse_results],\n            \"final_results\": [(doc_id, self.documents[doc_id].player_name, score) for doc_id, score in final_results],\n            \"latencies\": {\n                \"dense_retrieval_ms\": dense_latency,\n                \"sparse_retrieval_ms\": sparse_latency,\n                \"fusion_and_reranking_ms\": fusion_latency,\n                \"total_retrieval_ms\": dense_latency + sparse_latency + fusion_latency\n            }\n        }\n    \n    def demonstrate_caching_strategy(self",
+      "queries": "List[Dict]) -> Dict:\n        \"\"\"\n        Demonstrate query caching and batching optimization strategies.\n        \"\"\"\n        cache = {}  # query_hash -> results\n        batch_results = []\n        \n        for query in queries:\n            query_hash = hash(str(query[\"tokens\"]))\n            \n            if query_hash in cache:\n                # Cache hit\n                batch_results.append({\n                    \"query\": query,\n                    \"status\": \"cache_hit\",\n                    \"results\": cache[query_hash]\n                })\n            else:\n                # Cache miss - retrieve and cache\n                results = self.retrieve_with_latency_tracking(\n                    query[\"embedding\"],\n                    query[\"tokens\"]\n                )\n                cache[query_hash] = results\n                batch_results.append({\n                    \"query\": query,\n                    \"status\": \"cache_miss\",\n                    \"results\": results\n                })\n        \n        return {\n            \"cache_hits\": sum(1 for r in batch_results if r[\"status\"] == \"cache_hit\"),\n            \"cache_misses\": sum(1 for r in batch_results if r[\"status\"] == \"cache_miss\"),\n            \"details\": batch_results\n        }\n\n# DEMONSTRATION\nif __name__ == \"__main__\":\n    print(\"🏏 Production RAG Indexing & Retrieval Demonstration\\n\")\n    \n    rag_system = ProductionRAGIndexing()\n    rag_system.index_cricket_documents()\n    \n    # Test retrieval with latency tracking\n    print(\"\\n📊 Retrieval Performance Analysis:\")\n    print(\"-\" * 80)\n    \n    test_query = {\n        \"embedding\": np.array([0.85, 0.2, 0.75, 0.25, 0.8, 0.15, 0.7, 0.3]),  # Similar to Babar/Smith\n        \"tokens\": [\"babar\", \"footwork\", \"batting\", \"technique\"],\n        \"description\": \"Query about Babar Azam's batting technique\"\n    }\n    \n    print(f\"Query: {test_query['description']}\")\n    results = rag_system.retrieve_with_latency_tracking(test_query[\"embedding\"], test_query[\"tokens\"])\n    \n    print(\"\\n🔍 Dense Retrieval Results (HNSW):\")\n    for doc_id, player, score in results[\"dense_results\"]:\n        print(f\"  - {player}: {score:.4f}\")\n    \n    print(\"\\n🔍 Sparse Retrieval Results (BM25):\")\n    for doc_id, player, score in results[\"sparse_results\"]:\n        print(f\"  - {player}: {score:.4f}\")\n    \n    print(\"\\n⭐ Final Fused & Re-ranked Results:\")\n    for doc_id, player, score in results[\"final_results\"]:\n        print(f\"  - {player}: {score:.4f}\")\n    \n    print(\"\\n⏱️  Latency Breakdown:\")\n    for stage, latency in results[\"latencies\"].items():\n        print(f\"  - {stage}: {latency:.3f} ms\")\n    \n    # Demonstrate caching\n    print(\"\\n\" + \"=\"*80)\n    print(\"\\n💾 Query Caching Strategy:\")\n    print(\"-\" * 80)\n    \n    repeated_queries = [\n        {\"embedding\": np.array([0.85, 0.2, 0.75, 0.25, 0.8, 0.15, 0.7, 0.3]), \"tokens\": [\"babar\", \"footwork\", \"batting\", \"technique\"]},\n        {\"embedding\": np.array([0.9, 0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4]), \"tokens\": [\"rohit\", \"aggressive\", \"powerplay\"]},\n        {\"embedding\": np.array([0.85, 0.2, 0.75, 0.25, 0.8, 0.15, 0.7, 0.3]), \"tokens\": [\"babar\", \"footwork\", \"batting\", \"technique\"]},  # Repeat\n    ]\n    \n    cache_results = rag_system.demonstrate_caching_strategy(repeated_queries)\n    print(f\"Cache Hits: {cache_results['cache_hits']}\")\n    print(f\"Cache Misses: {cache_results['cache_misses']}\")\n    print(f\"Cache Hit Rate: {cache_results['cache_hits'] / 3 * 100:.1f}%\")",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "info_box",
+      "content": "Pro Tip: In production RAG systems operating at scale, implement a two-tier caching strategy: query-level caching for identical inputs (using query hash), and document-level caching for retrieval results from each corpus. This reduces redundant embedding computations and HNSW traversals dramatically—one major e-commerce RAG system achieved 40% latency reduction by caching the top-10 retrieval results for 80% of queries, since user questions cluster around common patterns. Additionally, use 'lazy evaluation': don't re-rank all 1000 candidate documents; re-rank only the top 50-100 where marginal improvements still matter. This balances precision gains against latency costs effectively in production environments with user-facing SLA constraints.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three established patterns dominate production RAG implementations, each addressing specific architectural concerns. The first pattern is 'Retrieve-Then-Rank' (also called the 'funnel approach'), which is the standard two-stage pipeline: retrieve many candidates through fast dense search, then re-rank a smaller subset with expensive cross-encoders. This pattern excels when latency is critical because the retrieval stage dominates overall latency (90-95% of query time is retrieval; re-ranking adds 5-10%), and most precision gains come from re-ranking the top-50 rather than all 1000 candidates. The second pattern is 'Predict-Then-Retrieve' (or 'query prediction'), where the system predicts the intent or optimal search parameters before retrieval. This includes query expansion (rewriting 'Babar technique short ball' into multiple diverse phrasings), parameter prediction (predicting whether this query benefits from dense vs. sparse weighting), and route prediction (deciding whether to search the 'active player stats' corpus or 'historical archive' corpus). This pattern is valuable for complex reasoning tasks where a single generic retrieval won't suffice. The third pattern is 'Iterative Refinement,' used when no single retrieval fully answers the question and successive retrievals with refined queries gather more context. For instance, a medical RAG might retrieve background on 'Type 2 diabetes' first, then refine to retrieve 'Metformin dosing protocols,' then refine again to retrieve 'Drug interactions with ACE inhibitors.' Each iteration conditions on previous results, enabling complex multi-step reasoning. Implementation trade-offs: Retrieve-Then-Rank is latency-optimized but may miss nuances; Predict-Then-Retrieve is accuracy-optimized but adds LLM calls for query prediction; Iterative Refinement provides highest accuracy but multiplies latency. Most production systems blend all three: starting with fast Retrieve-Then-Rank for 80% of queries, falling back to Predict-Then-Retrieve for complex queries, and using Iterative Refinement only when initial retrieval confidence is low.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}

@@ -1,0 +1,338 @@
+{
+  "lessonId": "large-language-models-11",
+  "title": "Lesson 12: Large Language Models Part 12",
+  "type": "reading",
+  "topicName": "Large Language Models",
+  "estimatedMinutes": 38,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "",
+      "language": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Large Language Models (LLMs) have evolved beyond simple next-token prediction into sophisticated systems capable of complex reasoning, multi-step planning, and contextual understanding. At their core, Part 12 of LLM architecture focuses on advanced inference optimization, context window management, and adaptive computation strategies that enable models to maintain coherence over longer sequences while minimizing computational overhead. The fundamental problem these techniques solve is the quadratic scaling of attention mechanisms—as sequence length grows, memory and computational costs grow exponentially, making it practically impossible to process thousands of tokens efficiently without optimization. Early transformer models struggled with fixed context windows of 512 or 1024 tokens; without these advanced techniques, models would be unable to handle documents of several thousand tokens while maintaining real-time inference speed. Techniques like sliding window attention, sparse attention patterns, and dynamic token pruning enable production systems to serve millions of users simultaneously while maintaining sub-100ms latency requirements. This layer of optimization is critical to systems like OpenAI's GPT-4, Google's Gemini, and Meta's Llama, which must process variable-length inputs at scale across diverse hardware (CPUs, GPUs, TPUs) while delivering deterministic, low-latency responses.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider a Test match innings where Virat Kohli is batting, and the fielding captain (Rohit Sharma) must decide which fielders to keep active for each delivery. At the start of the innings during the powerplay, every fielder is in critical positions—close catches at slip, short leg, covers—because every run matters. However, as the innings progresses and Kohli settles in the middle overs, the captain realizes that keeping all 11 fielders at peak alertness for every ball becomes exhausting and inefficient; instead, he leaves some fielders in less critical positions (deep third man, fine leg) where the probability of action is lower, rotating which players remain fully focused. The analogy maps directly: attention mechanisms in LLMs mirror the fielding positions—each token position is a fielder, and full attention (the slip cordon) requires maximum computational resources; without optimization, the model maintains full alertness to all 4000+ tokens simultaneously (all 11 fielders at slip), which is computationally unsustainable. Sliding window attention is like the captain's rotation—the model only computes expensive full attention within a local window (say, the last 128 tokens, equivalent to 4-5 overs), treating distant tokens like deep fielders that contribute context but don't require real-time focused computation. This parallel reveals a critical insight: just as a cricket captain's fielding adjusts to the match phase and batter's tendencies, LLMs must dynamically adjust their computational attention patterns—static full attention is like permanently stationing all fielders at slip regardless of situation, both are wasteful and unsustainable at scale.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "",
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Sliding Window Attention",
+      "level": 3,
+      "items": [],
+      "answer": -1,
+      "explanation": "",
+      "language": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Sliding window attention is a technique that restricts the attention computation at each token position to only a fixed-size window of preceding tokens, rather than attending to all previous tokens in the sequence. In a standard transformer with full attention, computing attention scores for position t requires comparing it against all t-1 previous positions, resulting in O(n²) complexity where n is sequence length. Sliding window attention reduces this to O(n × w) where w is the window size—a dramatic improvement when w is much smaller than n. For example, with a 4096-token context window and a sliding window size of 256, instead of computing 16 million attention pairs, the model computes only 1 million pairs, reducing memory consumption from quadratic to linear. This technique is based on the empirical observation that tokens have strong local dependencies—a word's meaning is mostly influenced by words nearby, not by tokens from the beginning of a document. Systems like Llama 2 and Mistral use sliding windows of 256-512 tokens; even with this restricted window, models maintain strong performance on reasoning tasks, demonstrating that the local context hypothesis holds across most language understanding problems. The trade-off is that truly long-range dependencies (e.g., referencing a concept introduced 3000 tokens ago) require additional mechanisms like sparse attention or explicit memory systems to maintain coherence.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine a cricket commentator (like Harsha Bhogle) who is broadcasting a five-day Test match live and must provide real-time analysis of Jasprit Bumrah's bowling spell. For each delivery, the commentator doesn't recall every single ball bowled in the previous four days; instead, he focuses intensely on the last 10-15 deliveries from the current bowling spell (the sliding window) to understand the pattern—whether Bumrah is building pressure through maiden overs, setting a trap through field placement, or exploiting the batter's weaknesses revealed in recent deliveries. The commentator maintains historical awareness (he knows Bumrah's career average economy rate), but that's held in separate, less-active memory; his real-time analysis window slides forward with each delivery, always focusing on the immediate context. In LLM terms, the full sequence of 4000 tokens is the entire Test match commentary archive, but sliding window attention is like the commentator's active focus on the last 256 tokens (roughly 5-6 overs of action)—far more efficient to process than reviewing every single word spoken over five days. The insight this reveals is that meaningful communication and decision-making don't require perfect recall of everything ever said; instead, they depend on deep understanding of recent context combined with a few anchoring facts held separately—exactly how sliding windows enable LLMs to maintain coherence and reasoning ability without quadratic cost.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Sparse Attention Patterns",
+      "level": 3,
+      "items": [],
+      "answer": -1,
+      "explanation": "",
+      "language": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Sparse attention patterns extend the efficiency gains of sliding window attention by selectively computing attention only between certain token pairs, based on predetermined structural patterns or learned importance scores. Rather than attending to all tokens in a window (dense attention) or a fixed local window (sliding window), sparse attention creates a graph where each token only attends to a subset of others according to a pattern—for example, every token attends to the previous 8 tokens (local), plus every 16th token going back to the start (strided), plus specific sentinel tokens (global). The computational benefit is substantial: instead of O(n²) or O(n × w), sparse patterns can achieve O(n × log n) or even O(n) depending on the structure. Common patterns include: (1) Local attention—each position attends only to nearby positions; (2) Strided attention—attention is computed at regular intervals; (3) Global tokens—special tokens that attend to all positions and vice versa, preserving long-range information flow; (4) Learned sparsity—using attention weights from previous layers to dynamically prune low-scoring attention connections. The theoretical foundation comes from information theory: not all token pairs are equally important for prediction. A novel's protagonist appears in important scenes separated by many pages; we don't need to compute attention from every word to every other word—we need attention to key scenes and to local context. Longformer and BigBird architectures use these sparse patterns to extend context windows to 16K tokens while maintaining training and inference efficiency comparable to models with 4K dense attention.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider the Indian cricket team's fielding strategy during an ODI against Australia. The captain (Rohit Sharma) doesn't communicate equally with all 11 fielders every second—that would be chaotic and inefficient. Instead, he uses a sparse communication pattern: he constantly talks to the slip cordon (active players involved in the immediate action, local pattern), calls out to specific fielders every few overs to rotate positions (strided pattern), and maintains one key link—the wicket-keeper MS Dhoni—who receives instructions from the captain, relays them to the entire field, and provides feedback to all bowlers (global token pattern serving as an information hub). When Jasprit Bumrah is bowling a crucial spell in the death overs, the captain focuses attention on his nearest fielders and specific strategically-placed deep fielders (sparse selection), not equally on all 11 because that's information-theoretically wasteful. The sparse attention pattern mirrors this exactly: computing attention (communication) only between strategically important token pairs (like pitcher-to-catcher in baseball or captain-to-key-fielders in cricket) rather than between every pair, while global tokens like the captain or keeper ensure critical information flows to everyone when needed. This pattern reveals why human teams are more efficient than hypothetically-connected systems where everyone talks to everyone—selective, structured attention based on role and relevance is how humans achieve coordination at scale, and sparse attention implements this same principle in neural networks.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Token Pruning and Adaptive Computation",
+      "level": 3,
+      "items": [],
+      "answer": -1,
+      "explanation": "",
+      "language": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Token pruning and adaptive computation strategies dynamically reduce the number of tokens processed in each transformer layer based on their estimated importance to the final prediction, enabling variable computational cost that adapts to input complexity. In a standard transformer, every token is processed through all layers with identical computational cost—a simple document and a complex one incur the same expense. Token pruning identifies tokens that contribute minimally to the output (often padding, stop words, or repetitive tokens in certain contexts) and either removes them from computation or processes them through lighter-weight layers. Methods include: (1) Learned pruning—using auxiliary classifiers trained alongside the main model to score each token's importance, pruning those below a threshold; (2) Entropy-based pruning—measuring the certainty of token predictions and pruning high-confidence tokens early; (3) Layer-wise pruning—allowing different tokens to exit at different depths (early exit), similar to mixture-of-experts routing. Adaptive computation implements a dynamic computational budget: a token carrying critical semantic information (like a rare entity or keyword) receives full processing through all layers, while a high-frequency filler word might exit after 8 of 24 layers, reducing redundant computation. This is theoretically grounded in the observation that not all tokens equally influence the final prediction—some decisions are made confidently with shallow processing, while others require deeper reasoning. Production systems like DistilBERT and Prune-Then-Distill achieve 30-40% inference speedup with minimal accuracy loss. The challenge is that pruning decisions must be made online (during inference) without knowledge of future context, so most systems use heuristics trained on the model's own attention patterns.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: During a Test match, the fielding captain (like Ajinkya Rahane) must manage his team's physical and mental energy efficiently across five days. Every fielder running hard for every single ball for five straight days would lead to exhaustion and poor decision-making by day 3. Instead, the captain uses adaptive energy allocation: when the batter is a recognized weak player facing a bowler in his prime spell (low-difficulty situation), fielders maintain basic awareness but don't expend full focus and sprinting energy—they know dismissal is likely soon. When a world-class batter like Virat Kohli is at the crease during a critical phase of the match (high-difficulty situation), every fielder is at maximum alertness, position adjustment happens frequently, and the slip cordon is fully active because each decision is crucial. Similarly, bowlers like Jasprit Bumrah operate on an adaptive exertion model: they deliver full-intensity deliveries with complex variations during dangerous overs and high-pressure moments, but may deliver simpler lines during overs when the batter is already beaten or set in a defensive mindset. Token pruning mirrors this exactly: the model recognizes that certain tokens require deep, expensive processing through all 24 layers (rare keywords, ambiguous phrases that need context) while common tokens or high-confidence predictions can be resolved after 8-10 layers, saving computation. This insight reveals that intelligence isn't about constant maximum effort—it's about allocating resources proportionally to task difficulty, which is why adaptive systems outperform always-maximal approaches in both cricket and neural networks.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "KV-Cache Optimization and Memory Management",
+      "level": 3,
+      "items": [],
+      "answer": -1,
+      "explanation": "",
+      "language": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "KV-Cache (Key-Value Cache) optimization is a critical technique for reducing memory bandwidth and latency during autoregressive inference, where tokens are generated one-at-a-time. During generation of token position t, the model must compute attention over all t previous tokens; naively, this means recomputing attention keys and values for all previous tokens, wasting computation. KV-Cache solves this by storing the computed key and value vectors for all previously processed tokens in GPU memory, allowing new attention computations to reuse them without recalculation. For a 7B parameter model with batch size 1 generating a 2K token response, KV-Cache stores 2K × num_layers × 2 × key_dim × value_dim floats; with 32 layers and 128D keys/values, this requires approximately 2K × 32 × 2 × 128 × 128 × 4 bytes ≈ 3.2 GB per sequence. The memory requirement scales linearly with output length and context size, not quadratically, making long-form generation tractable. However, KV-Cache introduces a different bottleneck: memory bandwidth becomes the limiting factor rather than computation. Reading and writing the cache for each token generation creates a bandwidth-bound operation—for a 2K token generation, the model loads 2K separate cache states from memory, and memory bandwidth (e.g., 900 GB/s on A100 GPUs) becomes the performance ceiling. Multi-query attention (MQA) and grouped-query attention (GQA) further optimize KV-Cache by sharing key and value vectors across multiple attention heads, reducing cache size by 8-16x. Flash-Attention and other kernel-level optimizations (like composite fused kernels) reduce memory movements by computing attention in smaller tiles that fit in GPU cache. Modern production systems combine these: using GQA to reduce cache size, KV-Cache to avoid recomputation, and hardware-optimized kernels to maximize throughput.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine a cricket scorecard system where a commentator (like Harsha Bhogle) is providing live ball-by-ball updates for a match that is currently at over 45 of a 50-over ODI. For each new delivery bowled (representing a token generated), the commentator needs to reference the scorecard to discuss the match situation—runs scored, wickets fallen, current run rate trends. If the commentator had to re-read the entire scorecard from the beginning for every delivery (recalculating keys and values), it would be impossibly slow. Instead, the commentator keeps a memo board (the KV-Cache) with the critical statistics continuously updated: total runs so far (cumulatively calculated), wickets fallen per batsman (stored), run rate moving averages, and fielding positions. When delivery 270 is bowled, the commentator simply updates this memo board (adds the new ball's result) and uses it for commentary, rather than recalculating everything from match start (over 1). The analogy maps directly: KV-Cache is like that memo board—storing pre-computed attention keys (like historical run rates and performance patterns) and values (like current match state data) so that when generating each new token, the model doesn't recalculate these expensive computations. However, just as the commentator's ability to deliver rapid commentary becomes bottlenecked by how fast he can read and update his memo board (not by the mental effort of calculation), modern LLM inference becomes bandwidth-limited (how fast GPU memory can be accessed), not compute-limited. This insight reveals why specialized attention optimizations like GQA and Flash-Attention focus on reducing cache size and memory bandwidth rather than computation—they're solving the actual bottleneck in modern systems.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import torch\nimport torch.nn.functional as F\nfrom dataclasses import dataclass\nfrom typing import Optional, Tuple\n\n@dataclass\nclass CricketMatchContext:\n    \"\"\"Represents a cricket match state being processed by LLM\"\"\"\n    match_id: str\n    innings_number: int\n    overs_completed: int\n    tokens: torch.Tensor  # Shape: (batch_size, seq_length)\n    player_names: list  # Rohit Sharma, Virat Kohli, Jasprit Bumrah, etc.\n    \nclass SlidingWindowAttention(torch.nn.Module):\n    \"\"\"Implements sliding window attention with local context focus\"\"\"\n    def __init__(self",
+      "hidden_dim": "int",
+      "window_size": "int = 256):\n        super().__init__()\n        self.hidden_dim = hidden_dim\n        self.window_size = window_size\n        self.query_proj = torch.nn.Linear(hidden_dim, hidden_dim)\n        self.key_proj = torch.nn.Linear(hidden_dim, hidden_dim)\n        self.value_proj = torch.nn.Linear(hidden_dim, hidden_dim)\n        \n    def forward(self",
+      "x": "torch.Tensor) -> torch.Tensor:\n        \"\"\"x shape: (batch, seq_len, hidden_dim)\"\"\"\n        batch_size, seq_len, _ = x.shape\n        \n        Q = self.query_proj(x)  # (batch, seq_len, hidden_dim)\n        K = self.key_proj(x)\n        V = self.value_proj(x)\n        \n        # Reshape for multi-head simulation (simplified: single head)\n        Q = Q.reshape(batch_size, seq_len, 1, self.hidden_dim)\n        K = K.reshape(batch_size, seq_len, 1, self.hidden_dim)\n        V = V.reshape(batch_size, seq_len, 1, self.hidden_dim)\n        \n        output = torch.zeros_like(V)\n        \n        # Sliding window: for each position, attend only to local context\n        for i in range(seq_len):\n            # Window from max(0, i-window_size) to i+1\n            start = max(0, i - self.window_size)\n            end = i + 1\n            \n            # Extract sliding window\n            Q_i = Q[:",
+      "i": "i+1, :, :]  # Current position query\n            K_window = K[:",
+      "start": "end, :, :]  # Keys in window\n            V_window = V[:",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "start": "end, :, :]  # Values in window\n            \n            # Compute attention scores\n            scores = torch.matmul(Q_i, K_window.transpose(-2, -1)) / (self.hidden_dim ** 0.5)\n            attn_weights = F.softmax(scores, dim=-1)  # (batch, 1, 1, window_len)\n            \n            # Apply attention to values\n            output[:",
+      "i": "i+1, :, :] = torch.matmul(attn_weights, V_window)\n        \n        output = output.reshape(batch_size, seq_len, self.hidden_dim)\n        return output\n\nclass TokenPruningLayer(torch.nn.Module):\n    \"\"\"Implements adaptive token pruning based on importance scores\"\"\"\n    def __init__(self",
+      "hidden_dim": "int",
+      "pruning_threshold": "float = 0.3):\n        super().__init__()\n        self.hidden_dim = hidden_dim\n        self.pruning_threshold = pruning_threshold\n        self.importance_scorer = torch.nn.Linear(hidden_dim, 1)\n        \n    def forward(self",
+      "x": "torch.Tensor",
+      "mask": "Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:\n        \"\"\"x shape: (batch, seq_len, hidden_dim)\n        Returns: (pruned_tokens, importance_scores)\n        \"\"\"\n        # Score importance of each token\n        importance_scores = torch.sigmoid(self.importance_scorer(x))  # (batch, seq_len, 1)\n        importance_scores = importance_scores.squeeze(-1)  # (batch, seq_len)\n        \n        if mask is not None:\n            importance_scores = importance_scores * mask  # Respect padding tokens\n        \n        # Create pruning mask: keep tokens with high importance or critical positions\n        # In cricket context: keep player names, critical keywords, recent context\n        pruning_mask = (importance_scores > self.pruning_threshold).float()\n        \n        # Also preserve first and last tokens (like key players in batting order)\n        pruning_mask[:, 0] = 1.0  # Keep start token\n        pruning_mask[:, -1] = 1.0  # Keep end token\n        \n        # Apply pruning: zero out low-importance tokens\n        pruned_tokens = x * pruning_mask.unsqueeze(-1)\n        \n        return pruned_tokens, importance_scores\n\nclass KVCacheManager:\n    \"\"\"Manages Key-Value cache for efficient autoregressive generation\"\"\"\n    def __init__(self",
+      "max_seq_len": "int",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "hidden_dim": "int",
+      "num_layers": "int):\n        self.max_seq_len = max_seq_len\n        self.hidden_dim = hidden_dim\n        self.num_layers = num_layers\n        self.cache = {}  # {layer_idx: (key_cache, value_cache)}\n        self.current_pos = 0\n        \n    def update(self",
+      "layer_idx": "int",
+      "keys": "torch.Tensor",
+      "values": "torch.Tensor):\n        \"\"\"Update KV cache with new token's keys and values\n        keys, values shape: (batch, 1, hidden_dim) for single token generation\n        \"\"\"\n        if layer_idx not in self.cache:\n            # Initialize cache for this layer\n            batch_size = keys.shape[0]\n            self.cache[layer_idx] = (\n                torch.zeros(batch_size, self.max_seq_len, self.hidden_dim, device=keys.device),\n                torch.zeros(batch_size, self.max_seq_len, self.hidden_dim, device=keys.device)\n            )\n        \n        # Append new keys and values at current position\n        k_cache, v_cache = self.cache[layer_idx]\n        k_cache[:, self.current_pos:self.current_pos+1, :] = keys\n        v_cache[:, self.current_pos:self.current_pos+1, :] = values\n        \n    def get_cached_kv(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "layer_idx": "int) -> Tuple[torch.Tensor, torch.Tensor]:\n        \"\"\"Retrieve cached K, V up to current position\"\"\"\n        if layer_idx not in self.cache:\n            return None, None\n        k_cache, v_cache = self.cache[layer_idx]\n        return k_cache[:, :self.current_pos+1, :], v_cache[:, :self.current_pos+1, :]\n    \n    def advance_position(self):\n        \"\"\"Move to next generation step\"\"\"\n        self.current_pos += 1\n    \n    def reset(self):\n        \"\"\"Reset cache for new sequence\"\"\"\n        self.cache = {}\n        self.current_pos = 0\n\nclass OptimizedLLMInference:\n    \"\"\"Combines all optimization techniques for efficient LLM inference\"\"\"\n    def __init__(self",
+      "hidden_dim": "int = 768",
+      "num_layers": "int = 12):\n        self.hidden_dim = hidden_dim\n        self.num_layers = num_layers\n        \n        self.sliding_window_attn = SlidingWindowAttention(hidden_dim, window_size=256)\n        self.token_pruner = TokenPruningLayer(hidden_dim, pruning_threshold=0.25)\n        self.kv_cache = KVCacheManager(max_seq_len=4096, hidden_dim=hidden_dim, num_layers=num_layers)\n        \n    def process_cricket_match_context(self",
+      "context": "CricketMatchContext) -> torch.Tensor:\n        \"\"\"Process cricket match tokens with all optimizations\"\"\"\n        batch_size, seq_len = context.tokens.shape\n        \n        # Simulate token embeddings (normally from embedding layer)\n        x = torch.randn(batch_size, seq_len, self.hidden_dim)\n        \n        # Create attention mask (example: mask padding tokens)\n        attention_mask = torch.ones(batch_size, seq_len)\n        \n        # Step 1: Sliding window attention - focus on recent game context\n        print(f\"[MATCH {context.match_id}] Applying sliding window attention...\")\n        x = self.sliding_window_attn(x)\n        \n        # Step 2: Token pruning - remove less critical commentary tokens\n        print(f\"[INNINGS {context.innings_number}] Pruning non-critical tokens...\")\n        x_pruned, importance = self.token_pruner(x, mask=attention_mask)\n        \n        # Step 3: Simulate KV-Cache for generation phase\n        print(f\"[OVERS {context.overs_completed}] Managing KV-Cache for next token generation...\")\n        self.kv_cache.reset()\n        \n        # During generation, for each new token:\n        for gen_step in range(min(5, seq_len)):  # Simulate generating 5 tokens\n            # In practice, new token embeddings come from previous layer output\n            new_token_hidden = torch.randn(batch_size, 1, self.hidden_dim)\n            \n            # Compute keys and values for this token\n            # (In full model, these would come from attention projection layers)\n            new_keys = new_token_hidden\n            new_values = new_token_hidden\n            \n            # Update cache (in production, done for each layer)\n            self.kv_cache.update(0, new_keys, new_values)\n            self.kv_cache.advance_position()\n        \n        # Return processed and optimized representation\n        return x_pruned\n\n# Example usage with cricket context\nif __name__ == \"__main__\":\n    # Simulate a cricket match being processed\n    cricket_context = CricketMatchContext(\n        match_id=\"IND_vs_AUS_2024_ODI\",\n        innings_number=1,\n        overs_completed=25,\n        tokens=torch.randint(0, 50000, (2, 512)),  # Batch of 2, 512 tokens each\n        player_names=[\"Rohit Sharma\", \"Virat Kohli\", \"Jasprit Bumrah\", \"Siraj\", \"Dhoni\"]\n    )\n    \n    # Initialize optimized inference pipeline\n    llm_inference = OptimizedLLMInference(hidden_dim=768, num_layers=24)\n    \n    # Process the cricket match context\n    print(f\"Processing cricket match: {cricket_context.match_id}\")\n    print(f\"Match state: Innings {cricket_context.innings_number}, {cricket_context.overs_completed} overs completed\\n\")\n    \n    output = llm_inference.process_cricket_match_context(cricket_context)\n    print(f\"\\nOutput shape: {output.shape}\")\n    print(f\"Successfully processed match with optimized inference techniques!\")\n    print(f\"Players in context: {', '.join(cricket_context.player_names)}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The code demonstrates how sliding window attention, token pruning, and KV-cache optimization work together in an integrated system. The `SlidingWindowAttention` class implements the core attention computation restricted to a local window (256 tokens), computing attention scores only for token pairs within this window rather than all pairs across the 512-token sequence. Notice how the inner loop `for i in range(seq_len)` operates on windows—for token position 100, attention is computed only against tokens 0-100 (within the window), not against all 512 tokens, reducing computation from 512² to 256². The `TokenPruningLayer` scores each token's importance using a learned scorer network and masks out tokens below a threshold (0.25), simulating how the model identifies and discards less critical tokens like repeated punctuation or filler words. Critically, it preserves position 0 and position -1 (like keeping the player names and match conclusion), demonstrating that pruning is selective, not random. The `KVCacheManager` simulates how inference stores computed key-value pairs during generation: for each new token generated (5 iterations in the example), new keys and values are cached at the current position, and the position counter advances. This avoids recomputing keys/values for all previous tokens. The `CricketMatchContext` dataclass anchors the computation in our domain: storing match metadata, player names, and token sequences. The main execution flow processes a fictional India vs Australia ODI match context through all three optimization techniques sequentially, showing how each layer reduces computational burden: sliding window reduces O(n²) to O(n×w), pruning zeros out unimportant tokens, and KV-cache ensures generation doesn't recalculate previous states. The print statements show the match progression (overs completed, innings number) to reinforce the cricket domain context.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "",
+      "language": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The internal mechanics of these optimization techniques involve several layers of computation and memory management operating at hardware level. When sliding window attention executes on a GPU, the attention kernel loads query vectors for position t into fast GPU cache (SRAM), then iterates through key-value pairs in the window (positions t-256 to t) from HBM (GPU main memory). The matrix multiplication Q @ K^T computes attention scores; for a 256-token window, this is 256 dot products rather than 4096, reducing both arithmetic operations and memory bandwidth consumption. The complexity reduction is non-trivial at scale: a 7B parameter model with 32 attention heads, 128D head dimension, and 4096-token context processes 4096² = 16M attention pairs with full attention, but only 4096 × 256 = 1M pairs with sliding window—a 16x reduction in operations and memory transfers. Token pruning executes as a two-stage pipeline: first, the importance scorer network (a small linear layer) scores all tokens in parallel (O(n) per layer), producing importance probabilities; second, a masking operation zeros out tensors at positions where importance < threshold. This masking is implemented as element-wise multiplication in GPU kernels (highly optimized), preserving gradient flow during training but zeroing gradients for pruned positions during backprop. The memory impact is significant—a pruned token contributes zero parameters to downstream layers, effectively removing it from computation. KV-Cache optimization transforms the memory-computation trade-off: instead of O(n²) memory for storing attention scores for all pairs (a 4096×4096 matrix at 4 bytes per float is 64 MB), the system stores O(n) cache of pre-computed keys and values (2 × seq_len × hidden_dim = 2 × 4096 × 768 × 4 bytes ≈ 24 MB), a 2.7x memory reduction. However, this trades memory for bandwidth: during generation, the model must load the entire KV-cache from main memory for each new token, creating a bandwidth bottleneck. On an A100 GPU (900 GB/s bandwidth), loading a 2K-token KV cache of 24 MB takes ~25 microseconds, and with modern 40-50K tokens per second throughput, this becomes the limiting factor. The technical solution involves kernel fusion: combining the attention computation, softmax, and value projection into a single GPU kernel to reduce memory roundtrips, exactly like Flash-Attention does—reading KV from HBM once, computing attention in registers/SRAM, and writing output directly, bypassing intermediate memory transfers.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider the infrastructure supporting a Test match broadcast—the production truck with video feeds, graphics systems, and commentary infrastructure. Normally, the director (controlling all 8-10 camera feeds simultaneously) must process every camera view for every second of play (full attention on all inputs), which requires immense bandwidth into the control room and processing power. Using sliding window attention is like the director focusing on the live feed (most recent 3-4 camera angles) for real-time decision-making, while keeping archived footage of the previous 10 overs on nearby storage that can be referenced but doesn't require active bandwidth. When the editor (token pruning) identifies that a particular camera view from fine leg shows nothing of importance (no action, no interesting crowd reaction), the production team simply doesn't send that camera's feed into the active processing pipeline—the camera runs, but its output is masked out, saving bandwidth. The KV-Cache is like the graphics operator's memory system: instead of re-rendering the match scorecard and statistics from raw play-by-play data for every update (which would be impossibly slow), the operator maintains a running scorecard buffer that's updated incrementally—first update adds Rohit's run count, next update modifies Bumrah's bowling figures—requiring minimal memory bandwidth for updates rather than reconstructing the entire visual from scratch. The kernel fusion (Flash-Attention concept) is like having the director, editor, and graphics operator in the same control room instead of separate facilities—they work with shared memory (fast SRAM), eliminating the delay of sending signals between separate buildings. This parallel reveals why modern LLM inference is fundamentally a hardware optimization challenge: the computational operations are straightforward, but efficiently moving data through the memory hierarchy is the real constraint, exactly as in a broadcast infrastructure where bandwidth and latency matter more than raw processing power.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import torch\nimport torch.nn as nn\nfrom typing import List, Dict, Tuple\nimport numpy as np\nfrom dataclasses import dataclass\n\n@dataclass\nclass BowlerStats:\n    \"\"\"Statistics for a cricket bowler processed by LLM\"\"\"\n    name: str\n    deliveries_count: int\n    economy_rate: float\n    maiden_overs: int\n    wickets: int\n    \nclass GroupedQueryAttention(nn.Module):\n    \"\"\"Grouped-Query Attention reduces KV-Cache size by 8-16x\n    vs Multi-Head Attention by sharing keys/values across query heads\n    \"\"\"\n    def __init__(self",
+      "hidden_dim": "int",
+      "num_query_heads": "int = 8",
+      "num_kv_groups": "int = 1):\n        super().__init__()\n        assert hidden_dim % num_query_heads == 0, \"hidden_dim must be divisible by num_query_heads\"\n        self.hidden_dim = hidden_dim\n        self.num_query_heads = num_query_heads\n        self.num_kv_groups = num_kv_groups\n        self.head_dim = hidden_dim // num_query_heads\n        \n        # Query projections: one per query head\n        self.query_proj = nn.Linear(hidden_dim, hidden_dim)\n        \n        # Key and Value projections: shared across groups\n        # If num_kv_groups=1, single K,V shared across all query heads (extreme compression)\n        # If num_kv_groups=num_query_heads, standard multi-head (no compression)\n        kv_dim = (hidden_dim // num_query_heads) * num_kv_groups\n        self.key_proj = nn.Linear(hidden_dim, kv_dim)\n        self.value_proj = nn.Linear(hidden_dim, kv_dim)\n        \n    def forward(self",
+      "x": "torch.Tensor",
+      "kv_cache": "Tuple[torch.Tensor, torch.Tensor] = None) -> Tuple[torch.Tensor, Tuple]:\n        \"\"\"Forward pass with optional KV-Cache for inference\n        x shape: (batch, seq_len, hidden_dim)\n        Returns: (output, (new_keys, new_values)) for cache updates\n        \"\"\"\n        batch_size, seq_len, _ = x.shape\n        \n        # Project to queries, keys, values\n        Q = self.query_proj(x)  # (batch, seq_len, hidden_dim)\n        K = self.key_proj(x)  # (batch, seq_len, kv_dim)\n        V = self.value_proj(x)  # (batch, seq_len, kv_dim)\n        \n        # Reshape for grouped attention\n        Q = Q.reshape(batch_size, seq_len, self.num_query_heads, self.head_dim)\n        K = K.reshape(batch_size, seq_len, self.num_kv_groups, self.head_dim)\n        V = V.reshape(batch_size, seq_len, self.num_kv_groups, self.head_dim)\n        \n        # Use cache if provided (inference mode)\n        if kv_cache is not None:\n            cached_K, cached_V = kv_cache\n            K = torch.cat([cached_K, K], dim=1)  # Append new keys\n            V = torch.cat([cached_V, V], dim=1)  # Append new values\n        \n        # Compute attention: expand KV groups to match query heads\n        # Each group of queries attends to one K,V pair\n        repeat_factor = self.num_query_heads // self.num_kv_groups\n        K_expanded = K.repeat(1, 1, repeat_factor, 1)  # Expand to match query heads\n        V_expanded = V.repeat(1, 1, repeat_factor, 1)\n        \n        # Scaled dot-product attention\n        scores = torch.matmul(Q, K_expanded.transpose(-2, -1)) / (self.head_dim ** 0.5)\n        attn_weights = torch.softmax(scores, dim=-1)\n        context = torch.matmul(attn_weights, V_expanded)\n        \n        # Reshape back\n        output = context.reshape(batch_size, seq_len, self.hidden_dim)\n        \n        return output, (K, V)\n\nclass SparsePatterned Attention(nn.Module):\n    \"\"\"Sparse attention combining local, strided, and global token patterns\"\"\"\n    def __init__(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "hidden_dim": "int",
+      "local_window": "int = 64",
+      "stride": "int = 16):\n        super().__init__()\n        self.hidden_dim = hidden_dim\n        self.local_window = local_window\n        self.stride = stride\n        self.query_proj = nn.Linear(hidden_dim, hidden_dim)\n        self.key_proj = nn.Linear(hidden_dim, hidden_dim)\n        self.value_proj = nn.Linear(hidden_dim, hidden_dim)\n        \n    def _get_sparse_mask(self",
+      "seq_len": "int",
+      "device": "torch.device) -> torch.Tensor:\n        \"\"\"Create sparse attention pattern: local + strided + global tokens\n        Mask shape: (seq_len, seq_len) - True means attend, False means mask out\n        \"\"\"\n        mask = torch.zeros(seq_len, seq_len, dtype=torch.bool, device=device)\n        \n        for i in range(seq_len):\n            # Local attention: attend to local window around position i\n            local_start = max(0, i - self.local_window // 2)\n            local_end = min(seq_len, i + self.local_window // 2 + 1)\n            mask[i",
+      "local_start": "local_end] = True\n            \n            # Strided attention: attend to positions at regular intervals (like scorecard updates)\n            for j in range(0, i, self.stride):\n                mask[i, j] = True\n            \n            # Global tokens: last token (team captain/decision maker) attends to all\n            # and all attend to last token\n            if i == seq_len - 1:\n                mask[i, :] = True\n            mask[:, seq_len - 1] = True\n        \n        return mask\n    \n    def forward(self",
+      "x": "torch.Tensor) -> torch.Tensor:\n        \"\"\"x shape: (batch, seq_len, hidden_dim)\"\"\"\n        batch_size, seq_len, _ = x.shape\n        device = x.device\n        \n        Q = self.query_proj(x)  # (batch, seq_len, hidden_dim)\n        K = self.key_proj(x)\n        V = self.value_proj(x)\n        \n        # Compute full attention scores\n        scores = torch.matmul(Q, K.transpose(-2, -1)) / (self.hidden_dim ** 0.5)\n        \n        # Get sparse pattern mask\n        sparse_mask = self._get_sparse_mask(seq_len, device)\n        \n        # Apply mask: set non-attended positions to very negative (will become ~0 after softmax)\n        scores = scores.masked_fill(~sparse_mask.unsqueeze(0), float('-inf'))\n        \n        # Attention\n        attn_weights = torch.softmax(scores, dim=-1)\n        attn_weights = attn_weights.masked_fill(~sparse_mask.unsqueeze(0), 0.0)\n        \n        # Apply to values\n        output = torch.matmul(attn_weights, V)\n        \n        return output\n\nclass AdaptiveEarlyExit(nn.Module):\n    \"\"\"Implements layer-wise token pruning: tokens exit early if confidence is high\"\"\"\n    def __init__(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "hidden_dim": "int",
+      "num_layers": "int",
+      "exit_threshold": "float = 0.9):\n        super().__init__()\n        self.hidden_dim = hidden_dim\n        self.num_layers = num_layers\n        self.exit_threshold = exit_threshold\n        \n        # Each layer has an exit classifier\n        self.exit_classifiers = nn.ModuleList([\n            nn.Linear(hidden_dim, 1) for _ in range(num_layers)\n        ])\n        \n    def should_exit(self",
+      "x": "torch.Tensor",
+      "layer_idx": "int) -> Tuple[torch.Tensor, torch.Tensor]:\n        \"\"\"Determine which tokens should exit at this layer\n        Returns: (mask of tokens to keep processing, confidence scores)\n        \"\"\"\n        # Score confidence that token has been processed sufficiently\n        confidence = torch.sigmoid(self.exit_classifiers[layer_idx](x))  # (batch, seq_len, 1)\n        confidence = confidence.squeeze(-1)  # (batch, seq_len)\n        \n        # Mask: True for tokens that should continue (low confidence)\n        continue_mask = (confidence < self.exit_threshold).float()\n        \n        return continue_mask, confidence\n\nclass CricketCommentaryLLM:\n    \"\"\"Advanced LLM system for processing cricket commentary with all optimizations\"\"\"\n    def __init__(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "hidden_dim": "int = 768",
+      "num_layers": "int = 12):\n        self.hidden_dim = hidden_dim\n        self.num_layers = num_layers\n        \n        # GQA: reduces cache to 1/8 size\n        self.gqa_attention = GroupedQueryAttention(hidden_dim, num_query_heads=8, num_kv_groups=1)\n        \n        # Sparse pattern attention for efficient long-context\n        self.sparse_attention = SparsePatternedAttention(hidden_dim, local_window=128, stride=32)\n        \n        # Early exit for adaptive computation\n        self.early_exit = AdaptiveEarlyExit(hidden_dim, num_layers, exit_threshold=0.85)\n        \n        # KV-Cache state\n        self.kv_cache_gqa: Dict[int, Tuple] = {}\n        \n    def estimate_cache_size(self",
+      "seq_len": "int) -> Dict[str, float]:\n        \"\"\"Estimate memory usage for different cache strategies\"\"\"\n        head_dim = self.hidden_dim // 8\n        num_layers = self.num_layers\n        bytes_per_float = 4\n        \n        # Standard multi-head: 2 * seq_len * hidden_dim * num_layers\n        mha_cache_size = 2 * seq_len * self.hidden_dim * num_layers * bytes_per_float / (1024**3)\n        \n        # GQA with 1 KV group: 2 * seq_len * head_dim * num_layers\n        gqa_cache_size = 2 * seq_len * head_dim * num_layers * bytes_per_float / (1024**3)\n        \n        return {\n            \"mha_cache_gb\": mha_cache_size,\n            \"gqa_cache_gb\": gqa_cache_size,\n            \"compression_ratio\": mha_cache_size / gqa_cache_size if gqa_cache_size > 0 else 1\n        }\n    \n    def process_bowler_commentary(self",
+      "bowler": "BowlerStats",
+      "commentary_tokens": "torch.Tensor) -> Dict:\n        \"\"\"Process cricket bowler commentary with advanced optimizations\n        bowler: BowlerStats object\n        commentary_tokens: (batch, seq_len, hidden_dim)\n        \"\"\"\n        batch_size, seq_len, _ = commentary_tokens.shape\n        device = commentary_tokens.device\n        \n        print(f\"\\n{'='*70}\")\n        print(f\"Processing bowler: {bowler.name}\")\n        print(f\"Stats: {bowler.deliveries_count} deliveries, {bowler.economy_rate} economy, {bowler.wickets}W\")\n        print(f\"Input: batch_size={batch_size}, seq_len={seq_len}\")\n        \n        # Estimate cache efficiency\n        cache_stats = self.estimate_cache_size(seq_len)\n        print(f\"\\nCache Efficiency:\")\n        print(f\"  Standard MHA cache: {cache_stats['mha_cache_gb']:.3f} GB\")\n        print(f\"  GQA cache: {cache_stats['gqa_cache_gb']:.3f} GB\")\n        print(f\"  Compression ratio: {cache_stats['compression_ratio']:.1f}x\")\n        \n        # Apply optimizations\n        x = commentary_tokens\n        tokens_exited = torch.zeros(batch_size, seq_len, device=device)\n        layers_processed = torch.ones(batch_size, seq_len, device=device) * self.num_layers\n        \n        for layer_idx in range(self.num_layers):\n            # Early exit check\n            exit_mask, confidence = self.early_exit.should_exit(x, layer_idx % self.early_exit.num_layers)\n            \n            # Count which tokens exit at this layer\n            new_exits = (1 - exit_mask) * (tokens_exited == 0)\n            tokens_exited += new_exits\n            layers_processed = torch.where(new_exits > 0, torch.full_like(layers_processed, layer_idx), layers_processed)\n            \n            # Use sparse attention for even layers, GQA for odd layers (hybrid)\n            if layer_idx % 2 == 0:\n                x = self.sparse_attention(x)\n                attn_type = \"Sparse\"\n            else:\n                x, kv = self.gqa_attention(x)\n                self.kv_cache_gqa[layer_idx] = kv\n                attn_type = \"GQA\"\n            \n            # Zero out positions that have exited\n            x = x * exit_mask.unsqueeze(-1)\n            \n            if layer_idx < 3 or layer_idx == self.num_layers - 1:\n                avg_layers = (self.num_layers - layers_processed).mean().item()\n                print(f\"  Layer {layer_idx}: {attn_type} attention | Avg remaining depth: {avg_layers:.1f} layers\")\n        \n        # Statistics\n        exit_rates = (tokens_exited > 0).float().mean().item()\n        avg_layer_depth = (self.num_layers - layers_processed).mean().item()\n        \n        return {\n            \"output\": x,\n            \"tokens_exited_early\": exit_rates,\n            \"avg_depth\": avg_layer_depth,\n            \"cache_compression\": cache_stats[\"compression_ratio\"],\n            \"bowler_name\": bowler.name\n        }\n\n# Example usage\nif __name__ == \"__main__\":\n    # Cricket bowlers and their statistics\n    bowlers = [\n        BowlerStats(\"Jasprit Bumrah\", deliveries_count=120, economy_rate=5.2, maiden_overs=8, wickets=3),\n        BowlerStats(\"Siraj\", deliveries_count=108, economy_rate=5.8, maiden_overs=5, wickets=2),\n    ]\n    \n    llm = CricketCommentaryLLM(hidden_dim=768, num_layers=12)\n    \n    # Simulate processing 2 batches of commentary, 256 tokens each\n    commentary_tokens = torch.randn(2, 256, 768)\n    \n    print(\"\\nAdvanced LLM Inference Optimizations for Cricket Commentary\\n\")\n    \n    for bowler in bowlers:\n        result = llm.process_bowler_commentary(bowler, commentary_tokens)\n        print(f\"\\nResults for {result['bowler_name']}:\")\n        print(f\"  {result['tokens_exited_early']*100:.1f}% tokens exited early\")\n        print(f\"  Average processing depth: {result['avg_depth']:.1f}/{llm.num_layers} layers\")\n        print(f\"  KV-Cache compression: {result['cache_compression']:.1f}x\")\n        print(f\"  Output shape: {result['output'].shape}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "info_box",
+      "content": "Pro Tip: When optimizing LLMs for production, monitor the memory-bandwidth trade-off carefully. KV-Cache saves computation but creates bandwidth bottlenecks on serving infrastructure. On A100 GPUs, once batch sizes exceed ~32 for a 7B model, you're often bottlenecked by memory bandwidth, not compute. Grouping queries (GQA) with cache compression (reducing cache by 8-16x) can actually reduce latency more than standard approaches, because less data moves through the memory system. Many production systems use multi-query attention (extreme GQA) for the last few layers only, using standard attention in early layers where gradients are more important during training. Measure actual latency with your hardware—theoretical speedups don't always translate to wall-clock improvements due to memory hierarchies and kernel efficiency.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "",
+      "language": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three established patterns dominate production LLM optimization: (1) Progressive Attention—starting with full attention in shallow layers to capture diverse patterns, transitioning to sparse/local attention in deeper layers where representations are more specialized and require less context. This is grounded in the observation that early layers build diverse representations (part-of-speech tags, syntax) requiring broad context, while later layers make specific predictions (is this token an entity?) using local information. Implementations like Longformer use this exact progression. (2) Hybrid Attention Schemes—combining multiple attention patterns in the same model: sliding windows for efficiency, sparse strided patterns for structure, and global token attention for critical decision points (like classification tokens). A typical schedule alternates layer types: even layers use sparse attention, odd layers use sliding windows, creating a checkerboard pattern that allows information to propagate globally while maintaining efficiency. (3) Dynamic Routing Based on Token Properties—using lightweight classifiers to route tokens through different attention paths: rare tokens (detected by embedding rarity in training data) receive full attention, frequent tokens receive sparse attention, padding tokens are masked entirely. This maximizes computation where it matters most and is fundamental to mixture-of-experts and adaptive computation frameworks. The technical rationale for these patterns comes from information theory: not all positions require equal computational investment. A token representing a rare entity name needs rich context to disambiguate, while a space character between words needs minimal processing. These patterns are not theoretical—they're deployed at scale by Anthropic (Claude), Google DeepMind, and OpenAI. The key implementation detail is that pattern selection must be deterministic during inference (no randomness) to enable caching and batching, but can be learned during training through relaxation methods (using soft attention weights to approximate discrete routing decisions).",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A Test match commentary team uses a progressive attention strategy: during the first hour (early layers of the innings), the commentators provide detailed description of every ball—angle of approach, seam position, precise placement, grass conditions—because establishing the match context and understanding the bowlers' strategies requires rich, broad information. As the match progresses to the middle sessions (middle layers), commentators transition to a hybrid approach: they maintain detailed attention on critical moments (a batsman building momentum, a bowler setting a trap) but use sparse attention for routine deliveries (straight balls to a defensive batsman), focusing on scorecard trends (strided patterns: every 10 overs' total) and occasional field changes. By the final session (deeper layers), when the match state is clear and strategic options narrow, commentators use dynamic routing: if a world-class batter like Virat Kohli comes to the crease (rare, high-importance token), they shift to full attention mode; if a lower-order batsman enters facing a worn pitch against experienced bowlers (common, routine situation), they use efficient sparse attention. This progression—detailed early context, hybrid middle processing, dynamic final routing—mirrors exactly how LLMs distribute computation: early layers build diverse feature representations (requiring full context), middle layers combine patterns (using hybrid attention for efficiency), and final layers make specific predictions (using dynamic routing to focus computation on high-value decisions). The insight revealed is that optimal systems don't use a single attention strategy—they adapt the attention pattern to the processing depth and information density, exactly as commentary teams adjust their focus throughout a multi-day match.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}

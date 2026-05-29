@@ -1,0 +1,325 @@
+{
+  "lessonId": "large-language-models-18",
+  "title": "Lesson 19: Large Language Models Part 19",
+  "type": "reading",
+  "topicName": "Large Language Models",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Large Language Models require sophisticated mechanisms to generate text sequentially, token by token, while maintaining coherence, contextual accuracy, and computational efficiency across millions of parameters. The fundamental challenge arises from the autoregressive nature of language generation: at inference time, each new token depends on all previously generated tokens, creating a dependency chain that cannot be parallelized like training. Without proper decoding strategies, models generate incoherent sequences, get trapped in repetitive loops, or collapse into low-probability mode-seeking behavior. This lesson explores the decoding algorithms—beam search, top-k sampling, nucleus sampling, and temperature scaling—that separate production-quality LLM outputs from random gibberish. Understanding these mechanisms is critical because they directly determine whether an LLM produces diverse, contextually appropriate responses or falls into the pathological behaviors that plague naive greedy decoding. In production systems at OpenAI, Anthropic, and Google, decoding strategy accounts for measurable differences in user satisfaction, task success rates, and computational cost-per-request.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma batting in a Test match during the 45th over of an innings. Each ball bowled by Jasprit Bumrah is a timestep, and Rohit must decide his shot (the token to generate) based not only on the bowler's delivery characteristics but on every ball he has faced so far in the innings—the match situation (first innings vs second), the field placement, the run rate pressure, and his own scoring pattern. If Rohit uses a greedy strategy and plays every ball defensively with maximum safety (greedy decoding), he scores slowly and predictably, missing match-winning boundaries. If instead he considers multiple possible shot outcomes simultaneously—an aggressive drive, a careful single, or a defensive block—each with calculated probabilities based on the bowler's skill and field setup (beam search with multiple hypotheses), he can navigate toward an innings that balances risk and reward. The decoding algorithm is Rohit's batting philosophy: whether he commits to the first viable option or explores a distribution of options, how he adjusts confidence based on pressure situations (temperature), and which probabilities he prunes as too risky (top-k filtering). Understanding this reveals why LLMs cannot simply pick the single highest-probability token at each step—doing so creates brittle, mode-seeking behavior just like playing safe cricket leads to predictable, uncompetitive innings.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Greedy Decoding",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Greedy decoding is the simplest autoregressive generation strategy: at each timestep, the model computes the probability distribution over the vocabulary and selects the token with the highest probability, then appends it to the sequence and repeats. Formally, given the conditional probability distribution P(w_t | w_{<t}), greedy decoding chooses w_t = argmax_i P(w_i | w_{<t}). This approach is computationally efficient, requiring only one forward pass per token, and guarantees determinism—identical inputs always produce identical outputs. However, greedy decoding suffers from fundamental theoretical limitations: it cannot recover from locally optimal but globally suboptimal token choices. For example, if the model assigns 30% probability to 'the' and 25% to 'a' at a particular position, greedy selection always picks 'the', but the sequence starting with 'a' might lead to significantly higher overall probability due to better continuations. This myopic behavior causes mode collapse, where the model gravitates toward high-frequency, safe tokens, producing generic, repetitive outputs that fail to capture the long-tail diversity of human language. In production systems, greedy decoding is rarely used for open-ended generation tasks because users consistently report outputs as bland and uncreative, though it remains valuable for deterministic tasks like machine translation or question answering where reproducibility matters more than diversity.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider a bowler in the 15th over of an ODI powerplay facing AB de Villiers, who must select each delivery (the token) with maximum probability of success by the moment of decision. If the bowler uses greedy selection—always throwing the delivery type with the highest success probability against de Villiers historically, say a yorker with 70% containment rate—AB faces a predictable, repetitive pattern. Every over becomes yorkers, yorkers, yorkers. The bowler cannot look ahead to understand that mixing in 20% short balls (lower individual probability but high combo probability with yorkers) would create more effective overall bowling. Greedy bowling, like greedy decoding, locks into locally safe decisions, making the attack mechanically repetitive and vulnerable to adaptation. In contrast, a strategic captain and bowler consider not individual ball probabilities but the cumulative innings impact, understanding that a short-pitched variation (lower immediate success rate) placed strategically can set up a yorker three balls later for higher overall match success. Greedy token selection mirrors greedy bowling: both ignore the impact of future sequences on cumulative quality.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Beam Search",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Beam search is a graph search algorithm that maintains a fixed number k of the most probable partial sequences (hypotheses) at each decoding step, rather than committing to a single greedy choice. At timestep t, the algorithm ranks all possible continuations of the k active hypotheses by their cumulative log-probability, retains the top k candidates, and continues decoding until reaching a stopping criterion (usually an end-of-sequence token or maximum length). The beam width k controls the breadth of exploration: k=1 reduces to greedy decoding, while k=5 typically provides substantial diversity improvement with manageable computational overhead. Each hypothesis maintains its own sequence history and probability accumulator, enabling the algorithm to escape local optima by exploring multiple promising paths simultaneously. Beam search is theoretically optimal in the sense that it is guaranteed to find the k highest-probability complete sequences if allowed to run to completion, though in practice early stopping and heuristics like length normalization modify this optimality. The computational cost scales linearly with beam width: a beam width of 5 requires approximately 5× more forward passes than greedy decoding. Beam search has dominated sequence generation tasks in machine translation and summarization for over a decade, though it tends to produce more grammatical but sometimes less diverse outputs compared to sampling-based methods, because the algorithm's preference for high probability often clusters around conventional phrasings.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli playing a crucial Test match against Australia, where the captain (the model) can maintain five alternative batting strategies simultaneously, each representing a different approach to the next 10 overs. Strategy 1: aggressive scoring against short-pitched bowling. Strategy 2: defensive accumulation against swing bowlers. Strategy 3: counterattack in powerplay overs. Strategy 4: patience in middle overs. Strategy 5: accelerating after 60 overs when conditions favor boundaries. At each over boundary (timestep), the captain reviews the cumulative runs and probability of success for each strategy, prunes the two weakest strategies, and develops the five strongest ones forward into the next over. The beam width of 5 means the captain never abandons promising approaches prematurely but also doesn't explore 1000 simultaneous strategies (computationally infeasible). If a defensive strategy suddenly proves weak after 15 overs due to aggressive Australian bowling, it gets pruned and replaced by a stronger alternative. This is beam search: maintaining multiple hypotheses (batting strategies), ranking by cumulative performance (log-probability), and merging the best ones forward. The key insight is that exploring five carefully selected paths beats exploring one greedy path, because even locally suboptimal looks like defensive batting can compound into globally superior innings.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Temperature Scaling and Sampling",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Temperature scaling modulates the entropy of the probability distribution used for sampling, enabling fine-grained control over output diversity and predictability without modifying the underlying model. The temperature parameter τ transforms the logits (pre-softmax activations) via z'_i = z_i / τ before applying softmax: when τ < 1, the distribution sharpens toward the maximum (more greedy-like), and when τ > 1, the distribution flattens (more uniform, more random). At τ = 1 (default), the original distribution is used; as τ approaches 0, the model becomes deterministic and greedy; as τ increases toward infinity, token selection approaches uniform random. Softmax sampling (also called nucleus sampling or top-p sampling) draws tokens from this modified distribution rather than selecting the argmax, introducing controlled randomness while respecting the model's learned preferences. This contrasts sharply with greedy decoding's determinism and beam search's implicit preference for high-probability sequences. Sampling-based approaches produce more diverse, creative, and human-like outputs because they allow the model to occasionally select lower-probability tokens that reflect the long tail of the distribution—tokens a human would sometimes choose. The effectiveness of sampling is particularly evident in open-ended tasks like creative writing, dialogue, and code generation, where beam search often produces generic or repetitive outputs. Temperature tuning is a critical hyperparameter in production LLM systems: language models like GPT-4 expose temperature as a user-facing parameter precisely because users want control over this diversity-versus-safety tradeoff.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider Rishabh Pant's batting style in a T20 match, where he must select shots across a spectrum of aggression. Imagine his shot selection follows a learned probability distribution: 40% aggressive drives, 35% controlled singles, 15% risky slog shots, 10% defensive blocks. This is the original softmax distribution. Now, if we apply low temperature (τ = 0.3), we sharpen it: 70% aggressive drives, 20% controlled singles, 10% risky shots, 0% defensive blocks. Pant becomes predictably aggressive, like greedy batting. If we increase temperature (τ = 1.5), we flatten it: 25% aggressive drives, 30% controlled singles, 25% risky shots, 20% defensive blocks. Pant becomes more unpredictable, occasionally playing surprising shots he wouldn't normally choose. In actual sampling-based generation, we don't just select the highest-probability shot anymore; instead, we randomly draw from this distribution. A random number generator picks 'risky shot' with 10% probability, adding authentic variance to Pant's approach. This mirrors how LLMs using temperature-based sampling produce more human-like outputs: they occasionally say unexpected but contextually valid words (low-probability tokens) with controlled probability, rather than always playing it safe with the highest-confidence response. Temperature reveals that token selection is not about finding the absolute best option but about calibrating risk and variance to match human creativity.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Top-k and Nucleus (Top-p) Sampling",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Top-k and nucleus sampling are filtering strategies that limit the vocabulary from which tokens are sampled, removing low-probability tokens that introduce incoherence without improving diversity. In top-k sampling, only the k tokens with the highest probability are retained, and the probability distribution is renormalized over this subset; tokens outside the top-k are assigned zero probability. For example, with k=40, the model samples only from the 40 most likely tokens, ignoring the 50,000+ tail tokens that might represent rare words or misspellings. Top-p (nucleus) sampling is more adaptive: it retains tokens in descending probability order until the cumulative probability reaches a threshold p (typically 0.95), then normalizes and samples. If the distribution is very peaked (few tokens dominate), nucleus sampling naturally selects a small number of tokens. If the distribution is flat (uncertainty is high), nucleus sampling selects more tokens to preserve the model's expressed uncertainty. This adaptivity makes nucleus sampling superior to top-k for most applications because it responds to the model's own confidence levels rather than applying a fixed cutoff. Both strategies effectively prevent the incoherence that arises from sampling extremely low-probability tokens—imagine an LLM sampling a token with probability 10^-6 because the probability distribution has a long tail of nonsensical tokens. Combined with temperature scaling, top-p sampling produces text that balances the model's learned preferences with genuine diversity, making it the dominant approach in production language models from OpenAI, Anthropic, and Google. The computational cost is minimal compared to beam search because sampling is highly parallelizable.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine a cricket batter like Steve Smith constructing an innings, where his shot vocabulary includes drives, cuts, pulls, defensive blocks, and 500+ other micro-variations. Top-k sampling is like Smith's coach saying: 'Steve, for this delivery, consider only your 40 most reliable shots based on your practice against this bowler. Forget the experimental techniques you've been trying.' The batter samples from those 40, introducing variation while staying within proven methods. Nucleus (top-p) sampling is smarter: the coach adjusts dynamically based on the bowler type. Against a consistent fast bowler with predictable patterns, Steve's top shots (drives, pulls) are overwhelmingly probable, so nucleus sampling naturally restricts to maybe 15 shot types (high cumulative probability threshold). Against a world-class spinner with unpredictable variations, Steve's uncertainty is high, so nucleus sampling expands to 60 shot types to match his genuine uncertainty about how the ball will behave. This adaptivity is nucleus sampling's core insight: the filter tightens or loosens based on the model's actual confidence, not a fixed parameter. When combined with temperature scaling (which adjusts how sharp the probability distribution is), the batter can simultaneously control both risk tolerance (temperature) and tactical vocabulary scope (p threshold). This mirrors production LLMs: temperature controls variance, nucleus sampling prevents nonsensical tokens, and together they produce both creative and coherent outputs.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "import numpy as np\nimport torch\nimport torch.nn.functional as F\nfrom dataclasses import dataclass\nfrom typing import List, Tuple\n\n@dataclass\nclass CricketMatchConfig:\n    \"\"\"Configuration for cricket-themed LLM decoding simulation.\"\"\"\n    vocab_size: int = 1000  # Represents cricket commentary vocabulary\n    max_sequence_length: int = 50\n    beam_width: int = 3\n    temperature: float = 0.8\n    top_k: int = 40\n    top_p: float = 0.95\n\nclass CricketCommentaryGenerator:\n    \"\"\"Simulates LLM decoding strategies using cricket commentary tokens.\"\"\"\n    \n    def __init__(self, config: CricketMatchConfig):\n        self.config = config\n        # Cricket token mappings\n        self.token_to_word = {\n            0: \"<START>\", 1: \"Rohit\", 2: \"Sharma\", 3: \"drives\", 4: \"down\",\n            5: \"the\", 6: \"ground\", 7: \"Bumrah\", 8: \"bowls\", 9: \"yorker\",\n            10: \"brilliant\", 11: \"delivery\", 12: \"Kohli\", 13: \"edges\",\n            14: \"boundary\", 15: \"four\", 16: \"runs\", 17: \"innings\",\n            18: \"wicket\", 19: \"falls\", 20: \"<END>\"\n        }\n        self.word_to_token = {v: k for k, v in self.token_to_word.items()}\n    \n    def simulate_logits(self, sequence: List[int], step: int) -> torch.Tensor:\n        \"\"\"\n        Simulate logits output from LLM.\n        Higher scores for contextually appropriate cricket tokens.\n        \"\"\"\n        logits = torch.randn(self.config.vocab_size) * 2\n        \n        # Boost cricket-relevant tokens\n        cricket_tokens = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 17, 18, 19, 20]\n        for token_id in cricket_tokens:\n            logits[token_id] += 3.0\n        \n        # Context-based adjustments\n        if 3 in sequence:  # \"drives\" → next likely \"down\"\n            logits[4] += 2.0\n        if 7 in sequence:  # \"Bumrah\" → next likely \"bowls\"\n            logits[8] += 2.0\n        if 20 in sequence:  # \"<END>\" stop decoding\n            logits[20] += 5.0\n        \n        return logits\n    \n    def greedy_decode(self) -> List[int]:\n        \"\"\"Greedy decoding: always select argmax.\"\"\"\n        sequence = [0]  # START token\n        for step in range(self.config.max_sequence_length):\n            logits = self.simulate_logits(sequence, step)\n            next_token = torch.argmax(logits).item()\n            sequence.append(next_token)\n            if next_token == 20:  # END token\n                break\n        return sequence\n    \n    def beam_search_decode(self) -> List[int]:\n        \"\"\"Beam search: maintain k best hypotheses.\"\"\"\n        k = self.config.beam_width\n        # Each hypothesis: (sequence, log_prob)\n        hypotheses = [([0], 0.0)]\n        \n        for step in range(self.config.max_sequence_length):\n            candidates = []\n            for sequence, log_prob in hypotheses:\n                if sequence[-1] == 20:  # Already ended\n                    candidates.append((sequence, log_prob))\n                    continue\n                \n                logits = self.simulate_logits(sequence, step)\n                log_probs = F.log_softmax(logits, dim=0)\n                \n                # Get top k continuations\n                top_log_probs, top_indices = torch.topk(log_probs, k=min(k, len(log_probs)))\n                for idx, log_p in zip(top_indices, top_log_probs):\n                    new_seq = sequence + [idx.item()]\n                    new_log_prob = log_prob + log_p.item()\n                    candidates.append((new_seq, new_log_prob))\n            \n            # Keep top k candidates\n            candidates.sort(key=lambda x: x[1], reverse=True)\n            hypotheses = candidates[:k]\n            \n            # Check if all hypotheses ended\n            if all(h[0][-1] == 20 for h in hypotheses):\n                break\n        \n        # Return best hypothesis\n        return hypotheses[0][0]\n    \n    def nucleus_sampling_decode(self) -> List[int]:\n        \"\"\"Nucleus (top-p) sampling with temperature.\"\"\"\n        sequence = [0]\n        for step in range(self.config.max_sequence_length):\n            logits = self.simulate_logits(sequence, step)\n            # Apply temperature\n            logits = logits / self.config.temperature\n            probs = F.softmax(logits, dim=0)\n            \n            # Nucleus sampling (top-p)\n            sorted_probs, sorted_indices = torch.sort(probs, descending=True)\n            cumsum_probs = torch.cumsum(sorted_probs, dim=0)\n            sorted_indices_to_remove = cumsum_probs > self.config.top_p\n            sorted_indices_to_remove[0] = False  # Keep at least one token\n            \n            filtered_probs = sorted_probs.clone()\n            filtered_probs[sorted_indices_to_remove] = 0\n            filtered_probs = filtered_probs / filtered_probs.sum()\n            \n            # Sample from filtered distribution\n            next_token = torch.multinomial(filtered_probs, 1).item()\n            sequence.append(next_token)\n            \n            if next_token == 20:\n                break\n        \n        return sequence\n    \n    def sequence_to_commentary(self, sequence: List[int]) -> str:\n        \"\"\"Convert token sequence to cricket commentary.\"\"\"\n        words = []\n        for token_id in sequence:\n            if token_id in self.token_to_word:\n                word = self.token_to_word[token_id]\n                if word != \"<START>\" and word != \"<END>\":\n                    words.append(word)\n        return \" \".join(words)\n\n# Demonstration\nif __name__ == \"__main__\":\n    config = CricketMatchConfig(beam_width=3, temperature=0.8, top_p=0.95)\n    generator = CricketCommentaryGenerator(config)\n    \n    print(\"=== Cricket Commentary Generation ===\")\n    print()\n    \n    # Greedy decoding\n    greedy_seq = generator.greedy_decode()\n    print(f\"Greedy Decoding: {generator.sequence_to_commentary(greedy_seq)}\")\n    \n    # Beam search\n    beam_seq = generator.beam_search_decode()\n    print(f\"Beam Search (k=3): {generator.sequence_to_commentary(beam_seq)}\")\n    \n    # Nucleus sampling\n    nucleus_seq = generator.nucleus_sampling_decode()\n    print(f\"Nucleus Sampling (p=0.95, τ=0.8): {generator.sequence_to_commentary(nucleus_seq)}\")\n",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The CricketCommentaryGenerator demonstrates all four decoding strategies operating on simulated LLM logits. The simulate_logits method generates probability distributions that favor cricket-relevant tokens (player names, cricket actions) while maintaining realism through random variation. Greedy decoding simply selects argmax at each step, producing deterministic but potentially monotonous sequences. Beam search maintains three competing hypotheses, tracking their cumulative log-probabilities and pruning weak candidates at each step—notice how it explores multiple promising paths before committing to the best one. Nucleus sampling applies temperature scaling to the logits (lower values sharpen, higher values flatten the distribution), then implements top-p filtering by sorting probabilities, computing cumulative sums, and masking tokens beyond the 95% threshold. The final sequence_to_commentary method converts token IDs back to cricket terminology. When you run this code with different random seeds, you'll observe that greedy decoding produces highly repetitive commentary, beam search generates more coherent multi-token phrases, and nucleus sampling produces diverse yet contextually valid variations. This directly mirrors production LLM behavior: users prefer the diversity and creativity of sampling over the deterministic brittleness of greedy decoding, while beam search occupies a middle ground useful for structured prediction tasks.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At runtime, LLM decoding operates on a fundamental constraint: autoregressive generation cannot be parallelized across time steps because each token depends causally on previous tokens. The forward pass computes logits for the entire vocabulary given the accumulated context, then the decoding algorithm selects one or multiple continuations and feeds them back as context for the next step. Beam search requires maintaining k independent state vectors and k independent forward passes per timestep, so decoding a 100-token sequence with beam width 5 requires 500 forward passes versus 100 for greedy decoding. Modern implementations use KV-cache optimization: intermediate key-value activations from the transformer are cached and reused, so each new forward pass only computes the attention and feedforward for the new token, not the entire sequence. Without KV-caching, decoding would be prohibitively slow. In nucleus sampling, the softmax computation is identical to training, but the multinomial sampling operation (torch.multinomial) introduces stochasticity at the numerical level—the random number generator determines which token is sampled from the filtered distribution. Temperature scaling modifies logits before softmax, mathematically increasing entropy without changing the model's learned parameters. Numerically, dividing logits by temperature < 1 increases the magnitude of differences between tokens (sharper distribution), while τ > 1 decreases differences (flatter). The top-p filtering operation requires a full sort of the vocabulary (O(V log V) where V is vocabulary size, typically 50k), making it more expensive than top-k which can use a partial sort. In production systems like OpenAI's API, the choice between greedy, sampling, and beam search is determined by the use case: deterministic code generation uses low temperature; creative writing uses nucleus sampling with τ ≈ 0.7-1.2; summarization often uses beam search. Memory overhead scales with beam width: storing k sequences each of length L requires k×L×d_model parameters in GPU memory, where d_model is hidden dimension. For large models (70B parameters), even beam width 3 can require additional GPU memory, making sampling the default for production deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider Mumbai Indians' strategy when Rohit Sharma must bat through 20 overs in a T20 match. Each over (timestep) requires Rohit to physically play balls sequentially—he cannot fast-forward to over 15 and play backwards to over 5. His coaching staff (the model) communicates recommended shots (logits) to Rohit at each ball, but Rohit must commit to one actual shot and face the outcome before receiving advice for the next ball. Greedy batting would mean Rohit always plays the shot with the highest probability of success for that single ball—a defensive block if the ball is short. Over 20 overs, this produces safe but predictable cricket. Beam search is like Rohit maintaining three simultaneous mental simulations: Strategy A (aggressive), Strategy B (balanced), Strategy C (cautious). After each over, he prunes the weakest strategy and develops the two strongest ones forward, keeping his overall innings flexible. Temperature scaling is like adjusting Rohit's risk tolerance: at τ = 0.3, he becomes ultra-conservative (low temperature = sharper distribution = fewer aggressive shots attempted). At τ = 1.5, he relaxes and attempts more varied shots. KV-caching is the coaching staff's efficiency: instead of fully re-analyzing Rohit's stance, guard position, and scoring patterns before each ball, they reuse their previous analysis and only compute what's new for the current delivery—dramatically speeding up their advice cycle. Without KV-caching, the coaching staff would re-do a 10-minute biomechanical analysis before each ball, making the game impossibly slow. This underground mechanics mirrors how transformers would become orders of magnitude slower without KV-cache.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "import torch\nimport torch.nn.functional as F\nfrom typing import Dict, List, Tuple\nimport math\n\nclass AdvancedCricketDecodingEngine:\n    \"\"\"\n    Production-grade LLM decoding engine with optimizations.\n    Demonstrates KV-cache, length normalization, and repetition penalty.\n    \"\"\"\n    \n    def __init__(self, vocab_size: int = 1000, hidden_dim: int = 128):\n        self.vocab_size = vocab_size\n        self.hidden_dim = hidden_dim\n        self.cricket_tokens = {\n            \"Rohit\": 1, \"Sharma\": 2, \"century\": 3, \"drives\": 4,\n            \"Bumrah\": 5, \"bowls\": 6, \"wicket\": 7, \"boundary\": 8,\n            \"four\": 9, \"six\": 10, \"runs\": 11, \"partnership\": 12,\n            \"batting\": 13, \"average\": 14, \"strike\": 15, \"rate\": 16,\n            \"maiden\": 17, \"over\": 18, \"powerplay\": 19, \"innings\": 20,\n            \"<END>\": 21\n        }\n    \n    def forward_pass_with_cache(self, tokens: List[int], \n                                past_cache: Dict = None) -> Tuple[torch.Tensor, Dict]:\n        \"\"\"\n        Simulate transformer forward pass with KV-cache.\n        In real implementation, this would run the actual model.\n        \"\"\"\n        batch_size, seq_len = 1, len(tokens)\n        logits = torch.randn(1, self.vocab_size) * 2.0\n        \n        # Boost cricket tokens based on context\n        cricket_token_ids = list(self.cricket_tokens.values())\n        for token_id in cricket_token_ids:\n            if token_id < self.vocab_size:\n                logits[0, token_id] += 2.5\n        \n        # Context-aware boosting\n        if 1 in tokens:  # \"Rohit\"\n            logits[0, 2] += 1.5  # \"Sharma\" more likely\n            logits[0, 4] += 1.0  # \"drives\" more likely\n        \n        if 5 in tokens:  # \"Bumrah\"\n            logits[0, 6] += 1.5  # \"bowls\" more likely\n            logits[0, 7] += 0.8  # \"wicket\" more likely\n        \n        # Simulate KV-cache: store attention states\n        new_cache = {\n            'key_states': torch.randn(1, seq_len, self.hidden_dim),\n            'value_states': torch.randn(1, seq_len, self.hidden_dim),\n            'sequence': tokens\n        }\n        \n        return logits, new_cache\n    \n    def apply_repetition_penalty(self, logits: torch.Tensor, \n                                 sequence: List[int], \n                                 penalty: float = 1.2) -> torch.Tensor:\n        \"\"\"\n        Penalize logits for tokens already in sequence.\n        Prevents boring repetition in generated text.\n        \"\"\"\n        logits = logits.clone()\n        for token_id in set(sequence):\n            if token_id < self.vocab_size:\n                if logits[0, token_id] > 0:\n                    logits[0, token_id] = logits[0, token_id] / penalty\n                else:\n                    logits[0, token_id] = logits[0, token_id] * penalty\n        return logits\n    \n    def length_normalized_beam_search(self, max_length: int = 30,\n                                     beam_width: int = 3) -> List[int]:\n        \"\"\"\n        Beam search with length normalization to prevent short-sequence bias.\n        \n        Without length normalization, beam search prefers shorter sequences\n        because each token multiplication lowers log-prob. With normalization,\n        we divide by sequence length to encourage longer, more complete outputs.\n        \"\"\"\n        k = beam_width\n        # (sequence, total_log_prob, num_tokens)\n        hypotheses = [([21], 0.0, 1)]  # Start token\n        \n        for step in range(max_length):\n            candidates = []\n            \n            for sequence, log_prob, num_tokens in hypotheses:\n                if sequence[-1] == 21:  # END token\n                    candidates.append((sequence, log_prob, num_tokens))\n                    continue\n                \n                logits, cache = self.forward_pass_with_cache(sequence)\n                logits = self.apply_repetition_penalty(logits, sequence, penalty=1.15)\n                log_probs = F.log_softmax(logits, dim=-1)[0]\n                \n                # Normalize by length to penalize short sequences\n                length_normalized_scores = []\n                for token_id, log_p in enumerate(log_probs):\n                    new_log_prob = log_prob + log_p.item()\n                    new_num_tokens = num_tokens + 1\n                    # Length normalization: divide by (num_tokens)^alpha\n                    normalized_score = new_log_prob / (new_num_tokens ** 0.75)\n                    length_normalized_scores.append((normalized_score, token_id, new_log_prob, new_num_tokens))\n                \n                # Top k by normalized score\n                top_k_scores = sorted(length_normalized_scores, reverse=True)[:k]\n                for norm_score, token_id, actual_log_prob, new_num_tokens in top_k_scores:\n                    new_seq = sequence + [token_id]\n                    candidates.append((new_seq, actual_log_prob, new_num_tokens))\n            \n            # Select top k candidates by normalized score (NOT actual log prob)\n            candidates_with_scores = [\n                ((seq, lp, nt), lp / (nt ** 0.75)) for seq, lp, nt in candidates\n            ]\n            candidates_with_scores.sort(key=lambda x: x[1], reverse=True)\n            hypotheses = [x[0] for x in candidates_with_scores[:k]]\n            \n            if all(h[0][-1] == 21 for h in hypotheses):\n                break\n        \n        best_seq, _, _ = max(hypotheses, key=lambda x: x[1] / (x[2] ** 0.75))\n        return best_seq\n    \n    def temperature_aware_top_k_sampling(self, temperature: float = 0.9,\n                                        top_k: int = 40,\n                                        max_length: int = 30) -> List[int]:\n        \"\"\"\n        Temperature-scaled top-k sampling.\n        Combines deterministic filtering (top-k) with stochastic sampling.\n        \"\"\"\n        sequence = [21]  # START\n        \n        for step in range(max_length):\n            logits, cache = self.forward_pass_with_cache(sequence)\n            logits = self.apply_repetition_penalty(logits, sequence)\n            \n            # Apply temperature\n            logits = logits / temperature\n            \n            # Top-k filtering\n            top_k_logits, top_k_indices = torch.topk(logits, k=min(top_k, self.vocab_size), dim=-1)\n            top_k_probs = F.softmax(top_k_logits, dim=-1)\n            \n            # Sample from top-k distribution\n            sampled_idx_in_topk = torch.multinomial(top_k_probs, 1).item()\n            next_token = top_k_indices[0, sampled_idx_in_topk].item()\n            \n            sequence.append(next_token)\n            if next_token == 21:  # END token\n                break\n        \n        return sequence\n    \n    def sequence_to_commentary(self, sequence: List[int]) -> str:\n        \"\"\"Convert tokens to cricket commentary.\"\"\"\n        reverse_mapping = {v: k for k, v in self.cricket_tokens.items()}\n        words = []\n        for token_id in sequence:\n            if token_id in reverse_mapping and reverse_mapping[token_id] != \"<END>\":\n                words.append(reverse_mapping[token_id])\n        return \" \".join(words)\n\n# Demonstration\nif __name__ == \"__main__\":\n    engine = AdvancedCricketDecodingEngine()\n    \n    print(\"=== Advanced Decoding Techniques ===\")\n    print()\n    \n    # Length-normalized beam search\n    seq_beam = engine.length_normalized_beam_search(beam_width=3, max_length=20)\n    print(f\"Length-Normalized Beam Search: {engine.sequence_to_commentary(seq_beam)}\")\n    \n    # Temperature-aware top-k sampling\n    seq_topk_cool = engine.temperature_aware_top_k_sampling(temperature=0.6, top_k=20)\n    print(f\"Top-k Sampling (τ=0.6, k=20): {engine.sequence_to_commentary(seq_topk_cool)}\")\n    \n    seq_topk_warm = engine.temperature_aware_top_k_sampling(temperature=1.2, top_k=50)\n    print(f\"Top-k Sampling (τ=1.2, k=50): {engine.sequence_to_commentary(seq_topk_warm)}\")\n",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "info_box",
+      "content": "Pro Tip: In production LLM services, the decoding choice directly impacts both latency and cost. Nucleus sampling with τ ≈ 0.85-1.0 offers the best balance: it's nearly as fast as greedy (single forward pass per token, can be batched), produces diverse outputs users prefer, and avoids the 3-5× latency overhead of beam search. However, for tasks requiring deterministic outputs (code generation, data extraction, fact retrieval), prefer low temperature (0.1-0.3) or beam search to avoid hallucinations. Google's production language models use repetition penalties and length normalization by default because these prevent degenerate outputs (endless repetition, premature termination) without the computational cost of beam search.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant patterns have emerged in production LLM systems through empirical validation and scale. First, the adaptive decoding pattern: rather than committing to a single strategy globally, systems detect the task type (creative vs. deterministic) at runtime and adjust temperature, sampling method, and filtering parameters accordingly. OpenAI's API exposes a 'presence_penalty' parameter that penalizes token repetition similar to the engine above, increasing diversity at minimal computational cost. Second, the constraint satisfaction pattern: many production tasks require outputs to satisfy hard constraints (valid JSON, specific length, vocabulary restrictions), so decoding algorithms are wrapped with constraint checkers that either reject invalid sequences or resample until constraints are satisfied. For example, code generation models often constrain the sampling to emit valid Python syntax using incremental parsing feedback. Third, the multi-path evaluation pattern: instead of committing to a single generation, systems generate k candidates using different random seeds (with fixed temperature and sampling strategy) and score them using a secondary evaluator—a rewards model trained to rate quality, factuality, or task-specific appropriateness. This amortizes the cost of generation because multiple candidates are decoded in parallel on accelerators. The theoretical justification is that the primary LLM's intrinsic probabilities are often poorly calibrated (mode-seeking), so explicit ranking by a specialized evaluator produces higher-quality outputs than greedy selection from the primary model's distribution.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: India's cricket team employs adaptive decoding when selecting a match strategy. For a Test match against South Africa in Johannesburg (difficult, unpredictable conditions like creative generation), they use a flexible approach: allow batsmen creative shot selection (high temperature), accept some risk of getting out to bad shots (higher tail probability tokens), but focus on overall innings partnership (diverse outputs over long sequences). For a T20 match on a flat Dubai pitch (deterministic, predictable like code generation), they lock in a fixed aggressive batting order (low temperature), minimal experimentation (top-k filtering), and clear execution (high-probability strategies). The captain selects the strategy—adaptive decoding—based on match context. The 'constraint satisfaction pattern' is like a batter with specific instructions: Rohit Sharma must score 35 runs in the next 30 balls to keep India competitive in a chase. His shots are constrained to high-probability boundaries and singles that accumulate toward the target. Invalid strategies (like playing for entertainment rather than team goal) get rejected and resampled. The 'multi-path evaluation pattern' mirrors how India's coaching staff develops three alternative batting plans pre-match (paths generated), then during play evaluates which plan is working against the opponent's bowling (secondary evaluator/rewards model), and dynamically switches if one approach falters. By parallel thinking through multiple scenarios rather than committing to the first plan, the team adapts better to unforeseen match dynamics.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "import torch\nimport torch.nn.functional as F\nfrom typing import List, Callable\nfrom enum import Enum\n\nclass TaskType(Enum):\n    CREATIVE = \"creative\"      # Narrative, dialogue, code\n    DETERMINISTIC = \"deterministic\"  # Translation, extraction, summarization\n    BALANCED = \"balanced\"      # General Q&A\n\nclass AdaptiveDecodingStrategy:\n    \"\"\"\n    Best Practice: Adaptive decoding that adjusts parameters by task type.\n    Demonstrates how production systems route to different strategies.\n    \"\"\"\n    \n    def __init__(self):\n        self.cricket_vocab = {\n            \"Virat\": 1, \"Kohli\": 2, \"aggressive\": 3, \"batting\": 4,\n            \"KL\": 5, \"Rahul\": 6, \"steady\": 7, \"partnership\": 8,\n            \"Bumrah\": 9, \"yorker\": 10, \"death\": 11, \"bowling\": 12,\n            \"Siraj\": 13, \"pace\": 14, \"swing\": 15, \"India\": 16,\n            \"wins\": 17, \"century\": 18, \"trophy\": 19, \"<END>\": 20\n        }\n    \n    def estimate_task_type(self, prompt: str) -> TaskType:\n        \"\"\"\n        Heuristic to detect task type from prompt.\n        Real systems use more sophisticated classification.\n        \"\"\"\n        creative_keywords = [\"write\", \"create\", \"story\", \"imagine\", \"code\", \"poem\"]\n        deterministic_keywords = [\"translate\", \"summarize\", \"extract\", \"factual\", \"json\"]\n        \n        prompt_lower = prompt.lower()\n        creative_score = sum(1 for kw in creative_keywords if kw in prompt_lower)\n        deterministic_score = sum(1 for kw in deterministic_keywords if kw in prompt_lower)\n        \n        if creative_score > deterministic_score:\n            return TaskType.CREATIVE\n        elif deterministic_score > creative_score:\n            return TaskType.DETERMINISTIC\n        else:\n            return TaskType.BALANCED\n    \n    def get_decoding_params(self, task_type: TaskType) -> dict:\n        \"\"\"\n        Return decoding hyperparameters optimized for task type.\n        This is the core of adaptive decoding.\n        \"\"\"\n        params = {\n            TaskType.CREATIVE: {\n                'temperature': 0.95,\n                'top_p': 0.98,\n                'top_k': 100,\n                'repetition_penalty': 1.05,\n                'presence_penalty': 0.1,\n                'frequency_penalty': 0.0,\n                'beam_width': 1,  # Use sampling instead\n                'num_return_sequences': 1\n            },\n            TaskType.DETERMINISTIC: {\n                'temperature': 0.3,\n                'top_p': 0.9,\n                'top_k': 20,\n                'repetition_penalty': 1.5,\n                'presence_penalty': 0.6,\n                'frequency_penalty': 0.2,\n                'beam_width': 3,\n                'num_return_sequences': 1\n            },\n            TaskType.BALANCED: {\n                'temperature': 0.7,\n                'top_p': 0.95,\n                'top_k': 40,\n                'repetition_penalty': 1.2,\n                'presence_penalty': 0.3,\n                'frequency_penalty': 0.1,\n                'beam_width': 1,\n                'num_return_sequences': 1\n            }\n        }\n        return params[task_type]\n    \n    def apply_penalties(self, logits: torch.Tensor, \n                       sequence: List[int],\n                       repetition_penalty: float = 1.2,\n                       presence_penalty: float = 0.1,\n                       frequency_penalty: float = 0.0) -> torch.Tensor:\n        \"\"\"\n        Apply multiple penalties to reduce repetition and encourage diversity.\n        \"\"\"\n        logits = logits.clone()\n        \n        # Count token frequencies in sequence\n        token_counts = {}\n        for token_id in sequence:\n            token_counts[token_id] = token_counts.get(token_id, 0) + 1\n        \n        # Repetition penalty: penalize tokens that appear multiple times\n        for token_id, count in token_counts.items():\n            if token_id < logits.shape[-1]:\n                if logits[0, token_id] > 0:\n                    logits[0, token_id] = logits[0, token_id] / (repetition_penalty ** count)\n                else:\n                    logits[0, token_id] = logits[0, token_id] * (repetition_penalty ** count)\n        \n        # Presence penalty: reduce probability of any repeated token\n        for token_id in set(sequence):\n            if token_id < logits.shape[-1]:\n                logits[0, token_id] -= presence_penalty\n        \n        # Frequency penalty: scale reduction by frequency\n        for token_id, count in token_counts.items():\n            if token_id < logits.shape[-1]:\n                logits[0, token_id] -= frequency_penalty * count\n        \n        return logits\n    \n    def adaptive_generate(self, prompt: str, max_length: int = 20) -> str:\n        \"\"\"\n        Generate text with adaptive parameters based on task type.\n        \"\"\"\n        task_type = self.estimate_task_type(prompt)\n        params = self.get_decoding_params(task_type)\n        \n        print(f\"Detected task: {task_type.value}\")\n        print(f\"Parameters: T={params['temperature']}, p={params['top_p']}, k={params['top_k']}\")\n        \n        sequence = [1]  # START\n        \n        for step in range(max_length):\n            # Simulate logits\n            logits = torch.randn(1, 20) * 1.5\n            \n            # Apply penalties\n            logits = self.apply_penalties(\n                logits, sequence,\n                repetition_penalty=params['repetition_penalty'],\n                presence_penalty=params['presence_penalty'],\n                frequency_penalty=params['frequency_penalty']\n            )\n            \n            # Apply temperature\n            logits = logits / params['temperature']\n            \n            # Top-k filtering\n            top_k = params['top_k']\n            top_k_logits, top_k_indices = torch.topk(logits, k=min(top_k, 20), dim=-1)\n            top_k_probs = F.softmax(top_k_logits, dim=-1)\n            \n            # Sample or use beam search based on beam_width\n            if params['beam_width'] == 1:\n                # Sampling\n                sampled_idx = torch.multinomial(top_k_probs[0], 1).item()\n                next_token = top_k_indices[0, sampled_idx].item()\n            else:\n                # Simplified greedy for demonstration\n                next_token = top_k_indices[0, torch.argmax(top_k_probs[0])].item()\n            \n            sequence.append(next_token)\n            if next_token == 20:  # END\n                break\n        \n        # Convert to words\n        reverse_vocab = {v: k for k, v in self.cricket_vocab.items()}\n        words = [reverse_vocab.get(t, f\"[{t}]\") for t in sequence if t != 20]\n        return \" \".join(words)\n\n# Demonstration\nif __name__ == \"__main__\":\n    strategy = AdaptiveDecodingStrategy()\n    \n    print(\"=== Adaptive Decoding Pattern ===\")\n    print()\n    \n    prompts = [\n        \"Write a cricket story about Virat Kohli\",\n        \"Summarize India's Test cricket performance\",\n        \"Describe Bumrah's death bowling technique\"\n    ]\n    \n    for prompt in prompts:\n        print(f\"Prompt: {prompt}\")\n        output = strategy.adaptive_generate(prompt)\n        print(f\"Output: {output}\")\n        print()\n",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: A common beginner mistake is applying repetition penalties too aggressively, which causes the model to avoid important repeated words like proper nouns ('Rohit', 'India') or essential pronouns ('he', 'she'). This creates grammatically incorrect output. Always examine the generated text for this artifact. The fix is to whitelist common, necessary tokens from penalties (e.g., skip penalties on the 100 most frequent tokens), or use lower penalty values (1.1 instead of 1.5). Another critical error is assuming beam search always produces better outputs than sampling—in practice, beam search's mode-seeking nature produces generic, safe outputs for open-ended tasks, while sampling with moderate temperature produces more creative, human-preferred outputs. Test both on your specific task and evaluate with human judges, not just automatic metrics.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Decoding strategy selection is a critical production decision at every major LLM deployment. OpenAI's GPT-4 API exposes temperature as a user-facing parameter (0-2 range) because different tasks demand different strategies: a question-answering bot uses temperature 0.3 for factual accuracy; a creative writing assistant uses 0.9 for diversity; a code generation tool uses 0.1 for syntactic correctness. Anthropic's Claude uses nucleus sampling by default with configurable top_p, as their empirical research found it outperforms greedy and beam search on human preference evaluations. Google's PaLM and LaMDA models use a combination of nucleus sampling with repetition penalties to balance quality and diversity. In industry applications: (1) customer support chatbots use low temperature with beam search or greedy decoding to ensure consistent, accurate responses; (2) content generation platforms use nucleus sampling with τ ≈ 0.8-1.0 to balance creativity and quality; (3) medical and legal document systems use deterministic beam search with length normalization to ensure complete, thorough outputs. The real-world impact is substantial—a 2023 study showed that switching from greedy to nucleus sampling on GPT-3.5 improved human preference ratings by 12-15% with zero model changes, only decoding strategy adjustments. At scale (millions of requests daily), the choice between greedy (0.1s latency) and beam search (0.3-0.5s latency) translates to millions of dollars in infrastructure cost. This is why adaptive decoding is becoming industry standard: systems detect task type and route to the appropriate strategy, maximizing both quality and efficiency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Greedy decoding (argmax selection) is computationally efficient but produces generic, mode-seeking outputs unsuitable for open-ended generation tasks, though it remains valuable for deterministic applications.",
+        "Beam search maintains k competing hypotheses and explores multiple promising token sequences simultaneously, providing better quality than greedy at 3-5× computational cost, ideal for structured prediction tasks.",
+        "Temperature scaling modulates probability distribution entropy: τ < 1 sharpens distributions toward greedy-like behavior, τ > 1 flattens distributions for more randomness, enabling fine-grained diversity control.",
+        "Nucleus (top-p) sampling adaptively filters vocabulary based on cumulative probability threshold, preventing incoherent low-probability tokens while preserving model's uncertainty, superior to fixed top-k filtering.",
+        "Repetition penalties and presence penalties reduce boring, repetitive outputs by scaling down logits for tokens already in sequence, with strength tunable per application (avoid over-penalizing necessary tokens like pronouns).",
+        "Length normalization in beam search divides accumulated log-probability by sequence length, preventing bias toward short outputs and encouraging complete, thorough generations compared to raw log-probability maximization.",
+        "Adaptive decoding patterns detect task type (creative vs. deterministic) and dynamically select optimal parameters—temperature, sampling method, penalties—enabling single system to excel across diverse applications without retraining."
+      ],
+      "language": "",
+      "level": 2,
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Which decoding strategy is most appropriate for a code generation system where syntactic correctness is critical, and why would high temperature or nucleus sampling with large top-p be problematic?",
+      "items": [
+        "Nucleus sampling with τ=1.2, top_p=0.99 because diversity in code is always preferred",
+        "Greedy decoding or low-temperature beam search because high-probability tokens strongly correlate with valid Python syntax, and sampling introduces risk of malformed code",
+        "Greedy decoding only because beam search adds unnecessary complexity to code generation",
+        "High-temperature nucleus sampling because it generates more creative code solutions"
+      ],
+      "answer": 1,
+      "explanation": "Code generation requires high syntactic correctness, which aligns with the model's highest-probability tokens—valid Python syntax has strong statistical signal in training data. Greedy decoding or low-temperature beam search (0.1-0.3) preserve this by heavily favoring high-probability sequences. High temperature and large top-p expand the sampling distribution to include low-probability tokens, increasing the chance of sampling malformed syntax like mismatched brackets or undefined variables. While creativity matters in code, correctness is paramount; the rare valid creative solution does not justify the many invalid outputs from high-temperature sampling. Production code generation systems (GitHub Copilot, OpenAI Codex) use temperature 0.0-0.2 by default, switching to higher temperatures only when explicitly enabled for exploratory use cases.",
+      "language": "",
+      "level": 2
+    },
+    {
+      "type": "quiz",
+      "content": "In a production system generating customer support responses, an engineer switches from greedy decoding to nucleus sampling with temperature 0.8 and top_p=0.95. Response quality improves, but latency increases from 150ms to 180ms. What is the most likely cause, and what optimization could maintain quality while reducing latency?",
+      "items": [
+        "Nucleus sampling requires beam search, which naturally has higher latency; reduce beam width to 1 to fix the issue",
+        "The increased latency is due to the softmax computation required for probability filtering; implement integer quantization to speed it up",
+        "Nucleus sampling still requires a single forward pass per token (same as greedy), so latency should be identical; the 30ms difference likely comes from sampling operation overhead; use table-based sampling or pre-computed distributions to optimize",
+        "Use greedy decoding again because sampling is inherently slower and cannot be optimized"
+      ],
+      "answer": 2,
+      "explanation": "Nucleus sampling and greedy decoding both require exactly one forward pass per generated token—the algorithmic complexity is identical in that dimension. The latency difference arises from the low-level operations: greedy requires an argmax (fast), while nucleus sampling requires sorting the entire vocabulary (O(V log V) where V ≈ 50k), filtering, and multinomial sampling. Optimization techniques include: pre-computing softmax tables for common temperature values, using approximate top-k algorithms that avoid full sorting, or batching sampling operations across multiple requests. The quality improvement from sampling (12-15% human preference gain) is worth a 30ms latency cost in many applications (chat, content generation), but for latency-critical applications (real-time translation, live captioning), this tradeoff must be explicitly evaluated. Beam search (option 1) would increase latency further, not reduce it. Integer quantization alone won't significantly help softmax computation.",
+      "language": "",
+      "level": 2
+    }
+  ]
+}

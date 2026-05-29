@@ -1,0 +1,263 @@
+{
+  "lessonId": "large-language-models-17",
+  "title": "Lesson 18: Large Language Models Part 18",
+  "type": "hands-on-exercise",
+  "topicName": "Large Language Models",
+  "estimatedMinutes": 55,
+  "xpReward": 100,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "What You'll Build",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "You will construct a fine-tuned Large Language Model specifically optimized for cricket domain tasks. This project demonstrates how transformers can be adapted for specialized vocabulary and context through instruction tuning and parameter-efficient fine-tuning (LoRA). You'll build a system that understands cricket terminology, match statistics, player performance analysis, and strategic commentary generation. The model will handle cricket-specific named entities (player names, team abbreviations, venue names) and produce contextually accurate outputs using domain-specific prompts. By the end, you'll have a working pipeline that accepts cricket match queries and generates informed analytical responses. This hands-on exercise teaches you transfer learning in LLMs—how pre-trained models acquire new domain knowledge through minimal additional training data. You'll implement tokenizer customization, prompt engineering templates, and evaluation metrics tailored to cricket domain accuracy.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: When Rohit Sharma enters an innings, he doesn't rebuild his batting technique from scratch—he applies his foundational skills developed through years of training while adapting his approach to the specific conditions of the pitch, opposition bowling attack, and match situation. Similarly, your base LLM (like GPT-2 or Llama) arrives with general language knowledge from massive pre-training, but to make it excel at cricket analysis, you fine-tune it—much like how Sharma adjusts his strike rotation against spin bowlers in powerplay overs versus death bowling. The foundation (pre-trained weights) stays intact, but you're selectively reinforcing the model's understanding of cricket-specific patterns: how run rates accelerate, why certain batsmen dominate left-arm pace, what makes a successful Duckworth-Lewis chase strategy. Each cricket-specific example you feed during fine-tuning acts like a practice session where the model refines its internal representations of cricket concepts. This is parameter-efficient fine-tuning—you're not retraining the entire 7-billion parameter model, just adding a small LoRA adapter (like adding specialized coaching for one specific skill) rather than changing every single neuron. Understanding this parallel reveals why fine-tuning is so powerful: you get domain expertise without the computational cost of training from scratch, just as elite cricketers develop match-specific adaptations while retaining their core technique.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Prerequisites",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Proficiency with Python 3.9+, including dataclasses, context managers, and JSON handling for configuration and match data",
+        "Understanding of transformer architecture: attention mechanisms, tokenization, embeddings, and the conceptual difference between pre-training and fine-tuning",
+        "Familiarity with PyTorch fundamentals: tensor operations, autograd, DataLoader construction, and custom loss functions for specialized training objectives",
+        "Knowledge of HuggingFace transformers library: loading pre-trained models, working with tokenizers, and using Trainer API for controlled model updates",
+        "Basic cricket domain knowledge: understanding match formats (T20, ODI, Test), batting/bowling terminology, key statistical metrics, and players from major international teams"
+      ],
+      "language": "",
+      "level": 2,
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Setup & Project Structure",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Set up a project directory called cricket_llm_tuner that organizes code, data, and models following MLOps conventions. Install PyTorch (with CUDA support if available), HuggingFace transformers, datasets library, and PEFT for parameter-efficient fine-tuning. Create subdirectories for raw cricket match data, processed datasets in parquet format, model checkpoints, and evaluation results. Use a Python virtual environment to isolate dependencies. Configure a constants file for model names, learning rates, batch sizes, and cricket-specific prompt templates. This structure supports reproducibility and scaling to larger training runs. The project uses a base model like GPT-2 or Llama-2-7b-hf and adds LoRA adapters for cricket domain specialization. Dataset includes match summaries, player statistics, and analytical questions with expected outputs.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "bash",
+      "content": "#!/bin/bash\n# Setup cricket_llm_tuner project structure\n\nmkdir -p cricket_llm_tuner\ncd cricket_llm_tuner\n\n# Create subdirectories\nmkdir -p data/raw data/processed\nmkdir -p models/checkpoints models/adapters\nmkdir -p results/evaluations results/outputs\nmkdir -p notebooks logs\n\n# Create Python virtual environment\npython3.10 -m venv venv\nsource venv/bin/activate\n\n# Upgrade pip and install core dependencies\npip install --upgrade pip setuptools wheel\n\n# Install ML/AI stack\npip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118\npip install transformers==4.36.0 datasets==2.16.0 peft==0.7.0\npip install accelerate==0.25.0 bitsandbytes==0.41.0 wandb==0.16.0\npip install tqdm numpy pandas scikit-learn matplotlib seaborn\n\n# Create project configuration files\ncat > config.py << 'EOF'\n# Configuration for cricket_llm_tuner\n\nMODEL_NAME = \"gpt2\"  # or \"meta-llama/Llama-2-7b-hf\" for stronger base\nLORA_R = 16\nLORA_ALPHA = 32\nLORA_DROPOUT = 0.05\nLORA_TARGET_MODULES = [\"c_attn\"]  # GPT-2 attention modules\n\nBATCH_SIZE = 4\nGRADIENT_ACCUMULATION_STEPS = 4\nLEARNING_RATE = 2e-4\nNUM_EPOCHS = 3\nWARMUP_STEPS = 100\nMAX_SEQ_LENGTH = 512\n\nCRICKET_TERMS = {\n    \"formats\": [\"T20\", \"ODI\", \"Test\", \"Domestic T20\"],\n    \"positions\": [\"Opener\", \"Middle-order\", \"Lower-order\", \"Bowler\"],\n    \"delivery_types\": [\"Pace\", \"Spin\", \"Off-break\", \"Leg-break\", \"Googly\"],\n}\nEOF\n\necho \"✓ Project structure created successfully\"\necho \"✓ Virtual environment ready: source venv/bin/activate\"\necho \"✓ Dependencies installed\"\nls -la",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 1 — Foundation: Cricket Domain Dataset & Tokenizer Configuration",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Step 1 establishes the data pipeline and custom tokenizer configuration. Create a cricket match dataset containing real match summaries, player statistics, and analytical Q&A pairs sourced from IPL, international cricket databases. Build a custom tokenizer that recognizes cricket-specific tokens (player names, team abbreviations like CSK, MI, RCB, venues like MCG) as atomic units to prevent subword fragmentation. Implement data preprocessing that normalizes match records, handles missing statistics, and creates prompt-response pairs following instruction-tuning formats. The tokenizer will map cricket entities correctly—'Virat Kohli' remains one token, not split into subwords, improving downstream model understanding. Create data loaders that batch examples efficiently while respecting sequence length constraints. This foundation ensures the model receives high-quality, domain-aware training signals from the very first epoch.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Before a Test match at Lord's, the England cricket team conducts a detailed preparation strategy—they study detailed match statistics, current weather patterns specific to the venue, recent performance data of Indian players against English conditions, and they assign specific fielding stations based on historical ball-tracking data. Your tokenizer customization is exactly this strategic preparation. Just as the team recognizes that 'Joe Root's technique against Jasprit Bumrah's back-of-length yorker' is a specific match scenario requiring targeted preparation (not generic batting practice), your custom tokenizer ensures 'Jasprit Bumrah' stays intact rather than being fragmented into 'J' + 'asp' + 'rit' + 'Bumrah'. The cricket dataset you curate acts like the match video library—centuries of innings footage analyzed to extract patterns about run rates, wicket probabilities, and successful strategies. When the model trains on this dataset during fine-tuning, it's absorbing cricket-specific contextual understanding, much like how Bumrah's economy figures improve through analyzing batsmen's weaknesses. The preprocessing steps (normalizing statistics formats, handling missing DRS review data) are like ensuring all match records are in standardized scorecard format before analysis. This preparation phase determines whether the model will understand that an economy of 6.5 in powerplay is excellent while 8.2 in death overs is poor—contextual knowledge that only emerges through domain-aware data engineering.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "#!/usr/bin/env python3\n\"\"\"\nStep 1: Cricket Domain Dataset & Tokenizer Configuration\n\"\"\"\n\nimport json\nimport os\nfrom dataclasses import dataclass\nfrom typing import List, Dict, Tuple\nfrom pathlib import Path\n\nimport torch\nfrom transformers import GPT2Tokenizer, PreTrainedTokenizer\nfrom datasets import Dataset, DatasetDict\nimport pandas as pd\n\n\n@dataclass\nclass CricketMatch:\n    \"\"\"Represents a cricket match with metadata\"\"\"\n    match_id: str\n    match_format: str  # T20, ODI, Test\n    team_a: str\n    team_b: str\n    venue: str\n    date: str\n    winner: str\n    winning_margin: str\n    toss_winner: str\n    toss_decision: str\n\n\n@dataclass\nclass CricketPlayerRecord:\n    \"\"\"Individual player performance in a match\"\"\"\n    player_name: str\n    team: str\n    role: str  # Batsman, Bowler, All-rounder\n    runs_scored: int = 0\n    balls_faced: int = 0\n    wickets_taken: int = 0\n    overs_bowled: float = 0\n    economy_rate: float = 0.0\n    strike_rate: float = 0.0\n\n\nclass CricketTokenizer:\n    \"\"\"Custom tokenizer that preserves cricket domain entities\"\"\"\n\n    def __init__(self",
+      "model_name": "str = \"gpt2\"):\n        self.base_tokenizer = GPT2Tokenizer.from_pretrained(model_name)\n        self.cricket_entities = self._build_cricket_vocab()\n        self._add_special_tokens()\n\n    def _build_cricket_vocab(self) -> Dict[str, int]:\n        \"\"\"Build cricket-specific vocabulary to prevent subword splitting\"\"\"\n        entities = {\n            \"players\": [\n                \"Virat Kohli\", \"Rohit Sharma\", \"Jasprit Bumrah\",\n                \"AB de Villiers\", \"Steve Smith\", \"Kane Williamson\",\n                \"Babar Azam\", \"Pat Cummins\", \"Mitchell Starc\",\n                \"Rashid Khan\", \"Yuzvendra Chahal\", \"Mohammed Siraj\"\n            ],\n            \"teams\": [\n                \"RCB\", \"MI\", \"CSK\", \"DC\", \"KKR\", \"PBKS\", \"RR\", \"SRH\",\n                \"India\", \"Australia\", \"England\", \"Pakistan\", \"West Indies\",\n                \"New Zealand\", \"Sri Lanka\", \"South Africa\"\n            ],\n            \"venues\": [\n                \"MCG\", \"Sydney Cricket Ground\", \"Lord's\",\n                \"Eden Gardens\", \"Wankhede Stadium\", \"Feroz Shah Kotla\",\n                \"GABBA\", \"Old Trafford\", \"Trent Bridge\"\n            ],\n            \"statistics\": [\n                \"economy rate\", \"strike rate\", \"average\",\n                \"run rate\", \"required run rate\", \"Duckworth-Lewis\",\n                \"maiden over\", \"death overs\", \"powerplay\"\n            ],\n            \"roles\": [\n                \"Opener\", \"Middle-order\", \"Lower-order\",\n                \"Pace bowler\", \"Spinner\", \"All-rounder\"\n            ]\n        }\n\n        vocab = {}\n        token_id = self.base_tokenizer.vocab_size\n\n        for category, terms in entities.items():\n            for term in terms:\n                vocab[term] = token_id\n                token_id += 1\n\n        return vocab\n\n    def _add_special_tokens(self):\n        \"\"\"Add cricket-specific special tokens\"\"\"\n        special_tokens = {\n            \"additional_special_tokens\": [\n                \"<MATCH_START>\", \"<MATCH_END>\",\n                \"<INNINGS_1>\", \"<INNINGS_2>\",\n                \"<CRICKET_STATS>\", \"</CRICKET_STATS>\",\n                \"<PLAYER>\", \"</PLAYER>\"\n            ]\n        }\n        self.base_tokenizer.add_special_tokens(special_tokens)\n\n    def tokenize(self",
+      "text": "str) -> List[str]:\n        \"\"\"Tokenize while preserving cricket entities\"\"\"\n        for entity in self.cricket_entities.keys():\n            # Placeholder: in production, use regex-based entity recognition\n            pass\n        return self.base_tokenizer.tokenize(text)\n\n    def encode(self",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "text": "str",
+      "max_length": "int = 512) -> torch.Tensor:\n        \"\"\"Encode text to token IDs with padding\"\"\"\n        encoding = self.base_tokenizer(\n            text,\n            max_length=max_length,\n            padding=\"max_length\",\n            truncation=True,\n            return_tensors=\"pt\"\n        )\n        return encoding[\"input_ids\"]\n\n\nclass CricketDatasetBuilder:\n    \"\"\"Build training dataset from cricket match records\"\"\"\n\n    def __init__(self",
+      "tokenizer": "CricketTokenizer):\n        self.tokenizer = tokenizer\n        self.matches: List[CricketMatch] = []\n        self.player_records: List[CricketPlayerRecord] = []\n\n    def add_match_record(self",
+      "match": "CricketMatch):\n        \"\"\"Add a cricket match to the dataset\"\"\"\n        self.matches.append(match)\n\n    def add_player_record(self",
+      "record": "CricketPlayerRecord):\n        \"\"\"Add individual player performance\"\"\"\n        self.player_records.append(record)\n\n    def create_instruction_tuning_examples(self) -> List[Dict]:\n        \"\"\"Create instruction-response pairs for fine-tuning\"\"\"\n        examples = []\n\n        # Example 1: Match analysis\n        examples.append({\n            \"instruction\": \"Analyze the match performance\",\n            \"input\": (\n                \"Match: RCB vs MI at Wankhede Stadium. \"\n                \"RCB scored 180/5. MI won by 6 runs. \"\n                \"Virat Kohli scored 45 off 32 balls. \"\n                \"Jasprit Bumrah took 2/38 from 4 overs.\"\n            ),\n            \"output\": (\n                \"Virat Kohli's strike rate of 140.6 was aggressive in powerplay. \"\n                \"Jasprit Bumrah's economy of 9.5 suggests MI's middle overs were expensive. \"\n                \"RCB's total of 180 was competitive but fell short by 6 runs on Wankhede's smaller ground.\"\n            )\n        })\n\n        # Example 2: Player performance\n        examples.append({\n            \"instruction\": \"Evaluate player form\",\n            \"input\": (\n                \"Rohit Sharma: 52 runs off 38 balls in last 3 T20 matches. \"\n                \"Strike rate: 136.8. Average: 34.0\"\n            ),\n            \"output\": (\n                \"Rohit Sharma is in excellent form with a strike rate above 130. \"\n                \"His average of 34 across T20s shows consistent batting at the top of the order. \"\n                \"The balance between aggression and stability makes him ideal for powerplay batting.\"\n            )\n        })\n\n        # Example 3: Bowling strategy\n        examples.append({\n            \"instruction\": \"Suggest bowling strategy\",\n            \"input\": (\n                \"Target: 165 in T20. Powerplay overs: 6. \"\n                \"Current run rate: 8.2 per over. \"\n                \"Batsmen: AB de Villiers (LHB, aggressive) and Steve Smith (RHB, technical)\"\n            ),\n            \"output\": (\n                \"Deploy pace bowler with short-of-length line against Smith in powerplay. \"\n                \"Use off-spinner to cramp De Villiers' room on the off side. \"\n                \"Death bowling requires slower balls at yorker length. \"\n                \"Target economy: under 7 runs per over in powerplay.\"\n            )\n        })\n\n        return examples\n\n    def build_dataset(self",
+      "examples": "List[Dict]) -> Dataset:\n        \"\"\"Convert examples to HuggingFace Dataset\"\"\"\n        def format_example(ex: Dict) -> Dict:\n            prompt = f\"\"\"<MATCH_START>\nInstruction: {ex['instruction']}\nInput: {ex['input']}\n<CRICKET_STATS>\nResponse: {ex['output']}\n</CRICKET_STATS>\n<MATCH_END>\"\"\"\n            return {\n                \"text\": prompt,\n                \"input_ids\": self.tokenizer.encode(prompt).squeeze().tolist()\n            }\n\n        formatted = [format_example(ex) for ex in examples]\n        return Dataset.from_dict({\n            \"text\": [f[\"text\"] for f in formatted],\n            \"input_ids\": [f[\"input_ids\"] for f in formatted]\n        })\n\n\nif __name__ == \"__main__\":\n    # Initialize\n    cricket_tokenizer = CricketTokenizer(model_name=\"gpt2\")\n    dataset_builder = CricketDatasetBuilder(cricket_tokenizer)\n\n    # Create sample matches\n    sample_match = CricketMatch(\n        match_id=\"IPL_2024_001\",\n        match_format=\"T20\",\n        team_a=\"RCB\",\n        team_b=\"MI\",\n        venue=\"Wankhede Stadium\",\n        date=\"2024-03-31\",\n        winner=\"MI\",\n        winning_margin=\"6 runs\",\n        toss_winner=\"RCB\",\n        toss_decision=\"bat\"\n    )\n\n    dataset_builder.add_match_record(sample_match)\n\n    # Create instruction-tuning examples\n    examples = dataset_builder.create_instruction_tuning_examples()\n    print(f\"Created {len(examples)} instruction-tuning examples\")\n\n    # Build dataset\n    train_dataset = dataset_builder.build_dataset(examples)\n    print(f\"\\nDataset shape: {len(train_dataset)} examples\")\n    print(f\"\\nSample instruction-response pair:\")\n    print(f\"Text: {train_dataset[0]['text'][:200]}...\")\n\n    # Save dataset\n    os.makedirs(\"data/processed\", exist_ok=True)\n    train_dataset.save_to_disk(\"data/processed/cricket_instruction_tuning\")\n    print(\"\\n✓ Dataset saved to data/processed/cricket_instruction_tuning\")",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 2 — Core Logic: LoRA Fine-Tuning Pipeline",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Step 2 implements the parameter-efficient fine-tuning using LoRA (Low-Rank Adaptation). Instead of updating all model parameters (prohibitively expensive for 7B+ models), LoRA adds small trainable matrices (rank 16) to selected layers, reducing trainable parameters from billions to millions. Configure LoRA target modules (typically attention layers) where domain adaptation matters most. Initialize the trainer with appropriate learning rates, gradient accumulation, mixed precision training for memory efficiency, and distributed training support. Implement cricket-domain specific loss computation that may weight player names and statistics more heavily. Monitor training with loss curves and validation metrics. This approach achieves 95% of full fine-tuning quality with 5% computational cost, essential for resource-constrained environments. The LoRA matrices act as learned adapters that inject cricket knowledge into the frozen base model.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: When Jasprit Bumrah arrived in international cricket, the Indian team didn't rebuild him from scratch—he had fundamental bowling mechanics developed through years of domestic cricket. However, to make him exceptional in fast-paced T20 cricket against world-class batsmen, coaching staff added specialized training: yorker practice against specific fielding configurations, studying left-handed batsmen's weaknesses, death-over execution drills. This targeted coaching didn't change Bumrah's fundamental action (frozen base model), but added specific adaptations to maximize performance in high-pressure situations (cricket domain tasks). Similarly, LoRA fine-tuning keeps the entire pre-trained GPT-2 model frozen but adds small 'adapter modules' in attention layers—these are like Bumrah's specialized T20 coaching that doesn't alter his core technique. The rank-16 LoRA matrices are incredibly compact (like a focused 2-week training camp) compared to retraining his entire biomechanics (full model fine-tuning). When the model encounters a cricket question—'Who would be ideal for death-overs bowling in T20?'—the LoRA adapters activate, combining base language understanding with cricket-specialized reasoning just as Bumrah combines textbook fast-bowling mechanics with his learned variations. This efficiency explains why LoRA-adapted models perform so well: you're getting specialized expertise (cricket domain knowledge) without the computational cost of complete retraining, much like Bumrah's international success comes from selective expertise development on frozen fundamental skills.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "#!/usr/bin/env python3\n\"\"\"\nStep 2: LoRA Fine-Tuning Pipeline for Cricket Domain LLM\n\"\"\"\n\nimport os\nfrom dataclasses import dataclass\nfrom typing import Optional, Tuple\n\nimport torch\nfrom torch.optim import AdamW\nfrom torch.optim.lr_scheduler import LinearLR\nfrom transformers import (\n    AutoModelForCausalLM,\n    AutoTokenizer,\n    Trainer,\n    TrainingArguments,\n    DataCollatorForLanguageModeling,\n)\nfrom datasets import load_from_disk\nfrom peft import LoraConfig, get_peft_model, TaskType\n\n\n@dataclass\nclass LoRAConfig:\n    \"\"\"Configuration for LoRA fine-tuning\"\"\"\n    lora_r: int = 16\n    lora_alpha: int = 32\n    lora_dropout: float = 0.05\n    lora_target_modules: list = None\n    bias: str = \"none\"\n\n    def __post_init__(self):\n        if self.lora_target_modules is None:\n            self.lora_target_modules = [\"c_attn\", \"c_proj\"]  # GPT-2 attention modules\n\n\n@dataclass\nclass TrainingConfig:\n    \"\"\"Configuration for training run\"\"\"\n    output_dir: str = \"models/checkpoints\"\n    num_train_epochs: int = 3\n    per_device_train_batch_size: int = 4\n    per_device_eval_batch_size: int = 4\n    gradient_accumulation_steps: int = 4\n    learning_rate: float = 2e-4\n    warmup_steps: int = 100\n    max_grad_norm: float = 1.0\n    weight_decay: float = 0.01\n    logging_steps: int = 10\n    eval_steps: int = 50\n    save_steps: int = 50\n    save_total_limit: int = 3\n    fp16: bool = True\n    gradient_checkpointing: bool = True\n    dataloader_pin_memory: bool = True\n\n\nclass CricketLLMFineTuner:\n    \"\"\"Fine-tune LLM for cricket domain using LoRA\"\"\"\n\n    def __init__(\n        self,\n        model_name: str = \"gpt2\",\n        lora_config: LoRAConfig = None,\n        training_config: TrainingConfig = None\n    ):\n        self.model_name = model_name\n        self.lora_config = lora_config or LoRAConfig()\n        self.training_config = training_config or TrainingConfig()\n        self.model = None\n        self.tokenizer = None\n        self.trainer = None\n\n    def load_base_model(self) -> Tuple[torch.nn.Module, AutoTokenizer]:\n        \"\"\"Load pre-trained model and tokenizer\"\"\"\n        print(f\"Loading base model: {self.model_name}\")\n        tokenizer = AutoTokenizer.from_pretrained(self.model_name)\n        tokenizer.pad_token = tokenizer.eos_token\n\n        model = AutoModelForCausalLM.from_pretrained(\n            self.model_name,\n            torch_dtype=torch.float16 if self.training_config.fp16 else torch.float32,\n            device_map=\"auto\" if torch.cuda.is_available() else None\n        )\n\n        return model, tokenizer\n\n    def apply_lora(self",
+      "model": "torch.nn.Module) -> torch.nn.Module:\n        \"\"\"Apply LoRA adapters to the model\"\"\"\n        print(f\"Applying LoRA configuration...\")\n        print(f\"  - Rank: {self.lora_config.lora_r}\")\n        print(f\"  - Alpha: {self.lora_config.lora_alpha}\")\n        print(f\"  - Target modules: {self.lora_config.lora_target_modules}\")\n\n        peft_config = LoraConfig(\n            r=self.lora_config.lora_r,\n            lora_alpha=self.lora_config.lora_alpha,\n            lora_dropout=self.lora_config.lora_dropout,\n            bias=self.lora_config.bias,\n            task_type=TaskType.CAUSAL_LM,\n            target_modules=self.lora_config.lora_target_modules,\n        )\n\n        peft_model = get_peft_model(model, peft_config)\n        peft_model.print_trainable_parameters()\n        return peft_model\n\n    def setup_training(\n        self,\n        train_dataset,\n        eval_dataset=None,\n        callbacks=None\n    ) -> Trainer:\n        \"\"\"Initialize training infrastructure\"\"\"\n        print(\"Setting up training pipeline...\")\n\n        training_args = TrainingArguments(\n            output_dir=self.training_config.output_dir,\n            num_train_epochs=self.training_config.num_train_epochs,\n            per_device_train_batch_size=self.training_config.per_device_train_batch_size,\n            per_device_eval_batch_size=self.training_config.per_device_eval_batch_size,\n            gradient_accumulation_steps=self.training_config.gradient_accumulation_steps,\n            learning_rate=self.training_config.learning_rate,\n            warmup_steps=self.training_config.warmup_steps,\n            max_grad_norm=self.training_config.max_grad_norm,\n            weight_decay=self.training_config.weight_decay,\n            logging_dir=\"logs\",\n            logging_steps=self.training_config.logging_steps,\n            eval_strategy=\"steps\" if eval_dataset else \"no\",\n            eval_steps=self.training_config.eval_steps,\n            save_strategy=\"steps\",\n            save_steps=self.training_config.save_steps,\n            save_total_limit=self.training_config.save_total_limit,\n            fp16=self.training_config.fp16,\n            gradient_checkpointing=self.training_config.gradient_checkpointing,\n            dataloader_pin_memory=self.training_config.dataloader_pin_memory,\n            report_to=[\"tensorboard\"],\n            push_to_hub=False,\n        )\n\n        data_collator = DataCollatorForLanguageModeling(\n            tokenizer=self.tokenizer,\n            mlm=False\n        )\n\n        trainer = Trainer(\n            model=self.model,\n            args=training_args,\n            train_dataset=train_dataset,\n            eval_dataset=eval_dataset,\n            data_collator=data_collator,\n            callbacks=callbacks or [],\n        )\n\n        return trainer\n\n    def train(\n        self,\n        train_dataset,\n        eval_dataset=None,\n        resume_from_checkpoint: Optional[str] = None\n    ) -> dict:\n        \"\"\"Execute fine-tuning\"\"\"\n        print(\"\\n\" + \"=\"*60)\n        print(\"Starting Cricket Domain LLM Fine-Tuning\")\n        print(\"=\"*60)\n\n        # Load model and tokenizer\n        self.model, self.tokenizer = self.load_base_model()\n\n        # Apply LoRA\n        self.model = self.apply_lora(self.model)\n\n        # Setup training\n        self.trainer = self.setup_training(train_dataset, eval_dataset)\n\n        # Execute training\n        print(f\"\\nTraining dataset size: {len(train_dataset)}\")\n        if eval_dataset:\n            print(f\"Evaluation dataset size: {len(eval_dataset)}\")\n        print(f\"Total training steps: {len(self.trainer.get_train_dataloader()) // self.training_config.gradient_accumulation_steps * self.training_config.num_train_epochs}\")\n        print()\n\n        train_result = self.trainer.train(resume_from_checkpoint=resume_from_checkpoint)\n\n        return train_result.metrics\n\n    def save_adapter(self",
+      "adapter_path": "str = \"models/adapters/cricket_lora\"):\n        \"\"\"Save LoRA adapter weights\"\"\"\n        os.makedirs(adapter_path, exist_ok=True)\n        self.model.save_pretrained(adapter_path)\n        print(f\"\\n✓ LoRA adapter saved to {adapter_path}\")\n\n    def save_model(self",
+      "model_path": "str = \"models/cricket_llm_finetuned\"):\n        \"\"\"Merge adapter with base model and save\"\"\"\n        os.makedirs(model_path, exist_ok=True)\n        merged_model = self.model.merge_and_unload()\n        merged_model.save_pretrained(model_path)\n        self.tokenizer.save_pretrained(model_path)\n        print(f\"\\n✓ Merged model saved to {model_path}\")\n\n\nif __name__ == \"__main__\":\n    # Load dataset\n    print(\"Loading cricket instruction-tuning dataset...\")\n    train_dataset = load_from_disk(\"data/processed/cricket_instruction_tuning\")\n    print(f\"Dataset loaded: {len(train_dataset)} examples\")\n\n    # Configure LoRA\n    lora_config = LoRAConfig(\n        lora_r=16,\n        lora_alpha=32,\n        lora_dropout=0.05,\n        lora_target_modules=[\"c_attn\", \"c_proj\"]\n    )\n\n    # Configure training\n    training_config = TrainingConfig(\n        output_dir=\"models/checkpoints\",\n        num_train_epochs=1,  # 1 epoch for demo\n        per_device_train_batch_size=2,\n        gradient_accumulation_steps=2,\n        learning_rate=2e-4,\n        warmup_steps=10,\n        logging_steps=5,\n        save_steps=10,\n    )\n\n    # Initialize and train\n    finetuner = CricketLLMFineTuner(\n        model_name=\"gpt2\",\n        lora_config=lora_config,\n        training_config=training_config\n    )\n\n    metrics = finetuner.train(train_dataset)\n    print(\"\\n\" + \"=\"*60)\n    print(\"Training Complete\")\n    print(\"=\"*60)\n    print(f\"Final loss: {metrics.get('train_loss', 'N/A'):.4f}\")\n\n    # Save trained adapter\n    finetuner.save_adapter()\n    print(\"\\n✓ Cricket LLM fine-tuning pipeline completed!\")",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 3 — Integration & Enhancement: Inference & Domain Evaluation",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Step 3 brings the system to production-readiness by building an inference pipeline and cricket-domain-specific evaluation metrics. Load the fine-tuned LoRA adapter and base model for generation tasks. Implement prompt templates optimized for cricket queries: player performance analysis, match strategy recommendations, statistical comparisons. Create batch inference capabilities for processing multiple cricket questions efficiently. Build evaluation metrics beyond standard perplexity: measure factual accuracy of cricket statistics, appropriateness of strategic recommendations, and entity recognition accuracy for player/team names. Implement cricket knowledge grounding where responses are checked against a knowledge base of historical statistics. Add human evaluation guidelines for assessing response quality. The integration layer handles model quantization for faster inference, caching mechanism for repeated queries about same players/matches, and structured output parsing to extract actionable cricket insights.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: After months of intensive net practice, training camps, and LoRA-style specialized coaching, a cricketer is finally ready for a Test match at Eden Gardens. But readiness isn't just mechanical skill—the team needs to verify through warm-up matches that the player performs under real match pressure, against specific opposition strategies, with actual crowd noise. Your inference pipeline is this match-day validation. The fine-tuned cricket LLM must now prove itself on live cricket questions: 'Given Virat Kohli's recent form against spinners (statistical grounding), what's the optimal field placement at Lord's?' The model must access a knowledge base like a captain referencing historical scorecards, recalling that Kohli struggles with leg-spin around off-stump at that venue. Custom evaluation metrics are like post-match analysis: a 95% win probability prediction is worthless if the actual result contradicts historical trends, just as recommending an aggressive approach against quality pace bowling when defensive strategy won 8 of 10 similar matches is poor strategy. The human evaluation step—where domain experts like cricket analysts review responses—is exactly the captain's debrief after a match, validating that recommended strategies actually align with proven cricket tactics. Performance under production constraints (lower latency, smaller model size through quantization) mirrors a player adapting to different ground conditions—the fundamentals (LoRA-adapted knowledge) remain, but execution must suit the environment (inference hardware). This integration phase reveals whether your cricket domain adaptation was authentic learning versus statistical pattern-matching.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "#!/usr/bin/env python3\n\"\"\"\nStep 3: Inference & Cricket Domain Evaluation Pipeline\n\"\"\"\n\nimport json\nfrom dataclasses import dataclass\nfrom typing import List, Dict, Optional, Tuple\nfrom enum import Enum\n\nimport torch\nfrom transformers import (\n    AutoModelForCausalLM,\n    AutoTokenizer,\n    pipeline,\n    TextGenerationPipeline\n)\nfrom peft import PeftModel\n\n\nclass CricketEntityType(Enum):\n    PLAYER = \"player\"\n    TEAM = \"team\"\n    VENUE = \"venue\"\n    STATISTIC = \"statistic\"\n    FORMAT = \"format\"\n\n\n@dataclass\nclass CricketKnowledgeBase:\n    \"\"\"Cricket statistical knowledge for grounding responses\"\"\"\n\n    player_stats: Dict[str, Dict] = None\n    team_records: Dict[str, Dict] = None\n    venue_stats: Dict[str, Dict] = None\n\n    def __post_init__(self):\n        if self.player_stats is None:\n            self.player_stats = {\n                \"Virat Kohli\": {\n                    \"t20_average\": 52.5,\n                    \"t20_sr\": 139.5,\n                    \"test_average\": 58.2,\n                    \"weakness\": \"leg-spin around off-stump\",\n                    \"strength\": \"short-pitched deliveries against pace\"\n                },\n                \"Jasprit Bumrah\": {\n                    \"t20_economy\": 6.8,\n                    \"test_average\": 20.4,\n                    \"specialty\": \"death overs, yorker accuracy\",\n                    \"strike_rate\": 115.0\n                },\n                \"Rohit Sharma\": {\n                    \"t20_average\": 34.0,\n                    \"t20_sr\": 136.8,\n                    \"opening_sr\": 142.3,\n                    \"powerplay_avg\": 42.1\n                }\n            }\n\n        if self.team_records is None:\n            self.team_records = {\n                \"RCB\": {\"t20_win_pct\": 0.52, \"avg_first_inning_score\": 168},\n                \"MI\": {\"t20_win_pct\": 0.58, \"avg_first_inning_score\": 165},\n                \"CSK\": {\"t20_win_pct\": 0.56, \"avg_first_inning_score\": 162}\n            }\n\n        if self.venue_stats is None:\n            self.venue_stats = {\n                \"Wankhede Stadium\": {\"avg_score\": 168, \"fast_bowling_assist\": False},\n                \"Eden Gardens\": {\"avg_score\": 162, \"fast_bowling_assist\": True},\n                \"MCG\": {\"avg_score\": 165, \"fast_bowling_assist\": True}\n            }\n\n    def get_player_stat(self",
+      "player": "str",
+      "stat": "str) -> Optional[str]:\n        \"\"\"Retrieve specific player statistic\"\"\"\n        if player in self.player_stats and stat in self.player_stats[player]:\n            return str(self.player_stats[player][stat])\n        return None\n\n\n@dataclass\nclass CricketGenerationConfig:\n    \"\"\"Configuration for cricket-aware text generation\"\"\"\n    max_length: int = 256\n    temperature: float = 0.7\n    top_p: float = 0.9\n    repetition_penalty: float = 1.2\n    num_beams: int = 1\n\n\nclass CricketLLMInference:\n    \"\"\"Inference engine for cricket domain LLM\"\"\"\n\n    CRICKET_PROMPTS = {\n        \"player_analysis\": \"\"\"\n<MATCH_START>\nInstruction: Analyze player performance\nInput: {input}\n<CRICKET_STATS>\nResponse:\"\"\",\n        \"match_strategy\": \"\"\"\n<MATCH_START>\nInstruction: Provide match strategy recommendation\nInput: {input}\n<CRICKET_STATS>\nResponse:\"\"\",\n        \"statistical_comparison\": \"\"\"\n<MATCH_START>\nInstruction: Compare cricket statistics\nInput: {input}\n<CRICKET_STATS>\nResponse:\"\"\",\n    }\n\n    def __init__(\n        self,\n        base_model: str = \"gpt2\",\n        adapter_path: Optional[str] = None,\n        knowledge_base: Optional[CricketKnowledgeBase] = None\n    ):\n        self.base_model_name = base_model\n        self.adapter_path = adapter_path\n        self.knowledge_base = knowledge_base or CricketKnowledgeBase()\n        self.tokenizer = None\n        self.model = None\n        self.generator = None\n        self._initialize_model()\n\n    def _initialize_model(self):\n        \"\"\"Load base model with LoRA adapter\"\"\"\n        print(f\"Loading base model: {self.base_model_name}\")\n        self.tokenizer = AutoTokenizer.from_pretrained(self.base_model_name)\n        self.tokenizer.pad_token = self.tokenizer.eos_token\n\n        self.model = AutoModelForCausalLM.from_pretrained(\n            self.base_model_name,\n            device_map=\"auto\" if torch.cuda.is_available() else None,\n            torch_dtype=torch.float32\n        )\n\n        # Load LoRA adapter if provided\n        if self.adapter_path:\n            print(f\"Loading LoRA adapter from: {self.adapter_path}\")\n            try:\n                self.model = PeftModel.from_pretrained(\n                    self.model,\n                    self.adapter_path\n                )\n                print(\"✓ LoRA adapter loaded successfully\")\n            except Exception as e:\n                print(f\"⚠ Warning: Could not load LoRA adapter: {e}\")\n\n        # Create text generation pipeline\n        self.generator = pipeline(\n            \"text-generation\",\n            model=self.model,\n            tokenizer=self.tokenizer,\n            device=0 if torch.cuda.is_available() else -1\n        )\n\n    def extract_cricket_entities(\n        self,\n        text: str\n    ) -> Dict[CricketEntityType, List[str]]:\n        \"\"\"Extract cricket entities (players, teams, etc.) from text\"\"\"\n        entities = {\n            CricketEntityType.PLAYER: [],\n            CricketEntityType.TEAM: [],\n            CricketEntityType.VENUE: [],\n            CricketEntityType.STATISTIC: [],\n            CricketEntityType.FORMAT: []\n        }\n\n        players = [\"Virat Kohli\", \"Rohit Sharma\", \"Jasprit Bumrah\", \"AB de Villiers\"]\n        teams = [\"RCB\", \"MI\", \"CSK\", \"DC\", \"KKR\", \"India\", \"Australia\"]\n        venues = [\"Wankhede Stadium\", \"Eden Gardens\", \"MCG\"]\n        stats = [\"strike rate\", \"economy\", \"average\", \"run rate\"]\n        formats = [\"T20\", \"ODI\", \"Test\"]\n\n        for player in players:\n            if player in text:\n                entities[CricketEntityType.PLAYER].append(player)\n        for team in teams:\n            if team in text:\n                entities[CricketEntityType.TEAM].append(team)\n        for venue in venues:\n            if venue in text:\n                entities[CricketEntityType.VENUE].append(venue)\n        for stat in stats:\n            if stat in text:\n                entities[CricketEntityType.STATISTIC].append(stat)\n        for fmt in formats:\n            if fmt in text:\n                entities[CricketEntityType.FORMAT].append(fmt)\n\n        return entities\n\n    def ground_response(self",
+      "response": "str",
+      "entities": "Dict) -> str:\n        \"\"\"Enhance response with knowledge base grounding\"\"\"\n        grounded = response\n\n        # Add player statistics if applicable\n        for player in entities.get(CricketEntityType.PLAYER, []):\n            if player in self.knowledge_base.player_stats:\n                avg_t20 = self.knowledge_base.get_player_stat(player, \"t20_average\")\n                if avg_t20:\n                    grounded += f\"\\n[Knowledge Base: {player}'s T20 average is {avg_t20}]\"\n\n        return grounded\n\n    def generate_response(\n        self,\n        query: str,\n        task_type: str = \"player_analysis\",\n        config: Optional[CricketGenerationConfig] = None\n    ) -> Dict:\n        \"\"\"Generate cricket-domain response\"\"\"\n        config = config or CricketGenerationConfig()\n\n        # Format prompt\n        prompt_template = self.CRICKET_PROMPTS.get(task_type, self.CRICKET_PROMPTS[\"player_analysis\"])\n        prompt = prompt_template.format(input=query)\n\n        # Extract entities\n        entities = self.extract_cricket_entities(query)\n\n        # Generate\n        print(f\"Generating response for task: {task_type}\")\n        print(f\"Query: {query}\")\n        print(f\"Identified entities: {entities}\")\n\n        outputs = self.generator(\n            prompt,\n            max_length=config.max_length,\n            temperature=config.temperature,\n            top_p=config.top_p,\n            repetition_penalty=config.repetition_penalty,\n            num_return_sequences=1,\n            do_sample=True,\n            pad_token_id=self.tokenizer.eos_token_id\n        )\n\n        raw_response = outputs[0][\"generated_text\"]\n        # Extract response after \"Response:\" marker\n        response_start = raw_response.find(\"Response:\") + len(\"Response:\")\n        response = raw_response[response_start:].strip()\n\n        # Ground with knowledge base\n        grounded_response = self.ground_response(response, entities)\n\n        return {\n            \"query\": query,\n            \"task_type\": task_type,\n            \"response\": response,\n            \"grounded_response\": grounded_response,\n            \"entities\": {\n                k.value: v for k, v in entities.items()\n            }\n        }\n\n\nclass CricketDomainEvaluator:\n    \"\"\"Evaluate LLM responses on cricket-specific metrics\"\"\"\n\n    def __init__(self",
+      "knowledge_base": "CricketKnowledgeBase):\n        self.knowledge_base = knowledge_base\n\n    def evaluate_entity_accuracy(self",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "response": "str",
+      "entities": "Dict) -> float:\n        \"\"\"Check if response correctly uses cricket entities\"\"\"\n        accuracy_score = 0.0\n        entity_count = sum(len(v) for v in entities.values())\n\n        if entity_count == 0:\n            return 1.0  # No entities expected\n\n        for entity_type, entity_list in entities.items():\n            for entity in entity_list:\n                if entity in response:\n                    accuracy_score += 1.0\n\n        return accuracy_score / entity_count if entity_count > 0 else 0.0\n\n    def evaluate_factual_consistency(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "response": "str",
+      "player": "str = None) -> float:\n        \"\"\"Verify response against knowledge base facts\"\"\"\n        if not player or player not in self.knowledge_base.player_stats:\n            return 0.5  # Unknown entity, neutral score\n\n        player_data = self.knowledge_base.player_stats[player]\n        consistency_score = 1.0\n\n        # Simple heuristic: if response mentions relevant stats, boost score\n        for stat_name, stat_value in player_data.items():\n            if isinstance(stat_value, (int, float)):\n                if str(stat_value) in response:\n                    consistency_score += 0.1\n\n        return min(consistency_score, 1.0)\n\n    def evaluate_response(\n        self,\n        response: str,\n        query: str,\n        entities: Dict\n    ) -> Dict[str, float]:\n        \"\"\"Comprehensive evaluation of cricket domain response\"\"\"\n        return {\n            \"entity_accuracy\": self.evaluate_entity_accuracy(response, entities),\n            \"response_length\": len(response.split()),\n            \"contains_statistics\": 1.0 if any(\n                stat in response for stat in [\"strike\", \"economy\", \"average\", \"rate\"]\n            ) else 0.0,\n            \"overall_score\": 0.75  # Placeholder for comprehensive metric\n        }\n\n\nif __name__ == \"__main__\":\n    # Initialize inference engine\n    print(\"Initializing Cricket Domain LLM...\\n\")\n    inference = CricketLLMInference(\n        base_model=\"gpt2\",\n        adapter_path=None,  # Set to \"models/adapters/cricket_lora\" if available\n        knowledge_base=CricketKnowledgeBase()\n    )\n\n    # Initialize evaluator\n    evaluator = CricketDomainEvaluator(inference.knowledge_base)\n\n    # Test queries\n    test_queries = [\n        {\n            \"query\": \"Analyze Virat Kohli's performance in T20 cricket\",\n            \"task_type\": \"player_analysis\"\n        },\n        {\n            \"query\": \"What bowling strategy should be used at Eden Gardens against aggressive batsmen?\",\n            \"task_type\": \"match_strategy\"\n        },\n        {\n            \"query\": \"Compare Jasprit Bumrah and Mohammed Siraj in death overs\",\n            \"task_type\": \"statistical_comparison\"\n        }\n    ]\n\n    print(\"=\"*70)\n    print(\"Cricket Domain LLM Inference Results\")\n    print(\"=\"*70)\n\n    for test in test_queries:\n        print(f\"\\n\\n{'─'*70}\")\n        result = inference.generate_response(test[\"query\"], test[\"task_type\"])\n\n        print(f\"\\nTask: {result['task_type']}\")\n        print(f\"Query: {result['query']}\")\n        print(f\"\\nIdentified Entities:\")\n        for entity_type, entities in result['entities'].items():\n            if entities:\n                print(f\"  {entity_type}: {', '.join(entities)}\")\n\n        print(f\"\\nGenerated Response:\")\n        print(f\"  {result['response'][:300]}...\")\n\n        # Evaluate\n        metrics = evaluator.evaluate_response(\n            result['response'],\n            test['query'],\n            {CricketEntityType[k.upper()]: v for k, v in result['entities'].items()}\n        )\n        print(f\"\\nEvaluation Metrics:\")\n        for metric, score in metrics.items():\n            print(f\"  {metric}: {score:.3f}\")\n\n    print(f\"\\n\\n{'='*70}\")\n    print(\"✓ Cricket Domain LLM Inference Complete\")\n    print(\"=\"*70)",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 4 — Testing & Verification",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Execute the complete pipeline with test data to verify functionality at each stage. Run the dataset builder to confirm instruction-tuning examples format correctly. Execute a brief training run (1-2 epochs) on sample cricket data to validate the LoRA fine-tuning loop, loss computation, and checkpoint saving. Generate sample inference queries about famous cricket matches and players, confirming the model produces coherent cricket-domain responses. Verify entity extraction correctly identifies player names and teams. Check that knowledge base grounding enhances responses with factual cricket statistics. Validate that all save/load mechanisms work properly for model checkpoints and adapters.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "bash",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}
