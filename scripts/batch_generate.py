@@ -43,6 +43,21 @@ INPUT_COST_PER_MTOK = 0.80
 OUTPUT_COST_PER_MTOK = 4.00
 
 # ---------------------------------------------------------------------------
+# Rate limiter — org limit is 50 RPM; stay at 40 to leave headroom
+# ---------------------------------------------------------------------------
+
+class _RateLimiter:
+    """Sliding-window rate limiter: at most `rate` requests per `period` seconds."""
+    def __init__(self, rate: int = 40, period: float = 60.0):
+        self._sem = asyncio.Semaphore(rate)
+        self._period = period
+
+    async def acquire(self) -> None:
+        await self._sem.acquire()
+        asyncio.get_running_loop().call_later(self._period, self._sem.release)
+
+
+# ---------------------------------------------------------------------------
 # Import prompt helpers from ai-worker, with inline fallback
 # ---------------------------------------------------------------------------
 _build_lesson_prompt_fn = None
@@ -514,6 +529,7 @@ def _slugify(title: str) -> str:
 async def generate_lesson_titles(
     client: anthropic.AsyncAnthropic,
     sem: asyncio.Semaphore,
+    rate_limiter: "_RateLimiter",
     course: dict,
 ) -> list:
     """Call Haiku to generate 35 lesson titles for a course."""
@@ -532,6 +548,7 @@ async def generate_lesson_titles(
 
     for attempt in range(3):
         try:
+            await rate_limiter.acquire()
             async with sem:
                 response = await client.messages.create(
                     model=MODEL,
@@ -554,6 +571,10 @@ async def generate_lesson_titles(
                 await asyncio.sleep(2 ** attempt * 2)
                 continue
             raise
+        except anthropic.RateLimitError as exc:
+            wait = 20 * (attempt + 1)
+            print(f"  [titles] Rate limit hit, retrying in {wait}s...")
+            await asyncio.sleep(wait)
         except anthropic.APIError as exc:
             wait = 2 ** attempt * 2
             print(f"  [titles] API error ({exc}), retrying in {wait}s...")
@@ -582,6 +603,7 @@ async def generate_lesson_titles(
 async def generate_single_lesson(
     client: anthropic.AsyncAnthropic,
     sem: asyncio.Semaphore,
+    rate_limiter: "_RateLimiter",
     course: dict,
     lesson_idx: int,
     lesson_title: str,
@@ -608,9 +630,10 @@ async def generate_single_lesson(
     json_reminder = "\n\nReturn ONLY valid JSON"
 
     last_exc = None
-    for attempt in range(3):
+    for attempt in range(5):
         current_prompt = user_prompt if attempt == 0 else user_prompt + json_reminder
         try:
+            await rate_limiter.acquire()
             async with sem:
                 response = await client.messages.create(
                     model=MODEL,
@@ -632,7 +655,7 @@ async def generate_single_lesson(
             try:
                 lesson_data = _parse_json_response(raw)
             except json.JSONDecodeError as exc:
-                if attempt < 2:
+                if attempt < 4:
                     print(f"    [lesson {lesson_idx}] JSON parse error ({exc}), retrying with JSON reminder...")
                     await asyncio.sleep(2 ** attempt * 2)
                     last_exc = exc
@@ -656,7 +679,12 @@ async def generate_single_lesson(
 
             return lesson_data, in_tok, out_tok
 
-        except (anthropic.RateLimitError, anthropic.APIConnectionError,
+        except anthropic.RateLimitError as exc:
+            wait = 20 * (attempt + 1)  # 20s, 40s, 60s, 80s, 100s
+            print(f"    [lesson {lesson_idx}] Rate limit hit (attempt {attempt+1}/5), retrying in {wait}s...")
+            await asyncio.sleep(wait)
+            last_exc = exc
+        except (anthropic.APIConnectionError,
                 anthropic.APITimeoutError, anthropic.InternalServerError) as exc:
             wait = 2 ** attempt * 2
             print(f"    [lesson {lesson_idx}] API error ({type(exc).__name__}), retrying in {wait}s...")
@@ -670,7 +698,7 @@ async def generate_single_lesson(
             await asyncio.sleep(wait)
             last_exc = exc
 
-    raise RuntimeError(f"Persistent failure after 3 attempts: {last_exc}") from last_exc
+    raise RuntimeError(f"Persistent failure after 5 attempts: {last_exc}") from last_exc
 
 
 # ---------------------------------------------------------------------------
@@ -680,6 +708,7 @@ async def generate_single_lesson(
 async def generate_course(
     client: anthropic.AsyncAnthropic,
     sem: asyncio.Semaphore,
+    rate_limiter: "_RateLimiter",
     course: dict,
     output_dir: Path,
     progress: dict,
@@ -699,6 +728,7 @@ async def generate_course(
 
     # --- Step 1: Get or generate lesson titles ---
     curriculum_path = course_dir / "curriculum.json"
+    titles = None
     if curriculum_path.exists():
         try:
             titles = json.loads(curriculum_path.read_text())
@@ -706,15 +736,14 @@ async def generate_course(
         except Exception:
             titles = None
 
-    if not curriculum_path.exists() or titles is None:
+    if titles is None:
         print(f"  [titles] Generating 35 lesson titles via Haiku...")
-        titles = await generate_lesson_titles(client, sem, course)
+        titles = await generate_lesson_titles(client, sem, rate_limiter, course)
         curriculum_path.write_text(json.dumps(titles, indent=2))
         print(f"  [titles] Saved curriculum.json")
 
     # Ensure we have exactly lessons_per_course entries
     if len(titles) < lessons_per_course:
-        # Pad if needed
         for i in range(len(titles), lessons_per_course):
             titles.append({"title": f"Advanced Topic {i+1}", "type": "reading"})
     titles = titles[:lessons_per_course]
@@ -743,7 +772,7 @@ async def generate_course(
 
         try:
             lesson_data, in_tok, out_tok = await generate_single_lesson(
-                client, sem, course, idx, lesson_title, lesson_type
+                client, sem, rate_limiter, course, idx, lesson_title, lesson_type
             )
             lesson_path.write_text(json.dumps(lesson_data, indent=2, ensure_ascii=False))
 
@@ -766,7 +795,7 @@ async def generate_course(
             save_progress(progress)
             notify_error(slug, idx, str(exc))
 
-    # Run all lessons concurrently (semaphore already limits parallelism)
+    # Run all lessons concurrently (semaphore + rate limiter control throughput)
     tasks = [_gen_lesson(i, titles[i]) for i in range(lessons_per_course)]
     await asyncio.gather(*tasks)
 
@@ -807,6 +836,7 @@ async def run_batch(
 
     client = anthropic.AsyncAnthropic(api_key=api_key)
     sem = asyncio.Semaphore(concurrency)
+    rate_limiter = _RateLimiter(rate=40, period=60.0)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     progress = load_progress()
@@ -826,7 +856,7 @@ async def run_batch(
 
     for i, course in enumerate(courses):
         stats = await generate_course(
-            client, sem, course, output_dir, progress, lessons_per_course
+            client, sem, rate_limiter, course, output_dir, progress, lessons_per_course
         )
         course_stats.append(stats)
         total_input += stats["input_tokens"]
@@ -889,8 +919,8 @@ def main() -> None:
         help="Generate all 60 courses (overrides --batch)"
     )
     parser.add_argument(
-        "--concurrency", type=int, default=5, metavar="N",
-        help="Number of parallel workers. Default: 5"
+        "--concurrency", type=int, default=3, metavar="N",
+        help="Number of parallel workers. Default: 3"
     )
     parser.add_argument(
         "--output-dir", type=str, default=str(REPO_ROOT / "generated_lessons"),
