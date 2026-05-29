@@ -100,18 +100,21 @@ def _schema() -> str:
 def _build_lesson_prompt(req: LessonRequest) -> str:
     hobby = req.hobby.strip() if req.hobby and req.hobby.lower() not in ("general", "", "none") else ""
 
-    # Analogy instruction injected into prompts when hobby is set.
-    # Pattern enforced: technical explanation FIRST, then analogy box immediately after.
+    # The golden rule: concept → analogy → code (when hobby is set).
+    # Every technical paragraph is immediately followed by an analogy box,
+    # then the code example uses hobby-themed variable names/data to reinforce both.
     analogy_rule = (
-        f"\nINTEREST-BASED ANALOGY RULE (hobby = \"{hobby}\"):\n"
-        f"After EVERY paragraph that explains a technical concept, insert an 'analogy' section.\n"
-        f"The analogy section must:\n"
-        f"  - Start with '🏏 Think of it like {hobby}: '\n"
-        f"  - Map EXACTLY the concept just explained to {hobby} in 2-4 sentences\n"
-        f"  - Be concrete and specific — name actual {hobby} concepts (e.g. innings, over, wicket, run rate)\n"
-        f"  - NEVER replace the technical paragraph — it always comes AFTER the technical explanation\n"
-        f"Code examples remain purely technical (no {hobby} variable names) so the code is reusable.\n"
-        f"The analogy box is a comprehension bridge, not the primary content.\n"
+        f"\n=== PERSONALISATION RULE (interest: {hobby}) ===\n"
+        f"The learning pattern for EVERY concept must follow this exact 3-step sequence:\n"
+        f"  STEP 1 — PARAGRAPH: Explain the technical concept precisely. Pure technical content. No {hobby} in the paragraph.\n"
+        f"  STEP 2 — ANALOGY: Immediately after the paragraph, add an 'analogy' section that bridges it to {hobby}.\n"
+        f"             Format: '🏏 Think of it like {hobby}: [2-4 sentences mapping the exact concept to {hobby}. "
+        f"Use specific {hobby} terms: e.g. innings, over, wicket, run rate, scorecard, batting lineup, bowling figures.]'\n"
+        f"  STEP 3 — CODE: The code example that follows uses {hobby}-themed class names, variable names, and sample data\n"
+        f"             (e.g. CricketPlayer, innings_count, match_id, Rohit Sharma, Jasprit Bumrah) to reinforce BOTH the concept and the analogy.\n"
+        f"The paragraph teaches the concept. The analogy makes it click. The code makes it concrete.\n"
+        f"Do NOT mix {hobby} into the paragraph text — keep the 3 steps cleanly separated.\n"
+        f"=== END PERSONALISATION RULE ===\n"
     ) if hobby else ""
 
     ctx = (
@@ -123,60 +126,108 @@ def _build_lesson_prompt(req: LessonRequest) -> str:
         + analogy_rule + "\n"
     )
 
-    # Section numbering note: when hobby is set, each concept paragraph is followed
-    # by an analogy section, so the total section count increases. The section list
-    # below shows the base structure; Claude must insert analogy sections after each
-    # concept paragraph.
-    analogy_note = (
-        f"IMPORTANT: After each numbered concept paragraph below, add an analogy section "
-        f"(type: 'analogy') that maps that concept to {hobby}. "
-        f"Do NOT add analogies after code blocks, info_box, warning_box, or key_points — only after paragraphs.\n\n"
-    ) if hobby else ""
-
     if req.lessonType == "reading":
-        return ctx + _schema() + f"""Generate a DEEP, comprehensive reading lesson on "{req.lessonTitle}" for the topic "{req.topicName}".
+        if hobby:
+            sections = f"""Include ALL of the following sections in EXACTLY this order:
 
-{analogy_note}This lesson must be equivalent to a high-quality textbook chapter. Include ALL of the following sections in order:
+1.  heading (level 2): Overview
+2.  paragraph: Motivating context — the problem this topic solves, why it was invented. Minimum 100 words. Pure technical.
+3.  analogy: Map the motivation to {hobby} — why does {hobby} need this concept too? 2-4 sentences.
+4.  heading (level 2): Core Concepts
+5.  paragraph: The first core concept — theory, mechanics, mental model. Minimum 120 words. Pure technical.
+6.  analogy: Map this concept to {hobby} using specific {hobby} terminology. 2-4 sentences.
+7.  code: First complete, commented code example using {hobby}-themed class/variable names and sample data.
+8.  paragraph: Walk through the code — explain each part, why it was written that way, runtime behaviour. Minimum 80 words.
+9.  heading (level 2): How It Works Under the Hood
+10. paragraph: Internal mechanics — what the runtime/compiler/framework actually does. Performance, memory model, execution flow. Minimum 120 words. Pure technical.
+11. analogy: Map the internals to {hobby} — e.g. how the JVM is like a cricket umpire enforcing rules. 2-4 sentences.
+12. code: Second code example — advanced usage, using {hobby}-themed data.
+13. info_box: Pro Tip — a non-obvious production insight. Start with "Pro Tip:".
+14. heading (level 2): Common Patterns & Best Practices
+15. paragraph: 2-3 established patterns with reasoning — why pattern A over B. Minimum 100 words. Pure technical.
+16. analogy: Map the best practice to {hobby} — e.g. why following a good batting technique matters even when improvising. 2-4 sentences.
+17. code: Third code example — best practice vs anti-pattern, using {hobby}-themed objects.
+18. warning_box: Most common beginner mistake and exactly how to avoid it. Start with "Warning:".
+19. heading (level 2): Real-World Application
+20. paragraph: How this is used in production at scale — specific companies, frameworks, systems. Minimum 80 words.
+21. key_points: 6-7 detailed takeaway bullets — complete, specific insights.
+22. quiz: Conceptual question on the core mechanism. 4 options, correct index, 40+ word explanation.
+23. quiz: Applied scenario question. 4 options, correct index, 40+ word explanation."""
+        else:
+            sections = """Include ALL of the following sections in order:
 
-1. heading (level 2): Overview — what this lesson covers and why it matters in the real world
-2. paragraph: Motivating context — the problem this topic solves, why it was invented, what breaks without it. Minimum 100 words. Pure technical explanation.
+1. heading (level 2): Overview
+2. paragraph: Motivating context — the problem this topic solves, why it was invented. Minimum 100 words.
 3. heading (level 2): Core Concepts
-4. paragraph: Explain the first core concept — theory, mechanics, mental model. Minimum 120 words. Pure technical explanation.
-5. code: First complete, commented code example demonstrating the core concept. Use real {req.topicCategory} code with generic, reusable variable names.
+4. paragraph: The first core concept — theory, mechanics, mental model. Minimum 120 words.
+5. code: First complete, commented code example demonstrating the core concept.
 6. paragraph: Walk through the code — explain each part, why it was written that way, runtime behaviour. Minimum 80 words.
 7. heading (level 2): How It Works Under the Hood
-8. paragraph: Internal mechanics — what the runtime/compiler/framework actually does. Performance implications, memory model, or execution flow. Minimum 120 words.
-9. code: Second code example showing a more advanced or real-world usage pattern.
-10. info_box: Pro Tip — a non-obvious insight experienced engineers use in production. Start with "Pro Tip:".
+8. paragraph: Internal mechanics — runtime/compiler/framework internals. Performance, memory, execution flow. Minimum 120 words.
+9. code: Second code example — advanced usage.
+10. info_box: Pro Tip — a non-obvious production insight. Start with "Pro Tip:".
 11. heading (level 2): Common Patterns & Best Practices
-12. paragraph: 2-3 established patterns with reasoning — why pattern A over pattern B. Minimum 100 words.
-13. code: Third code example — best practice vs anti-pattern comparison OR a complete real-world snippet.
-14. warning_box: The most common mistake beginners make and exactly how to avoid it. Start with "Warning:".
+12. paragraph: 2-3 established patterns with reasoning — why pattern A over B. Minimum 100 words.
+13. code: Third code example — best practice vs anti-pattern.
+14. warning_box: Most common beginner mistake and exactly how to avoid it. Start with "Warning:".
 15. heading (level 2): Real-World Application
 16. paragraph: How this is used in production at scale — specific companies, frameworks, systems. Minimum 80 words.
-17. key_points: 6-7 detailed takeaway bullets — complete, specific insights (not vague summaries).
-18. quiz: Conceptual question testing understanding of the core mechanism. 4 options, correct index, 40+ word explanation.
-19. quiz: Applied scenario question — given a real situation, what is the correct approach? 4 options, correct index, 40+ word explanation.
+17. key_points: 6-7 detailed takeaway bullets — complete, specific insights.
+18. quiz: Conceptual question on the core mechanism. 4 options, correct index, 40+ word explanation.
+19. quiz: Applied scenario question. 4 options, correct index, 40+ word explanation."""
+
+        return ctx + _schema() + f"""Generate a DEEP, comprehensive reading lesson on "{req.lessonTitle}" for the topic "{req.topicName}".
+
+This lesson must be equivalent to a high-quality textbook chapter.
+{sections}
 
 Set estimatedMinutes to 25-35. Set xpReward to 75."""
 
     elif req.lessonType == "exercise":
-        return ctx + _schema() + f"""Generate a DETAILED hands-on exercise for "{req.lessonTitle}" in "{req.topicName}".
+        if hobby:
+            sections = f"""Include ALL sections in EXACTLY this order:
 
-{analogy_note}This must be a fully guided, step-by-step exercise building real, functional software. Include ALL sections:
+1.  heading (level 2): What You'll Build
+2.  paragraph: What the learner builds — a {hobby}-themed project, its purpose, skills reinforced. Minimum 80 words. Pure technical.
+3.  analogy: Why this project maps perfectly to {hobby} — the domain connection. 2-3 sentences.
+4.  heading (level 2): Prerequisites
+5.  key_points: 4-5 specific prerequisites.
+6.  heading (level 2): Setup & Project Structure
+7.  paragraph: Project setup, directory structure, dependencies. Minimum 60 words.
+8.  code: Setup commands / file structure (language: bash) — use {hobby}-themed project/file names.
+9.  heading (level 2): Step 1 — Foundation
+10. paragraph: What Step 1 accomplishes and the concept behind it. Minimum 60 words. Pure technical.
+11. analogy: Map Step 1's concept to {hobby}. 2-3 sentences.
+12. code: Complete code for Step 1 — use {hobby}-themed class/variable names and real sample data.
+13. heading (level 2): Step 2 — Core Logic
+14. paragraph: What Step 2 builds on Step 1 and what new concept it introduces. Minimum 60 words. Pure technical.
+15. analogy: Map Step 2's concept to {hobby}. 2-3 sentences.
+16. code: Complete code for Step 2 with {hobby}-themed data.
+17. heading (level 2): Step 3 — Integration & Enhancement
+18. paragraph: How Step 3 brings everything together. Minimum 60 words. Pure technical.
+19. analogy: Map Step 3's integration to {hobby}. 2-3 sentences.
+20. code: Complete code for Step 3.
+21. heading (level 2): Step 4 — Testing & Verification
+22. paragraph: How to run and verify the solution. Minimum 40 words.
+23. code: Run commands + expected output using realistic {hobby} data (language: bash).
+24. warning_box: Most common error and fix. Start with "Warning:".
+25. info_box: Extension challenge specific to {hobby} domain. Start with "Extension Challenge:".
+26. key_points: 5-6 key concepts reinforced."""
+        else:
+            sections = """Include ALL sections in order:
 
 1. heading (level 2): What You'll Build
-2. paragraph: Exactly what the learner will build — finished product, purpose, skills reinforced. Minimum 80 words.
+2. paragraph: What the learner builds, its purpose, skills reinforced. Minimum 80 words.
 3. heading (level 2): Prerequisites
-4. key_points: 4-5 specific prerequisites — what to know or have installed.
+4. key_points: 4-5 specific prerequisites.
 5. heading (level 2): Setup & Project Structure
 6. paragraph: Project setup, directory structure, dependencies. Minimum 60 words.
-7. code: Setup commands / initial file structure / dependency installation (language: bash).
+7. code: Setup commands / file structure (language: bash).
 8. heading (level 2): Step 1 — Foundation
 9. paragraph: What Step 1 accomplishes and the concept behind it. Minimum 60 words.
-10. code: Complete code for Step 1 with comments on each key line.
+10. code: Complete code for Step 1 with comments.
 11. heading (level 2): Step 2 — Core Logic
-12. paragraph: What Step 2 builds on Step 1 and what new concept it introduces. Minimum 60 words.
+12. paragraph: What Step 2 builds and what new concept it introduces. Minimum 60 words.
 13. code: Complete code for Step 2.
 14. heading (level 2): Step 3 — Integration & Enhancement
 15. paragraph: How Step 3 brings everything together. Minimum 60 words.
@@ -184,28 +235,31 @@ Set estimatedMinutes to 25-35. Set xpReward to 75."""
 17. heading (level 2): Step 4 — Testing & Verification
 18. paragraph: How to run and verify the solution. Minimum 40 words.
 19. code: Run commands + expected output (language: bash).
-20. warning_box: The most common error learners hit and how to fix it. Start with "Warning:".
-21. info_box: Extension challenge to deepen understanding. Start with "Extension Challenge:".
-22. key_points: 5-6 key concepts reinforced by this exercise.
+20. warning_box: Most common error and fix. Start with "Warning:".
+21. info_box: Extension challenge. Start with "Extension Challenge:".
+22. key_points: 5-6 key concepts reinforced."""
+
+        return ctx + _schema() + f"""Generate a DETAILED hands-on exercise for "{req.lessonTitle}" in "{req.topicName}".
+
+This must be a fully guided, step-by-step exercise building real, functional software.
+{sections}
 
 Set estimatedMinutes to 50-60. Set xpReward to 100."""
 
     elif req.lessonType == "quiz":
         applied_framing = (
-            f"For questions 5 and 6 (applied scenarios), frame the scenario as a decision "
-            f"a developer building a {hobby} application must make — this grounds the abstract "
-            f"concept in something the learner cares about."
+            f"Questions 5-6: Applied scenarios framed as decisions a developer building a {hobby} app must make"
         ) if hobby else "Questions 5-6: Applied scenarios — given X situation, what should you do?"
         return ctx + _schema() + f"""Generate a RIGOROUS quiz for "{req.lessonTitle}" in "{req.topicName}".
 
-The quiz must test genuine understanding — not just recall. Mix conceptual, applied, and tricky questions. Include:
+The quiz must test genuine understanding — not just recall. Include:
 
 1. heading (level 2): Knowledge Check — {req.lessonTitle}
-2. paragraph: Intro explaining what this quiz covers and how it tests understanding. 40+ words.
+2. paragraph: Intro — what this quiz covers and how it tests understanding{f", mention applied questions use {hobby} scenarios" if hobby else ""}. 40+ words.
 3-10. Eight quiz sections progressing from foundational to advanced:
    - Questions 1-2: Foundational conceptual understanding
    - Questions 3-4: How things work mechanically / under the hood
-   - Questions 5-6: {applied_framing}
+   - {applied_framing}
    - Questions 7-8: Tricky edge cases or common misconceptions
 
    Each quiz section must have:
@@ -214,42 +268,74 @@ The quiz must test genuine understanding — not just recall. Mix conceptual, ap
    - answer: Integer 0-3 (correct option index)
    - explanation: 40+ word explanation of WHY the correct answer is right and the others wrong
 
-11. key_points: 6 detailed summary bullets of the key concepts tested.
+11. key_points: 6 detailed summary bullets of key concepts tested.
 
 Set estimatedMinutes to 20. Set xpReward to 50."""
 
     elif req.lessonType == "project":
-        return ctx + _schema() + f"""Generate a COMPREHENSIVE capstone mini-project for "{req.lessonTitle}" in "{req.topicName}".
+        if hobby:
+            sections = f"""Include ALL sections in EXACTLY this order:
 
-{analogy_note}This must be a real, non-trivial project impressive in a portfolio. Include ALL sections:
+1.  heading (level 2): Project Overview
+2.  paragraph: The project — a {hobby}-themed app showcasing {req.topicName} skills. Purpose, what it demonstrates, portfolio value. Minimum 100 words. Pure technical.
+3.  analogy: Why building this in the {hobby} domain is a great fit for these technologies. 2-3 sentences.
+4.  heading (level 2): Learning Objectives
+5.  key_points: 5-6 specific skills the learner will demonstrate.
+6.  heading (level 2): Technical Requirements
+7.  key_points: 7-8 specific requirements grounded in the {hobby} use case.
+8.  heading (level 2): Architecture & Design
+9.  paragraph: Architecture — components, interactions, data flow, design decisions. Minimum 120 words. Pure technical.
+10. analogy: Map the architecture to {hobby} — e.g. how API Gateway is like the stadium entrance turnstile. 2-3 sentences.
+11. code: Architecture skeleton / project structure with {hobby}-themed file/class names.
+12. heading (level 2): Phase 1 — Core Implementation
+13. paragraph: What Phase 1 builds and why this foundation matters. Minimum 60 words. Pure technical.
+14. analogy: Map Phase 1's core concept to {hobby}. 2-3 sentences.
+15. code: Phase 1 implementation — use {hobby}-themed class names and realistic sample data.
+16. heading (level 2): Phase 2 — Feature Completion
+17. paragraph: What Phase 2 adds and how it builds on Phase 1. Minimum 60 words. Pure technical.
+18. analogy: Map Phase 2's new feature to {hobby}. 2-3 sentences.
+19. code: Phase 2 code with {hobby}-themed data.
+20. heading (level 2): Phase 3 — Polish & Production Readiness
+21. paragraph: Error handling, edge cases, testing, production considerations. Minimum 60 words.
+22. code: Error handling / validation / test code.
+23. heading (level 2): Evaluation Rubric
+24. key_points: 6-7 specific evaluation criteria — what "excellent" looks like for each.
+25. info_box: Extension challenges — 3 {hobby}-specific ways to extend the project. Start with "Extension Challenges:"."""
+        else:
+            sections = """Include ALL sections in order:
 
 1. heading (level 2): Project Overview
-2. paragraph: The project, its real-world purpose, what it demonstrates, why it's valuable. Minimum 100 words.
+2. paragraph: The project, its real-world purpose, what it demonstrates, portfolio value. Minimum 100 words.
 3. heading (level 2): Learning Objectives
-4. key_points: 5-6 specific skills the learner will demonstrate.
+4. key_points: 5-6 specific skills demonstrated.
 5. heading (level 2): Technical Requirements
-6. key_points: 7-8 specific functional and non-functional requirements — precise ("must handle X", "must implement Y").
+6. key_points: 7-8 specific requirements — precise ("must handle X").
 7. heading (level 2): Architecture & Design
-8. paragraph: Architecture — components, interactions, data flow, design decisions and trade-offs. Minimum 120 words.
-9. code: Architecture skeleton / project structure with key files and responsibilities.
+8. paragraph: Architecture — components, interactions, data flow, trade-offs. Minimum 120 words.
+9. code: Architecture skeleton / project structure.
 10. heading (level 2): Phase 1 — Core Implementation
-11. paragraph: What Phase 1 builds and why this foundation matters. Minimum 60 words.
-12. code: Core implementation for Phase 1 with detailed comments.
+11. paragraph: What Phase 1 builds and why it matters. Minimum 60 words.
+12. code: Phase 1 implementation with detailed comments.
 13. heading (level 2): Phase 2 — Feature Completion
-14. paragraph: What Phase 2 adds and how it builds on Phase 1. Minimum 60 words.
-15. code: Key code for Phase 2.
+14. paragraph: What Phase 2 adds. Minimum 60 words.
+15. code: Phase 2 code.
 16. heading (level 2): Phase 3 — Polish & Production Readiness
-17. paragraph: Error handling, edge cases, testing, production considerations. Minimum 60 words.
-18. code: Error handling, validation, or test code.
+17. paragraph: Error handling, testing, production considerations. Minimum 60 words.
+18. code: Error handling / test code.
 19. heading (level 2): Evaluation Rubric
-20. key_points: 6-7 specific evaluation criteria — what "excellent" looks like for each.
-21. info_box: Extension challenges — 3 ways to take the project further. Start with "Extension Challenges:".
+20. key_points: 6-7 evaluation criteria.
+21. info_box: Extension challenges. Start with "Extension Challenges:"."""
+
+        return ctx + _schema() + f"""Generate a COMPREHENSIVE capstone mini-project for "{req.lessonTitle}" in "{req.topicName}".
+
+This must be a real, non-trivial project impressive in a portfolio.
+{sections}
 
 Set estimatedMinutes to 60. Set xpReward to 150."""
 
     else:
         return ctx + _schema() + f"""Generate educational content for "{req.lessonTitle}" in "{req.topicName}".
-{analogy_note}Include: heading, a detailed 100-word paragraph, a complete code example, an info_box with a pro tip, and key_points with 5 detailed bullets.
+Include: heading, a detailed 100-word paragraph{f", analogy mapping it to {hobby}" if hobby else ""}, a complete code example{f" with {hobby}-themed variable names" if hobby else ""}, an info_box with a pro tip, and key_points with 5 detailed bullets.
 Set estimatedMinutes to 20. Set xpReward to 50."""
 
 
