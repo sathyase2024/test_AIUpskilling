@@ -512,7 +512,33 @@ def _parse_json_response(raw: str) -> dict:
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(lines[1:-1]) if len(lines) > 2 else text
-    return json.loads(text)
+        text = text.strip()
+
+    # Direct parse
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Extract outermost {...} in case there's surrounding text
+    start = text.find('{')
+    end = text.rfind('}')
+    if start != -1 and end > start:
+        try:
+            return json.loads(text[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    # json_repair as last resort (handles unescaped quotes, trailing commas, etc.)
+    try:
+        from json_repair import repair_json
+        repaired = repair_json(text, return_objects=True)
+        if isinstance(repaired, dict):
+            return repaired
+    except Exception:
+        pass
+
+    return json.loads(text)  # re-raise original error
 
 
 def _slugify(title: str) -> str:
