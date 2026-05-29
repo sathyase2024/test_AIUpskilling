@@ -4,11 +4,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 
-from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS
+from config import MODEL, MAX_TOKENS, get_client
 
 router = APIRouter(prefix="/generate", tags=["generate"])
-
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
 class LessonRequest(BaseModel):
@@ -67,9 +65,39 @@ class CurriculumResponse(BaseModel):
     modules: List[CurriculumModule]
 
 
+def _schema() -> str:
+    return (
+        "Return a JSON object with this exact schema:\n"
+        "{\n"
+        '  "lessonId": "<provided lessonId>",\n'
+        '  "title": "<lesson title>",\n'
+        '  "type": "<lesson type>",\n'
+        '  "topicName": "<topic name>",\n'
+        '  "estimatedMinutes": <integer>,\n'
+        '  "xpReward": <integer>,\n'
+        '  "generated": true,\n'
+        '  "sections": [ { "type": "...", "content": "...", "language": "...", "level": 2, "items": [], "answer": -1, "explanation": "" } ]\n'
+        "}\n\n"
+        "Section types and their required fields:\n"
+        '- "heading": content=heading text, level=2 or 3\n'
+        '- "paragraph": content=rich explanatory text (minimum 80 words per paragraph, explain WHY not just WHAT)\n'
+        '- "code": content=full working code, language=language name (e.g. "python","java","typescript","bash")\n'
+        '- "info_box": content=pro tip or important note starting with "Pro Tip:" or "Note:"\n'
+        '- "warning_box": content=common mistake or pitfall starting with "Warning:" or "Common Mistake:"\n'
+        '- "key_points": items=array of 5-7 detailed bullet strings (each 15-25 words)\n'
+        '- "quiz": content=question, items=4 answer options, answer=correct index (0-3), explanation=why correct (30+ words)\n\n'
+        "QUALITY REQUIREMENTS:\n"
+        "- Every paragraph must be at least 80 words with real technical depth\n"
+        "- Every code block must be complete, runnable, and well-commented\n"
+        "- Include real-world context: where is this used in production, why does it matter\n"
+        "- Do NOT use vague phrases like 'this is important' — explain WHY with specifics\n"
+        "- Use precise technical language appropriate for the difficulty level\n\n"
+        "Return only valid JSON. No markdown fences. No text outside the JSON.\n\n"
+    )
+
+
 def _build_lesson_prompt(req: LessonRequest) -> str:
-    """Build a lesson-type-specific prompt requesting JSON output."""
-    base_context = (
+    ctx = (
         f"Topic: {req.topicName}\n"
         f"Category: {req.topicCategory}\n"
         f"Lesson Title: {req.lessonTitle}\n"
@@ -77,119 +105,119 @@ def _build_lesson_prompt(req: LessonRequest) -> str:
         f"Difficulty: {req.difficulty}\n\n"
     )
 
-    schema_description = (
-        "Return a JSON object matching this schema exactly:\n"
-        "{\n"
-        '  "lessonId": "<the lessonId provided>",\n'
-        '  "title": "<lesson title>",\n'
-        '  "type": "<lesson type>",\n'
-        '  "topicName": "<topic name>",\n'
-        '  "estimatedMinutes": <integer>,\n'
-        '  "xpReward": <integer>,\n'
-        '  "generated": true,\n'
-        '  "sections": [\n'
-        "    {\n"
-        '      "type": "<section type>",\n'
-        '      "content": "<text content>",\n'
-        '      "language": "<optional: programming language for code blocks>",\n'
-        '      "level": <optional: heading level, default 2>,\n'
-        '      "items": [<optional: list of strings for key_points, or list of option strings for quiz>],\n'
-        '      "answer": <optional: integer index of correct answer for quiz, default -1>,\n'
-        '      "explanation": "<optional: explanation for quiz answers>"\n'
-        "    }\n"
-        "  ]\n"
-        "}\n\n"
-        'Section types: "heading", "paragraph", "code", "info_box", "warning_box", "quiz", "exercise", "key_points"\n\n'
-    )
-
     if req.lessonType == "reading":
-        return (
-            base_context
-            + "Generate a comprehensive reading lesson as JSON.\n\n"
-            + schema_description
-            + f"Include these sections in order:\n"
-            f'1. heading (level 2): "What is {req.topicName}?"\n'
-            f"2. paragraph: 2-3 sentence explanation of {req.lessonTitle}\n"
-            f'3. heading (level 2): "Key Concepts"\n'
-            f"4. paragraph: detailed explanation of key concepts\n"
-            f"5. code: relevant code example (set language field appropriately)\n"
-            f'6. info_box: content starting with "Pro Tip:" followed by practical advice\n'
-            f'7. heading (level 2): "How It Works"\n'
-            f"8. paragraph: deeper explanation of the mechanics\n"
-            f"9. code: second illustrative example (set language field)\n"
-            f'10. key_points: items array with 4-5 key takeaway bullet points\n\n'
-            f"Set estimatedMinutes to 10-15 and xpReward to 50-100.\n"
-            f"Return only valid JSON, no markdown fences."
-        )
+        return ctx + _schema() + f"""Generate a DEEP, comprehensive reading lesson on "{req.lessonTitle}" for the topic "{req.topicName}".
+
+This lesson must be equivalent to a high-quality textbook chapter. Include ALL of the following sections in order:
+
+1. heading (level 2): Overview — what this lesson covers and why it matters in the real world
+2. paragraph: Motivating context — explain the problem this topic solves, with a real-world analogy. Minimum 100 words.
+3. heading (level 2): Core Concepts
+4. paragraph: Explain the first core concept in depth — the theory, the mechanics, the mental model. Minimum 120 words.
+5. code: First complete, commented code example demonstrating the core concept. Use real {req.topicCategory} code.
+6. paragraph: Walk through the code — explain each important part, why it was written that way, and what happens at runtime. Minimum 80 words.
+7. heading (level 2): How It Works Under the Hood
+8. paragraph: Explain the internal mechanics — what the runtime/compiler/framework is actually doing. Include performance implications, memory model, or execution flow as relevant. Minimum 120 words.
+9. code: Second code example showing a more advanced or real-world usage pattern.
+10. info_box: Pro Tip with a non-obvious insight that experienced engineers use in production.
+11. heading (level 2): Common Patterns & Best Practices
+12. paragraph: Explain 2-3 established patterns or best practices with reasoning. Why is pattern A preferred over pattern B? Minimum 100 words.
+13. code: Third code example showing best practice vs anti-pattern comparison OR a complete real-world snippet.
+14. warning_box: The most common mistake beginners make with this concept and exactly how to avoid it.
+15. heading (level 2): Real-World Application
+16. paragraph: Describe how this is used in production systems at scale — mention specific companies, frameworks, or systems where relevant. Minimum 80 words.
+17. key_points: 6-7 detailed takeaway bullets — each bullet must be a complete, specific insight (not vague summaries).
+18. quiz (question 1): Conceptual question testing understanding of the core mechanism.
+19. quiz (question 2): Applied question — given a scenario, what is the correct approach?
+
+Set estimatedMinutes to 25-35. Set xpReward to 75."""
+
     elif req.lessonType == "exercise":
-        return (
-            base_context
-            + "Generate a hands-on exercise lesson as JSON.\n\n"
-            + schema_description
-            + "Include these sections in order:\n"
-            '1. heading (level 2): "Exercise Overview"\n'
-            f"2. paragraph: description of what the learner will build related to {req.lessonTitle}\n"
-            '3. heading (level 2): "Prerequisites"\n'
-            "4. key_points: items array listing 3-4 prerequisite skills/knowledge\n"
-            '5. heading (level 2): "Step-by-Step Instructions"\n'
-            "6. paragraph: introduction to step 1 with instructions\n"
-            "7. code: code for step 1 (set language field)\n"
-            "8. paragraph: introduction to step 2 with instructions\n"
-            "9. code: code for step 2 (set language field)\n"
-            "10. paragraph: introduction to step 3 with instructions\n"
-            "11. code: code for step 3 (set language field)\n"
-            '12. heading (level 2): "Expected Output"\n'
-            "13. code: the expected output when running the completed exercise\n"
-            "14. info_box: a helpful hint for completing the exercise\n\n"
-            "Set estimatedMinutes to 20-30 and xpReward to 75-150.\n"
-            "Return only valid JSON, no markdown fences."
-        )
+        return ctx + _schema() + f"""Generate a DETAILED hands-on exercise for "{req.lessonTitle}" in "{req.topicName}".
+
+This must be a fully guided, step-by-step exercise that builds a real, functional piece of software. Include ALL sections:
+
+1. heading (level 2): What You'll Build
+2. paragraph: Describe exactly what the learner will build — the finished product, its purpose, and what skills it reinforces. Be specific. Minimum 80 words.
+3. heading (level 2): Prerequisites
+4. key_points: 4-5 specific prerequisites with what the learner needs to already know or have installed.
+5. heading (level 2): Setup & Project Structure
+6. paragraph: Explain the project setup, directory structure, and any dependencies to install. Minimum 60 words.
+7. code: Setup commands / initial file structure / dependency installation.
+8. heading (level 2): Step 1 — Foundation
+9. paragraph: Explain what Step 1 accomplishes and the concept behind it. Minimum 60 words.
+10. code: Complete code for Step 1 with comments explaining each key line.
+11. heading (level 2): Step 2 — Core Logic
+12. paragraph: Explain what Step 2 builds on from Step 1 and what new concept it introduces. Minimum 60 words.
+13. code: Complete code for Step 2.
+14. heading (level 2): Step 3 — Integration & Enhancement
+15. paragraph: Explain Step 3 and how it brings everything together. Minimum 60 words.
+16. code: Complete code for Step 3.
+17. heading (level 2): Step 4 — Testing & Verification
+18. paragraph: How to run and verify the solution works correctly. Minimum 40 words.
+19. code: How to run the code + expected output.
+20. warning_box: The most common error learners hit in this exercise and how to fix it.
+21. info_box: Extension challenge — one way to take this exercise further to deepen understanding.
+22. key_points: 5-6 key concepts reinforced by this exercise.
+
+Set estimatedMinutes to 50-60. Set xpReward to 100."""
+
     elif req.lessonType == "quiz":
-        return (
-            base_context
-            + "Generate a quiz lesson as JSON.\n\n"
-            + schema_description
-            + "Include these sections in order:\n"
-            '1. heading (level 2): "Test Your Knowledge"\n'
-            f"2. paragraph: brief intro explaining this quiz tests understanding of {req.lessonTitle}\n"
-            "3-7. Five quiz sections (type: \"quiz\"), each with:\n"
-            "   - content: the question text\n"
-            "   - items: array of exactly 4 answer option strings\n"
-            "   - answer: integer 0-3 indicating the correct option index\n"
-            "   - explanation: brief explanation of why the answer is correct\n"
-            '8. key_points: items array summarizing the 4-5 main topics that were tested\n\n'
-            "Make questions progressively harder. Set estimatedMinutes to 10-15, xpReward to 60-100.\n"
-            "Return only valid JSON, no markdown fences."
-        )
+        return ctx + _schema() + f"""Generate a RIGOROUS quiz for "{req.lessonTitle}" in "{req.topicName}".
+
+The quiz must test genuine understanding — not just recall. Mix conceptual, applied, and tricky questions. Include:
+
+1. heading (level 2): Knowledge Check — {req.lessonTitle}
+2. paragraph: Intro explaining what this quiz covers and how it will test their understanding. 40+ words.
+3-10. Eight quiz sections, progressing from foundational to advanced:
+   - Questions 1-2: Foundational conceptual understanding
+   - Questions 3-4: How things work mechanically / under the hood
+   - Questions 5-6: Applied scenarios — "given X situation, what should you do?"
+   - Questions 7-8: Tricky edge cases or common misconceptions
+
+   Each quiz section must have:
+   - content: A clear, specific question (not trivially obvious)
+   - items: Exactly 4 answer options (plausible distractors, not obviously wrong)
+   - answer: Integer 0-3 (correct option index)
+   - explanation: 40+ word explanation of WHY the correct answer is right and why the others are wrong
+
+11. key_points: 6 detailed summary bullets of the key concepts tested in this quiz.
+
+Set estimatedMinutes to 20. Set xpReward to 50."""
+
     elif req.lessonType == "project":
-        return (
-            base_context
-            + "Generate a mini-project lesson as JSON.\n\n"
-            + schema_description
-            + "Include these sections in order:\n"
-            f'1. heading (level 2): "Project: {req.lessonTitle}"\n'
-            f"2. paragraph: description of the project and its learning goals\n"
-            '3. heading (level 2): "Requirements"\n'
-            "4. key_points: items array with 5-6 functional requirements\n"
-            '5. heading (level 2): "Architecture"\n'
-            "6. paragraph: overview of the key components and how they fit together\n"
-            "7. code: starter code / skeleton structure (set language field)\n"
-            '8. heading (level 2): "Implementation Steps"\n'
-            "9. key_points: items array with 5-7 implementation checklist items\n"
-            '10. heading (level 2): "Evaluation Criteria"\n'
-            "11. key_points: items array with 4-5 criteria for a good solution\n\n"
-            "Set estimatedMinutes to 45-60, xpReward to 150-200.\n"
-            "Return only valid JSON, no markdown fences."
-        )
+        return ctx + _schema() + f"""Generate a COMPREHENSIVE capstone mini-project for "{req.lessonTitle}" in "{req.topicName}".
+
+This must be a real, non-trivial project that would be impressive in a portfolio. Include ALL sections:
+
+1. heading (level 2): Project Overview
+2. paragraph: Describe the project, its real-world purpose, what it demonstrates, and why it's valuable. Minimum 100 words.
+3. heading (level 2): Learning Objectives
+4. key_points: 5-6 specific skills and concepts the learner will demonstrate by completing this project.
+5. heading (level 2): Technical Requirements
+6. key_points: 7-8 specific functional and non-functional requirements (be precise — "must handle X", "must implement Y").
+7. heading (level 2): Architecture & Design
+8. paragraph: Explain the architecture — components, how they interact, data flow, design decisions and trade-offs. Minimum 120 words.
+9. code: Architecture skeleton / project structure with key files and their responsibilities.
+10. heading (level 2): Phase 1 — Core Implementation
+11. paragraph: What to build in Phase 1 and why this foundation matters. Minimum 60 words.
+12. code: Starter code / core implementation for Phase 1 with detailed comments.
+13. heading (level 2): Phase 2 — Feature Completion
+14. paragraph: What Phase 2 adds and how it builds on Phase 1. Minimum 60 words.
+15. code: Key code for Phase 2.
+16. heading (level 2): Phase 3 — Polish & Production Readiness
+17. paragraph: Error handling, edge cases, testing, and production considerations. Minimum 60 words.
+18. code: Error handling, validation, or test code example.
+19. heading (level 2): Evaluation Rubric
+20. key_points: 6-7 specific evaluation criteria with what "excellent" looks like for each.
+21. info_box: Extension challenges — 3 ways to take the project to the next level.
+
+Set estimatedMinutes to 60. Set xpReward to 150."""
+
     else:
-        return (
-            base_context
-            + "Generate educational lesson content as JSON.\n\n"
-            + schema_description
-            + "Include a heading, paragraph with an explanation, a code example, and key_points.\n"
-            "Set estimatedMinutes to 15 and xpReward to 50.\n"
-            "Return only valid JSON, no markdown fences."
-        )
+        return ctx + _schema() + f"""Generate educational content for "{req.lessonTitle}" in "{req.topicName}".
+Include: heading, a detailed 100-word paragraph, a complete code example, an info_box with a pro tip, and key_points with 5 detailed bullets.
+Set estimatedMinutes to 20. Set xpReward to 50."""
 
 
 @router.post("/lesson", response_model=LessonContentResponse)
@@ -203,7 +231,7 @@ async def generate_lesson(req: LessonRequest) -> LessonContentResponse:
     user_prompt = _build_lesson_prompt(req)
 
     try:
-        response = client.messages.create(
+        response = get_client().messages.create(
             model="claude-sonnet-4-6",
             max_tokens=MAX_TOKENS,
             system=[
@@ -325,7 +353,7 @@ async def generate_curriculum(req: CurriculumRequest):
     )
 
     try:
-        response = client.messages.create(
+        response = get_client().messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=[
