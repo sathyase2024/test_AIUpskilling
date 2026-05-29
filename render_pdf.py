@@ -48,6 +48,9 @@ def render_section(sec):
             f'</div>'
         )
 
+    elif t == "analogy":
+        return f'<div class="analogy-box">{html_escape(content)}</div>'
+
     elif t == "info_box":
         return f'<div class="info-box"><strong>💡 </strong>{html_escape(content)}</div>'
 
@@ -242,6 +245,19 @@ code {
     line-height: 1.55;
     white-space: pre-wrap;
     word-break: break-word;
+}
+
+/* Analogy box */
+.analogy-box {
+    background: #f0fdf4;
+    border-left: 4px solid #22c55e;
+    padding: 3mm 4mm;
+    margin: 2mm 0 4mm;
+    border-radius: 0 6px 6px 0;
+    font-size: 10pt;
+    color: #14532d;
+    font-style: italic;
+    page-break-inside: avoid;
 }
 
 /* Info / warning boxes */
