@@ -107,9 +107,15 @@ def _build_lesson_prompt(req: LessonRequest) -> str:
         f"\n=== PERSONALISATION RULE (interest: {hobby}) ===\n"
         f"The learning pattern for EVERY concept must follow this exact 3-step sequence:\n"
         f"  STEP 1 — PARAGRAPH: Explain the technical concept precisely. Pure technical content. No {hobby} in the paragraph.\n"
-        f"  STEP 2 — ANALOGY: Immediately after the paragraph, add an 'analogy' section that bridges it to {hobby}.\n"
-        f"             Format: '🏏 Think of it like {hobby}: [2-4 sentences mapping the exact concept to {hobby}. "
-        f"Use specific {hobby} terms: e.g. innings, over, wicket, run rate, scorecard, batting lineup, bowling figures.]'\n"
+        f"  STEP 2 — ANALOGY: Immediately after the paragraph, add an 'analogy' section. This is the most important step.\n"
+        f"             The analogy must be DEEP and DETAILED — not a one-liner. Follow this structure:\n"
+        f"             a) First, describe the {hobby} scenario in specific detail (2-3 sentences). Name real players, real situations, real mechanics.\n"
+        f"             b) Then explicitly draw the parallel — map EACH part of the technical concept to its {hobby} equivalent (3-4 sentences).\n"
+        f"             c) End with the insight — what does understanding this {hobby} parallel reveal about the technical concept? (1-2 sentences).\n"
+        f"             Total length: 6-10 sentences. Start with '🏏 Think of it like {hobby}:'.\n"
+        f"             Use precise {hobby} terminology: innings, over, delivery, wicket, run rate, economy, DRS, powerplay,\n"
+        f"             fielding positions, batting order, bowling spell, maiden over, scorecard, duckworth-lewis, etc.\n"
+        f"             The analogy must make someone say 'oh NOW I understand why it works that way' — not just 'that's a bit like cricket'.\n"
         f"  STEP 3 — CODE: The code example that follows uses {hobby}-themed class names, variable names, and sample data\n"
         f"             (e.g. CricketPlayer, innings_count, match_id, Rohit Sharma, Jasprit Bumrah) to reinforce BOTH the concept and the analogy.\n"
         f"The paragraph teaches the concept. The analogy makes it click. The code makes it concrete.\n"
@@ -132,20 +138,20 @@ def _build_lesson_prompt(req: LessonRequest) -> str:
 
 1.  heading (level 2): Overview
 2.  paragraph: Motivating context — the problem this topic solves, why it was invented. Minimum 100 words. Pure technical.
-3.  analogy: Map the motivation to {hobby} — why does {hobby} need this concept too? 2-4 sentences.
+3.  analogy: Map the motivation to {hobby} — why does {hobby} need this concept too? 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 4.  heading (level 2): Core Concepts
 5.  paragraph: The first core concept — theory, mechanics, mental model. Minimum 120 words. Pure technical.
-6.  analogy: Map this concept to {hobby} using specific {hobby} terminology. 2-4 sentences.
+6.  analogy: Map this concept to {hobby} using specific {hobby} terminology. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 7.  code: First complete, commented code example using {hobby}-themed class/variable names and sample data.
 8.  paragraph: Walk through the code — explain each part, why it was written that way, runtime behaviour. Minimum 80 words.
 9.  heading (level 2): How It Works Under the Hood
 10. paragraph: Internal mechanics — what the runtime/compiler/framework actually does. Performance, memory model, execution flow. Minimum 120 words. Pure technical.
-11. analogy: Map the internals to {hobby} — e.g. how the JVM is like a cricket umpire enforcing rules. 2-4 sentences.
+11. analogy: Map the internals to {hobby} — e.g. how the JVM is like a cricket umpire enforcing rules. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 12. code: Second code example — advanced usage, using {hobby}-themed data.
 13. info_box: Pro Tip — a non-obvious production insight. Start with "Pro Tip:".
 14. heading (level 2): Common Patterns & Best Practices
 15. paragraph: 2-3 established patterns with reasoning — why pattern A over B. Minimum 100 words. Pure technical.
-16. analogy: Map the best practice to {hobby} — e.g. why following a good batting technique matters even when improvising. 2-4 sentences.
+16. analogy: Map the best practice to {hobby} — e.g. why following a good batting technique matters even when improvising. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 17. code: Third code example — best practice vs anti-pattern, using {hobby}-themed objects.
 18. warning_box: Most common beginner mistake and exactly how to avoid it. Start with "Warning:".
 19. heading (level 2): Real-World Application
@@ -189,7 +195,7 @@ Set estimatedMinutes to 25-35. Set xpReward to 75."""
 
 1.  heading (level 2): What You'll Build
 2.  paragraph: What the learner builds — a {hobby}-themed project, its purpose, skills reinforced. Minimum 80 words. Pure technical.
-3.  analogy: Why this project maps perfectly to {hobby} — the domain connection. 2-3 sentences.
+3.  analogy: Why this project maps perfectly to {hobby} — the domain connection. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 4.  heading (level 2): Prerequisites
 5.  key_points: 4-5 specific prerequisites.
 6.  heading (level 2): Setup & Project Structure
@@ -197,15 +203,15 @@ Set estimatedMinutes to 25-35. Set xpReward to 75."""
 8.  code: Setup commands / file structure (language: bash) — use {hobby}-themed project/file names.
 9.  heading (level 2): Step 1 — Foundation
 10. paragraph: What Step 1 accomplishes and the concept behind it. Minimum 60 words. Pure technical.
-11. analogy: Map Step 1's concept to {hobby}. 2-3 sentences.
+11. analogy: Map Step 1's concept to {hobby}. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 12. code: Complete code for Step 1 — use {hobby}-themed class/variable names and real sample data.
 13. heading (level 2): Step 2 — Core Logic
 14. paragraph: What Step 2 builds on Step 1 and what new concept it introduces. Minimum 60 words. Pure technical.
-15. analogy: Map Step 2's concept to {hobby}. 2-3 sentences.
+15. analogy: Map Step 2's concept to {hobby}. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 16. code: Complete code for Step 2 with {hobby}-themed data.
 17. heading (level 2): Step 3 — Integration & Enhancement
 18. paragraph: How Step 3 brings everything together. Minimum 60 words. Pure technical.
-19. analogy: Map Step 3's integration to {hobby}. 2-3 sentences.
+19. analogy: Map Step 3's integration to {hobby}. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 20. code: Complete code for Step 3.
 21. heading (level 2): Step 4 — Testing & Verification
 22. paragraph: How to run and verify the solution. Minimum 40 words.
@@ -278,22 +284,22 @@ Set estimatedMinutes to 20. Set xpReward to 50."""
 
 1.  heading (level 2): Project Overview
 2.  paragraph: The project — a {hobby}-themed app showcasing {req.topicName} skills. Purpose, what it demonstrates, portfolio value. Minimum 100 words. Pure technical.
-3.  analogy: Why building this in the {hobby} domain is a great fit for these technologies. 2-3 sentences.
+3.  analogy: Why building this in the {hobby} domain is a great fit for these technologies. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 4.  heading (level 2): Learning Objectives
 5.  key_points: 5-6 specific skills the learner will demonstrate.
 6.  heading (level 2): Technical Requirements
 7.  key_points: 7-8 specific requirements grounded in the {hobby} use case.
 8.  heading (level 2): Architecture & Design
 9.  paragraph: Architecture — components, interactions, data flow, design decisions. Minimum 120 words. Pure technical.
-10. analogy: Map the architecture to {hobby} — e.g. how API Gateway is like the stadium entrance turnstile. 2-3 sentences.
+10. analogy: Map the architecture to {hobby} — e.g. how API Gateway is like the stadium entrance turnstile. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 11. code: Architecture skeleton / project structure with {hobby}-themed file/class names.
 12. heading (level 2): Phase 1 — Core Implementation
 13. paragraph: What Phase 1 builds and why this foundation matters. Minimum 60 words. Pure technical.
-14. analogy: Map Phase 1's core concept to {hobby}. 2-3 sentences.
+14. analogy: Map Phase 1's core concept to {hobby}. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 15. code: Phase 1 implementation — use {hobby}-themed class names and realistic sample data.
 16. heading (level 2): Phase 2 — Feature Completion
 17. paragraph: What Phase 2 adds and how it builds on Phase 1. Minimum 60 words. Pure technical.
-18. analogy: Map Phase 2's new feature to {hobby}. 2-3 sentences.
+18. analogy: Map Phase 2's new feature to {hobby}. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
 19. code: Phase 2 code with {hobby}-themed data.
 20. heading (level 2): Phase 3 — Polish & Production Readiness
 21. paragraph: Error handling, edge cases, testing, production considerations. Minimum 60 words.
