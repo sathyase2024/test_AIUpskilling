@@ -659,10 +659,21 @@ async def generate_single_lesson(
         hobby=HOBBY,
     )
     json_reminder = "\n\nReturn ONLY valid JSON"
+    # Prompt suffix used when the model hits the token limit (output truncated)
+    brevity_suffix = (
+        "\n\nIMPORTANT: Keep each section's content concise — max 3-4 paragraphs or "
+        "10 code lines per section. Use at most 6 sections total. Return ONLY valid JSON."
+    )
 
     last_exc = None
+    truncated = False
     for attempt in range(5):
-        current_prompt = user_prompt if attempt == 0 else user_prompt + json_reminder
+        if attempt == 0:
+            current_prompt = user_prompt
+        elif truncated:
+            current_prompt = user_prompt + brevity_suffix
+        else:
+            current_prompt = user_prompt + json_reminder
         try:
             await rate_limiter.acquire()
             async with sem:
@@ -682,6 +693,7 @@ async def generate_single_lesson(
             raw = response.content[0].text.strip()
             in_tok = response.usage.input_tokens
             out_tok = response.usage.output_tokens
+            truncated = out_tok >= MAX_TOKENS - 10
 
             try:
                 lesson_data = _parse_json_response(raw)
@@ -691,7 +703,8 @@ async def generate_single_lesson(
                     )
             except json.JSONDecodeError as exc:
                 if attempt < 4:
-                    print(f"    [lesson {lesson_idx}] JSON parse error ({exc}), retrying with JSON reminder...")
+                    reason = "output truncated (hit token limit)" if truncated else str(exc)
+                    print(f"    [lesson {lesson_idx}] JSON parse error ({reason}), retrying{'  with brevity hint' if truncated else ''}...")
                     await asyncio.sleep(2 ** attempt * 2)
                     last_exc = exc
                     continue
