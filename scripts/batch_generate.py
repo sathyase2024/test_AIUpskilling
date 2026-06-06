@@ -944,9 +944,12 @@ def main() -> None:
         "--all", action="store_true",
         help="Generate all 60 courses (overrides --batch)"
     )
-      parser.add_argument("--course", type=int, metavar="N",
-        help="Single course index 0-59. Overrides --batch and --all.")
-        parser.add_argument(
+          )
+    parser.add_argument(
+        "--course", type=int, metavar="N",
+        help="Single course index 0-59. Overrides --batch and --all."
+    )
+    parser.add_argument(
         "--concurrency", type=int, default=3, metavar="N",
         help="Number of parallel workers. Default: 3"
     )
