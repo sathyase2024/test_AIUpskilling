@@ -35,7 +35,7 @@ PROGRESS_PATH = REPO_ROOT / "generation_progress.json"
 AI_WORKER_PATH = REPO_ROOT / "ai-worker"
 
 MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 16000
+MAX_TOKENS = 4096
 HOBBY = "cricket"
 
 # Cost per million tokens (USD)
@@ -944,7 +944,9 @@ def main() -> None:
         "--all", action="store_true",
         help="Generate all 60 courses (overrides --batch)"
     )
-    parser.add_argument(
+      parser.add_argument("--course", type=int, metavar="N",
+        help="Single course index 0-59. Overrides --batch and --all.")
+        parser.add_argument(
         "--concurrency", type=int, default=3, metavar="N",
         help="Number of parallel workers. Default: 3"
     )
@@ -964,13 +966,19 @@ def main() -> None:
     lessons_per_course = catalogue.get("lessons_per_course", 35)
     batches = catalogue.get("batches", {})
 
-    if args.all:
+    if args.course is not None:
+        selected_courses = [c for c in all_courses if c["index"] == args.course]
+        if not selected_courses:
+            print(f"ERROR: Course {args.course} not found (valid: 0-{len(all_courses)-1}).")
+            sys.exit(1)
+        batch_label = f"course-{args.course}"
+    elif args.all:
         selected_courses = all_courses
         batch_label = "all"
     else:
         batch_key = str(args.batch)
         if batch_key not in batches:
-            print(f"ERROR: Batch {args.batch} not found in catalogue. Available: {list(batches.keys())}")
+            print(f"ERROR: Batch {args.batch} not found. Available: {list(batches.keys())}")
             sys.exit(1)
         batch_range = batches[batch_key]
         selected_courses = [
