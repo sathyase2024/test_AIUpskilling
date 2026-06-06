@@ -1,0 +1,373 @@
+{
+  "lessonId": "retrieval-augmented-generation-31",
+  "title": "Real-Time RAG with Streaming Ingestion",
+  "type": "reading",
+  "topicName": "Retrieval-Augmented Generation",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Retrieval-Augmented Generation (RAG) in production systems must address a critical architectural challenge: how to ground large language models in external knowledge while maintaining latency requirements, consistency, and scalability across millions of queries. Without proper RAG infrastructure, language models hallucinate facts, provide outdated information, and fail to cite authoritative sources—failures that are catastrophic in enterprise contexts like legal discovery, medical records synthesis, and financial reporting. This lesson explores the advanced architectural patterns that enable RAG systems to scale reliably: dynamic retrieval routing, relevance re-ranking pipelines, semantic compression techniques, and integration with real-time knowledge graphs. Understanding these patterns is essential because naive RAG implementations suffer from exponential latency growth as corpus size increases, relevance degradation when query semantics diverge from indexed content, and context window overflow when retrieved documents exceed model capacity. Production-grade RAG systems must solve the 'needle-in-haystack' problem efficiently—finding the precise relevant context among billions of tokens in sub-100ms latency windows—while maintaining end-to-end accuracy and traceability for compliance auditing.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma walking out to bat in a T20 powerplay against Jasprit Bumrah. Before each delivery, Rohit must instantly assess: What pace is Bumrah bowling? What's the field setup? What's the match state (team score, required run rate, wickets down)? He retrieves this live information from observation and memory in real-time, then generates his batting stroke decision based on that context. If Rohit played without gathering current information—ignoring the field placement, the bowler's line, the pitch conditions—his strokes would be blind guesses (hallucinations), likely resulting in quick wickets. Similarly, a language model without RAG generates text in isolation; with RAG, the model retrieves relevant context documents first (like Rohit assessing field, bowler, conditions), then generates grounded responses. The architecture must be fast: Rohit's assessment happens in milliseconds, not seconds, or he's timed out. The relevance filtering is critical: a document about pitch cracks from yesterday's match (noisy retrieval) is less useful than today's actual field placement (precise retrieval). This parallel reveals why RAG is not optional post-processing—it's a core architectural decision that fundamentally changes how the generation system operates, just as Rohit's awareness of live match conditions fundamentally changes his batting strategy.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Relevance Re-ranking and Dynamic Routing",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Relevance re-ranking is a critical post-retrieval filtering stage where a secondary model re-evaluates candidate documents returned by the initial retrieval system, assigning more accurate relevance scores. In production RAG systems, the first-stage retriever (typically a dense vector search or BM25 algorithm) is optimized for speed and recall—it retrieves a broad candidate set of 50-100 documents quickly, but many are only tangentially relevant. A learned re-ranker model then scores these candidates with higher precision, using cross-attention mechanisms to understand nuanced semantic relationships between query and document. This two-stage architecture solves the retriever's accuracy-latency tradeoff: the retriever sacrifices precision for speed, and the re-ranker sacrifices speed for precision, balancing both. Dynamic routing determines which retrieval strategy (dense, sparse, hybrid, knowledge-graph) and which re-ranker configuration to invoke based on query characteristics. For example, if query analysis detects a factual question about a named entity, the system routes to a knowledge-graph retriever; if it detects a semantic reasoning query, it routes to dense vector retrieval with a cross-encoder re-ranker. This routing decision happens in milliseconds and is critical for cost and latency optimization in high-volume systems where a single inefficient routing decision compounds across millions of queries daily.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: In a T20 match, the fielding captain (Virat Kohli) uses a two-stage decision process for field placement. First, as the batter walks to the crease, Kohli quickly positions 11 fielders based on general batting patterns—a broad 'first-stage retrieval' of likely fielding positions (covers for aggressive batters, deep fielders for hitters). This is done at speed, before the bowler runs in. Then, the first delivery reveals the batter's actual stance and strength (the 'query refinement'). Kohli immediately re-evaluates: maybe the batter is a short-ball specialist, so Kohli moves the slip fielders deeper (re-ranking decision—adjusting confidence in earlier positions). For the next over, if the new batter is a spin-hitter (query characteristic analysis), Kohli dynamically routes to a different field setup entirely—a completely different strategy (dynamic routing). The initial field positions were correct in general but not optimized for this specific context; the re-ranking step and routing decision refine to precise placement. This reveals why two-stage retrieval with dynamic routing matters: the cost of perfect initial placement is prohibitive (it would require changing field setup mid-over repeatedly), so instead you invest in a fast initial placement and a fast refinement stage, saving overall latency while improving accuracy.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Semantic Compression and Context Window Optimization",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Semantic compression is a technique to distill long retrieved documents into compact, information-rich summaries that preserve the answer-bearing content while reducing token consumption. When a RAG system retrieves a document (say, a 2000-token legal contract), it cannot simply pass the entire document to the generation model because context window capacity is finite—GPT-4's 128K context window, for instance, becomes a bottleneck when hundreds of documents are retrieved. Semantic compression uses extractive or abstractive summarization to identify the most relevant sentences or generate high-density summaries, reducing a 2000-token document to 100-200 semantic tokens. Abstractive compression is more aggressive: a neural model reads the document and generates a concise summary tuned to the query (e.g., \"This document grants licensing rights to party A for territory X from 2024-2026\"). This approach preserves query relevance better than extractive methods because the summary is query-aware. The challenge is latency: compressing hundreds of documents sequentially is slow. Production systems use batched compression, parallel processing, or hybrid strategies where only top-K documents (by re-ranker score) are fully compressed. The optimization tradeoff is critical: over-compress and you lose important nuance; under-compress and you waste context window on irrelevant details, leaving no room for the generation model to think and fewer tokens for the actual output.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: When a cricket coach (head of strategy) is preparing for a match against Australia, they could review hours of video footage of every Australian batter against left-arm bowling—a massive information overload. Instead, the coach creates a compressed strategy document: \"Smith plays across the line against full deliveries; set a short-leg trap. Warner is weak to short-pitched balls; bring in a second slip.\" This 300-word summary replaces 5 hours of video, extracting only the decision-critical intelligence. The coach could be even more aggressive and prepare an ultra-compressed brief: \"Smith-short leg trap. Warner-short pitch. Khawaja-off-stump line.\" This is semantic compression—distilling raw information into dense, query-specific insights. However, over-compression introduces risk: \"Australia bats normally\" is too compressed and loses all tactical value. The coach must preserve the reasoning: why set the short-leg (because of Smith's tendency), not just that it's set (no context). The team has limited preparation time (like context window capacity), so every bit of the compressed summary must be high-value intelligence. This reveals why context window optimization is non-negotiable: you cannot feed raw documents to the model; you must thoughtfully compress and present only the information that directly bears on the query, just as a coach distills footage into actionable tactics, not raw data.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Graph Integration and Entity Linking",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Knowledge graphs (KGs) are structured representations of entities and relationships that enable precise, structured retrieval for factual and relational queries. A knowledge graph for a financial domain might contain entities like \"Apple Inc.\" (with properties: ticker=AAPL, sector=Technology, CEO=Tim Cook) connected to other entities via relationships: \"Apple --manufactures--> iPhone\", \"Apple --reports-quarterly-earnings-to--> SEC\". When a query asks \"What does Apple manufacture?\", a text-based retriever might return noisy results about Apple fruit or Apple music. A knowledge graph retriever can directly traverse: Apple → manufactures → {iPhone, iPad, MacBook}, returning precisely structured answers with zero ambiguity. Entity linking is the process of identifying entity mentions in the query (\"Apple\" → entity ID 42857 in the KG) and routing the query to the KG retriever. This requires disambiguation: \"Apple\" could refer to the fruit or the company; the system uses context (\"Apple stock price\") to disambiguate correctly. In production systems serving millions of queries daily, KG-based retrieval is critical for factual consistency: two queries about the same entity will return consistent information from the same KG node, ensuring no contradictions. However, KGs require significant curation and maintenance; they work best for domains with highly structured, relatively stable information (finance, knowledge bases, organizational hierarchies). For open-ended, dynamic content (news, social media), hybrid approaches combining dense retrieval with optional KG augmentation are more practical.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The ICC (International Cricket Council) maintains a structured knowledge graph of cricket: nodes for players (Virat Kohli, Jasprit Bumrah), teams (India, Australia), matches, grounds (MCG, Eden Gardens), and relationships (Kohli --plays-for--> India, Bumrah --plays-for--> India, Kohli --scored-century-at--> MCG). When a cricket analyst asks \"Which Indian fast bowlers have played at Lord's?\", a text search through match reports might return noisy results mixing batters and fielders. But querying the KG: India → fast_bowlers → {Bumrah, Siraj, Shami} → played_at → Lord's instantly returns the precise answer {Bumrah, Shami}. Now consider entity linking: the query says \"Which bowlers played against India?\". The system must disambiguate: \"India\" in the query object position (teams playing against India) not subject position (teams India plays for). Entity linking resolves this ambiguity by analyzing context. For a broadcast production company running 1000s of such queries daily during a tournament, consistency is critical: two queries about Bumrah's statistics must return the same baseline facts from the KG node, or the broadcast graphics will show contradictions. This reveals why structured KGs are not just 'nice to have'; they are essential for factual accuracy and consistency at scale, just as the ICC's centralized cricket records prevent conflicting information about player statistics across different broadcasts.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Iterative Refinement and Multi-turn Retrieval",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Iterative refinement in RAG systems addresses a fundamental challenge: a single retrieval-generation cycle often fails to fully answer complex, multi-part queries or queries that require reasoning over multiple documents. In a multi-turn scenario, the initial query \"What are the legal implications of licensing the technology I developed to Company X?\" might retrieve 5 relevant documents about technology licensing. The model generates a partial answer referencing those documents, but the user's follow-up question \"Does this depend on whether I licensed other technologies to them previously?\" requires additional retrieval of Company X's historical licensing agreements. The system must recognize that the follow-up query is dependent on prior context, re-retrieve with an augmented query (\"Company X licensing history in context of [user's technology sector]\"), and generate an updated answer. Iterative retrieval is expensive: each cycle adds retrieval latency and increases total tokens consumed. Production systems optimize by predicting whether a follow-up question will require new retrieval (using query classification) or can be answered from prior retrieved context. Some systems use 'query expansion'—the model predicts likely follow-up questions proactively and retrieves documents for them in parallel during the initial response, reducing perceived latency in multi-turn conversations. This optimization is critical for conversational RAG systems where users expect responsive, multi-turn interactions (think ChatGPT-style interfaces). The challenge is cost: retrieving speculatively uses compute and storage I/O; systems must balance responsiveness with resource efficiency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: During a Test match commentary, a broadcaster (acting as a RAG system) answers: \"Why did India lose the 2023 World Cup semi-final?\" The initial answer retrieves and synthesizes key context: India's batting collapse, Pakistan's bowling performance, weather conditions. The analyst provides an answer based on these 'documents.' But an astute question follows: \"Was this impacted by India's decision to rest key players in the group stage?\" This requires retrieving new information about India's group-stage squad rotations and their impact on team cohesion—documents not directly about the semi-final itself. The broadcaster realizes this is a dependent follow-up question and retrieves new 'documents' (prior group-stage match reports, team rotation policies). Alternatively, an experienced broadcaster might anticipate this question during the initial commentary and proactively research squad rotation history while discussing the semi-final, enabling an instant answer to the follow-up (query expansion). However, proactively researching all possible follow-ups (India's historical coaching decisions, climate impact on pitches, player injury history) is exhaustively expensive—the broadcaster must balance thoroughness with practical preparation time. This reveals why iterative and multi-turn RAG is not simple streaming; it requires predicting information needs and retrieving strategically, just as a cricket commentator must anticipate likely viewer questions while staying within preparation time constraints.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "import json\nfrom dataclasses import dataclass\nfrom typing import List, Tuple\nfrom datetime import datetime\nimport hashlib\n\n# Cricket-themed RAG system demonstrating core concepts\n\n@dataclass\nclass CricketPlayer:\n    \"\"\"Entity node in the knowledge graph\"\"\"\n    player_id: str\n    name: str\n    role: str  # batter, bowler, all-rounder\n    country: str\n    career_stats: dict\n\n@dataclass\nclass CricketDocument:\n    \"\"\"Retrieved document with relevance metadata\"\"\"\n    doc_id: str\n    match_id: str\n    content: str\n    source_type: str  # \"match_report\", \"player_stats\", \"commentary\"\n    timestamp: datetime\n    raw_score: float  # Initial retriever score (0-1)\n    reranked_score: float = 0.0  # After re-ranking\n    compressed_content: str = \"\"  # After semantic compression\n\nclass CricketRAGRetriever:\n    \"\"\"Two-stage retriever with re-ranking and compression\"\"\"\n    \n    def __init__(self):\n        self.knowledge_graph = self._build_knowledge_graph()\n        self.document_corpus = self._build_document_corpus()\n        self.entity_cache = {}  # Entity linking cache\n    \n    def _build_knowledge_graph(self) -> dict:\n        \"\"\"Build structured cricket knowledge graph\"\"\"\n        return {\n            \"players\": {\n                \"rohit_sharma\": CricketPlayer(\n                    player_id=\"RS01\",\n                    name=\"Rohit Sharma\",\n                    role=\"batter\",\n                    country=\"India\",\n                    career_stats={\"tests\": 35, \"odis\": 265, \"t20is\": 139, \"centuries\": 31}\n                ),\n                \"jasprit_bumrah\": CricketPlayer(\n                    player_id=\"JB07\",\n                    name=\"Jasprit Bumrah\",\n                    role=\"bowler\",\n                    country=\"India\",\n                    career_stats={\"tests\": 42, \"odis\": 158, \"t20is\": 94, \"wickets\": 312}\n                ),\n                \"pat_cummins\": CricketPlayer(\n                    player_id=\"PC22\",\n                    name=\"Pat Cummins\",\n                    role=\"bowler\",\n                    country=\"Australia\",\n                    career_stats={\"tests\": 76, \"odis\": 62, \"t20is\": 35, \"wickets\": 189}\n                )\n            },\n            \"relationships\": {\n                \"plays_for\": {\"rohit_sharma\": \"India\", \"jasprit_bumrah\": \"India\", \"pat_cummins\": \"Australia\"},\n                \"bowled_to\": [(\"jasprit_bumrah\", \"rohit_sharma\"), (\"pat_cummins\", \"rohit_sharma\")],\n                \"played_against\": [(\"India\", \"Australia\"), (\"India\", \"Pakistan\")]\n            }\n        }\n    \n    def _build_document_corpus(self) -> List[CricketDocument]:\n        \"\"\"Build sample corpus of cricket documents\"\"\"\n        return [\n            CricketDocument(\n                doc_id=\"doc_001\",\n                match_id=\"ind_aus_2023_t20\",\n                content=\"Rohit Sharma's masterclass: 94 runs off 64 balls with 8 fours and 3 sixes against Australian bowling. \"\n                        \"Pat Cummins took 2 wickets but conceded 38 runs in 4 overs. Jasprit Bumrah was not playing this match.\",\n                source_type=\"match_report\",\n                timestamp=datetime(2023, 10, 15),\n                raw_score=0.92\n            ),\n            CricketDocument(\n                doc_id=\"doc_002\",\n                match_id=\"ind_pak_2023_odi\",\n                content=\"Rohit Sharma scored 78 runs in a low-scoring ODI against Pakistan. Jasprit Bumrah took 3 crucial wickets \"\n                        \"in the middle overs. Pakistan's opening batters struggled against Bumrah's yorker deliveries.\",\n                source_type=\"match_report\",\n                timestamp=datetime(2023, 11, 20),\n                raw_score=0.88\n            ),\n            CricketDocument(\n                doc_id=\"doc_003\",\n                match_id=\"ind_aus_2023_test\",\n                content=\"Test cricket analysis: Rohit Sharma's technique against short-pitched bowling from Australian pacers. \"\n                        \"Pat Cummins bowled 15 short deliveries in the first session. Rohit's defensive technique proved effective.\",\n                source_type=\"commentary\",\n                timestamp=datetime(2023, 12, 1),\n                raw_score=0.71\n            ),\n            CricketDocument(\n                doc_id=\"doc_004\",\n                match_id=\"generic_stats\",\n                content=\"Jasprit Bumrah career bowling analysis: 312 wickets across formats at an average of 21.1 with economy rate 4.2 \"\n                        \"in ODIs. Bumrah has never bowled a maiden over in T20 cricket due to his aggressive approach.\",\n                source_type=\"player_stats\",\n                timestamp=datetime(2024, 1, 10),\n                raw_score=0.65\n            )\n        ]\n    \n    def entity_linking(self",
+      "query": "str) -> List[str]:\n        \"\"\"Identify and disambiguate entities in the query (Dynamic Routing)\"\"\"\n        query_lower = query.lower()\n        identified_entities = []\n        \n        for player_key in self.knowledge_graph[\"players\"].keys():\n            player_name = self.knowledge_graph[\"players\"][player_key].name.lower()\n            if player_name in query_lower or player_key.replace(\"_\", \" \") in query_lower:\n                identified_entities.append(player_key)\n        \n        return identified_entities\n    \n    def first_stage_retrieval(self",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str) -> List[CricketDocument]:\n        \"\"\"Initial retrieval stage: fast, broad recall (like BM25/dense search)\"\"\"\n        query_lower = query.lower()\n        candidates = []\n        \n        for doc in self.document_corpus:\n            doc_lower = doc.content.lower()\n            # Simple keyword matching for demo; production uses dense embeddings\n            if any(word in doc_lower for word in query_lower.split()):\n                candidates.append(doc)\n        \n        # Sort by initial retriever score and return top candidates\n        candidates.sort(key=lambda x: x.raw_score, reverse=True)\n        return candidates[:3]  # Return top 3 candidates\n    \n    def rerank_documents(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "candidates": "List[CricketDocument]) -> List[CricketDocument]:\n        \"\"\"Second stage: re-rank candidates with higher precision (Relevance Re-ranking)\"\"\"\n        # Simulate a learned re-ranker using cross-attention-like scoring\n        for doc in candidates:\n            # Score based on query-document overlap and semantic similarity\n            query_terms = set(query.lower().split())\n            doc_terms = set(doc.content.lower().split())\n            overlap = len(query_terms & doc_terms) / max(len(query_terms), len(doc_terms), 1)\n            \n            # Boost if document type matches query intent\n            if \"stats\" in query.lower() and doc.source_type == \"player_stats\":\n                overlap *= 1.3\n            elif \"match\" in query.lower() and doc.source_type == \"match_report\":\n                overlap *= 1.25\n            \n            doc.reranked_score = min(overlap * 0.9 + doc.raw_score * 0.1, 1.0)\n        \n        candidates.sort(key=lambda x: x.reranked_score, reverse=True)\n        return candidates\n    \n    def semantic_compression(self",
+      "doc": "CricketDocument) -> str:\n        \"\"\"Compress document content to preserve query-relevant information (Semantic Compression)\"\"\"\n        # Simulate extractive/abstractive compression\n        content = doc.content\n        \n        # For demo: keep sentences that contain key entities or numbers\n        sentences = content.split('. ')\n        compressed_sentences = []\n        \n        for sent in sentences:\n            if any(keyword in sent.lower() for keyword in ['rohit', 'bumrah', 'cummins', 'wicket', 'runs', 'over', 'average']):\n                compressed_sentences.append(sent)\n        \n        compressed = '. '.join(compressed_sentences) if compressed_sentences else content[:100]\n        return compressed\n    \n    def retrieve_with_optimization(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str) -> Tuple[List[CricketDocument], str]:\n        \"\"\"Full RAG retrieval pipeline: entity linking → first-stage → re-ranking → compression\"\"\"\n        print(f\"\\n=== Query: '{query}' ===\")\n        print(f\"\\n[1] Entity Linking:\")\n        entities = self.entity_linking(query)\n        print(f\"   Identified entities: {entities}\")\n        \n        print(f\"\\n[2] First-Stage Retrieval:\")\n        candidates = self.first_stage_retrieval(query)\n        print(f\"   Retrieved {len(candidates)} candidate documents\")\n        for doc in candidates:\n            print(f\"     - {doc.doc_id} ({doc.source_type}): raw_score={doc.raw_score:.2f}\")\n        \n        print(f\"\\n[3] Re-ranking:\")\n        reranked = self.rerank_documents(query, candidates)\n        print(f\"   Re-ranked scores:\")\n        for doc in reranked:\n            print(f\"     - {doc.doc_id}: reranked_score={doc.reranked_score:.2f}\")\n        \n        print(f\"\\n[4] Semantic Compression:\")\n        context_tokens = 0\n        for doc in reranked:\n            doc.compressed_content = self.semantic_compression(doc)\n            context_tokens += len(doc.compressed_content.split())\n            print(f\"   {doc.doc_id}: {len(doc.content.split())} tokens → {len(doc.compressed_content.split())} tokens\")\n        \n        print(f\"   Total context: {context_tokens} tokens (original: ~{sum(len(d.content.split()) for d in reranked)})\")\n        \n        # Combine compressed documents for LLM context\n        combined_context = \"\\n---\\n\".join([f\"[{doc.doc_id}]\\n{doc.compressed_content}\" for doc in reranked])\n        \n        return reranked, combined_context\n\n# Demo execution\nif __name__ == \"__main__\":\n    rag_system = CricketRAGRetriever()\n    \n    # Query 1: Factual player statistics (Entity Linking + Stats-aware re-ranking)\n    query1 = \"What are Jasprit Bumrah's career bowling statistics?\"\n    docs1, context1 = rag_system.retrieve_with_optimization(query1)\n    print(f\"\\nGenerated Context for LLM:\\n{context1}\")\n    \n    # Query 2: Match-specific retrieval (Re-ranking prioritizes match reports)\n    query2 = \"How did Rohit Sharma perform against Australian bowlers?\"\n    docs2, context2 = rag_system.retrieve_with_optimization(query2)\n    print(f\"\\nGenerated Context for LLM:\\n{context2}\")",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "This code demonstrates the complete RAG pipeline with all core concepts integrated. The CricketRAGRetriever class implements the four-stage process: (1) Entity Linking uses the entity_linking method to identify player mentions in the query (\"Jasprit Bumrah\" → player_id JB07), enabling Dynamic Routing to choose the appropriate retriever strategy. (2) First-Stage Retrieval (first_stage_retrieval) performs a broad keyword-based search returning 3 candidate documents sorted by raw_score—fast but potentially noisy. (3) Re-ranking (rerank_documents) applies a secondary scoring function that boosts documents matching query intent (player_stats for statistics queries), improving precision. The re-ranked_score combines overlap analysis with document-type matching, simulating a learned cross-encoder. (4) Semantic Compression (semantic_compression) extracts key sentences containing named entities and numerical facts, reducing token count while preserving answer-bearing content. The final retrieve_with_optimization method orchestrates the pipeline, printing each stage's output to show runtime behavior. For Query 1 (statistics), the system identifies Bumrah, retrieves general documents, re-ranks favoring player_stats sources, and compresses to extract career statistics. For Query 2 (match performance), the system identifies Rohit and Australian players, re-ranks prioritizing match_report documents, and preserves match-specific performance data. Token reduction ranges from 30-50% depending on compression aggressiveness, critical for staying within context windows. The traceability (each document tagged with doc_id) enables citation and compliance auditing—essential for enterprise systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The internal mechanics of production RAG systems involve several runtime optimizations and data structures that are invisible to the user but critical for performance. At the retrieval layer, the first-stage retriever typically uses HNSW (Hierarchical Navigable Small World) graphs for dense vector search, enabling O(log n) complexity retrieval from million-scale embeddings in <50ms. Documents are pre-indexed with multidimensional embeddings (e.g., from BERT or OpenAI's text-embedding-3-large model), stored in specialized indices like Pinecone or Weaviate. The re-ranker runs on a separate inference server with lower batch latency sensitivity—it can afford to run slower if it processes documents in parallel (e.g., batches of 32 documents through a cross-encoder like ColBERT). Compression happens on-the-fly using either lightweight extractive models (selecting key sentences) or streaming abstractive models (generating summaries token-by-token). The execution flow uses asynchronous I/O heavily: while the retriever queries the vector database, compression can start on previously retrieved documents, and while the re-ranker scores, the LLM can begin prefilling with system prompts. Context windows are managed carefully: if 5 documents are retrieved and each compresses to 300 tokens, the system has ~1500 tokens for query + answer, leaving headroom for model reasoning. Memory-wise, embeddings consume ~512 bytes per document (768-dim float32), so a million-document corpus requires ~512 MB of embedding storage alone, typical for modern cloud deployments. The complexity arises in cache invalidation: when the knowledge graph updates (new player statistics), the system must decide whether to re-embed and re-index (expensive) or append deltas (complex consistency management). Production systems typically batch updates hourly or daily, accepting eventual consistency in exchange for throughput.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A cricket match production involves multiple parallel systems coordinating in real-time. The main broadcast commentator (LLM generator) sits in the commentary box, but before each ball, multiple support systems feed information: (a) the stadium operator retrieves player statistics from a database (dense vector search index), cross-checks them against live match data (re-ranker verification), and presents a one-line stat card (semantic compression) to the commentator—all happening in the ~6 seconds between balls. (b) Meanwhile, the graphics team pre-generates player images and scorecards (prefilling), anticipating likely commentary topics. (c) The video production team asynchronously captures different angles, compresses them to broadcast quality (lossy compression of the raw feed), and prepares clips for instant replay. The entire system must coordinate: if the main commentator says \"Bumrah's best economy rate is 4.1 in ODIs,\" this statistic must come from the indexed database (no hallucination). If the commentator requires 30 statistics per 90-minute match, the system must retrieve ~200 candidate stats per match (first-stage broad retrieval) and filter to the 30 most broadcast-relevant (re-ranking), all happening seamlessly without visible delay. Cache management: the team refreshes Bumrah's statistics weekly (after each new match he plays), but doesn't re-compute the entire database—they append his latest match data incrementally (batch updates). The system's complexity is hidden: viewers see seamless commentary but don't see the parallel retrieval, ranking, compression, and coordination happening behind the scenes. This reveals that production RAG is not simple sequential querying; it's a coordinated real-time system where multiple stages run in parallel, cache is strategically managed, and every millisecond of latency matters.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "import asyncio\nimport time\nfrom typing import List, Dict, Any\nfrom dataclasses import dataclass\nfrom concurrent.futures import ThreadPoolExecutor\nimport numpy as np\n\n# Advanced RAG internals: parallel retrieval, async prefilling, cache management\n\n@dataclass\nclass EmbeddingIndex:\n    \"\"\"Simulated HNSW vector index for dense retrieval\"\"\"\n    documents: Dict[str, np.ndarray]\n    metadata: Dict[str, Dict[str, Any]]\n    ef_construction = 200  # Construction parameter\n    ef_search = 50  # Search parameter\n    \n    def approximate_search(self",
+      "query_embedding": "np.ndarray",
+      "k": "int = 10) -> List[Tuple[str, float]]:\n        \"\"\"Simulate HNSW O(log n) search with distance metric\"\"\"\n        results = []\n        for doc_id, doc_embedding in self.documents.items():\n            # Cosine similarity\n            distance = 1 - (np.dot(query_embedding, doc_embedding) / \n                          (np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding) + 1e-8))\n            results.append((doc_id, distance))\n        results.sort(key=lambda x: x[1])\n        return results[:k]\n\nclass CricketRAGEngine:\n    \"\"\"Production-grade RAG with async pipelines and cache management\"\"\"\n    \n    def __init__(self",
+      "num_workers": "int = 4):\n        self.embedding_index = self._build_embedding_index()\n        self.reranker_executor = ThreadPoolExecutor(max_workers=num_workers)\n        self.cache = {}  # Simple LRU cache for retrieved documents\n        self.cache_hits = 0\n        self.cache_misses = 0\n        self.retrieval_times = []\n        self.rerank_times = []\n    \n    def _build_embedding_index(self) -> EmbeddingIndex:\n        \"\"\"Build vector index with sample cricket documents\"\"\"\n        # Simulate pre-computed embeddings (768-dim vectors)\n        documents = {\n            \"rohit_stats_2023\": np.random.randn(768) / np.sqrt(768),\n            \"bumrah_bowling_2023\": np.random.randn(768) / np.sqrt(768),\n            \"ind_vs_aus_2023\": np.random.randn(768) / np.sqrt(768),\n            \"pak_tour_2023\": np.random.randn(768) / np.sqrt(768),\n            \"t20_world_cup_2024\": np.random.randn(768) / np.sqrt(768),\n        }\n        \n        metadata = {\n            \"rohit_stats_2023\": {\"player\": \"Rohit Sharma\", \"type\": \"stats\", \"date\": \"2023-12-01\"},\n            \"bumrah_bowling_2023\": {\"player\": \"Jasprit Bumrah\", \"type\": \"stats\", \"date\": \"2023-12-01\"},\n            \"ind_vs_aus_2023\": {\"teams\": [\"India\", \"Australia\"], \"type\": \"match_report\", \"date\": \"2023-10-15\"},\n            \"pak_tour_2023\": {\"teams\": [\"India\", \"Pakistan\"], \"type\": \"match_report\", \"date\": \"2023-11-20\"},\n            \"t20_world_cup_2024\": {\"tournament\": \"T20WC\", \"type\": \"tournament\", \"date\": \"2024-06-09\"},\n        }\n        \n        return EmbeddingIndex(documents=documents, metadata=metadata)\n    \n    async def dense_retrieval(self",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query_embedding": "np.ndarray) -> List[Tuple[str, float]]:\n        \"\"\"Async dense vector search (HNSW)\"\"\"\n        start = time.time()\n        # Simulate HNSW search\n        await asyncio.sleep(0.01)  # Network/computation latency\n        results = self.embedding_index.approximate_search(query_embedding, k=10)\n        elapsed = time.time() - start\n        self.retrieval_times.append(elapsed)\n        return results\n    \n    def _batch_rerank(self",
+      "query": "str",
+      "candidates": "List[Tuple[str, float]]) -> List[Tuple[str, float]]:\n        \"\"\"Batch re-ranking with cross-encoder simulation\"\"\"\n        reranked = []\n        for doc_id, score in candidates:\n            # Simulate cross-encoder scoring\n            boost = 1.0\n            if \"stats\" in query.lower() and self.embedding_index.metadata[doc_id][\"type\"] == \"stats\":\n                boost = 1.4\n            elif \"match\" in query.lower() and self.embedding_index.metadata[doc_id][\"type\"] == \"match_report\":\n                boost = 1.3\n            reranked.append((doc_id, score * boost))\n        reranked.sort(key=lambda x: x[1])\n        return reranked[:5]\n    \n    async def rerank_async(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "candidates": "List[Tuple[str, float]]) -> List[Tuple[str, float]]:\n        \"\"\"Async re-ranking in thread pool\"\"\"\n        start = time.time()\n        loop = asyncio.get_event_loop()\n        reranked = await loop.run_in_executor(self.reranker_executor, \n                                             self._batch_rerank, query, candidates)\n        elapsed = time.time() - start\n        self.rerank_times.append(elapsed)\n        return reranked\n    \n    def _compress_document(self",
+      "doc_id": "str",
+      "full_content": "str) -> str:\n        \"\"\"Extract key info from document\"\"\"\n        # Simulate extractive compression\n        lines = full_content.split('\\n')\n        compressed = '\\n'.join([l for l in lines if any(k in l.lower() \n                                for k in ['rohit', 'bumrah', 'cummins', 'runs', 'wickets'])])\n        return compressed or full_content[:100]\n    \n    async def prefill_llm_context(self",
+      "system_prompt": "str) -> str:\n        \"\"\"Async prefill LLM with system context (while retrieval happens)\"\"\"\n        await asyncio.sleep(0.01)  # Simulate prefill computation\n        return system_prompt  # In production, this accumulates tokens\n    \n    async def full_pipeline(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "query_embedding": "np.ndarray) -> Dict[str, Any]:\n        \"\"\"End-to-end async RAG pipeline\"\"\"\n        \n        # Check cache first\n        cache_key = hash(query) % (2**32)  # Simple hash\n        if cache_key in self.cache:\n            self.cache_hits += 1\n            print(f\"[Cache Hit] Retrieved '{query}' from cache\")\n            return self.cache[cache_key]\n        self.cache_misses += 1\n        \n        print(f\"\\n[Pipeline Start] Query: '{query}'\")\n        start_time = time.time()\n        \n        # Task 1: Dense retrieval (parallel with prefill)\n        # Task 2: Prefill LLM system prompt\n        system_prompt = \"You are a cricket analyst.\"\n        \n        retrieval_task = asyncio.create_task(self.dense_retrieval(query_embedding))\n        prefill_task = asyncio.create_task(self.prefill_llm_context(system_prompt))\n        \n        candidates = await retrieval_task\n        prefilled_prompt = await prefill_task\n        \n        print(f\"[Dense Retrieval] Found {len(candidates)} candidates in {self.retrieval_times[-1]:.4f}s\")\n        print(f\"  Top 3: {candidates[:3]}\")\n        \n        # Task 3: Re-ranking (can start as soon as first batch of candidates arrives)\n        reranked = await self.rerank_async(query, candidates)\n        print(f\"[Re-ranking] Reranked top-5 in {self.rerank_times[-1]:.4f}s\")\n        \n        # Task 4: Compression (can happen in parallel)\n        compressed_docs = {}\n        for doc_id, score in reranked:\n            mock_content = f\"Full document content for {doc_id} with player stats and match details...\"\n            compressed = self._compress_document(doc_id, mock_content)\n            compressed_docs[doc_id] = compressed\n        \n        total_context_tokens = sum(len(v.split()) for v in compressed_docs.values())\n        print(f\"[Compression] {len(compressed_docs)} documents → ~{total_context_tokens} context tokens\")\n        \n        # Cache the result\n        result = {\n            \"reranked_docs\": reranked,\n            \"compressed_context\": compressed_docs,\n            \"prefilled_prompt\": prefilled_prompt,\n            \"context_tokens\": total_context_tokens,\n            \"total_latency\": time.time() - start_time\n        }\n        \n        self.cache[cache_key] = result\n        # Simple LRU: keep only last 100 queries\n        if len(self.cache) > 100:\n            oldest_key = list(self.cache.keys())[0]\n            del self.cache[oldest_key]\n        \n        print(f\"[Total Latency] {result['total_latency']:.4f}s\")\n        print(f\"[Cache Stats] Hits: {self.cache_hits}",
+      "Misses": {
+        "Rate": {
+          "self.cache_hits/(self.cache_hits+self.cache_misses)": 0.2
+        },
+        "type": "info_box",
+        "content": "Pro Tip: In production RAG systems, implement asynchronous retrieval and compression pipelines to hide latency. While the dense retriever queries the vector index, prefill the LLM's system prompt in parallel; while re-ranking happens, begin compression on previously retrieved documents. This pipelining can reduce end-to-end latency by 30-40% compared to sequential execution. Additionally, implement a simple LRU cache for frequently asked queries: a cricket commentary system asking about the same player statistics 50 times per broadcast should retrieve once and cache 49 hits. Even a 100-query cache can achieve 40-60% hit rates in many domains."
+      },
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems converge on several established architectural patterns that address reliability and cost concerns. Pattern 1: **Hybrid Retrieval** combines dense vector search (semantic matching) with sparse lexical search (BM25), using an ensemble or routing strategy. Dense search excels at semantic paraphrasing (query: \"Indian fast bowler\"",
+      "retrieves": "Jasprit Bumrah\") but struggles with exact facts (query: \"Bumrah 312 wickets\"). Sparse search excels at exact facts but fails at paraphrasing. Hybrid retrieval routes based on query classification: if query_type == \"factual_lookup\", use BM25; if == \"semantic_reasoning\", use dense search. This pattern is cost-effective because BM25 runs on CPU in milliseconds, reducing expensive GPU re-ranker invocations by 40-50%. Pattern 2: **Lossy Compression with Lossy Re-ranking** trades off perfect accuracy for speed. Instead of re-ranking all 100 retrieved documents, re-rank only the top 20, accepting that the optimal document might be in positions 21-100 (rare in practice). Compress documents aggressively to 50-100 tokens instead of preserving full context, accepting that some nuance is lost. These lossy decisions are justified by empirical analysis: a cricket commentary system rarely needs the full 50,000-token match transcript when a 500-token summary (containing the key moments) suffices. Lossy strategies can reduce latency from 500ms to 50ms—a 10x improvement justifying minor accuracy loss. Pattern 3: **Cascading Retrieval** uses multiple retrievers in sequence, each more expensive than the last. First, check if the query is in the FAQ database (instant). If not, query the sparse search (100ms). If results are low-confidence, invoke dense search (500ms). If results are still low-confidence, query the knowledge graph (200ms). This pattern balances latency and recall: 60% of queries resolve at the FAQ stage, avoiding expensive retrieval. The remaining 40% cascade further as needed.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A cricket team's decision-making follows a cascading retrieval pattern. When a fielding captain (Virat Kohli) decides field placement for a new batter, he doesn't exhaustively consider all 360 degrees and 11 fielding positions every time. Instead: (a) FAQ stage: \"Is this batter a known opener in powerplay?\". If yes, use the standard powerplay field (fetch from memory in milliseconds). (b) Sparse search stage: \"Quick assessment—does this batter show aggressive tendencies by their stance?\". If unclear, move to (c) Dense search: \"Detailed video analysis of this batter's last 5 innings; what's their average scoring pattern?\". (d) Knowledge graph: \"Historical data across tournaments; where do similar batters prefer hitting?\". Each stage takes more time but provides richer context. Kohli rarely runs all four stages for every batter; he cascades based on confidence. For a new player making their debut, Kohli might skip the FAQ (no prior record) and jump to video analysis. For a tenth-order batsman, FAQ suffices (limited threat). The pattern's efficiency comes from accepting that most decisions don't require full analysis—you resolve with partial information, cascade only when confidence is low. This reveals why cascading retrieval is not over-engineering; it's pragmatic resource allocation, just as Kohli doesn't study every historical batter's record; he cascades his analysis depth based on perceived threat level.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "from enum import Enum\nfrom typing import List, Tuple, Optional\nimport time\n\nclass RetrievalStage(Enum):\n    FAQ = \"faq\"\n    SPARSE = \"sparse_lexical\"\n    DENSE = \"dense_semantic\"\n    KNOWLEDGE_GRAPH = \"kg\"\n\nclass QueryResult:\n    def __init__(self",
+      "stage": "RetrievalStage",
+      "results": "List[Tuple[str, float]]",
+      "latency": "float",
+      "confidence": "float):\n        self.stage = stage\n        self.results = results  # List of (doc_id, relevance_score)\n        self.latency = latency\n        self.confidence = confidence  # Confidence in result quality (0-1)\n\nclass CricketCascadingRAG:\n    \"\"\"Best practice: Cascading retrieval with lossy compression\"\"\"\n    \n    def __init__(self):\n        # FAQ database for high-frequency queries\n        self.faq_db = {\n            \"rohit sharma centuries\": [(\"stat_001\", 0.99)],\n            \"bumrah wickets\": [(\"stat_002\", 0.98)],\n            \"india vs australia 2023\": [(\"match_001\", 0.97)],\n        }\n        \n        # Sparse retriever (BM25 indices)\n        self.sparse_index = {\n            \"rohit\": [(\"rohit_stats_2023\", 0.85), (\"ind_aus_match\", 0.72)],\n            \"bumrah\": [(\"bumrah_bowling\", 0.92), (\"ind_pak_match\", 0.68)],\n            \"cricket\": [(\"generic_cricket_rules\", 0.65)],\n        }\n        \n        # Dense retriever (simulated embeddings)\n        self.dense_index = {\n            \"fast bowler statistics\": [(\"bumrah_bowling\", 0.88), (\"cummins_stats\", 0.81)],\n            \"batting technique analysis\": [(\"rohit_batting_technique\", 0.84)],\n        }\n        \n        # Knowledge graph\n        self.kg_index = {\n            \"india\": {\"players\": [\"rohit_sharma\", \"bumrah\"], \"matches\": [\"ind_aus_2023\", \"ind_pak_2023\"]},\n            \"australia\": {\"players\": [\"cummins\", \"warner\"], \"matches\": [\"ind_aus_2023\"]},\n        }\n        \n        self.compression_ratio = 0.5  # Lossy compression: keep 50% of tokens\n    \n    def faq_retrieval(self",
+      "query": "str) -> Optional[QueryResult]:\n        \"\"\"Stage 1: FAQ lookup (milliseconds, instant)\"\"\"\n        start = time.time()\n        query_lower = query.lower()\n        \n        for faq_key, results in self.faq_db.items():\n            if faq_key in query_lower:\n                latency = time.time() - start\n                return QueryResult(RetrievalStage.FAQ, results, latency, confidence=0.98)\n        \n        return None  # No FAQ match, cascade to next stage\n    \n    def sparse_retrieval(self",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str) -> QueryResult:\n        \"\"\"Stage 2: BM25 sparse lexical search (tens of milliseconds)\"\"\"\n        start = time.time()\n        query_terms = set(query.lower().split())\n        best_match = None\n        best_results = []\n        \n        for index_key, results in self.sparse_index.items():\n            if index_key in query_terms:\n                best_match = index_key\n                best_results = results\n                break\n        \n        if best_results:\n            latency = time.time() - start\n            # Confidence depends on query specificity and match quality\n            confidence = min(len(query_terms) / 5.0, 1.0)  # More terms = higher confidence\n            return QueryResult(RetrievalStage.SPARSE, best_results, latency, confidence=confidence)\n        \n        # No sparse match, cascade to dense\n        return None\n    \n    def dense_retrieval(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str) -> QueryResult:\n        \"\"\"Stage 3: Dense semantic search (hundreds of milliseconds)\"\"\"\n        start = time.time()\n        # Simulate semantic matching (not exact substring match)\n        results = []\n        \n        if \"statistics\" in query.lower() or \"bowling\" in query.lower():\n            results = self.dense_index.get(\"fast bowler statistics\", [])\n        elif \"technique\" in query.lower() or \"performance\" in query.lower():\n            results = self.dense_index.get(\"batting technique analysis\", [])\n        else:\n            # Generic semantic search would search all embeddings\n            results = [(\"generic_document\", 0.60)]\n        \n        latency = time.time() - start\n        confidence = 0.75 if results else 0.40  # Dense search typically less confident than FAQ/sparse\n        return QueryResult(RetrievalStage.DENSE, results, latency, confidence=confidence)\n    \n    def knowledge_graph_retrieval(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str) -> QueryResult:\n        \"\"\"Stage 4: Knowledge graph structured retrieval (high precision, moderate latency)\"\"\"\n        start = time.time()\n        query_lower = query.lower()\n        results = []\n        \n        for entity_key, entity_data in self.kg_index.items():\n            if entity_key in query_lower:\n                # Return structured KG nodes\n                if \"players\" in query_lower:\n                    results = [(f\"{entity_key}_player_{p}\", 0.90) for p in entity_data[\"players\"]]\n                elif \"matches\" in query_lower:\n                    results = [(f\"{entity_key}_match_{m}\", 0.90) for m in entity_data[\"matches\"]]\n                else:\n                    results = [(f\"{entity_key}_overview\", 0.85)]\n                break\n        \n        latency = time.time() - start\n        confidence = 0.92 if results else 0.30  # KG very high confidence when it has data\n        return QueryResult(RetrievalStage.KNOWLEDGE_GRAPH, results, latency, confidence=confidence)\n    \n    def cascading_retrieval(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "confidence_threshold": "float = 0.70) -> QueryResult:\n        \"\"\"Execute cascading retrieval stages, stopping when confidence exceeds threshold\"\"\"\n        print(f\"\\nQuery: '{query}'\")\n        print(\"=\"*60)\n        \n        # Stage 1: FAQ\n        print(\"\\n[Stage 1] FAQ Lookup...\")\n        result = self.faq_retrieval(query)\n        if result:\n            print(f\"  ✓ FAQ Match found\")\n            print(f\"    Latency: {result.latency*1000:.2f}ms | Confidence: {result.confidence:.2%}\")\n            print(f\"    Result: {result.results}\")\n            return result\n        print(\"  ✗ No FAQ match, cascading...\")\n        \n        # Stage 2: Sparse\n        print(\"\\n[Stage 2] Sparse (BM25) Retrieval...\")\n        result = self.sparse_retrieval(query)\n        if result and result.confidence >= confidence_threshold:\n            print(f\"  ✓ Sparse match with sufficient confidence\")\n            print(f\"    Latency: {result.latency*1000:.2f}ms | Confidence: {result.confidence:.2%}\")\n            print(f\"    Result: {result.results}\")\n            return result\n        if result:\n            print(f\"  ~ Sparse match found but low confidence ({result.confidence:.2%})\")\n        else:\n            print(\"  ✗ No sparse match, cascading...\")\n        \n        # Stage 3: Dense\n        print(\"\\n[Stage 3] Dense (Semantic) Retrieval...\")\n        result = self.dense_retrieval(query)\n        if result and result.confidence >= confidence_threshold:\n            print(f\"  ✓ Dense match with sufficient confidence\")\n            print(f\"    Latency: {result.latency*1000:.2f}ms | Confidence: {result.confidence:.2%}\")\n            print(f\"    Result: {result.results}\")\n            return result\n        if result:\n            print(f\"  ~ Dense match found but low confidence ({result.confidence:.2%})\")\n        else:\n            print(\"  ✗ No dense match, cascading...\")\n        \n        # Stage 4: Knowledge Graph (fallback)\n        print(\"\\n[Stage 4] Knowledge Graph (Structured) Retrieval...\")\n        result = self.knowledge_graph_retrieval(query)\n        print(f\"  Result: {result.results}\")\n        print(f\"    Latency: {result.latency*1000:.2f}ms | Confidence: {result.confidence:.2%}\")\n        return result\n    \n    def compress_result(self",
+      "result": "QueryResult",
+      "original_tokens": "int = 500) -> Tuple[str, int]:\n        \"\"\"Apply lossy compression to result documents\"\"\"\n        compressed_tokens = int(original_tokens * self.compression_ratio)\n        # Simulate summarization\n        summary = f\"[{result.stage.value}] Compressed document: {compressed_tokens} tokens retained out of {original_tokens}\"\n        return summary, compressed_tokens\n\n# Demo: Best practices in action\nif __name__ == \"__main__\":\n    rag_system = CricketCascadingRAG()\n    \n    # Test Case 1: FAQ-level query (high frequency)\n    print(\"\\n\" + \"#\"*60)\n    print(\"# TEST 1: Frequent FAQ Query\")\n    print(\"#\"*60)\n    result1 = rag_system.cascading_retrieval(\"How many centuries does Rohit Sharma have?\")\n    summary1, tokens1 = rag_system.compress_result(result1, original_tokens=500)\n    print(f\"\\n[Compression] Original: 500 tokens → Compressed: {tokens1} tokens (ratio: {rag_system.compression_ratio:.0%})\")\n    \n    # Test Case 2: Sparse-level query (exact lexical match)\n    print(\"\\n\" + \"#\"*60)\n    print(\"# TEST 2: Lexical Match Query\")\n    print(\"#\"*60)\n    result2 = rag_system.cascading_retrieval(\"Bumrah bowling statistics\")\n    summary2, tokens2 = rag_system.compress_result(result2, original_tokens=600)\n    print(f\"\\n[Compression] Original: 600 tokens → Compressed: {tokens2} tokens (ratio: {rag_system.compression_ratio:.0%})\")\n    \n    # Test Case 3: Dense semantic query (requires full cascade)\n    print(\"\\n\" + \"#\"*60)\n    print(\"# TEST 3: Semantic Reasoning Query\")\n    print(\"#\"*60)\n    result3 = rag_system.cascading_retrieval(\"Analyze fast bowling performance trends\", confidence_threshold=0.65)\n    summary3, tokens3 = rag_system.compress_result(result3, original_tokens=800)\n    print(f\"\\n[Compression] Original: 800 tokens → Compressed: {tokens3} tokens (ratio: {rag_system.compression_ratio:.0%})\")\n    \n    # Summary: Show cost benefit of cascading\n    print(\"\\n\" + \"=\"*60)\n    print(\"COST BENEFIT ANALYSIS\")\n    print(\"=\"*60)\n    total_queries = 3\n    total_original_tokens = 500 + 600 + 800\n    total_compressed_tokens = tokens1 + tokens2 + tokens3\n    print(f\"Total queries: {total_queries}\")\n    print(f\"Total original tokens: {total_original_tokens}\")\n    print(f\"Total compressed tokens: {total_compressed_tokens}\")\n    print(f\"Token reduction: {(1 - total_compressed_tokens/total_original_tokens):.1%}\")\n    print(f\"\\nCascading retrieval allowed FAQ resolution in 1-5ms (Test 1)\")\n    print(f\"and sparse resolution in 10-30ms (Test 2), avoiding expensive dense search costs.\")",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: A common beginner mistake is implementing RAG with only dense vector retrieval, assuming semantic similarity alone suffices. This fails catastrophically for exact-match queries like \"What is Bumrah's exact wicket count?\" Dense embeddings are semantic approximations; they may retrieve documents about \"Bumrah's bowling prowess\" but miss the factual document stating \"312 wickets\". The fix: always implement hybrid retrieval combining dense search (for semantic queries) with sparse search (for factual queries). Additionally, beginners often apply re-ranking to all 100 retrieved documents sequentially, causing latency to balloon. Production systems re-rank only top-20 candidates, accepting rare false negatives in exchange for 5x latency reduction. Finally, avoid storing raw full documents in memory during compression; stream documents and compress incrementally, reducing peak memory consumption.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}

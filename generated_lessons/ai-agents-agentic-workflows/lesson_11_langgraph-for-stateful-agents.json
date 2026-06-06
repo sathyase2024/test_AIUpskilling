@@ -1,0 +1,368 @@
+{
+  "lessonId": "ai-agents-agentic-workflows-11",
+  "title": "LangGraph for Stateful Agents",
+  "type": "reading",
+  "topicName": "AI Agents & Agentic Workflows",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Advanced agentic workflows represent the frontier of autonomous AI systems, where agents must coordinate across multiple specialized subtasks, manage state transitions, handle uncertainty, and recover from failures without constant human intervention. Traditional single-agent architectures break down when tasks require hierarchical decomposition—breaking complex problems into sub-problems that may depend on each other, require sequential execution, or demand conditional branching based on intermediate results. The core challenge is orchestrating agents that don't share memory perfectly, may operate asynchronously, and must make decisions despite incomplete information. In production systems serving e-commerce, customer support, research automation, or financial analysis, failures in workflow coordination manifest as incomplete tasks, circular dependencies, timeout cascades, and state corruption. This lesson explores advanced patterns for multi-agent orchestration, temporal reasoning, failure recovery, and adaptive replanning—the techniques that transform single-shot prompts into robust, self-correcting autonomous systems that scale to thousands of tasks daily without manual debugging.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider India's 2019 World Cup campaign under Virat Kohli, where the team faced a semi-final elimination against New Zealand. The match required perfect orchestration: openers Rohit Sharma and Shikhar Dhawan had to build a foundation (Task 1), middle-order batsmen like Kohli and MS Dhoni had to accelerate based on the run-rate requirement (Task 2, conditional on Task 1's output), and bowlers Jasprit Bumrah and Mohammed Shami had to adapt their bowling strategy (Task 2b) based on whether the opposition was scoring too fast (feedback loop). Each batter's role depends on the scorecard state at the time they walk to the crease; each bowler's length and pace adjust based on the opposition's strengths revealed during their innings. If Rohit got out cheaply (failure in Task 1), the entire workflow replan triggered—the middle order couldn't execute their preset strategy because the foundation was compromised. Similarly, advanced agentic workflows decompose complex goals into subtasks (batting positions), execute them in sequence or parallel (batting order vs powerplay field placement), condition later steps on earlier outputs (adjusted bowling based on run rate), and handle failures by replanning (calling back a bowler, switching bowling angles). The insight is that just as a cricket captain must hold global state (current score, wickets, overs remaining, opposition weaknesses) and decide the next step dynamically, an AI orchestrator must maintain workflow state, route to the right sub-agent, and recover gracefully when subtasks fail.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Hierarchical Task Decomposition",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Hierarchical task decomposition is the practice of recursively breaking down a complex goal into smaller, independently executable subtasks that form a directed acyclic graph (DAG) or state machine. Rather than asking a single agent to 'build a customer support ticket resolution system', hierarchical decomposition creates a tree: a root goal is split into 'classify intent', 'retrieve context', 'generate response', and 'validate safety'—each of which may itself contain sub-subtasks. The power of this approach lies in specialization: each subtask can be handled by an agent optimized for that specific domain (intent classification agents are trained on labeled data, retrieval agents use semantic search, generation agents use fine-tuned language models). The decomposition also creates natural points for human oversight, caching, and parallelization. However, incorrectly defining task boundaries creates wasted coordination overhead or forces downstream agents to operate on incomplete information. The decomposition strategy must balance granularity (more tasks = more coordination cost, but finer specialization) against cohesion (fewer tasks = less overhead, but lower specialization and higher individual agent complexity).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: When preparing for a Test series against Australia, the Indian cricket board doesn't just say 'go win the series'—they decompose the goal hierarchically. The top-level goal 'Win the Test series' breaks into Match 1, Match 2, Match 3, Match 4, and Match 5 (five subtasks). Each match-winning goal further decomposes: 'Win Match 1' becomes 'Win the first innings' and 'Win the second innings'—both of which depend on 'Restrict opposition first innings' (a bowling subtask). The first innings sub-goal decomposes further: 'Score 400 runs' becomes 'Opening partnership phase' (Rohit and Shubman Gill), 'Middle-order consolidation phase' (Kohli and Pant), and 'Tail-end contribution phase' (Bumrah and Siraj). Each phase has a specialized role: openers prioritize stability (low dot percentage), middle order prioritizes acceleration (high strike rate), tail prioritizes damage limitation (minimum runs conceded). A single batsman trying to do all three at once—opening conservatively AND accelerating aggressively AND blocking defensively—would fail. The insight is that decomposing a complex match into hierarchical phases with role specialization mirrors decomposing a complex AI goal into subtasks with specialized agents; without the hierarchy, agents lack clear context and waste effort.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Conditional Workflow Routing",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Conditional workflow routing is the mechanism by which a workflow engine examines the output of a subtask and decides which agent or subtask to invoke next, based on predicates defined over that output. In a static workflow, Task A always runs, then Task B always runs, regardless of A's result. In conditional routing, the output of Task A determines whether Task B, Task C, or a recovery handler executes. For instance, in a research paper analysis workflow: after an agent extracts key claims from a paper, conditional logic routes to 'verify academic citations' if the claim is factual, 'audit methodology' if it is procedural, or 'fact-check with external sources' if it is empirical. The routing decision is made programmatically—the orchestrator evaluates predicates like 'if output.confidence > 0.9 then proceed, else escalate to human'. This creates adaptive workflows that respond to real-time conditions rather than executing a pre-baked sequence. Implementing conditional routing requires the orchestrator to maintain state (what was the output?), expose that state via a query language or structured format (JSON, function returns), and implement a routing rule engine (if-else chains, lookup tables, or policy networks). Naive implementations fail when the routing predicate is too strict (blocking valid paths) or too loose (routing to incorrect subtasks, wasting computation).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: In a Test match, the India vs England series, the captain (Rohit Sharma) makes conditional routing decisions based on live match state. At lunch on Day 1, if England's opening pair has built a 100-run partnership with a run rate above 4 per over AND there are 2 overs until lunch, Rohit may route to 'aggressive pace attack' with Mohammed Siraj bowling short-pitched deliveries. Conversely, if England's openers are struggling against spin with 8 maidens in the first 10 overs, Rohit routes to 'sustained spin attack' with R Ashwin. The decision tree is conditional: Output of 'assess opposition form' is {runs:120, run_rate:4.2, maidens:8, confidence:0.85}. Predicate 1: if run_rate > 4 AND maidens < 5 → execute Pace Attack Subtask. Predicate 2: if maidens > 7 AND avg_dot_pct > 0.5 → execute Spin Attack Subtask. If no condition matches, default to 'balanced attack' with all-rounders. The routing is live and adaptive: after every over, the match state is re-evaluated, and if conditions change, the subtask changes. Similarly, in agentic workflows, the orchestrator evaluates intermediate outputs and routes conditionally, not blindly executing a preset sequence. The insight is that routing based on conditions allows workflows to adapt in real-time, just as a cricket captain adapts bowling and field strategy to opposition performance.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "State Management Across Agent Boundaries",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "State management across agent boundaries is the discipline of maintaining consistent, accessible, and recoverable representations of workflow context as control passes between agents. Each agent in a workflow operates on a slice of global state: the customer service agent sees {customer_id, issue_type, ticket_id}; the retrieval agent adds {relevant_docs, confidence_scores}; the generation agent adds {draft_response, tone_flags}; the safety validator adds {safety_score, flagged_content}. The orchestrator must maintain a single source of truth for this state—typically a structured store (database, distributed cache like Redis, or message queue)—ensuring that: (1) agents read a consistent snapshot before executing, (2) updates are atomic (partial writes don't corrupt downstream agents' inputs), (3) failures don't corrupt state (rollback on error), and (4) state is retrievable for auditing and debugging. In distributed systems, state management introduces subtle challenges: network partitions can cause agents to hold stale state, concurrent updates can race, and large state objects slow down I/O. Many implementations naively pass state by copying it between agents (causing synchronization issues), or by reference (requiring shared storage and introducing bottlenecks). Production systems use event sourcing (appending immutable state changes to a log) or temporal databases (versioning state at each workflow step) to resolve this; these provide replay-ability (re-run a workflow from a checkpoint) and auditability (understand what decision each agent made given what state).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: During India's ICC World Cup campaign, the team maintains a scorecard state across multiple agents: batsmen, bowlers, umpires, and the commentary panel. The scorecard state includes {runs_scored, wickets_lost, overs_completed, run_rate, powerplay_status, DRS_reviews_left, cumulative_runs_by_batter}. When Virat Kohli walks to the crease, he receives a state snapshot: 'Current score is 45/1, 8 overs in, run rate is 5.6, we need 280, powerplay is over'. Kohli executes his batting role with that state. When he hits a four, the state updates: {runs: 49, run_rate: 5.4}. That updated state is passed to the next batter. If Kohli gets run out and there's a review, the state must rollback to before the dismissal decision, DRS is invoked, and based on the outcome, state either commits (wicket stands) or reverts (given not out). The umpire, field placement decision-maker, and bowler all operate on the same state snapshot. If state were inconsistent—say the bowler thinks it's the powerplay when it's actually the death overs—they'd bowl the wrong strategy. State is also versioned: the official scorecard stores every run, every wicket, every over change in sequence, allowing replay (understand the flow of the match) and audit (detect if state was ever corrupted). The insight is that just as a cricket scorecard is the single source of truth for match state, accessed and updated by multiple decision-makers (batsmen, bowlers, field), the workflow state store is the single source of truth for task context, accessed by multiple agents.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Failure Detection and Adaptive Replanning",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Failure detection and adaptive replanning is the capability of a workflow system to recognize when a subtask has failed, degraded, or become infeasible, and to automatically generate and execute an alternate workflow path without human intervention. Failures in agentic workflows occur at multiple levels: (1) Agent failure—the agent crashes, times out, or produces an invalid output (malformed JSON, nonsensical response), (2) Task failure—the subtask completes but its output doesn't satisfy downstream requirements (e.g., a retrieval agent finds zero relevant documents for a query), (3) Resource failure—external systems the agent depends on are down (database unavailable, API rate-limited, vectorstore offline). Detecting failures requires monitoring at each step: output validation (does the response schema match expectations?), semantic validation (does the response make sense given the input?), and health checks (are external systems responsive?). Once a failure is detected, the system must decide to either: (1) retry the same agent with different parameters, (2) invoke a fallback agent designed to handle the same task with different techniques, (3) escalate to a higher-level agent that can replan the workflow, or (4) fail fast and report to a human. Adaptive replanning means the system doesn't just retry blindly; it modifies the workflow plan based on failure diagnosis. For example, if 'retrieve from vector database' times out, replan to 'retrieve from keyword index', then fall back to 'retrieve from LLM-generated summary cache'. This requires the system to maintain a library of alternate strategies, a cost model (which replans are expensive in latency or tokens?), and a decision policy (under what conditions invoke which replan?).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: India's cricket team, managed by Rohit Sharma and coach Rahul Dravid, constantly detects failures and adapts strategy. During a Test match against Pakistan, the initial plan was 'Open with Rohit and Shubman Gill, bowl first-change with Bumrah, then pivot to spin'. But Rohit gets out to a brilliant catch in slip (agent failure). The team detects this failure—opening partnership is disrupted—and invokes adaptive replanning: instead of a traditional middle-order approach, they immediately promote KL Rahul from No. 5 to No. 3 (fallback to a specialist who can stabilize). Later, Bumrah's bowling spell shows fatigue after 12 overs (agent degradation: output quality dropping—he's giving away easy runs). Dravid detects this through metrics (economy rate rising from 2.1 to 3.8 per over) and replans: take Bumrah off, rotate in Mohammed Shami for a fresh spell. If the pitch suddenly offers excessive turn on Day 2 (environmental change), the plan changes again: reduce fast bowlers, increase spin attack with Ashwin and Kuldeep. The system never executes a rigid pre-game plan; it monitors ongoing metrics, detects deviations from expected performance, diagnoses the root cause, and adapts. Each replan (promote a batter, rotate a bowler, change field) is chosen from a library of known strategies, with cost-benefit analysis (a promoted batter gains stability but risks a less experienced fielder lower down). The insight is that agentic workflows, like cricket captaincy, must be reactive and adaptive; blind execution of a static plan leads to losses.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Agent Specialization and Tool Integration",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Agent specialization and tool integration is the design pattern of creating narrowly-scoped agents, each optimized for a specific subtask, and equipping them with domain-specific tools (APIs, databases, search engines, execution environments) rather than trying to build general-purpose agents that can do everything. A specialized agent approach recognizes that asking a single LLM to 'answer a legal question, execute Python code, retrieve documents, and validate safety' is inefficient—the model wastes capacity on tasks far from its training distribution. Instead, build: a Legal-Expert agent trained on legal documents and fine-tuned for legal reasoning; a Code-Execution agent that can safely sandbox and run Python; a Retrieval agent that uses semantic search and ranking; a Safety agent that applies rule-based and learned classifiers. Each agent is a smaller model (cheaper, faster) trained or equipped for its domain. Tools are the external systems each agent can invoke: the Retrieval agent has access to a vector database and a keyword index; the Code-Execution agent has access to a Python sandbox and a memory profiler; the Legal agent has access to a legal knowledge base and precedent database. The orchestrator routes tasks to the appropriate specialized agent and ensures the agent has access to its required tools. This pattern scales because: (1) specialized agents are cheaper to run than large general models, (2) tool access is auditable and secure (each agent can only touch its assigned tools), (3) failures are isolated (one agent's crash doesn't disable the whole system), (4) specialization improves accuracy (a model fine-tuned on code is better at generating code than a general model). The trade-off is coordination overhead: routing decisions must be made, tool calls must be orchestrated, and state must flow between agents.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Instead of asking one person to be opener, middle-order batsman, bowler, and wicket-keeper all at once, cricket teams build specialized roles. Rohit Sharma is an opening specialist—he's trained to handle the new ball, play aggressive yet stable innings, and build partnerships. His tools are his technique (driving, defending), his fitness regime (to handle long opening innings), and his field awareness. Jasprit Bumrah is a bowling specialist—he's trained to deliver yorkers, assess pitch conditions, and vary pace. His tools are his unique bowling action, his strategic knowledge of opposition batsmen, and his fitness for long spells. Rishabh Pant is a wicket-keeper specialist—he's trained to read bowling, position himself, and execute stumpings. His tools are his glove work, his signaling, and his communication with bowlers. The team doesn't ask Bumrah to also bat and keep wickets because his specialization in bowling would be diluted. Instead, each specialist is equipped with domain-specific tools and called upon when needed. The captain (orchestrator) routes: 'Fast bowling needed?' → call Bumrah. 'Aggressive batting phase?' → call Pant. 'Spin needed on turning pitch?' → call Ashwin. This is far more effective than asking one generalist to do all roles poorly. The insight is that agent specialization with tool integration mirrors cricket team structure: narrow roles, domain-specific equipment, orchestration by a captain, and reliability through specialization rather than generalization.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "import json\nimport time\nfrom enum import Enum\nfrom typing import Dict, List, Any, Optional\nfrom dataclasses import dataclass, asdict\nfrom abc import ABC, abstractmethod\n\n# ============================================================================\n# HIERARCHICAL TASK DECOMPOSITION & WORKFLOW STATE MANAGEMENT\n# ============================================================================\n\nclass TaskStatus(Enum):\n    \"\"\"Task lifecycle states.\"\"\"\n    PENDING = \"pending\"\n    RUNNING = \"running\"\n    SUCCESS = \"success\"\n    FAILED = \"failed\"\n    REPLANNING = \"replanning\"\n\n\n@dataclass\nclass MatchState:\n    \"\"\"Global workflow state: match scorecard.\"\"\"\n    match_id: str\n    team: str\n    runs_scored: int\n    wickets_lost: int\n    overs_completed: float\n    run_rate: float\n    target: int\n    powerplay_active: bool\n    opposition_runs: int\n    opposition_wickets: int\n    drs_reviews: int\n    last_wicket_info: Optional[str] = None\n    timestamp: float = 0.0\n\n    def to_dict(self) -> Dict[str, Any]:\n        return asdict(self)\n\n\n@dataclass\nclass WorkflowTask:\n    \"\"\"Represents a single task in the workflow DAG.\"\"\"\n    task_id: str\n    task_name: str\n    agent_type: str  # 'opener', 'middle_order', 'bowler', 'validator'\n    status: TaskStatus\n    input_state: Dict[str, Any]\n    output: Optional[Dict[str, Any]] = None\n    error_msg: Optional[str] = None\n    dependencies: List[str] = None\n    retry_count: int = 0\n    max_retries: int = 2\n    timestamp_start: float = 0.0\n    timestamp_end: float = 0.0\n\n    def __post_init__(self):\n        if self.dependencies is None:\n            self.dependencies = []\n\n\nclass SpecializedAgent(ABC):\n    \"\"\"Base class for specialized agents.\"\"\"\n    def __init__(self",
+      "agent_id": "str",
+      "agent_type": "str",
+      "tools": "List[str]):\n        self.agent_id = agent_id\n        self.agent_type = agent_type\n        self.tools = tools  # e.g., ['technique', 'field_awareness']\n        self.execution_time = 0.0\n\n    @abstractmethod\n    def execute(self",
+      "state": "MatchState",
+      "task_input": "Dict[str, Any]) -> Dict[str, Any]:\n        \"\"\"Execute the agent's specialized task.\"\"\"\n        pass\n\n    def validate_output(self",
+      "output": "Dict[str, Any]) -> tuple[bool, Optional[str]]:\n        \"\"\"Validate agent output. Return (is_valid, error_msg).\"\"\"\n        if output is None:\n            return False, \"Output is None\"\n        if not isinstance(output, dict):\n            return False, \"Output is not a dict\"\n        return True, None\n\n\nclass OpenerAgent(SpecializedAgent):\n    \"\"\"Specialized agent for opening innings.\"\"\"\n    def __init__(self):\n        super().__init__(\n            agent_id=\"opener_1\",\n            agent_type=\"opener\",\n            tools=[\"batting_technique\", \"partnership_building\", \"field_reading\"]\n        )\n\n    def execute(self",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "state": "MatchState",
+      "task_input": "Dict[str, Any]) -> Dict[str, Any]:\n        \"\"\"Simulate opening batting phase (Rohit Sharma style).\"\"\"\n        self.execution_time = time.time()\n        \n        # Task: Add opening partnership runs\n        target_runs = task_input.get('target_opening_runs', 50)\n        overs_used = task_input.get('overs_available', 6)\n        confidence = 0.85 if state.powerplay_active else 0.7\n        \n        runs_scored = min(target_runs, int(target_runs * confidence))\n        wickets_lost = 0 if confidence > 0.8 else 1\n        \n        return {\n            \"runs_added\": runs_scored,\n            \"wickets_lost\": wickets_lost,\n            \"overs_used\": overs_used,\n            \"run_rate\": runs_scored / overs_used,\n            \"phase\": \"powerplay_complete\",\n            \"confidence\": confidence,\n            \"batters\": [\"Rohit Sharma\", \"Shubman Gill\"],\n        }\n\n\nclass MiddleOrderAgent(SpecializedAgent):\n    \"\"\"Specialized agent for middle-order consolidation.\"\"\"\n    def __init__(self):\n        super().__init__(\n            agent_id=\"middle_order_1\",\n            agent_type=\"middle_order\",\n            tools=[\"acceleration\", \"pace_variation_reading\", \"pressure_handling\"]\n        )\n\n    def execute(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "state": "MatchState",
+      "task_input": "Dict[str, Any]) -> Dict[str, Any]:\n        \"\"\"Simulate middle-order batting (Virat Kohli / MS Dhoni style).\"\"\"\n        self.execution_time = time.time()\n        \n        # Task: Accelerate and consolidate based on current state\n        runs_needed = task_input.get('runs_needed', 0)\n        overs_remaining = task_input.get('overs_remaining', 30)\n        current_run_rate = state.run_rate\n        required_run_rate = runs_needed / overs_remaining if overs_remaining > 0 else 0\n        \n        # If required run rate is high, be aggressive\n        aggression = 0.9 if required_run_rate > 5.5 else 0.6\n        runs_scored = int(required_run_rate * overs_remaining * aggression)\n        wickets_lost = 1 if aggression > 0.85 else 0  # Higher risk = more wickets\n        \n        return {\n            \"runs_added\": runs_scored,\n            \"wickets_lost\": wickets_lost,\n            \"overs_used\": min(overs_remaining, int(overs_remaining * 0.7)),\n            \"acceleration_factor\": aggression,\n            \"phase\": \"consolidation_and_acceleration\",\n            \"batters\": [\"Virat Kohli\", \"Rishabh Pant\"],\n        }\n\n\nclass BowlingAgent(SpecializedAgent):\n    \"\"\"Specialized agent for bowling strategy.\"\"\"\n    def __init__(self):\n        super().__init__(\n            agent_id=\"bowling_1\",\n            agent_type=\"bowler\",\n            tools=[\"pace_variation\", \"line_length\", \"field_placement\", \"yorker_execution\"]\n        )\n\n    def execute(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "state": "MatchState",
+      "task_input": "Dict[str, Any]) -> Dict[str, Any]:\n        \"\"\"Simulate bowling spell (Jasprit Bumrah style).\"\"\"\n        self.execution_time = time.time()\n        \n        opposition_run_rate = task_input.get('opposition_run_rate', 5.0)\n        overs_to_bowl = task_input.get('overs_to_bowl', 3)\n        \n        # If opposition scoring too fast, tighten bowling (maiden overs)\n        if opposition_run_rate > 6.0:\n            maiden_overs = int(overs_to_bowl * 0.67)\n            economy = 3.5  # Tight economy\n            strategy = \"yorkers_and_deception\"\n        else:\n            maiden_overs = int(overs_to_bowl * 0.33)\n            economy = 5.2\n            strategy = \"consistent_length_and_line\"\n        \n        runs_conceded = int(economy * overs_to_bowl)\n        wickets_taken = 1 if strategy == \"yorkers_and_deception\" else 0\n        \n        return {\n            \"runs_conceded\": runs_conceded,\n            \"wickets_taken\": wickets_taken,\n            \"overs_bowled\": overs_to_bowl,\n            \"maiden_overs\": maiden_overs,\n            \"economy_rate\": economy,\n            \"strategy\": strategy,\n            \"bowler\": \"Jasprit Bumrah\",\n        }\n\n\nclass ValidatorAgent(SpecializedAgent):\n    \"\"\"Specialized agent for validating match state and safety.\"\"\"\n    def __init__(self):\n        super().__init__(\n            agent_id=\"validator_1\",\n            agent_type=\"validator\",\n            tools=[\"scorecard_validation\", \"rule_checking\", \"drs_review\"]\n        )\n\n    def execute(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "state": "MatchState",
+      "task_input": "Dict[str, Any]) -> Dict[str, Any]:\n        \"\"\"Validate current state for consistency and legality.\"\"\"\n        self.execution_time = time.time()\n        \n        # Validation checks\n        is_valid = True\n        errors = []\n        \n        if state.runs_scored < 0:\n            is_valid = False\n            errors.append(\"Negative runs recorded\")\n        \n        if state.wickets_lost > 10:\n            is_valid = False\n            errors.append(\"Wickets exceed team size\")\n        \n        if state.overs_completed > 50 and state.target == -1:  # ODI check\n            is_valid = False\n            errors.append(\"Exceeded ODI over limit\")\n        \n        if state.drs_reviews < 0:\n            is_valid = False\n            errors.append(\"DRS reviews corrupted\")\n        \n        return {\n            \"is_valid\": is_valid,\n            \"errors\": errors,\n            \"validation_timestamp\": time.time(),\n            \"state_snapshot\": state.to_dict(),\n        }\n\n\nclass ConditionalRouter:\n    \"\"\"Routes workflow based on conditional logic over match state.\"\"\"\n    @staticmethod\n    def route_next_task(state: MatchState",
+      "previous_output": "Dict[str, Any]) -> str:\n        \"\"\"Decide next task based on current state.\"\"\"\n        runs_needed = state.target - state.runs_scored\n        overs_remaining = 50 - state.overs_completed if state.target > 0 else 50 - state.overs_completed\n        \n        # Conditional routing logic\n        if state.overs_completed < 6 and state.powerplay_active:\n            # Still in powerplay, continue opening phase\n            return \"opening_phase\"\n        elif state.overs_completed < 20 and state.wickets_lost < 3:\n            # Early overs, build foundation\n            return \"foundation_phase\"\n        elif runs_needed > 0 and overs_remaining > 10:\n            # Middle overs, accelerate if needed\n            required_rate = runs_needed / overs_remaining\n            if required_rate > 6.0:\n                return \"aggressive_phase\"\n            else:\n                return \"consolidation_phase\"\n        elif overs_remaining <= 10 and runs_needed > 0:\n            # Death overs\n            return \"death_overs_phase\"\n        else:\n            # Match won or completed\n            return \"match_end\"\n\n\nclass AdaptiveReplanner:\n    \"\"\"Detects failures and generates alternate plans.\"\"\"\n    def __init__(self):\n        self.fallback_strategies = {\n            \"opener_failure\": \"promote_middle_order\",\n            \"bowler_fatigue\": \"rotate_bowling_attack\",\n            \"low_run_rate\": \"aggressive_acceleration\",\n            \"high_opposition_rate\": \"tight_bowling_strategy\",\n        }\n\n    def detect_failure(self",
+      "task": "WorkflowTask",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "state": "MatchState) -> Optional[str]:\n        \"\"\"Detect if a task failed or requires replanning.\"\"\"\n        if task.status == TaskStatus.FAILED:\n            return f\"{task.agent_type}_failure\"\n        \n        if task.output:\n            if task.agent_type == \"opener\" and task.output.get('wickets_lost', 0) > 1:\n                return \"opener_failure\"\n            if task.agent_type == \"bowler\" and task.output.get('economy_rate', 0) > 7.0:\n                return \"bowler_fatigue\"\n            if state.run_rate < (state.target - state.runs_scored) / (50 - state.overs_completed) * 0.9:\n                return \"low_run_rate\"\n        \n        return None\n\n    def generate_replan(self",
+      "failure_type": "str) -> List[str]:\n        \"\"\"Generate alternate task sequence for a failure.\"\"\"\n        if failure_type in self.fallback_strategies:\n            return [self.fallback_strategies[failure_type]]\n        return []\n\n\nclass WorkflowOrchestrator:\n    \"\"\"Main orchestrator for agentic cricket workflow.\"\"\"\n    def __init__(self):\n        self.agents = {\n            \"opener\": OpenerAgent(),\n            \"middle_order\": MiddleOrderAgent(),\n            \"bowler\": BowlingAgent(),\n            \"validator\": ValidatorAgent(),\n        }\n        self.router = ConditionalRouter()\n        self.replanner = AdaptiveReplanner()\n        self.workflow_state: Dict[str, MatchState] = {}\n        self.task_history: List[WorkflowTask] = []\n        self.current_plan: List[str] = []\n\n    def initialize_match(self",
+      "match_id": "str",
+      "target": "int):\n        \"\"\"Initialize workflow state for a new match.\"\"\"\n        self.workflow_state[match_id] = MatchState(\n            match_id=match_id,\n            team=\"India\",\n            runs_scored=0,\n            wickets_lost=0,\n            overs_completed=0.0,\n            run_rate=0.0,\n            target=target,\n            powerplay_active=True,\n            opposition_runs=target - 10,\n            opposition_wickets=3,\n            drs_reviews=2,\n            timestamp=time.time(),\n        )\n        print(f\"\\n[INIT] Match {match_id} initialized. Target: {target}\\n\")\n\n    def execute_task(\n        self,\n        match_id: str,\n        task_name: str,\n        agent_type: str,\n        task_input: Dict[str, Any],\n    ) -> WorkflowTask:\n        \"\"\"Execute a single task through a specialized agent.\"\"\"\n        state = self.workflow_state[match_id]\n        agent = self.agents[agent_type]\n        \n        task = WorkflowTask(\n            task_id=f\"task_{len(self.task_history) + 1}\",\n            task_name=task_name,\n            agent_type=agent_type,\n            status=TaskStatus.RUNNING,\n            input_state=task_input,\n            timestamp_start=time.time(),\n        )\n        \n        print(f\"[EXECUTE] Task: {task.task_name} | Agent: {agent_type} | State: R={state.runs_scored}/W={state.wickets_lost}, Overs={state.overs_completed}\")\n        \n        try:\n            # Agent executes\n            output = agent.execute(state, task_input)\n            \n            # Validate output\n            is_valid, error = agent.validate_output(output)\n            if not is_valid:\n                raise ValueError(f\"Validation failed: {error}\")\n            \n            # Update state based on output\n            if agent_type == \"opener\":\n                state.runs_scored += output[\"runs_added\"]\n                state.wickets_lost += output[\"wickets_lost\"]\n                state.overs_completed += output[\"overs_used\"]\n                state.run_rate = state.runs_scored / state.overs_completed if state.overs_completed > 0 else 0\n                state.powerplay_active = state.overs_completed < 6\n            elif agent_type == \"middle_order\":\n                state.runs_scored += output[\"runs_added\"]\n                state.wickets_lost += output[\"wickets_lost\"]\n                state.overs_completed += output[\"overs_used\"]\n                state.run_rate = state.runs_scored / state.overs_completed if state.overs_completed > 0 else 0\n            elif agent_type == \"validator\":\n                if not output[\"is_valid\"]:\n                    print(f\"[VALIDATION_ERROR] {output['errors']}\")\n                    task.status = TaskStatus.FAILED\n                    task.error_msg = str(output[\"errors\"])\n            \n            task.output = output\n            task.status = TaskStatus.SUCCESS\n            print(f\"[SUCCESS] {task.task_name} completed. New state: R={state.runs_scored}/W={state.wickets_lost}\")\n            \n        except Exception as e:\n            task.status = TaskStatus.FAILED\n            task.error_msg = str(e)\n            print(f\"[ERROR] Task {task.task_name} failed: {e}\")\n            \n            # Trigger replanning on failure\n            failure_type = self.replanner.detect_failure(task, state)\n            if failure_type:\n                print(f\"[REPLAN] Detected failure type: {failure_type}\")\n                replan = self.replanner.generate_replan(failure_type)\n                print(f\"[REPLAN] Generated alternate plan: {replan}\")\n        \n        task.timestamp_end = time.time()\n        self.task_history.append(task)\n        return task\n\n    def route_workflow(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "match_id": "str):\n        \"\"\"Use conditional routing to decide next task.\"\"\"\n        state = self.workflow_state[match_id]\n        previous_output = self.task_history[-1].output if self.task_history else {}\n        \n        next_phase = self.router.route_next_task(state, previous_output)\n        print(f\"[ROUTE] Next phase: {next_phase}\")\n        return next_phase\n\n    def run_match_simulation(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "match_id": "str):\n        \"\"\"Run a complete match workflow with hierarchical task decomposition.\"\"\"\n        print(f\"\\n{'='*80}\")\n        print(f\"CRICKET MATCH WORKFLOW - {match_id}\")\n        print(f\"{'='*80}\\n\")\n        \n        state = self.workflow_state[match_id]\n        iteration = 0\n        max_iterations = 50  # Prevent infinite loops\n        \n        while iteration < max_iterations:\n            iteration += 1\n            print(f\"\\n--- ITERATION {iteration} ---\")\n            \n            # Conditional routing: decide next phase\n            next_phase = self.route_workflow(match_id)\n            \n            if next_phase == \"match_end\":\n                print(f\"\\n[MATCH_END] Final Score: {state.runs_scored}/{state.wickets_lost} in {state.overs_completed} overs\")\n                if state.runs_scored >= state.target:\n                    print(f\"[RESULT] INDIA WINS by {10 - state.wickets_lost} wickets!\")\n                else:\n                    print(f\"[RESULT] INDIA LOSES by {state.target - state.runs_scored} runs.\")\n                break\n            \n            # Execute task based on phase\n            if next_phase == \"opening_phase\":\n                self.execute_task(\n                    match_id,\n                    task_name=\"Opening Partnership\",\n                    agent_type=\"opener\",\n                    task_input={\"target_opening_runs\": 60, \"overs_available\": 6},\n                )\n            elif next_phase == \"foundation_phase\":\n                self.execute_task(\n                    match_id,\n                    task_name=\"Consolidation Phase\",\n                    agent_type=\"middle_order\",\n                    task_input={\n                        \"runs_needed\": state.target - state.runs_scored,\n                        \"overs_remaining\": 50 - state.overs_completed,\n                    },\n                )\n            elif next_phase == \"consolidation_phase\":\n                self.execute_task(\n                    match_id,\n                    task_name=\"Consolidation & Acceleration\",\n                    agent_type=\"middle_order\",\n                    task_input={\n                        \"runs_needed\": max(0, state.target - state.runs_scored),\n                        \"overs_remaining\": max(0, 50 - state.overs_completed),\n                    },\n                )\n            elif next_phase == \"aggressive_phase\":\n                self.execute_task(\n                    match_id,\n                    task_name=\"Aggressive Acceleration\",\n                    agent_type=\"middle_order\",\n                    task_input={\n                        \"runs_needed\": state.target - state.runs_scored,\n                        \"overs_remaining\": 50 - state.overs_completed,\n                    },\n                )\n            elif next_phase == \"death_overs_phase\":\n                self.execute_task(\n                    match_id,\n                    task_name=\"Death Overs Assault\",\n                    agent_type=\"middle_order\",\n                    task_input={\n                        \"runs_needed\": state.target - state.runs_scored,\n                        \"overs_remaining\": 50 - state.overs_completed,\n                    },\n                )\n            \n            # After every task, validate state\n            self.execute_task(\n                match_id,\n                task_name=\"State Validation\",\n                agent_type=\"validator\",\n                task_input={\"state\": state.to_dict()},\n            )\n            \n            state = self.workflow_state[match_id]\n            print(f\"[STATE] After iteration {iteration}: R={state.runs_scored}/W={state.wickets_lost}, Overs={state.overs_completed:.1f}, RR={state.run_rate:.2f}\")\n        \n        self.print_workflow_summary(match_id)\n\n    def print_workflow_summary(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "match_id": "str):\n        \"\"\"Print summary of workflow execution.\"\"\"\n        print(f\"\\n{'='*80}\")\n        print(f\"WORKFLOW SUMMARY - {match_id}\")\n        print(f\"{'='*80}\")\n        print(f\"Total tasks executed: {len(self.task_history)}\")\n        print(f\"Successful tasks: {sum(1 for t in self.task_history if t.status == TaskStatus.SUCCESS)}\")\n        print(f\"Failed tasks: {sum(1 for t in self.task_history if t.status == TaskStatus.FAILED)}\")\n        print(f\"\\nTask execution order:\")\n        for i, task in enumerate(self.task_history[:10], 1):  # Show first 10\n            print(f\"  {i}. {task.task_name} ({task.agent_type}) -> {task.status.value}\")\n        if len(self.task_history) > 10:\n            print(f\"  ... and {len(self.task_history) - 10} more tasks\")\n        print()\n\n\n# ============================================================================\n# MAIN EXECUTION\n# ============================================================================\n\nif __name__ == \"__main__\":\n    # Create orchestrator and initialize match\n    orchestrator = WorkflowOrchestrator()\n    match_id = \"IND_vs_ENG_T20_2024\"\n    target_runs = 180\n    \n    orchestrator.initialize_match(match_id, target_runs)\n    \n    # Run the complete match simulation with hierarchical decomposition,\n    # conditional routing, state management, and replanning\n    orchestrator.run_match_simulation(match_id)",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The code demonstrates all four core concepts in an integrated cricket match workflow. The `MatchState` dataclass maintains global state (runs, wickets, overs, run rate) that flows between agents—this is the state management across agent boundaries. Each agent (`OpenerAgent`, `MiddleOrderAgent`, `BowlingAgent`, `ValidatorAgent`) is specialized for a single domain, equipped with domain-specific tools (e.g., the opener has 'batting_technique' and 'partnership_building' tools). The `WorkflowOrchestrator` orchestrates the execution: it calls `execute_task()` which runs the agent, validates output, and updates the shared state. The `ConditionalRouter` implements conditional workflow routing—based on `match_state.overs_completed`, `match_state.wickets_lost`, and `runs_needed`, it decides the next task: if we're in powerplay, execute 'opening_phase'; if overs are 20-40, execute 'consolidation_phase'; if in death overs, execute 'death_overs_phase'. This means the workflow plan is not pre-baked; it's generated dynamically based on current state. The `AdaptiveReplanner` detects failures (e.g., if an opener loses 2 wickets, or if a bowler's economy exceeds 7.0) and generates alternate plans (e.g., 'promote_middle_order', 'rotate_bowling_attack'). At each iteration, state is validated by the ValidatorAgent, ensuring consistency and detecting corruption before it cascades downstream. The simulation runs until the target is reached or 50 overs are exhausted, with each task execution recorded in `task_history` for audit and replay.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At the runtime level, an advanced agentic workflow system is a state machine that cycles through three phases: (1) Read the current global state from persistent storage (database, cache, or distributed ledger), (2) Evaluate routing predicates to determine which agent to invoke next, (3) Execute the agent with input derived from the current state, validate its output, commit the state update, and repeat. The orchestrator must maintain consistency across these cycles despite failures: if an agent crashes mid-execution, the state should not be partially updated. This is typically solved using transactions (database-level ACID guarantees), event sourcing (appending immutable event logs and replaying to rebuild state), or two-phase commit (coordinator ensures all nodes agree before committing). In distributed systems, the challenge is magnified: agents may be distributed across multiple machines, state may be replicated, and network partitions can cause divergence. Modern systems use consensus protocols (Raft, Paxos) or eventual consistency models (allowing temporary divergence, then re-convergence). At the language/framework level, orchestrators are built using async/await (agents execute concurrently, not sequentially), dependency injection (agents receive state and tools via constructor or method arguments), and middleware hooks (validation, logging, retry logic wrap agent execution). Performance-critical systems optimize by caching intermediate state (avoid re-reading from disk), batching state updates (write once per cycle instead of once per agent), and precomputing routing decisions (if predicates are expensive, cache the routing table). Memory is managed carefully in long-running workflows: large state objects are streamed (read one field at a time) rather than loaded wholly, and agent outputs are immediately persisted and dereferenced (not held in memory), reducing GC pressure. Failures are handled at multiple levels: agent-level retries (retry the same agent with backoff), task-level fallbacks (invoke a fallback agent if the primary fails), and workflow-level escalation (if all agents fail for a task, escalate to a human or a recovery service). Monitoring and observability are critical: every task execution logs its input, output, duration, and success/failure status; every state transition is timestamped; and distributed tracing follows a task through all agents to identify bottlenecks.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A cricket match's execution, from an umpire and commentary perspective, involves constant state reads, conditional decisions, and recovery from failures. At the start of each over, the umpire reads the current state: {balls_bowled_in_over: 0, runs_this_over: 0, current_batter: Rohit, current_bowler: Bumrah, field_positions: [list]}. The bowler delivers a ball (agent execution). The outcome is: 'four runs'. The umpire updates state: {balls_bowled: 1, runs_this_over: 4, batter_strike_rate: [updated]}. Based on this new state, the fielding captain (orchestrator) evaluates predicates: 'If runs_this_over > 10, tighten the field. If maidens_consecutive > 2, maintain pressure. If bowler_economy > 7, rotate bowler.' Each predicate is a routing decision. If a bowler delivers a no-ball (agent failure), the umpire triggers a recovery: {no_ball_signal, free_hit_granted, bowler_reputation_down_1}. The state machine cycles: read state → evaluate predicates → route to next bowler or same bowler with adjusted field → bowler executes → update state. The state is stored in the official scorecard (persistent storage); if there's a dispute, DRS (distributed replay system) reviews the footage to confirm state. If a technical issue (rain, light failure) interrupts execution, the Duckworth-Lewis method (a state compression algorithm) computes the equivalent target and resumes from that compressed state. The insight is that cricket execution is a real-world state machine with routing, persistence, recovery, and monitoring—exactly like an advanced agentic workflow at runtime.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "import asyncio\nfrom typing import Callable, Coroutine, Any\nfrom dataclasses import dataclass, field\nfrom collections import deque\nimport logging\n\nlogging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')\nlogger = logging.getLogger(__name__)\n\n# ============================================================================\n# ADVANCED: ASYNC EXECUTION, FAILURE RECOVERY, STATE PERSISTENCE\n# ============================================================================\n\nclass StateStore:\n    \"\"\"Persistent state store with ACID guarantees (simulated).\"\"\"\n    def __init__(self):\n        self.state_log = deque(maxlen=1000)  # Event log for replay\n        self.current_state = {}\n        self.transaction_in_progress = False\n\n    def begin_transaction(self):\n        \"\"\"Start atomic transaction.\"\"\"\n        self.transaction_in_progress = True\n        logger.info(\"[TRANSACTION] Begin\")\n\n    def commit_transaction(self",
+      "state_update": "dict):\n        \"\"\"Atomically write state update to log and commit.\"\"\"\n        if not self.transaction_in_progress:\n            raise RuntimeError(\"No transaction in progress\")\n        \n        # Append to event log (immutable)\n        self.state_log.append(state_update)\n        \n        # Update current state\n        self.current_state.update(state_update)\n        \n        self.transaction_in_progress = False\n        logger.info(f\"[TRANSACTION] Commit: {state_update}\")\n\n    def rollback_transaction(self):\n        \"\"\"Rollback transaction (state reverts to before begin).\"\"\"\n        self.transaction_in_progress = False\n        logger.warning(\"[TRANSACTION] Rollback\")\n\n    def replay_from_log(self",
+      "up_to_index": "int = None):\n        \"\"\"Rebuild state from event log (recovery after crash).\"\"\"\n        logger.info(f\"[REPLAY] Rebuilding state from {len(self.state_log)} events\")\n        reconstructed_state = {}\n        for i, event in enumerate(self.state_log):\n            if up_to_index and i > up_to_index:\n                break\n            reconstructed_state.update(event)\n        self.current_state = reconstructed_state\n        logger.info(f\"[REPLAY] State reconstructed: {self.current_state}\")\n        return self.current_state\n\n    def read(self) -> dict:\n        \"\"\"Read current state (snapshot for agent execution).\"\"\"\n        return self.current_state.copy()\n\n\nclass RetryPolicy:\n    \"\"\"Exponential backoff retry strategy.\"\"\"\n    def __init__(self",
+      "max_retries": "int = 3",
+      "base_delay": "float = 1.0):\n        self.max_retries = max_retries\n        self.base_delay = base_delay\n\n    async def execute_with_retry(\n        self,\n        agent_func: Callable[..., Coroutine[Any, Any, Any]],\n        *args,\n        **kwargs\n    ):\n        \"\"\"Execute agent function with exponential backoff.\"\"\"\n        for attempt in range(self.max_retries + 1):\n            try:\n                result = await agent_func(*args, **kwargs)\n                if attempt > 0:\n                    logger.info(f\"[RETRY] Succeeded on attempt {attempt + 1}\")\n                return result\n            except Exception as e:\n                if attempt == self.max_retries:\n                    logger.error(f\"[RETRY] Failed after {self.max_retries + 1} attempts: {e}\")\n                    raise\n                wait_time = self.base_delay * (2 ** attempt)\n                logger.warning(f\"[RETRY] Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s\")\n                await asyncio.sleep(wait_time)\n\n\nclass CircuitBreaker:\n    \"\"\"Circuit breaker pattern to prevent cascading failures.\"\"\"\n    def __init__(self",
+      "failure_threshold": "int = 5",
+      "timeout": "float = 60.0):\n        self.failure_threshold = failure_threshold\n        self.timeout = timeout\n        self.failure_count = 0\n        self.last_failure_time = None\n        self.state = \"CLOSED\"  # CLOSED = healthy, OPEN = failing, HALF_OPEN = testing recovery\n\n    async def call(\n        self,\n        agent_func: Callable[..., Coroutine[Any, Any, Any]],\n        *args,\n        **kwargs\n    ):\n        \"\"\"Execute agent function with circuit breaker protection.\"\"\"\n        if self.state == \"OPEN\":\n            if asyncio.get_event_loop().time() - self.last_failure_time > self.timeout:\n                self.state = \"HALF_OPEN\"\n                logger.info(\"[CIRCUIT_BREAKER] Transitioning to HALF_OPEN (testing recovery)\")\n            else:\n                raise RuntimeError(\"Circuit breaker is OPEN. Agent is failing.\")\n        \n        try:\n            result = await agent_func(*args, **kwargs)\n            if self.state == \"HALF_OPEN\":\n                self.state = \"CLOSED\"\n                self.failure_count = 0\n                logger.info(\"[CIRCUIT_BREAKER] Recovery successful, transitioning to CLOSED\")\n            return result\n        except Exception as e:\n            self.failure_count += 1\n            self.last_failure_time = asyncio.get_event_loop().time()\n            if self.failure_count >= self.failure_threshold:\n                self.state = \"OPEN\"\n                logger.error(f\"[CIRCUIT_BREAKER] Failure threshold reached. Circuit OPEN.\")\n            raise\n\n\nclass AdvancedAgent:\n    \"\"\"Agent with async execution, circuit breaker, and retry policies.\"\"\"\n    def __init__(self",
+      "agent_id": "str",
+      "agent_type": "str):\n        self.agent_id = agent_id\n        self.agent_type = agent_type\n        self.circuit_breaker = CircuitBreaker(failure_threshold=3)\n        self.retry_policy = RetryPolicy(max_retries=2, base_delay=0.5)\n        self.execution_count = 0\n\n    async def execute(self",
+      "state": "dict",
+      "task_input": "dict) -> dict:\n        \"\"\"Async execution with safety guards.\"\"\"\n        # Wrap with circuit breaker and retry\n        return await self.circuit_breaker.call(\n            self.retry_policy.execute_with_retry,\n            self._execute_core,\n            state,\n            task_input\n        )\n\n    async def _execute_core(self",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "state": "dict",
+      "task_input": "dict) -> dict:\n        \"\"\"Core agent logic (async).\"\"\"\n        self.execution_count += 1\n        logger.info(f\"[AGENT:{self.agent_id}] Executing (attempt #{self.execution_count})\")\n        \n        # Simulate async I/O (e.g., calling external API)\n        await asyncio.sleep(0.1)\n        \n        # Simulate occasional failure for demo\n        import random\n        if random.random() < 0.15:  # 15% failure rate\n            raise RuntimeError(f\"Agent {self.agent_id} encountered error during execution\")\n        \n        # Return simulated output\n        return {\n            \"agent_id\": self.agent_id,\n            \"status\": \"success\",\n            \"output\": {\"batsman_name\": \"Rohit Sharma\", \"runs\": random.randint(20, 100)},\n        }\n\n\nclass AdvancedOrchestrator:\n    \"\"\"Orchestrator with async execution, persistence, and recovery.\"\"\"\n    def __init__(self):\n        self.state_store = StateStore()\n        self.agents = {\n            \"specialist_1\": AdvancedAgent(\"specialist_1\", \"batter\"),\n            \"specialist_2\": AdvancedAgent(\"specialist_2\", \"batter\"),\n            \"validator\": AdvancedAgent(\"validator\", \"validator\"),\n        }\n        self.execution_log = []\n\n    async def orchestrate_workflow(self",
+      "match_id": "str",
+      "num_tasks": "int = 5):\n        \"\"\"Orchestrate async workflow with failure handling and state persistence.\"\"\"\n        logger.info(f\"\\n{'='*80}\")\n        logger.info(f\"ADVANCED WORKFLOW: {match_id}\")\n        logger.info(f\"{'='*80}\\n\")\n        \n        # Initialize state\n        self.state_store.begin_transaction()\n        self.state_store.commit_transaction({\n            \"match_id\": match_id,\n            \"team\": \"India\",\n            \"runs\": 0,\n            \"wickets\": 0,\n            \"overs\": 0.0,\n        })\n        \n        # Execute tasks asynchronously\n        tasks = []\n        for i in range(num_tasks):\n            agent_type = \"specialist_1\" if i % 2 == 0 else \"specialist_2\"\n            task = asyncio.create_task(\n                self._execute_single_task(\n                    match_id,\n                    f\"task_{i + 1}\",\n                    agent_type\n                )\n            )\n            tasks.append(task)\n        \n        # Wait for all tasks (with exception handling)\n        results = await asyncio.gather(*tasks, return_exceptions=True)\n        \n        # Process results\n        for i, result in enumerate(results):\n            if isinstance(result, Exception):\n                logger.error(f\"Task {i + 1} failed with exception: {result}\")\n                # Attempt recovery via replay\n                logger.info(\"Attempting recovery via state log replay...\")\n                recovered_state = self.state_store.replay_from_log()\n                logger.info(f\"Recovered state: {recovered_state}\")\n            else:\n                logger.info(f\"Task {i + 1} result: {result}\")\n        \n        logger.info(f\"\\nFinal state: {self.state_store.read()}\")\n        logger.info(f\"Event log entries: {len(self.state_store.state_log)}\")\n        logger.info(f\"Execution log: {len(self.execution_log)} tasks tracked\")\n\n    async def _execute_single_task(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "match_id": "str",
+      "task_id": "str",
+      "agent_type": "str):\n        \"\"\"Execute a single task with transaction and state update.\"\"\"\n        logger.info(f\"[TASK:{task_id}] Starting on agent {agent_type}\")\n        \n        try:\n            # Read current state\n            state_snapshot = self.state_store.read()\n            logger.info(f\"[TASK:{task_id}] State snapshot: {state_snapshot}\")\n            \n            # Execute agent\n            agent = self.agents[agent_type]\n            result = await agent.execute(state_snapshot, {})\n            \n            # Begin transaction for state update\n            self.state_store.begin_transaction()\n            \n            # Update state based on result\n            if result[\"status\"] == \"success\":\n                new_runs = state_snapshot.get(\"runs\", 0) + result[\"output\"].get(\"runs\", 0)\n                self.state_store.commit_transaction({\"runs\": new_runs})\n                logger.info(f\"[TASK:{task_id}] State committed: runs={new_runs}\")\n            \n            # Log execution\n            self.execution_log.append({\n                \"task_id\": task_id,\n                \"agent_type\": agent_type,\n                \"status\": \"success\",\n                \"result\": result,\n            })\n            \n            return result\n        \n        except Exception as e:\n            logger.error(f\"[TASK:{task_id}] Failed: {e}\")\n            self.state_store.rollback_transaction()\n            self.execution_log.append({\n                \"task_id\": task_id,\n                \"agent_type\": agent_type,\n                \"status\": \"failed\",\n                \"error\": str(e),\n            })\n            raise\n\n\nasync def main():\n    \"\"\"Run advanced workflow orchestration with async agents.\"\"\"\n    orchestrator = AdvancedOrchestrator()\n    await orchestrator.orchestrate_workflow(\"IND_vs_AUSTRALIA_Test_2024\", num_tasks=8)\n\n\nif __name__ == \"__main__\":\n    asyncio.run(main())",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "info_box",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}

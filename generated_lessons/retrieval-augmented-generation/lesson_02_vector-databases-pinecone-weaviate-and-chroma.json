@@ -1,0 +1,313 @@
+{
+  "lessonId": "retrieval-augmented-generation-02",
+  "title": "Vector Databases: Pinecone, Weaviate, and Chroma",
+  "type": "reading",
+  "topicName": "Retrieval-Augmented Generation",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In advanced Retrieval-Augmented Generation (RAG) systems, the third critical phase focuses on query optimization, ranking refinement, and managing the complete end-to-end pipeline under production constraints. While Parts 1 and 2 established retrieval mechanisms and initial ranking strategies, Part 3 addresses the reality that naive RAG systems suffer from catastrophic failure modes: retrieved documents may be stale, ranking signals may contradict semantic relevance, latency may balloon under concurrent load, and the fusion of retrieved context with generation can produce hallucinations or inconsistent outputs. This lesson examines how production RAG systems handle query expansion to broaden retrieval coverage, implement multi-stage ranking pipelines that combine BM25, dense embeddings, and learned rerankers, manage trade-offs between retrieval breadth and generation quality, and implement feedback loops that continuously refine the system. The stakes are high: a financial institution's RAG-powered compliance chatbot retrieving outdated regulations incurs regulatory fines; a customer support RAG hallucinating warranty terms destroys trust; a medical RAG system returning irrelevant documents delays diagnosis. Understanding these advanced mechanisms is essential for deploying RAG systems that remain accurate, responsive, and trustworthy at scale.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider a Test match between India and Australia where Virat Kohli is batting in the fourth innings against Pat Cummins. Before each delivery, Cummins and his captain Steve Smith conduct a comprehensive analysis—they review Kohli's recent scoring patterns (query expansion), check the field placements against historical data (multi-stage ranking), adjust the bowler's position based on wind conditions (latency management), and prepare backup strategies if the initial plan fails (feedback loops). Just as Cummins must synthesize multiple information sources—Kohli's batting average against short balls, his performance in previous innings, the current pitch condition, and the match situation—a RAG system must integrate query expansion (broadening the retrieval net like considering multiple bowling angles), multi-stage ranking (prioritizing which information is most relevant, like checking which field placement is most effective), and real-time feedback (adjusting strategy based on how Kohli responds to each delivery). When the delivery is executed and Kohli either plays a shot or adjusts his stance, that outcome feeds back into the team's strategy—similarly, user feedback on RAG outputs trains the reranker and refines future queries. This parallel reveals that advanced RAG isn't just about retrieving documents; it's about orchestrating multiple decision-making layers in real-time to handle uncertainty, adapt to changing conditions, and maintain performance under pressure.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Query Expansion & Reformulation",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Query expansion is the process of augmenting the original user query with semantically equivalent or complementary terms, paraphrases, and hypothetical document passages to increase recall in the retrieval stage. A user asking 'How do I fix a leaky faucet?' may not retrieve documents written as 'Repairing dripping taps' or 'Water fixture maintenance'—vocabularies diverge. Query expansion bridges this gap through multiple techniques: synonym generation (replacing 'faucet' with 'tap', 'fixture', 'valve'), query paraphrasing (rephrasing to 'What steps repair a dripping faucet?'), pseudo-relevance feedback (assuming the top-k initially retrieved documents are relevant and extracting expansion terms from them), and most recently, hypothetical document embeddings (HyDE) where a language model generates what a relevant document might look like and retrieves based on that embedding. Each expansion variant is then used to query the retriever independently, and results are merged through union, intersection, or learned fusion weights. The rationale is simple: recall is a prerequisite for relevance—if a truly relevant document is never retrieved, no amount of ranking can recover it. In production systems, query expansion increases computational cost linearly with the number of expansions, but modern implementations batch these queries or use approximate similarity search to manage latency. The trade-off is explicit: broader retrieval (more documents fetched) versus narrower, more confident retrieval (fewer documents but higher precision). Advanced RAG systems learn which queries benefit most from expansion (e.g., technical queries expand more effectively than entity-specific queries) and dynamically decide expansion depth per request.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma preparing to face a tricky spinner like Nathan Lyon in an ODI. Before stepping into the crease, Rohit's batting coach reviews multiple angles: How does Rohit score against leg-spinners when the ball is pitched outside off-stump? (expansion variant 1) How does he play short-pitched deliveries from off-spinners? (expansion variant 2) What were his scores in previous matches against Lyon at the MCG? (pseudo-relevance feedback from past innings). Each angle is a 'query expansion' of the core question 'How do I succeed against Lyon today?' The coach doesn't rely on a single analysis—instead, they gather multiple perspectives, merge insights from all variants, and weight each one based on relevance to today's specific conditions (pitch type, weather, match situation). Just as Rohit's preparation broadens his mental retrieval of applicable techniques from his memory, a query expansion system broadens retrieval coverage by asking the document store multiple formulations of the same information need. The insight here is crucial: the original user query is rarely the optimal formulation for search—it's typically a shorthand expression of a much richer information need. Expansion makes that richness explicit.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Multi-Stage Ranking & Reranking",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Multi-stage ranking involves applying progressively more sophisticated and computationally expensive ranking models in sequence, each filtering the candidate set passed to the next stage. The motivation is efficiency: applying a cross-encoder (fine-tuned transformer model that jointly scores a query-document pair) to all millions of documents in a corpus is prohibitively expensive. Instead, a typical pipeline resembles: Stage 1 (Retrieval) uses fast approximate nearest neighbor search or BM25 to fetch top-1000 candidates in milliseconds. Stage 2 (Light Ranking) applies a bi-encoder model (dual-tower embedding approach) to rerank those 1000 to top-100, scoring each pair independently at roughly 100-200 documents per second. Stage 3 (Heavy Ranking) applies a cross-encoder fine-tuned on clicked query-document pairs or relevance labels to rerank top-100 to top-10, scoring at 5-10 documents per second. Stage 4 (Optional: Learning-to-Rank) may apply a LambdaMART or neural LTR model that combines dozens of signals (document freshness, authority score, user engagement signals, semantic similarity, term frequency) into a learned ranking score. Each stage exploits a fundamental asymmetry: high recall is cheap (simple models can fetch thousands of candidates), high precision is expensive (sophisticated models require detailed analysis). By dividing labor across stages, the system achieves both efficiency and effectiveness. The ranking scores must be thoughtfully normalized between stages—a Stage 1 BM25 score of 15 is not directly comparable to a Stage 3 cross-encoder score of 0.87. Production systems either calibrate scores to a standard scale or apply learned fusion weights. Furthermore, multi-stage ranking introduces the risk of 'ranking collapse' where Stage 1 filters out relevant documents that no subsequent stage can recover; careful tuning of stage thresholds is essential.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider the Indian Premier League auction where franchise scouts identify overseas fast bowlers to buy. The process has multiple stages: Stage 1 (Initial Screening) scouts watch highlight reels and economy rates across all available players—within hours, they filter 200 candidates down to 50 based on cost and basic metrics. Stage 2 (Light Analysis) team analysts review video footage of the 50 to assess bowling accuracy, variations, and fitness—within a day, this reduces to 15 serious contenders. Stage 3 (Heavy Analysis) the head coach and captain watch full match footage, conduct live video interviews, and check injury reports—this intensive process identifies the top 3-4 final targets. Stage 4 (Auction Intelligence) during the auction itself, real-time information about other franchises' bidding strategies and remaining budget feeds into dynamic decision-making, narrowing to 1-2 actual purchases. Each stage is progressively more expensive in time and expert attention, but each filters the candidate set intelligently—Stage 1 wouldn't directly score a bowler as 'suitable' or 'unsuitable', but rather passes a large candidate set to Stage 2. Critically, if Stage 1 filters out a bowler (perhaps incorrectly discarding him as 'too expensive'), Stage 2 never sees him; this is ranking collapse and must be prevented by setting Stage 1 thresholds conservatively to maintain recall. The multi-stage approach mirrors RAG's ranking pipeline: coarse filters (BM25) are fast and broad, fine-grained analysis (cross-encoders) is slow but deep, and the stages must be calibrated so that truly relevant bowlers—or documents—are never prematurely eliminated.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Dense Retrieval vs. Sparse Retrieval Fusion",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Dense retrieval uses learned embeddings (vectors) to find semantically similar documents, while sparse retrieval relies on term matching (BM25, TF-IDF). Neither approach dominates universally: dense retrieval excels at semantic paraphrases ('How do I repair a faucet?' matches 'Fixing dripping taps') and captures syntactic variation, but fails catastrophically on rare entities and exact-match scenarios; sparse retrieval excels on specific terminology, numbers, and exact phrases but cannot bridge semantic gaps. Advanced RAG systems employ fusion strategies that combine both signals. Reciprocal Rank Fusion (RRF) is a simple, parameter-free method: if dense retrieval ranks document D at position 3 and sparse retrieval ranks it at position 5, RRF computes a combined score inversely proportional to ranks: score = 1/(k+3) + 1/(k+5) where k is a constant (typically 60). Learned fusion applies a trained model to predict the optimal weight for each signal—this requires labeled relevance data but adapts to specific domains and query types. Hybrid search systems maintain separate dense and sparse indices and execute both paths concurrently, a technique used by Pinecone, Weaviate, and Elasticsearch. The retriever output is a union of both methods' results, potentially deduplicated. The fusion must account for distribution differences: a dense similarity score of 0.87 means something very different than a BM25 score of 42. Modern systems apply normalization (min-max scaling to [0, 1]) or learned calibration before fusion. A critical insight is that dense and sparse signals capture orthogonal information: dense models learn semantic patterns from pre-training, while sparse signals encode linguistic structure that is task-agnostic. Fusion leverages both views of relevance, improving both recall (retrieving more correct documents) and precision (downranking irrelevant documents that match only by chance).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Picture Jasprit Bumrah preparing to bowl in a T20 match against Aaron Finch. Bumrah's preparation combines two independent assessment methods: Dense Scouting (reviewing video analysis of Finch's recent batting patterns, his footwork against pace, his weakness to yorkers—a learned, semantic understanding of his batting style built from observation) and Sparse Scouting (checking Finch's hard statistics: his T20 career average, runs scored in the last 10 matches, his economy rate against specific bowlers—exact numerical data without interpretation). Before bowling, Bumrah and captain Rohit fuse these signals: Finch's recent videos show he's struggling against short balls (dense signal suggests a specific strategy), but his last-10-matches statistics show he's been aggressive against short-pitched deliveries in powerplay (sparse signal contradicts dense). They weight both: the video analysis gets higher weight because it's recent context (learned fusion), but the statistics can't be ignored because they're grounded in actual performance (sparse ground truth). They might decide on a mixed approach: bowl a mix of yorkers and short balls, weighting Finch's semantic weakness (footwork deficiency) more heavily than his numerical aggregate stats (which don't account for recent form). Each signal alone would be insufficient—video alone could miss that Finch's aggregate stats show he's actually strong against pace, and stats alone can't detect subtle footwork improvements. This mirrors dense-sparse fusion in RAG: dense embeddings capture 'why' something is relevant (semantic similarity), while BM25 captures 'what' matches exactly (linguistic structure). Fusion leverages both views, achieving better retrieval.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Context Window Management & Token Budgeting",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Language models have finite context windows (GPT-4 allows 8K or 128K tokens, Claude 3.5 allows 200K tokens). In RAG systems, the context window must accommodate: the original user query, system prompt/instructions, retrieved document passages, chat history (if conversational), and space for the model to generate a response. Token budgeting is the process of strategically allocating this finite capacity. A naive approach—concatenating all top-k retrieved documents until context is exhausted—often wastes tokens on irrelevant passages at the end and fails to give the model room to reason. Advanced strategies employ several techniques: Passage Selection (choosing only the most relevant passages that fit the budget), Passage Compression (summarizing or compressing passages to reduce token count while preserving information), Lost-in-the-Middle Effects (research shows language models attend poorly to information in the middle of context; thus, the highest-ranked passages should be placed at the beginning or end, with lower-ranked passages in the middle), and Dynamic Budgeting (allocating more tokens to complex queries and less to simple ones). A system might reserve 30% of tokens for query+system prompt, 50% for context passages, and 20% for generation headroom. When retrieving documents, the system computes a cumulative token count and stops adding documents when adding the next one would exceed budget. Furthermore, the quality of the generation degrades if the model lacks space to generate—a 100-token budget for generation often yields truncated, low-quality responses. Some systems use iterative retrieval, where if the first generation is poor (detected via confidence scoring or explicit user feedback), they retrieve additional documents and regenerate. This adds latency but improves quality. The interplay between retrieval quantity and generation quality is nonlinear: retrieving 20 relevant passages with 500 tokens for generation often outperforms 50 passages with 100 tokens for generation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli preparing to bat in the final Test match of a series, with access to 8 hours of playing time (the context window). Before stepping onto the field, Kohli and his coaching staff must budget that 8 hours across multiple activities: warming up and getting into rhythm (system prompt/query), reviewing the opposition's bowlers and their recent form (document context), adjusting his technique if early dismissals warrant changes (regeneration with new context), and attempting to score runs and build an innings (actual generation/response). They cannot spend all 8 hours reviewing (excessive retrieved context) because Kohli needs actual time to bat; conversely, they cannot spend only 30 minutes reviewing because facing unfamiliar bowling variations would lead to poor shots. The optimal allocation might be 1 hour of review (passage selection), 6.5 hours of batting (generation with ample reasoning space), and 0.5 hours for in-innings adjustments (iterative retrieval if Kohli's approach isn't working). Moreover, not all information is equally useful—a detailed analysis of Nathan Lyon's bowling in the powerplay (lost-in-the-middle effect) might be less critical than understanding his variations in death overs. Kohli's team prioritizes the most impactful insights and compresses less critical information to stay within the 8-hour budget. If information from multiple sources—recent matches, pitch conditions, weather forecasts—all compete for Kohli's mental bandwidth, strategic allocation ensures the most relevant insights (highest-ranked documents) receive focus. This directly parallels context window management: finite capacity demands strategic allocation, and the quality of the outcome (Kohli's innings or the RAG response) depends not just on information quantity but on how thoughtfully that information is ordered and budgeted.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import os\nfrom typing import List, Dict, Tuple\nfrom dataclasses import dataclass\nimport hashlib\n\n# Simulated dense and sparse retrievers for cricket knowledge base\n@dataclass\nclass CricketMatch:\n    \"\"\"Represents a cricket match document.\"\"\"\n    match_id: str\n    teams: str\n    format: str\n    description: str\n    token_count: int\n    relevance_signal: str\n\n    def __hash__(self):\n        return hash(self.match_id)\n\n\nclass DenseRetriever:\n    \"\"\"Simulates dense embedding-based retrieval (semantic matching).\"\"\"\n    def __init__(self):\n        # Simulated cricket match documents with semantic relevance\n        self.documents = [\n            CricketMatch(\"m1\", \"India vs Australia\", \"Test\", \"Virat Kohli scored 150 in difficult conditions\", 200, \"semantic\"),\n            CricketMatch(\"m2\", \"India vs England\", \"ODI\", \"Rohit Sharma hit 8 fours in powerplay\", 180, \"semantic\"),\n            CricketMatch(\"m3\", \"India vs Pakistan\", \"T20\", \"Jasprit Bumrah took 2/28 with excellent death bowling\", 160, \"semantic\"),\n            CricketMatch(\"m4\", \"CSK vs MI\", \"IPL\", \"MS Dhoni's captaincy led to unexpected win\", 170, \"sparse\"),\n        ]\n\n    def retrieve(self",
+      "query": "str",
+      "top_k": "int = 3) -> List[Tuple[CricketMatch, float]]:\n        \"\"\"Retrieve documents using dense (semantic) similarity.\"\"\"\n        # Simulate semantic matching scores\n        scores = []\n        for doc in self.documents:\n            if \"Virat\" in query and doc.match_id == \"m1\":\n                scores.append((doc, 0.92))\n            elif \"Rohit\" in query and doc.match_id == \"m2\":\n                scores.append((doc, 0.89))\n            elif \"Bumrah\" in query and doc.match_id == \"m3\":\n                scores.append((doc, 0.88))\n            else:\n                scores.append((doc, 0.45))\n        return sorted(scores, key=lambda x: x[1], reverse=True)[:top_k]\n\n\nclass SparseRetriever:\n    \"\"\"Simulates BM25-based retrieval (term matching).\"\"\"\n    def __init__(self):\n        self.documents = [\n            CricketMatch(\"m1\", \"India vs Australia\", \"Test\", \"Virat Kohli scored 150 in difficult conditions\", 200, \"semantic\"),\n            CricketMatch(\"m2\", \"India vs England\", \"ODI\", \"Rohit Sharma hit 8 fours in powerplay\", 180, \"semantic\"),\n            CricketMatch(\"m3\", \"India vs Pakistan\", \"T20\", \"Jasprit Bumrah took 2/28 with excellent death bowling\", 160, \"semantic\"),\n            CricketMatch(\"m4\", \"CSK vs MI\", \"IPL\", \"MS Dhoni's captaincy led to unexpected win\", 170, \"sparse\"),\n        ]\n\n    def retrieve(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "top_k": "int = 3) -> List[Tuple[CricketMatch, float]]:\n        \"\"\"Retrieve documents using sparse (BM25) similarity.\"\"\"\n        # Simulate BM25 term matching scores\n        scores = []\n        for doc in self.documents:\n            score = 0\n            if \"Kohli\" in query and \"Kohli\" in doc.description:\n                score += 25\n            if \"Sharma\" in query and \"Sharma\" in doc.description:\n                score += 25\n            if \"Bumrah\" in query and \"Bumrah\" in doc.description:\n                score += 25\n            if \"powerplay\" in query and \"powerplay\" in doc.description:\n                score += 15\n            if score == 0:\n                score = 5  # Default low score for non-matching\n            scores.append((doc, float(score)))\n        return sorted(scores, key=lambda x: x[1], reverse=True)[:top_k]\n\n\nclass MultiStageRanker:\n    \"\"\"Implements multi-stage ranking: dense -> sparse -> fusion -> cross-encoder.\"\"\"\n    def __init__(self",
+      "dense_retriever": "DenseRetriever",
+      "sparse_retriever": "SparseRetriever):\n        self.dense_retriever = dense_retriever\n        self.sparse_retriever = sparse_retriever\n\n    def reciprocal_rank_fusion(self",
+      "dense_results": "List[Tuple[CricketMatch, float]], \n                                sparse_results: List[Tuple[CricketMatch, float]], \n                                k: int = 60) -> List[Tuple[CricketMatch, float]]:\n        \"\"\"Fuse dense and sparse rankings using Reciprocal Rank Fusion (RRF).\"\"\"\n        fusion_scores = {}\n        \n        # Add dense scores with RRF formula\n        for rank, (doc, score) in enumerate(dense_results, start=1):\n            if doc.match_id not in fusion_scores:\n                fusion_scores[doc.match_id] = (doc, 0.0)\n            doc_obj, current_score = fusion_scores[doc.match_id]\n            fusion_scores[doc.match_id] = (doc_obj, current_score + 1.0 / (k + rank))\n        \n        # Add sparse scores with RRF formula\n        for rank, (doc, score) in enumerate(sparse_results, start=1):\n            if doc.match_id not in fusion_scores:\n                fusion_scores[doc.match_id] = (doc, 0.0)\n            doc_obj, current_score = fusion_scores[doc.match_id]\n            fusion_scores[doc.match_id] = (doc_obj, current_score + 1.0 / (k + rank))\n        \n        # Sort by fused score\n        fused = sorted(fusion_scores.values(), key=lambda x: x[1], reverse=True)\n        return fused\n\n    def cross_encoder_rerank(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "candidates": "List[Tuple[CricketMatch, float]], \n                              top_k: int = 2) -> List[Tuple[CricketMatch, float]]:\n        \"\"\"Simulate cross-encoder reranking (Stage 3 heavy ranking).\"\"\"\n        # Simulate cross-encoder scoring (more accurate but slower)\n        reranked = []\n        for doc, fusion_score in candidates:\n            # Cross-encoder considers query-document interaction\n            cross_score = 0.0\n            if \"scoring\" in query.lower() and \"scored\" in doc.description.lower():\n                cross_score = 0.95\n            elif \"bowling\" in query.lower() and (\"bowling\" in doc.description.lower() or \"bowled\" in doc.description.lower()):\n                cross_score = 0.93\n            elif \"captaincy\" in query.lower() and \"captaincy\" in doc.description.lower():\n                cross_score = 0.91\n            else:\n                cross_score = fusion_score * 0.7  # Fallback: weight fusion score\n            reranked.append((doc, cross_score))\n        return sorted(reranked, key=lambda x: x[1], reverse=True)[:top_k]\n\n\nclass QueryExpander:\n    \"\"\"Expands user queries to improve recall.\"\"\"\n    def __init__(self):\n        self.expansions = {\n            \"Kohli\": [\"Virat Kohli\", \"Virat\", \"Kohli batting\"],\n            \"Bumrah\": [\"Jasprit Bumrah\", \"Bumrah bowling\", \"Bumrah death\"],\n            \"Sharma\": [\"Rohit Sharma\", \"Sharma batting\", \"Sharma powerplay\"],\n        }\n\n    def expand_query(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str) -> List[str]:\n        \"\"\"Generate query expansions.\"\"\"\n        expanded = [query]  # Original query\n        for keyword, variants in self.expansions.items():\n            if keyword in query:\n                expanded.extend(variants)\n        return expanded\n\n\nclass ContextWindowManager:\n    \"\"\"Manages context window allocation and token budgeting.\"\"\"\n    def __init__(self",
+      "total_tokens": "int = 4096):\n        self.total_tokens = total_tokens\n        self.system_prompt_tokens = 200\n        self.query_tokens = 100\n        self.generation_buffer = 500\n\n    def allocate_context(self",
+      "candidates": "List[Tuple[CricketMatch, float]]) -> List[CricketMatch]:\n        \"\"\"Allocate retrieved documents within token budget.\"\"\"\n        available_tokens = (self.total_tokens - self.system_prompt_tokens - \n                           self.query_tokens - self.generation_buffer)\n        \n        selected_docs = []\n        cumulative_tokens = 0\n        \n        # Sort by relevance (higher score first) to prioritize best documents\n        for doc, score in candidates:\n            if cumulative_tokens + doc.token_count <= available_tokens:\n                selected_docs.append(doc)\n                cumulative_tokens += doc.token_count\n            else:\n                break  # Stop when budget exceeded\n        \n        print(f\"\\n[Token Budget Report]\")\n        print(f\"  Total context window: {self.total_tokens} tokens\")\n        print(f\"  System prompt: {self.system_prompt_tokens} tokens\")\n        print(f\"  User query: {self.query_tokens} tokens\")\n        print(f\"  Generation buffer: {self.generation_buffer} tokens\")\n        print(f\"  Available for context: {available_tokens} tokens\")\n        print(f\"  Used for {len(selected_docs)} documents: {cumulative_tokens} tokens\")\n        print(f\"  Remaining buffer: {available_tokens - cumulative_tokens} tokens\")\n        \n        return selected_docs\n\n\nclass AdvancedRAGPipeline:\n    \"\"\"Complete RAG pipeline: query expansion -> retrieval -> fusion -> ranking -> context mgmt.\"\"\"\n    def __init__(self):\n        self.dense_retriever = DenseRetriever()\n        self.sparse_retriever = SparseRetriever()\n        self.ranker = MultiStageRanker(self.dense_retriever, self.sparse_retriever)\n        self.query_expander = QueryExpander()\n        self.context_manager = ContextWindowManager(total_tokens=4096)\n\n    def process_query(self",
+      "user_query": "str) -> Dict:\n        \"\"\"Execute complete RAG pipeline.\"\"\"\n        print(f\"\\n{'='*70}\")\n        print(f\"USER QUERY: {user_query}\")\n        print(f\"{'='*70}\")\n        \n        # Stage 1: Query Expansion\n        print(\"\\n[Stage 1: Query Expansion]\")\n        expanded_queries = self.query_expander.expand_query(user_query)\n        print(f\"  Original: {user_query}\")\n        print(f\"  Expanded variants: {expanded_queries[1:]}\")\n        \n        # Stage 2: Dense Retrieval (initial recall)\n        print(\"\\n[Stage 2: Dense Retrieval (Semantic)]\")\n        dense_results = self.dense_retriever.retrieve(user_query, top_k=3)\n        print(f\"  Top 3 dense results:\")\n        for doc, score in dense_results:\n            print(f\"    - {doc.match_id} ({doc.teams}): {score:.2f}\")\n        \n        # Stage 3: Sparse Retrieval (term matching)\n        print(\"\\n[Stage 3: Sparse Retrieval (BM25)]\")\n        sparse_results = self.sparse_retriever.retrieve(user_query, top_k=3)\n        print(f\"  Top 3 sparse results:\")\n        for doc, score in sparse_results:\n            print(f\"    - {doc.match_id} ({doc.teams}): {score:.1f}\")\n        \n        # Stage 4: Fusion (Reciprocal Rank Fusion)\n        print(\"\\n[Stage 4: Fusion (RRF)]\")\n        fused_results = self.ranker.reciprocal_rank_fusion(dense_results, sparse_results)\n        print(f\"  Top fused results (combining dense + sparse):\")\n        for doc, score in fused_results[:3]:\n            print(f\"    - {doc.match_id} ({doc.teams}): {score:.4f}\")\n        \n        # Stage 5: Cross-Encoder Reranking (heavy ranking)\n        print(\"\\n[Stage 5: Cross-Encoder Reranking]\")\n        reranked = self.ranker.cross_encoder_rerank(user_query, fused_results, top_k=2)\n        print(f\"  Top 2 after cross-encoder reranking:\")\n        for doc, score in reranked:\n            print(f\"    - {doc.match_id} ({doc.teams}): {score:.4f}\")\n        \n        # Stage 6: Context Window Management\n        print(\"\\n[Stage 6: Context Window Management]\")\n        final_docs = self.context_manager.allocate_context(reranked)\n        \n        # Stage 7: Generate response (simulated)\n        print(\"\\n[Stage 7: Generation]\")\n        response = f\"Based on retrieved cricket matches {[doc.match_id for doc in final_docs]}, \"\n        response += f\"here's the answer: {final_docs[0].description if final_docs else 'No documents retrieved.'}\"\n        print(f\"  Response: {response}\")\n        \n        return {\n            \"query\": user_query,\n            \"expanded_queries\": expanded_queries,\n            \"dense_results\": dense_results,\n            \"sparse_results\": sparse_results,\n            \"fused_results\": fused_results,\n            \"reranked_results\": reranked,\n            \"final_context_docs\": final_docs,\n            \"response\": response\n        }\n\n\n# Demonstration\nif __name__ == \"__main__\":\n    rag_pipeline = AdvancedRAGPipeline()\n    \n    # Test Query 1: Focus on batting\n    result1 = rag_pipeline.process_query(\"How did Kohli score runs in difficult conditions?\")\n    \n    # Test Query 2: Focus on bowling\n    result2 = rag_pipeline.process_query(\"What was Bumrah's bowling economy?\")\n    \n    # Test Query 3: Focus on batting partnerships\n    result3 = rag_pipeline.process_query(\"Sharma powerplay performance\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "This code demonstrates the complete advanced RAG pipeline. The pipeline begins with QueryExpander, which takes the user query 'How did Kohli score runs in difficult conditions?' and generates semantic variants ('Virat Kohli', 'Kohli batting'). Each variant flows through two parallel retrievers: DenseRetriever simulates semantic matching using embeddings (returning documents where Kohli's performance scores 0.92 similarity), while SparseRetriever simulates BM25 term matching (scoring documents with exact 'Kohli' mentions at 25 BM25 points). These independent result sets proceed to MultiStageRanker, which applies Reciprocal Rank Fusion—a parameter-free fusion method that assigns higher combined scores to documents ranked high by either signal. If the dense retriever ranks match m1 first and sparse ranks it third, the RRF formula 1/(60+1) + 1/(60+3) yields a higher fused score than a document ranked poorly by both. The ranker then applies a cross-encoder reranking step (Stage 5), which simulates a heavy transformer model that jointly analyzes the query-document pair and assigns more nuanced scores (0.95 for perfect semantic alignment). This stage filters the candidate set from 4 documents to the top 2, eliminating noise. Finally, ContextWindowManager applies token budgeting: it allocates the 4096-token context window across system prompt (200 tokens), user query (100 tokens), generation buffer (500 tokens), and remaining 3296 tokens for document context. It accumulates documents in order of relevance until adding the next document would exceed the budget, ensuring both retrieval quality and generation space. The output demonstrates runtime behavior: each stage emits its top-k results, showing score normalization and how different signals (dense: 0.92, sparse: 25, fused: 0.0167, cross-encoded: 0.95) evolve through the pipeline. This orchestration—expansion, parallel retrieval, fusion, heavy ranking, and context management—represents production RAG systems used at companies like OpenAI (ChatGPT with browsing), Google (Vertex AI Search), and Anthropic (Claude's long-context mode).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Under the hood, advanced RAG systems execute a carefully choreographed sequence of operations that spans latency budgets of typically 100-500 milliseconds per query. The runtime begins when a user query enters the system; query expansion happens in parallel—a separate language model (often a smaller, faster model than the generation model) is invoked to generate 3-5 query variants concurrently, adding 10-30ms. Concurrently, the query is encoded into a dense vector (using a bi-encoder like all-MiniLM-L6-v2 in ~5ms) and a sparse representation (BM25 inverted index lookup in <1ms). Dense retrieval then executes approximate nearest neighbor (ANN) search using algorithms like HNSW (Hierarchical Navigable Small World) or LSH (Locality-Sensitive Hashing) implemented in libraries like FAISS, Annoy, or Weaviate. These algorithms avoid brute-force similarity computation (O(n*d) where n is corpus size, d is embedding dimensionality) by constructing space-partitioning structures that prune the search space, achieving O(log n + k) complexity to retrieve top-k neighbors—in practice, retrieving top-1000 from a 1M-document corpus completes in 15-25ms. Sparse retrieval simultaneously executes BM25 scoring using inverted indices stored in search engines like Elasticsearch; the query terms are looked up in the index, and documents containing those terms are scored. Fusion of the two signals happens either at the database level (systems like Elasticsearch 8.0+ support hybrid search natively) or in application code (loading both result lists and applying RRF). The fused result list (typically 100-500 documents) is then fed to the reranker. A cross-encoder reranker processes each query-document pair through a transformer (e.g., a 3-layer or 12-layer BERT-based model fine-tuned on relevance labels). Cross-encoders are sequential, scoring one pair at a time, making them latency-sensitive; inference is typically outsourced to a batching service that groups multiple requests and executes them on GPU. Scoring 100 documents with a 12-layer cross-encoder requires roughly 100 forward passes, taking 50-100ms on modern GPUs when amortized across batch. Meanwhile, context window management executes synchronously: the top-k reranked documents are accumulated, their token counts computed via a fast tokenizer, and documents added greedily until budget is exhausted. LLM generation then begins, receiving the prompt formatted as: [system_prompt] [user_query] [document_contexts] [any_prior_conversation]. The generation model performs autoregressive decoding, producing tokens one at a time. In systems like GPT-4 with long context windows, generation latency scales with output length, not input length—a 100-document context requires roughly the same latency as a 5-document context, a critical property that makes dense retrieval practical at scale. Total end-to-end latency is typically 200-400ms, dominated by reranking (if synchronous) and generation. Performance optimization strategies include: caching query embeddings (if repeated queries occur), batching reranking requests to amortize GPU overhead, using smaller reranker models for high-latency-sensitive applications, and implementing early-stopping in retrieval (if the top-10 documents are all highly confident, stop searching). Distributed systems fan out queries to multiple retrieval shards in parallel and merge results, trading consistency for latency—a 1M-document corpus sharded across 10 machines processes each shard in parallel, achieving near-linear speedup. Memory consumption is dominated by index structures: a dense index of 1M documents with 384-dimensional embeddings (float32) consumes roughly 1.5GB (1M * 384 * 4 bytes); sparse inverted indices are more compact for small vocabularies but can explode with large, rare-heavy vocabularies. Modern systems use techniques like product quantization (PQ) to compress embeddings to 64 or 128 bits per vector, reducing memory to 256MB or 512MB at the cost of minor recall loss.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider a cricket commentary team during a live Test match between India and South Africa, where the lead commentator must deliver expert analysis within 30 seconds of each delivery. The operational flow under the hood resembles this production system. When a delivery is bowled, parallel processes begin: the lead commentator (query expansion) simultaneously considers 3-4 interpretations of what just happened ('Was it a good line-and-length delivery, or did it exploit the pitch?'), while the statistics analyst (dense retrieval) pulls up Babar Azam's previous innings against this bowling style from a constantly updated database (ANN index), and the research team (sparse retrieval) searches the match records for exact statistics—'How many times has Azam faced this bowler on similar pitches?'—in a traditional file system (inverted index). These parallel processes complete in ~10-15 seconds via optimized workflows: the statistics pull is fast because they've pre-organized data by bowler, player, and pitch (HNSW indexing), while the file search is fast because critical keywords are tagged and cached (BM25 inverted index). These two independent analyses are fused (Stage 4) by a senior analyst who weighs both the statistical pattern and the current-match context—Azam's stats say he's strong against pace, but today's pitch is seaming, so that general pattern is downweighted in favor of seam-specific performance. The fused insight then passes to a specialized tactical advisor (cross-encoder reranker) who takes 5 seconds to examine the fused recommendation in detail and assign a confidence score—'This insight is 95% relevant because it directly addresses Azam's weakness on seaming pitches today.' This high-confidence insight is then formatted into the commentary structure (context window management) and delivered to the lead commentator with 10 seconds remaining in the 30-second window. The commentator (generation model) uses those 10 seconds to articulate the insight conversationally and smoothly. The entire pipeline—parallel intelligence gathering, fusion, expert vetting, formatting, and delivery—completes within the hard deadline. If match conditions change dramatically (pitch deteriorates, new batter enters), the entire process restarts for the next delivery, but cached data structures (indices) ensure no re-computation of basics. This mirrors RAG's under-the-hood choreography: parallel subprocesses, cached indices for speed, sequential bottlenecks (reranking, generation) are carefully managed, and the system must deliver within latency budgets despite complexity.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import time\nimport random\nfrom typing import List, Tuple, Dict\nfrom dataclasses import dataclass, field\nfrom enum import Enum\n\n\nclass PipelineStage(Enum):\n    \"\"\"Pipeline execution stages with latency profiles.\"\"\"\n    QUERY_EXPANSION = \"query_expansion\"\n    DENSE_RETRIEVAL = \"dense_retrieval\"\n    SPARSE_RETRIEVAL = \"sparse_retrieval\"\n    FUSION = \"fusion\"\n    RERANKING = \"reranking\"\n    CONTEXT_MGMT = \"context_management\"\n    GENERATION = \"generation\"\n\n\n@dataclass\nclass LatencyProfile:\n    \"\"\"Tracks latency for each pipeline stage.\"\"\"\n    stage: PipelineStage\n    start_time: float = 0.0\n    end_time: float = 0.0\n    duration_ms: float = 0.0\n    memory_mb: float = 0.0\n\n    def __post_init__(self):\n        if self.start_time > 0 and self.end_time > 0:\n            self.duration_ms = (self.end_time - self.start_time) * 1000\n\n\n@dataclass\nclass RankingDocument:\n    \"\"\"Document with multi-stage ranking scores.\"\"\"\n    doc_id: str\n    player_name: str\n    match_context: str\n    dense_score: float = 0.0\n    sparse_score: float = 0.0\n    fusion_score: float = 0.0\n    cross_encoder_score: float = 0.0\n    stage_history: List[Tuple[str, float]] = field(default_factory=list)\n\n    def add_stage_score(self",
+      "stage_name": "str",
+      "score": "float):\n        \"\"\"Record score at each pipeline stage.\"\"\"\n        self.stage_history.append((stage_name, score))\n        if stage_name == \"dense\":\n            self.dense_score = score\n        elif stage_name == \"sparse\":\n            self.sparse_score = score\n        elif stage_name == \"fusion\":\n            self.fusion_score = score\n        elif stage_name == \"cross_encoder\":\n            self.cross_encoder_score = score\n\n\nclass HighPerformanceRAG:\n    \"\"\"Advanced RAG system optimized for latency and accuracy metrics.\"\"\"\n\n    def __init__(self",
+      "corpus_size": "int = 1_000_000",
+      "embedding_dim": "int = 384):\n        self.corpus_size = corpus_size\n        self.embedding_dim = embedding_dim\n        self.indices_memory_mb = (corpus_size * embedding_dim * 4) / (1024 * 1024)  # float32\n        self.latency_profiles: List[LatencyProfile] = []\n        self.cricket_documents = self._initialize_cricket_corpus()\n\n    def _initialize_cricket_corpus(self) -> List[RankingDocument]:\n        \"\"\"Initialize a small test corpus of cricket documents.\"\"\"\n        return [\n            RankingDocument(\"doc_1\", \"Virat Kohli\", \"Test vs Australia: Kohli scored 150 in difficult seaming conditions\"),\n            RankingDocument(\"doc_2\", \"Jasprit Bumrah\", \"T20 vs Pakistan: Bumrah bowled 0/25 in 4 overs with yorkers\"),\n            RankingDocument(\"doc_3\", \"Rohit Sharma\", \"ODI vs England: Sharma scored 120 in powerplay\"),\n            RankingDocument(\"doc_4\", \"KL Rahul\", \"Test vs South Africa: Rahul struggled against short ball\"),\n            RankingDocument(\"doc_5\", \"Hardik Pandya\", \"IPL: Pandya took 3/20 with excellent death bowling\"),\n        ]\n\n    def query_expansion_stage(self",
+      "query": "str) -> List[str]:\n        \"\"\"Stage 1: Query expansion with latency measurement.\"\"\"\n        start = time.time()\n        \n        # Simulate LLM-based expansion (5-20ms typical)\n        time.sleep(random.uniform(0.005, 0.020))  # 5-20ms\n        \n        expanded = [query]\n        if \"Kohli\" in query:\n            expanded.extend([\"Virat Kohli scoring\", \"Kohli batting technique\"])\n        if \"Bumrah\" in query:\n            expanded.extend([\"Jasprit Bumrah bowling\", \"Bumrah death overs\"])\n        \n        end = time.time()\n        profile = LatencyProfile(PipelineStage.QUERY_EXPANSION, start, end)\n        self.latency_profiles.append(profile)\n        return expanded\n\n    def dense_retrieval_stage(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "top_k": "int = 100) -> List[RankingDocument]:\n        \"\"\"Stage 2: Dense retrieval with ANN search simulation (15-25ms typical).\"\"\"\n        start = time.time()\n        \n        # Simulate HNSW ANN search (typically O(log n))\n        # For 1M docs, ANN takes ~15-25ms; brute force would take seconds\n        time.sleep(random.uniform(0.015, 0.025))\n        \n        # Score documents by semantic similarity\n        scored_docs = []\n        for doc in self.cricket_documents:\n            if \"Kohli\" in query and \"Kohli\" in doc.player_name:\n                score = 0.92\n            elif \"Bumrah\" in query and \"Bumrah\" in doc.player_name:\n                score = 0.88\n            elif \"Sharma\" in query and \"Sharma\" in doc.player_name:\n                score = 0.85\n            else:\n                score = random.uniform(0.3, 0.5)\n            doc.add_stage_score(\"dense\", score)\n            scored_docs.append((doc, score))\n        \n        end = time.time()\n        profile = LatencyProfile(PipelineStage.DENSE_RETRIEVAL, start, end)\n        self.latency_profiles.append(profile)\n        \n        # Simulated index memory\n        profile.memory_mb = self.indices_memory_mb\n        \n        return [doc for doc, _ in sorted(scored_docs, key=lambda x: x[1], reverse=True)][:top_k]\n\n    def sparse_retrieval_stage(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "top_k": "int = 100) -> List[RankingDocument]:\n        \"\"\"Stage 3: Sparse (BM25) retrieval using inverted indices (<5ms typical).\"\"\"\n        start = time.time()\n        \n        # Inverted index lookup is extremely fast (<1ms typically)\n        time.sleep(random.uniform(0.001, 0.005))\n        \n        scored_docs = []\n        for doc in self.cricket_documents:\n            score = 0.0\n            # BM25 term matching\n            if \"Kohli\" in query and \"Kohli\" in doc.player_name:\n                score += 25.0\n            if \"scoring\" in query and \"scored\" in doc.match_context:\n                score += 15.0\n            if \"bowling\" in query and \"bowled\" in doc.match_context:\n                score += 20.0\n            if score == 0:\n                score = random.uniform(2.0, 8.0)\n            doc.add_stage_score(\"sparse\", score)\n            scored_docs.append((doc, score))\n        \n        end = time.time()\n        profile = LatencyProfile(PipelineStage.SPARSE_RETRIEVAL, start, end)\n        self.latency_profiles.append(profile)\n        \n        return [doc for doc, _ in sorted(scored_docs, key=lambda x: x[1], reverse=True)][:top_k]\n\n    def fusion_stage(self",
+      "dense_results": "List[RankingDocument], \n                     sparse_results: List[RankingDocument]) -> List[RankingDocument]:\n        \"\"\"Stage 4: Fusion with RRF (negligible latency, <1ms).\"\"\"\n        start = time.time()\n        \n        fusion_scores = {}\n        k = 60  # RRF constant\n        \n        # Process dense results\n        for rank, doc in enumerate(dense_results, start=1):\n            if doc.doc_id not in fusion_scores:\n                fusion_scores[doc.doc_id] = (doc, 0.0)\n            _, current = fusion_scores[doc.doc_id]\n            fusion_scores[doc.doc_id] = (doc, current + 1.0 / (k + rank))\n        \n        # Process sparse results\n        for rank, doc in enumerate(sparse_results, start=1):\n            if doc.doc_id not in fusion_scores:\n                fusion_scores[doc.doc_id] = (doc, 0.0)\n            _, current = fusion_scores[doc.doc_id]\n            fusion_scores[doc.doc_id] = (doc, current + 1.0 / (k + rank))\n        \n        fused = sorted(fusion_scores.values(), key=lambda x: x[1], reverse=True)\n        for doc, score in fused:\n            doc.add_stage_score(\"fusion\", score)\n        \n        end = time.time()\n        profile = LatencyProfile(PipelineStage.FUSION, start, end)\n        self.latency_profiles.append(profile)\n        \n        return [doc for doc, _ in fused]\n\n    def cross_encoder_reranking_stage(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "candidates": "List[RankingDocument], \n                                      top_k: int = 10) -> List[RankingDocument]:\n        \"\"\"Stage 5: Cross-encoder reranking (50-100ms for 100 docs on GPU).\"\"\"\n        start = time.time()\n        \n        # Simulate GPU-batched cross-encoder inference\n        # Typical: 12-layer transformer, 100 docs/batch, ~100ms per batch\n        num_docs = len(candidates)\n        if num_docs <= 10:\n            sleep_time = 0.020  # 20ms for small batch\n        elif num_docs <= 50:\n            sleep_time = 0.050  # 50ms for medium batch\n        else:\n            sleep_time = 0.100  # 100ms for large batch\n        time.sleep(random.uniform(sleep_time * 0.8, sleep_time * 1.2))\n        \n        reranked = []\n        for doc in candidates:\n            # Cross-encoder assigns detailed relevance score\n            if \"Kohli\" in query and \"Kohli\" in doc.player_name:\n                score = 0.95\n            elif \"Bumrah\" in query and \"Bumrah\" in doc.player_name:\n                score = 0.93\n            else:\n                score = doc.fusion_score * 0.75\n            doc.add_stage_score(\"cross_encoder\", score)\n            reranked.append(doc)\n        \n        end = time.time()\n        profile = LatencyProfile(PipelineStage.RERANKING, start, end)\n        # GPU memory for batch inference\n        profile.memory_mb = 2048  # Typical GPU memory for 12-layer transformer\n        self.latency_profiles.append(profile)\n        \n        return sorted(reranked, key=lambda doc: doc.cross_encoder_score, reverse=True)[:top_k]\n\n    def context_management_stage(self",
+      "docs": "List[RankingDocument], \n                                 context_window: int = 4096) -> List[RankingDocument]:\n        \"\"\"Stage 6: Token budgeting and context allocation.\"\"\"\n        start = time.time()\n        \n        # Token calculation (simplified: ~4 tokens per document on average)\n        system_prompt_tokens = 200\n        query_tokens = 100\n        generation_buffer = 500\n        available = context_window - system_prompt_tokens - query_tokens - generation_buffer\n        \n        selected = []\n        used_tokens = 0\n        tokens_per_doc = 150  # Average\n        \n        for doc in docs:\n            if used_tokens + tokens_per_doc <= available:\n                selected.append(doc)\n                used_tokens += tokens_per_doc\n        \n        time.sleep(0.005)  # Negligible latency for token counting\n        \n        end = time.time()\n        profile = LatencyProfile(PipelineStage.CONTEXT_MGMT, start, end)\n        self.latency_profiles.append(profile)\n        \n        return selected\n\n    def generation_stage(self",
+      "context": "List[RankingDocument]",
+      "max_tokens": "int = 100) -> str:\n        \"\"\"Stage 7: LLM generation (typically 1-2 seconds).\"\"\"\n        start = time.time()\n        \n        # Simulate autoregressive token generation\n        # Typical: 50-100 tokens/second for modern GPUs\n        # Linear with output length, not input length\n        tokens_per_second = 75\n        generation_latency = max_tokens / tokens_per_second\n        time.sleep(min(generation_latency, 2.0))  # Cap at 2 seconds for demo\n        \n        response = f\"Based on {len(context)} retrieved cricket documents: \"\n        if context:\n            response += context[0].match_context\n        \n        end = time.time()\n        profile = LatencyProfile(PipelineStage.GENERATION, start, end)\n        # GPU memory for generation\n        profile.memory_mb = 4096  # Typical for 7B-13B model\n        self.latency_profiles.append(profile)\n        \n        return response\n\n    def run_complete_pipeline(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str) -> Dict:\n        \"\"\"Execute complete advanced RAG pipeline.\"\"\"\n        print(f\"\\n{'='*80}\")\n        print(f\"QUERY: {query}\")\n        print(f\"{'='*80}\")\n        \n        # Stage 1: Expansion\n        expanded = self.query_expansion_stage(query)\n        print(f\"\\n[1] Query Expansion ({self.latency_profiles[-1].duration_ms:.1f}ms)\")\n        print(f\"    Expanded to {len(expanded)} variants\")\n        \n        # Stages 2-3: Parallel retrieval\n        dense = self.dense_retrieval_stage(query, top_k=100)\n        sparse = self.sparse_retrieval_stage(query, top_k=100)\n        print(f\"\\n[2] Dense Retrieval ({self.latency_profiles[-2].duration_ms:.1f}ms)\")\n        print(f\"    Index memory: {self.latency_profiles[-2].memory_mb:.1f}MB\")\n        print(f\"[3] Sparse Retrieval ({self.latency_profiles[-1].duration_ms:.1f}ms)\")\n        \n        # Stage 4: Fusion\n        fused = self.fusion_stage(dense, sparse)\n        print(f\"\\n[4] Fusion/RRF ({self.latency_profiles[-1].duration_ms:.1f}ms)\")\n        print(f\"    Top result: {fused[0].player_name} (fusion_score: {fused[0].fusion_score:.4f})\")\n        \n        # Stage 5: Reranking\n        reranked = self.cross_encoder_reranking_stage(query, fused[:20], top_k=10)\n        print(f\"\\n[5] Cross-Encoder Reranking ({self.latency_profiles[-1].duration_ms:.1f}ms)\")\n        print(f\"    GPU memory: {self.latency_profiles[-1].memory_mb:.0f}MB\")\n        print(f\"    Top result: {reranked[0].player_name} (cross_encoder_score: {reranked[0].cross_encoder_score:.4f})\")\n        \n        # Stage 6: Context management\n        selected = self.context_management_stage(reranked, context_window=4096)\n        print(f\"\\n[6] Context Management ({self.latency_profiles[-1].duration_ms:.1f}ms)\")\n        print(f\"    Documents selected: {len(selected)}\")\n        \n        # Stage 7: Generation\n        response = self.generation_stage(selected, max_tokens=100)\n        gen_time = self.latency_profiles[-1].duration_ms\n        print(f\"\\n[7] Generation ({gen_time:.1f}ms)\")\n        print(f\"    GPU memory: {self.latency_profiles[-1].memory_mb:.0f}MB\")\n        print(f\"    Response: {response[:100]}...\")\n        \n        # Total latency analysis\n        total_latency = sum(p.duration_ms for p in self.latency_profiles)\n        print(f\"\\n{'='*80}\")\n        print(f\"TOTAL LATENCY: {total_latency:.1f}ms ({total_latency/1000:.2f}s)\")\n        print(f\"Pipeline breakdown:\")\n        for profile in self.latency_profiles:\n            pct = (profile.duration_ms / total_latency) * 100 if total_latency > 0 else 0\n            print(f\"  {profile.stage.value:20s}: {profile.duration_ms:7.1f}ms ({pct:5.1f}%)\")\n        print(f\"{'='*80}\\n\")\n        \n        return {\n            \"query\": query,\n            \"expanded_variants\": len(expanded),\n            \"dense_results\": len(dense),\n            \"sparse_results\": len(sparse),\n            \"fused_results\": len(fused),\n            \"reranked_results\": len(reranked),\n            \"final_context_docs\": len(selected),\n            \"response\": response,\n            \"total_latency_ms\": total_latency,\n            \"latency_profiles\": self.latency_profiles.copy()\n        }\n\n\nif __name__ == \"__main__\":\n    # Initialize high-performance RAG system\n    rag = HighPerformanceRAG(corpus_size=1_000_000, embedding_dim=384)\n    \n    # Test queries\n    queries = [\n        \"How did Kohli perform in difficult conditions?\",\n        \"What was Bumrah's bowling economy?\",\n        \"Sharma powerplay statistics\"\n    ]\n    \n    for query in queries:\n        result = rag.run_complete_pipeline(query)\n        rag.latency_profiles = []  # Reset for next query",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "info_box",
+      "content": "Pro Tip: In production RAG systems, query expansion and retrieval are often run in parallel rather than sequentially. While the language model expands the query (10-30ms), dense retrieval can simultaneously run against the original query using pre-built HNSW indices, and sparse retrieval can execute inverted index lookups. This parallelization overlaps latency phases: by the time expansion completes, retrieval results are already available. Additionally, reranking becomes the largest latency bottleneck in high-traffic systems; companies like OpenAI and Google deploy specialized serving infrastructure (LLM inference servers with batch scheduling) to achieve high throughput. Consider caching reranker results for identical or very similar queries—if the same query appears 100 times, recomputing cross-encoder scores is wasteful. Memcached or Redis can store (query_hash, top_k_reranked_docs) pairs with TTL, yielding millisecond-level latency for cache hits.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}
