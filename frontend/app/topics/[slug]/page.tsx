@@ -61,6 +61,57 @@ interface TopicDetail {
   lessons: Lesson[]
 }
 
+// ─── API → TopicDetail transform ──────────────────────────────────────────────
+
+function transformApiResponse(raw: any): TopicDetail {
+  const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+  const difficulty = (['Beginner','Intermediate','Advanced'] as Difficulty[])
+    .find(d => d.toLowerCase() === raw.difficulty?.toLowerCase()) ?? 'Intermediate'
+
+  const lessons: Lesson[] = (raw.lessons ?? []).map((l: any) => ({
+    id: l.id ?? String(l.orderIndex),
+    title: l.title ?? `Lesson ${l.orderIndex}`,
+    duration: `${l.durationMinutes ?? 15} min`,
+    type: (l.type as LessonType) ?? 'reading',
+    xp: l.xpReward ?? 50,
+    locked: false,
+  }))
+
+  const enrolled = raw.enrolledCount >= 1000
+    ? `${(raw.enrolledCount / 1000).toFixed(1)}K`
+    : String(raw.enrolledCount ?? 0)
+
+  const SLUG_ICON: Record<string, string> = {
+    javascript: 'JS', typescript: 'TS', python: 'PY', java: '☕', go: 'Go',
+    rust: '🦀', react: '⚛', nextjs: '▲', angular: '🅰', vuejs: '💚',
+    nodejs: '🟩', 'spring-boot': '🍃', django: '🐍', fastapi: '⚡',
+    docker: '🐳', kubernetes: '☸', aws: '☁', terraform: '🏗',
+    postgresql: '🐘', mongodb: '🍃', redis: '⚡', dsa: '🌳',
+    'system-design': '🏛', flutter: '🦋', 'react-native': '📱',
+    'ml-fundamentals': '📊', 'generative-ai': '🤖', rag: '🔍',
+    'ai-agents': '🤖', 'prompt-engineering': '✍',
+    'pytorch-deep-learning': '🔥', 'retrieval-augmented-generation': '🔍',
+    'ai-agents-agentic-workflows': '🤖', 'large-language-models': '🧠',
+    'python-for-ai-ml': 'PY',
+  }
+
+  return {
+    id: 0,
+    slug: raw.slug,
+    name: raw.name,
+    category: raw.category ? capFirst(raw.category.replace(/-/g, ' ')) : 'Programming',
+    difficulty,
+    description: raw.description ?? '',
+    hours: raw.durationHours ?? 0,
+    rating: Number(raw.rating ?? 4.5).toFixed(1),
+    enrolled,
+    reviews: Math.floor((raw.enrolledCount ?? 0) / 8),
+    icon: SLUG_ICON[raw.slug] ?? '📚',
+    gradient: raw.imageGradient ?? 'from-purple-600 to-cyan-500',
+    lessons,
+  }
+}
+
 // ─── Fallback data ────────────────────────────────────────────────────────────
 
 function buildFallbackTopic(slug: string): TopicDetail {
@@ -195,8 +246,8 @@ export default function TopicDetailPage() {
       try {
         const res = await fetch(`${API_URL}/topics/${slug}`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data: TopicDetail = await res.json()
-        setTopic(data)
+        const raw = await res.json()
+        setTopic(transformApiResponse(raw))
       } catch {
         // API unavailable — use fallback mock data
         setTopic(buildFallbackTopic(slug))

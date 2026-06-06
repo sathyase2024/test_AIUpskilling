@@ -30,10 +30,17 @@ async function bootstrap() {
   );
 
   // ── CORS ─────────────────────────────────────────────────────────────────────
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  const origins = frontendUrl.split(',').map((o) => o.trim()).filter(Boolean);
+  const configured = (process.env.FRONTEND_URL || '')
+    .split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({
-    origin: origins.length ? origins : false,
+    origin: (origin, callback) => {
+      const allowed =
+        !origin ||
+        /^https?:\/\/localhost(:\d+)?$/.test(origin) ||
+        /^https:\/\/[a-z0-9-]+\.onrender\.com$/.test(origin) ||
+        configured.includes(origin);
+      callback(allowed ? null : new Error('CORS'), allowed);
+    },
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,

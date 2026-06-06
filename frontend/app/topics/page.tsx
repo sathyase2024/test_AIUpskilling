@@ -24,9 +24,96 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ApiTopicsResponse {
-  data: Topic[]
+  data: any[]
   total: number
   page: number
+}
+
+// ─── Gradient helpers (inline CSS avoids Tailwind purge for dynamic classes) ──
+
+const TC: Record<string, string> = {
+  'gray-700': '#374151', 'gray-900': '#111827',
+  'red-500': '#ef4444',  'red-600': '#dc2626',  'red-700': '#b91c1c',
+  'rose-400': '#fb7185', 'rose-600': '#e11d48', 'rose-700': '#be123c',
+  'orange-400': '#fb923c','orange-500': '#f97316','orange-600': '#ea580c',
+  'amber-500': '#f59e0b', 'amber-600': '#d97706',
+  'yellow-400': '#facc15','yellow-500': '#eab308','yellow-600': '#ca8a04',
+  'lime-600': '#65a30d',
+  'green-500': '#22c55e', 'green-600': '#16a34a', 'green-700': '#15803d',
+  'emerald-400': '#34d399','emerald-500': '#10b981','emerald-600': '#059669',
+  'teal-500': '#14b8a6',  'teal-600': '#0d9488',  'teal-700': '#0f766e',
+  'cyan-400': '#22d3ee',  'cyan-500': '#06b6d4',  'cyan-600': '#0891b2',
+  'sky-500': '#0ea5e9',
+  'blue-400': '#60a5fa',  'blue-500': '#3b82f6',  'blue-600': '#2563eb',
+  'blue-700': '#1d4ed8',  'blue-900': '#1e3a8a',
+  'indigo-500': '#6366f1','indigo-600': '#4f46e5',
+  'violet-500': '#8b5cf6',
+  'purple-500': '#a855f7','purple-600': '#9333ea','purple-700': '#7e22ce',
+  'fuchsia-500': '#d946ef','fuchsia-600': '#c026d3',
+  'pink-400': '#f472b6',  'pink-500': '#ec4899',  'pink-600': '#db2777',
+}
+
+function gradientBg(cls: string, dir = 'to right'): string {
+  const fromKey = cls.match(/from-([a-z]+-\d+)/)?.[1] ?? ''
+  const toKey   = cls.match(/\bto-([a-z]+-\d+)/)?.[1] ?? ''
+  const from = TC[fromKey] ?? '#7c3aed'
+  const to   = TC[toKey]   ?? '#06b6d4'
+  return `linear-gradient(${dir}, ${from}, ${to})`
+}
+
+// ─── API → Topic transform ─────────────────────────────────────────────────────
+
+const CAT_MAP: Record<string, Category> = {
+  programming: 'Programming', frontend: 'Frontend', backend: 'Backend',
+  mobile: 'Mobile', cloud: 'Cloud', devops: 'Cloud', 'ai-ml': 'AI/ML',
+  databases: 'Databases', security: 'Security', product: 'Product',
+  'software-engineering': 'Programming',
+}
+const DIFF_MAP: Record<string, Difficulty> = {
+  beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced',
+}
+const SLUG_ICON: Record<string, string> = {
+  javascript: 'JS', typescript: 'TS', python: 'PY', java: '☕', go: 'Go',
+  rust: '🦀', react: '⚛', nextjs: '▲', angular: '🅰', vuejs: '💚',
+  tailwindcss: 'TW', nodejs: '🟩', 'spring-boot': '🍃', django: '🐍',
+  fastapi: '⚡', docker: '🐳', kubernetes: '☸', aws: '☁', terraform: '🏗',
+  postgresql: '🐘', mongodb: '🍃', redis: '⚡', dsa: '🌳',
+  'system-design': '🏛', flutter: '🦋', 'react-native': '📱',
+  'ml-fundamentals': '📊', 'generative-ai': '🤖', rag: '🔍',
+  'ai-agents': '🤖', 'prompt-engineering': '✍',
+  'pytorch-deep-learning': '🔥', 'retrieval-augmented-generation': '🔍',
+  'ai-agents-agentic-workflows': '🤖', 'large-language-models': '🧠',
+  'python-for-ai-ml': 'PY', microservices: '🔗', graphql: '◈', grpc: '📡',
+  'aws': '☁', 'gcp': '☁', docker: '🐳', mongodb: '🍃',
+}
+const CAT_ICON: Record<Category, string> = {
+  Programming: '💻', Frontend: '🖥', Backend: '🗄', Mobile: '📱',
+  Cloud: '☁', 'AI/ML': '🤖', Databases: '🗃', Security: '🛡', Product: '📋',
+}
+function fmtEnrolled(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n || 0)
+}
+
+function transformApiTopic(raw: any): Topic {
+  const category = CAT_MAP[raw.category] ?? 'Programming'
+  const difficulty = DIFF_MAP[raw.difficulty] ?? 'Intermediate'
+  const gradient = raw.imageGradient || 'from-purple-600 to-cyan-500'
+  return {
+    id: 0,
+    slug: raw.slug,
+    name: raw.name,
+    category,
+    difficulty,
+    hours: raw.durationHours ?? 0,
+    rating: Number(raw.rating ?? 4.5).toFixed(1),
+    reviews: Math.floor((raw.enrolledCount ?? 0) / 8),
+    enrolled: fmtEnrolled(raw.enrolledCount ?? 0),
+    tags: Array.isArray(raw.tags) ? raw.tags : [],
+    icon: SLUG_ICON[raw.slug] ?? CAT_ICON[category] ?? '📚',
+    gradient,
+    topBarGradient: gradient,
+    description: raw.description ?? '',
+  }
 }
 
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced'
@@ -357,11 +444,12 @@ function TopicCard({ topic }: { topic: Topic }) {
   return (
     <div className="group relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] hover:border-white/25 hover:shadow-2xl hover:shadow-purple-500/10 flex flex-col">
       {/* Colored top bar */}
-      <div className={`h-1.5 w-full bg-gradient-to-r ${topic.topBarGradient}`} />
+      <div className="h-1.5 w-full" style={{ background: gradientBg(topic.topBarGradient) }} />
 
       {/* Card header with icon */}
       <div
-        className={`relative h-32 bg-gradient-to-br ${topic.gradient} flex items-center justify-center overflow-hidden`}
+        className="relative h-32 flex items-center justify-center overflow-hidden"
+        style={{ background: gradientBg(topic.gradient, 'to bottom right') }}
       >
         {/* Subtle light overlay */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(255,255,255,0.25),transparent_60%)]" />
@@ -444,7 +532,8 @@ function TopicCard({ topic }: { topic: Topic }) {
         <div className="mt-auto pt-1">
           <Link
             href={`/topics/${topic.slug ?? topic.id}`}
-            className={`block w-full py-2.5 rounded-xl bg-gradient-to-r ${topic.gradient} text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-md text-center`}
+            className="block w-full py-2.5 rounded-xl text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-md text-center"
+            style={{ background: gradientBg(topic.gradient) }}
           >
             Start Learning
           </Link>
@@ -686,7 +775,7 @@ export default function TopicsPage() {
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const json: ApiTopicsResponse = await res.json()
-        setApiTopics(json.data)
+        setApiTopics(json.data.map(transformApiTopic))
       } catch (err) {
         if ((err as Error).name !== 'AbortError') {
           // API unavailable — fall back to local mock data
