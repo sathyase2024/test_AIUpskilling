@@ -76,6 +76,8 @@ async def generate_quiz(req: QuizGenerateRequest):
 
         return questions
 
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse quiz JSON: {str(e)}")
     except anthropic.AuthenticationError:

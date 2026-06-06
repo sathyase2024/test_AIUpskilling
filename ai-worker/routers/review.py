@@ -103,6 +103,8 @@ async def review_code(req: CodeReviewRequest):
             explanation=review_data.get("explanation", ""),
         )
 
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse review JSON: {str(e)}")
     except anthropic.AuthenticationError:

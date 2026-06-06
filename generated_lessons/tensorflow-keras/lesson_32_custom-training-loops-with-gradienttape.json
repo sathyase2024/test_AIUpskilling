@@ -1,0 +1,241 @@
+{
+  "lessonId": "tensorflow-keras-32",
+  "title": "Custom Training Loops with GradientTape",
+  "type": "lesson",
+  "topicName": "TensorFlow & Keras",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "GradientTape in TensorFlow provides a mechanism for computing gradients of arbitrary computations with respect to variables, enabling developers to build custom training loops beyond the standard model.fit() abstraction. While Keras provides high-level APIs for common training scenarios, many production systems require fine-grained control over the training process: implementing custom loss functions that depend on model internals, performing multi-task learning with task-specific optimizers, applying gradient clipping or normalization strategies, or handling distributed training scenarios with precise gradient synchronization. Without GradientTape, developers are forced into the rigid structure of model.fit(), losing the flexibility to implement cutting-edge techniques like adversarial training, curriculum learning, or gradient-based meta-learning. GradientTape records operations on a computation graph, enabling efficient backpropagation through arbitrary TensorFlow operations, even those not originally designed as part of a neural network layer. This capability is foundational for researchers implementing novel algorithms and engineers building production systems that demand control over every step of the training process.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli reviewing his batting performance during a test match. Between innings, he doesn't just accept what happened—he explicitly records every decision he made: which deliveries he left, which he played aggressively, the exact footwork for each shot. He then systematically traces backward through each decision, asking 'which adjustment in my technique would have improved that outcome?' This is exactly what GradientTape does: it records every computational decision (like operations in the network), then traces backward through those decisions to compute how much each variable contributed to the final error. Kohli's recorded decisions represent the forward pass (building the computation graph), his backward analysis represents the gradient computation (understanding which technique changes matter most), and his applied adjustments represent the optimizer update (changing variables based on gradient insights). The power lies in this explicit recording and analysis—just as Kohli can selectively focus on specific aspects of his technique rather than retraining his entire batting style, GradientTape lets you compute gradients through any computation you design, not just standard layer operations. This selective, detailed analysis is why custom training loops enable advanced techniques that generic model.fit() cannot express.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Gradient Tape Recording",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "GradientTape operates on a fundamental principle: before computing gradients, the tape must first record all operations that transform inputs into outputs. When you create a tf.GradientTape() context, TensorFlow instruments the execution environment to track every operation—matrix multiplications, element-wise operations, control flow—building an implicit computation graph in memory. This recording only captures operations on watched variables and tensors; by default, variables are watched automatically, but constant tensors are not. The tape maintains references to intermediate tensor values and operation metadata, allowing it to later traverse this recorded sequence backward. The recording phase is crucial because without complete operation history, gradient computation becomes impossible. Once the forward pass completes and the context exits, the tape becomes immutable and ready for differentiation. This design pattern—record first, differentiate later—differs fundamentally from eager execution frameworks that compute gradients during the forward pass. TensorFlow's approach enables efficient reuse of tape state and selective gradient computation across multiple loss functions without re-executing the forward pass.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider the role of the third umpire in a Decision Review System (DRS) challenge during an ICC World Cup match. When a batsman like Rohit Sharma or the bowling team queries a decision, the third umpire doesn't make a judgment call on the spot—first, they meticulously review and record every camera angle, every frame of the ball's trajectory, the exact position of the fielders and batsman. Only after compiling this complete record do they analyze backward from the moment of impact, asking 'which specific factor changed the outcome?' This mirrors GradientTape's recording phase: the forward pass (the actual play) creates a complete recorded history (computation graph), and then backward analysis (DRS analysis) can be performed on demand. Just as the third umpire can only answer complex questions if all camera angles were recorded during the match, GradientTape can only compute gradients if all operations were recorded during the forward pass. If the taping didn't capture a critical angle (operation), you cannot analyze its impact (compute its gradient) retroactively. The immutability of the recorded tape after the match ends mirrors the tape's immutability after the forward pass exits—both prevent inconsistency when replaying decisions.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Watched Variables and Gradient Computation",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "For GradientTape to compute gradients, it must know which variables are targets of differentiation. By default, all tf.Variable objects are automatically watched by the tape, meaning the tape tracks how operations transform these variables into the final loss output. Intermediate tensors created from operations are also recorded, but gradients with respect to tensors are only returned if explicitly requested via the watch() method. This distinction is critical: you cannot compute gradients with respect to a non-Variable tensor unless you explicitly watch it, because the tape only maintains full operation history for watched tensors. The tape.gradient(target, sources) call performs reverse-mode automatic differentiation, traversing the recorded computation graph backward from the loss (target) to each variable in sources, applying the chain rule at each step. If a variable was never used in any computation that contributed to the loss, its gradient will be None. The computational cost of gradient computation scales with the number of unique paths through the graph and the complexity of operations, not with the number of variables. Understanding the relationship between watched variables, operation sequences, and gradient targets is essential for debugging gradient-related issues like vanishing gradients or NaN values.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Picture Jasprit Bumrah analyzing his bowling performance for an over. Every ball he bowled during a powerplay over was recorded: his run-up distance, wrist rotation, seam position, delivery point. After the over completes, the bowling coach asks: 'which of your technique adjustments most impacted the economy rate in that over?' But here's the critical part—the coach can only measure impact for aspects that Bumrah actually varied during that over. If Bumrah's grip position never changed (unwatched tensor), the coach cannot compute how grip affects economy, because there's no recorded variation to analyze. Similarly, if a variable like Bumrah's footwork was adjusted but never actually threw the ball (not used in the computation), its impact on the economy is zero, and the gradient is None. The tape records every variable that actually contributed to the outcome (watched variables and their operations), but cannot produce meaningful gradients for variables outside that causal chain. The coach's analysis (gradient computation) is only as complete as the recorded variations in technique (watched variables), revealing why explicit watching of non-Variable tensors is sometimes necessary.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Backpropagation Through the Computation Graph",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Backpropagation through the computation graph is the process of computing gradients by traversing the recorded operations in reverse order, applying the chain rule to propagate loss signal backward through nested functions and layers. When you call tape.gradient(loss, variables), TensorFlow starts at the loss output and works backward: for each operation in the recorded graph, it computes the gradient of that operation's output with respect to its inputs, multiplies this by the incoming gradient (the gradient of loss with respect to that operation's output), and propagates the result to the operation's inputs. This multiplication of local gradients follows the chain rule from calculus: if loss depends on layer3's output, layer3's output depends on layer2's output, and layer2's output depends on a variable, then the gradient of loss with respect to the variable is the product of all three local gradients. The tape must maintain intermediate values from the forward pass to compute these local gradients, which is why memory usage scales with model depth and batch size. Certain operations like concatenation or slicing have specific gradient definitions that correctly route gradients to the appropriate inputs. The efficiency of backpropagation depends on graph structure: deeply nested operations create long dependency chains, while operations with multiple inputs must correctly split the incoming gradient among their inputs according to mathematical rules.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider Rohit Sharma's team analyzing why they lost a test match. The loss in that match resulted from a specific batting collapse, which itself resulted from the opener's dismissal, which resulted from a particular delivery. To understand the ultimate impact of any single decision—say, the fielding captain's choice to place a slip fielder instead of fine leg—the coach must trace backward through the entire causal chain: the field placement decision → the batsman's response → the shot selection → the contact point → the resulting trajectory → the final catch. Each step in this chain has a multiplicative effect: the field placement alone didn't cause the loss, but combined with the batsman's specific shot selection (multiplying through) it created the dismissal. The gradient is this multiplicative chain of impact factors. If the team had recorded every decision point during the match, they can now replay backward and ask: 'which adjustment in any single decision would have most reduced the loss?' That's exactly backpropagation—tracing backward through the recorded computation graph, multiplying partial gradients (local impact of each operation) to compute the total impact (gradient) of each variable on the final loss. The chain rule itself is the cricket analogy: total impact = field placement impact × batsman response × shot technique × ball physics, showing why understanding the full causal chain is necessary.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Persistent Tapes and Multiple Gradient Computations",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "By default, TensorFlow's GradientTape is consumed after a single gradient() call—the tape is erased and its resources are released, preventing reuse. This design minimizes memory overhead for typical training loops where you compute gradients once per step. However, advanced scenarios require computing multiple gradient outputs from a single forward pass: computing gradients for multiple loss terms, computing higher-order gradients (gradient of gradients) for meta-learning or adversarial robustness, or computing gradients with respect to multiple targets. The persistent=True parameter creates a tape that remains valid after gradient() calls, allowing unlimited gradient computations from the same forward pass without re-executing the forward pass. Persistent tapes require manual resource cleanup via tape.reset() to prevent memory leaks, as the tape retains all intermediate activations. Computing gradients from a persistent tape is mathematically identical to recomputing gradients from scratch, but computationally far more efficient because intermediate values are reused. The cost of persistence is increased memory usage proportional to the number of intermediate tensors in the computation path. Persistent tapes are essential for implementing techniques like gradient penalty regularization, Hessian-based optimization, or multi-task learning with separate gradients per task, making them a critical tool despite their memory implications.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine analyzing a delivery from Jasprit Bumrah during a crucial match moment. The DRS system records the delivery once—ball trajectory, fielder positions, batsman stance—creating a permanent recording. Normally, after reviewing the decision once, the recording is discarded. But for high-stakes moments, cricket officials might replay the same recording multiple times to answer different questions: 'Was it leg before wicket?' then 'Did the fielder catch it cleanly?' then 'Did the batsman's bat make contact?' Rather than re-bowling the delivery to answer each question, they leverage the single recording multiple times. This is exactly what persistent=True does: the forward pass is the single recorded delivery, and persistent=True means you can query it multiple times (computing gradients with respect to different loss terms, computing second derivatives) without re-executing. Normally, each tape is consumed after one query—like watching the DRS footage once then deleting it. The cost is that persistent recordings must store more data (all angles, all slow-motion frames, high memory usage). If you try to use a non-persistent tape multiple times or try to compute second derivatives from it, you get an error—just as you cannot analyze a delivery recording that's already been deleted. This pattern reveals why advanced ML algorithms that need multiple gradient computations from single forward passes require conscious persistence management.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "import tensorflow as tf\nimport numpy as np\n\n# Define a cricket-themed custom training loop with GradientTape\nclass CricketPlayerModel(tf.keras.Model):\n    \"\"\"Model predicting batting performance based on match conditions.\"\"\"\n    def __init__(self):\n        super(CricketPlayerModel, self).__init__()\n        self.dense1 = tf.keras.layers.Dense(64, activation='relu')\n        self.dense2 = tf.keras.layers.Dense(32, activation='relu')\n        self.output_layer = tf.keras.layers.Dense(1)  # Predict runs scored\n        \n    def call(self, inputs):\n        x = self.dense1(inputs)\n        x = self.dense2(x)\n        return self.output_layer(x)\n\n# Initialize model and optimizer\nmodel = CricketPlayerModel()\noptimizer = tf.keras.optimizers.Adam(learning_rate=0.001)\n\n# Create synthetic cricket dataset\n# Features: [pitch_hardness, ball_speed, fielder_distance, bowler_experience]\n# Target: runs_scored\nnp.random.seed(42)\nnum_samples = 200\nX_train = np.random.randn(num_samples, 4).astype(np.float32)\ny_train = (X_train[:, 0] * 3 + X_train[:, 1] * 2 - X_train[:, 2] * 1.5 + np.random.randn(num_samples) * 0.5).astype(np.float32)\ny_train = y_train.reshape(-1, 1)\n\n# Custom training loop with GradientTape\ndef train_custom_loop(model, optimizer, X_data, y_data, epochs=5, batch_size=16):\n    \"\"\"Custom training loop implementing gradient computation and updates.\"\"\"\n    dataset = tf.data.Dataset.from_tensor_slices((X_data, y_data)).batch(batch_size)\n    \n    for epoch in range(epochs):\n        epoch_loss = 0.0\n        num_batches = 0\n        \n        for batch_X, batch_y in dataset:\n            # STEP 1: Record operations inside GradientTape context\n            with tf.GradientTape() as tape:\n                # Forward pass: predict player performance\n                predictions = model(batch_X, training=True)\n                \n                # Compute custom loss (MSE + L2 regularization)\n                mse_loss = tf.reduce_mean(tf.square(predictions - batch_y))\n                \n                # Add regularization term: penalize large weights in first layer\n                l2_loss = 0.01 * tf.reduce_sum(tf.square(model.dense1.kernel))\n                \n                total_loss = mse_loss + l2_loss\n            \n            # STEP 2: Compute gradients (watched variables = model.trainable_variables)\n            # tape.gradient(target, sources) performs backpropagation\n            gradients = tape.gradient(total_loss, model.trainable_variables)\n            \n            # STEP 3: Apply gradients to update model parameters\n            optimizer.apply_gradients(zip(gradients, model.trainable_variables))\n            \n            epoch_loss += total_loss.numpy()\n            num_batches += 1\n        \n        avg_loss = epoch_loss / num_batches\n        print(f\"Epoch {epoch + 1}/{epochs}",
+      "Loss": {
+        "avg_loss": "4f}\")\n\n# Execute training\nprint(\"Training Custom Model for Cricket Performance Prediction:\")\ntrain_custom_loop(model, optimizer, X_train, y_train, epochs=5, batch_size=16)\n\n# Demonstrate inference\nprint(\"\\nModel Inference on Test Data:\")\ntest_sample = np.array([[0.5, 1.2, -0.8, 0.3]], dtype=np.float32)\npredicted_runs = model(test_sample)\nprint(f\"Test input (pitch_hardness, ball_speed, fielder_distance, bowler_experience): {test_sample[0]}\")\nprint(f\"Predicted runs scored: {predicted_runs.numpy()[0][0]:.2f}\")\n\n# Demonstrate persistent tape for computing gradients w.r.t. inputs\nprint(\"\\nAdvanced: Computing gradients w.r.t. inputs (persistent tape):\")\ntest_input = tf.Variable(test_sample, dtype=tf.float32)\nwith tf.GradientTape(persistent=True) as tape:\n    tape.watch(test_input)  # Watch non-Variable tensor\n    output = model(test_input)\n\n# Multiple gradient computations from same tape\ngradient_wrt_input = tape.gradient(output, test_input)\nprint(f\"Input gradients shape: {gradient_wrt_input.shape}\")\nprint(f\"Gradient magnitude: {tf.reduce_sum(tf.abs(gradient_wrt_input)).numpy():.4f}\")\n\n# Second gradient computation on same persistent tape (backward pass analysis)\nsquared_output = output ** 2\ngradient_squared = tape.gradient(squared_output, test_input)\nprint(f\"Second gradient (d(output²)/dx) magnitude: {tf.reduce_sum(tf.abs(gradient_squared)).numpy():.4f}\")\n\n# Clean up persistent tape\ntape.reset()\nprint(\"\\nPersistent tape cleaned up.\")"
+      },
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "This code implements a complete custom training loop for predicting cricket player performance, demonstrating all core concepts in sequence. The CricketPlayerModel defines a simple neural network (dense layers) for regression. Inside train_custom_loop, the GradientTape context (STEP 1) records all operations: the forward pass through model layers, MSE loss computation, and L2 regularization penalty—this is the recording phase. The tape observes every operation transforming batch_X into the total_loss. Next, tape.gradient(total_loss, model.trainable_variables) (STEP 2) performs backpropagation by traversing the recorded computation graph backward. The chain rule propagates gradients through the L2 loss term (which depends on dense1.kernel) and the MSE loss term (which depends on all layer outputs). Finally, optimizer.apply_gradients (STEP 3) uses these computed gradients to update model parameters. The loop batches data and repeats this cycle for multiple epochs. The second code segment demonstrates persistent=True, showing how a single forward pass can be queried twice: once for gradients with respect to inputs, and again for second-order gradients (gradient of squared output). The watch() method explicitly marks the non-Variable input tensor for gradient computation. This pattern reveals how custom loops enable complex loss functions and multi-term optimization that standard model.fit() cannot easily express, and why persistent tapes are necessary for advanced algorithms requiring multiple gradient queries per forward pass.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "GradientTape's internal machinery operates at the intersection of TensorFlow's eager execution mode and graph construction semantics. When you enter a GradientTape context in eager mode, TensorFlow activates a special tracing mode that intercepts operations before they execute. Each operation registered with the tape (via watching mechanism) is recorded as a node in an implicit directed acyclic graph (DAG), storing references to the operation type, input tensor metadata, and output shapes. Critically, the tape does not execute the forward pass differently—it simply maintains a shadow record of what would execute anyway. For watched Variables, this happens automatically; for other tensors, explicit watch() calls register them. The forward pass executes normally in eager mode, producing actual numerical outputs that flow through your model. When gradient() is called, TensorFlow constructs reverse-mode differentiation logic: starting from the output node (your loss), it performs a depth-first traversal backward through the DAG. For each operation node visited, TensorFlow applies that operation's registered gradient function—a mathematically defined function that computes the gradient of that operation's output with respect to its inputs. These gradient functions are implemented in highly optimized C++ kernels for performance. The chain rule is applied at each step: incoming_gradient × local_gradient = outgoing_gradient. Memory management during backpropagation is complex: intermediate activations from the forward pass must be retained if their gradients depend on them, but can be discarded once their contribution is computed. TensorFlow uses a reference-counting system to determine when tensors can be freed. With persistent=True, the tape refuses to discard intermediate values after the first gradient() call, consuming more memory but enabling reuse. Non-persistent tapes automatically garbage-collect recorded operations after gradient() completes, releasing all intermediate values and tape metadata, making them memory-efficient for typical single-gradient training steps.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider the complex process of reviewing a LBW (leg before wicket) decision through DRS during an India vs. England test match. The moment the LBW appeal occurs, multiple camera angles, Hawk-Eye projection data, and ball-tracking sensors activate simultaneously—this is like GradientTape entering its tracing mode, recording every physical measurement (forward pass) without changing the actual play. All this data (tape) is stored in a structured format (DAG), not executed in any way. When the third umpire reviews the decision, they don't re-simulate the delivery—they analyze the recorded data by working backward from the moment of impact (output node), asking at each point: 'What contribution did this aspect (operation) make to the overall LBW decision?' For the impact point, they apply ball physics rules (gradient function for that operation). For the pitch contact point, they apply geometry rules. For the batsman's position, they apply positioning rules. Each rule (gradient function) computes local impact, and these impacts multiply together (chain rule) to determine total impact of each variable. The third umpire might retain certain Hawk-Eye frames longer if they might be needed for secondary queries (persistent tape), or discard frames immediately after answering their question (non-persistent tape) to save storage. The operational efficiency depends on how many frames must be held in memory and whether they can be reused. This mirrors exactly how TensorFlow manages intermediate tensor storage: retaining what might be needed for future gradient computations, discarding what won't be, using reference-counting to track usage patterns, and automatically freeing resources when operations complete.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "import tensorflow as tf\nimport numpy as np\n\n# Advanced example: Multi-task learning with separate loss terms and gradient manipulation\nclass MultiTaskCricketModel(tf.keras.Model):\n    \"\"\"Model predicting both runs scored and wicket probability.\"\"\"\n    def __init__(self):\n        super(MultiTaskCricketModel, self).__init__()\n        self.shared_dense = tf.keras.layers.Dense(64, activation='relu')\n        self.runs_dense = tf.keras.layers.Dense(32, activation='relu')\n        self.runs_output = tf.keras.layers.Dense(1)  # Regression task\n        self.wicket_dense = tf.keras.layers.Dense(32, activation='relu')\n        self.wicket_output = tf.keras.layers.Dense(1, activation='sigmoid')  # Classification task\n\n    def call(self, inputs):\n        shared = self.shared_dense(inputs)\n        runs = self.runs_output(self.runs_dense(shared))\n        wicket_prob = self.wicket_output(self.wicket_dense(shared))\n        return runs, wicket_prob\n\n# Simulate match data: batsman statistics across 100 matches\nnp.random.seed(42)\nnum_matches = 100\nfeatures = np.random.randn(num_matches, 5).astype(np.float32)\nruns_actual = (features[:, 0] * 10 + features[:, 1] * 5 + np.random.randn(num_matches) * 2).reshape(-1, 1).astype(np.float32)\nwicket_labels = (np.random.rand(num_matches) > 0.6).astype(np.float32).reshape(-1, 1)\n\nmodel = MultiTaskCricketModel()\noptimizer = tf.keras.optimizers.Adam(learning_rate=0.001)\n\ndef train_multitask_with_custom_gradients(model, optimizer, X_data, runs_data, wicket_data, epochs=3):\n    \"\"\"Training with separate loss terms, gradient clipping, and gradient inspection.\"\"\"\n    dataset = tf.data.Dataset.from_tensor_slices((X_data, runs_data, wicket_data)).batch(16)\n    \n    for epoch in range(epochs):\n        epoch_loss = 0.0\n        \n        for batch_X, batch_runs, batch_wickets in dataset:\n            # Persistent tape allows multiple gradient computations\n            with tf.GradientTape(persistent=True) as tape:\n                # Forward pass: compute both task outputs\n                predicted_runs, predicted_wicket_prob = model(batch_X, training=True)\n                \n                # Task 1 loss: runs prediction (MSE)\n                runs_loss = tf.reduce_mean(tf.square(predicted_runs - batch_runs))\n                \n                # Task 2 loss: wicket probability (binary crossentropy)\n                wicket_loss = tf.reduce_mean(\n                    tf.nn.sigmoid_cross_entropy_with_logits(batch_wickets, predicted_wicket_prob)\n                )\n                \n                # Combined loss with task weighting\n                task_weight_runs = 0.7\n                task_weight_wicket = 0.3\n                total_loss = task_weight_runs * runs_loss + task_weight_wicket * wicket_loss\n            \n            # Compute gradients for both tasks separately\n            runs_gradients = tape.gradient(runs_loss, model.trainable_variables)\n            wicket_gradients = tape.gradient(wicket_loss, model.trainable_variables)\n            \n            # Inspect gradient magnitudes (diagnostic analysis)\n            runs_grad_norm = tf.reduce_sum([tf.reduce_sum(tf.abs(g)) if g is not None else 0.0 \n                                           for g in runs_gradients])\n            wicket_grad_norm = tf.reduce_sum([tf.reduce_sum(tf.abs(g)) if g is not None else 0.0 \n                                             for g in wicket_gradients])\n            \n            # Gradient clipping: prevent exploding gradients\n            combined_gradients = [(r + w) / 2 if r is not None and w is not None else r or w\n                                 for r, w in zip(runs_gradients, wicket_gradients)]\n            clipped_gradients, _ = tf.clip_by_global_norm(combined_gradients, clip_norm=1.0)\n            \n            # Update model with averaged, clipped gradients\n            optimizer.apply_gradients(zip(clipped_gradients, model.trainable_variables))\n            \n            epoch_loss += total_loss.numpy()\n            \n            # Cleanup persistent tape to prevent memory accumulation\n            tape.reset()\n        \n        avg_loss = epoch_loss / len(list(dataset))\n        print(f\"Epoch {epoch + 1}/{epochs}",
+      "Loss": {
+        "avg_loss": "4f}\")\n\nprint(\"Multi-Task Learning with Custom Gradient Manipulation:\")\ntrain_multitask_with_custom_gradients(model, optimizer, features, runs_actual, wicket_labels, epochs=3)\n\n# Demonstrate second-order gradients (Hessian-vector products)\nprint(\"\\n--- Computing Second-Order Gradients (Advanced) ---\")\ntest_batch = features[:8]  # Small batch for Hessian computation\n\nwith tf.GradientTape(persistent=True) as outer_tape:\n    with tf.GradientTape(persistent=True) as inner_tape:\n        predicted_runs, predicted_wicket_prob = model(test_batch, training=False)\n        runs_loss = tf.reduce_mean(tf.square(predicted_runs - runs_actual[:8]))\n    \n    # First gradient\n    first_gradients = inner_tape.gradient(runs_loss, model.trainable_variables)\n    \n    # Gradient of gradients (second-order)\n    gradient_norm = tf.sqrt(tf.reduce_sum([tf.reduce_sum(tf.square(g)) if g is not None else 0.0\n                                          for g in first_gradients]))\n    inner_tape.reset()\n\n# Second gradient (Hessian-like computation)\nsecond_gradients = outer_tape.gradient(gradient_norm, model.trainable_variables)\nouter_tape.reset()\n\nprint(f\"First gradient norm: {gradient_norm.numpy():.4f}\")\nif any(g is not None for g in second_gradients):\n    second_grad_norm = tf.sqrt(tf.reduce_sum([tf.reduce_sum(tf.square(g)) if g is not None else 0.0\n                                             for g in second_gradients]))\n    print(f\"Second gradient (curvature) norm: {second_grad_norm.numpy():.4f}\")\nelse:\n    print(\"Second gradients are None (curvature information)\")\n\nprint(\"\\nMulti-task training with advanced gradient manipulation complete.\")"
+      },
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "info_box",
+      "content": "Pro Tip: Use persistent=True carefully—each gradient() call you make adds latency, but allows analyzing single forward pass from multiple angles. In production, persistent tapes are essential for techniques like gradient penalty (computing gradients of gradients), but default non-persistent tapes are 20-30% faster per step for standard supervised learning because resources are freed immediately. Profile your actual use case: if you're only computing one gradient per forward pass, persistent=True wastes memory. If you need Hessian information or multi-task gradients, it's essential. Also, always call tape.reset() after last gradient() on persistent tapes to prevent memory leaks that accumulate across training steps.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}

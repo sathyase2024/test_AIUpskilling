@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -8,7 +8,7 @@ import { Lesson } from '../entities/lesson.entity';
 import { Topic } from '../entities/topic.entity';
 
 @Injectable()
-export class AiService {
+export class AiService implements OnApplicationBootstrap {
   private readonly logger = new Logger(AiService.name);
   private readonly apiKey: string;
   private readonly apiUrl = 'https://api.anthropic.com/v1/messages';
@@ -66,15 +66,36 @@ export class AiService {
     return await this.lessonRepo.save(lesson);
   }
 
-  /** Trigger background pre-generation for all ungenerated lessons */
+  /** Auto-trigger pre-generation 15 s after startup so topic seeding finishes first */
+  onApplicationBootstrap() {
+    setTimeout(() => {
+      this.pregenerateAll().catch(err =>
+        this.logger.error(`Startup pre-generation failed: ${err.message}`)
+      );
+    }, 15_000);
+  }
+
+  /** Generate all ungenerated lessons sequentially in the background */
   async pregenerateAll(): Promise<{ triggered: number }> {
     const ungenerated = await this.lessonRepo.find({ where: { isGenerated: false } });
-    // Fire and forget - generate in background
-    for (const lesson of ungenerated) {
-      this.generateLesson(lesson.id).catch(err =>
-        this.logger.error(`Background gen failed ${lesson.id}: ${err.message}`)
-      );
-    }
+    if (ungenerated.length === 0) return { triggered: 0 };
+    this.logger.log(`Pre-generating ${ungenerated.length} lessons in background…`);
+
+    // Sequential to avoid overwhelming the AI worker / Anthropic rate limits
+    (async () => {
+      let done = 0;
+      for (const lesson of ungenerated) {
+        try {
+          await this.generateLesson(lesson.id);
+          done++;
+          if (done % 5 === 0) this.logger.log(`Pre-generation progress: ${done}/${ungenerated.length}`);
+        } catch (err) {
+          this.logger.error(`Pre-gen failed for ${lesson.id}: ${err.message}`);
+        }
+      }
+      this.logger.log(`Pre-generation complete: ${done}/${ungenerated.length} lessons ready`);
+    })().catch(console.error);
+
     return { triggered: ungenerated.length };
   }
 

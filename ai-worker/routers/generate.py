@@ -133,61 +133,76 @@ def _build_lesson_prompt(req: LessonRequest) -> str:
     )
 
     if req.lessonType == "reading":
+        analogy_instruction = (
+            f"6-10 sentences following the 3-part structure in the PERSONALISATION RULE: "
+            f"(a) specific {hobby} scenario with real names/situations, "
+            f"(b) map each part of the concept to its {hobby} equivalent explicitly, "
+            f"(c) state the insight this parallel reveals."
+        ) if hobby else ""
+
         if hobby:
             sections = f"""Include ALL of the following sections in EXACTLY this order:
 
 1.  heading (level 2): Overview
-2.  paragraph: Motivating context — the problem this topic solves, why it was invented. Minimum 100 words. Pure technical.
-3.  analogy: Map the motivation to {hobby} — why does {hobby} need this concept too? 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
+2.  paragraph: Motivating context — the problem this topic solves, why it was invented, what breaks without it. Minimum 100 words. Pure technical.
+3.  analogy: {analogy_instruction}
 4.  heading (level 2): Core Concepts
-5.  paragraph: The first core concept — theory, mechanics, mental model. Minimum 120 words. Pure technical.
-6.  analogy: Map this concept to {hobby} using specific {hobby} terminology. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
-7.  code: First complete, commented code example using {hobby}-themed class/variable names and sample data.
-8.  paragraph: Walk through the code — explain each part, why it was written that way, runtime behaviour. Minimum 80 words.
-9.  heading (level 2): How It Works Under the Hood
-10. paragraph: Internal mechanics — what the runtime/compiler/framework actually does. Performance, memory model, execution flow. Minimum 120 words. Pure technical.
-11. analogy: Map the internals to {hobby} — e.g. how the JVM is like a cricket umpire enforcing rules. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
-12. code: Second code example — advanced usage, using {hobby}-themed data.
-13. info_box: Pro Tip — a non-obvious production insight. Start with "Pro Tip:".
-14. heading (level 2): Common Patterns & Best Practices
-15. paragraph: 2-3 established patterns with reasoning — why pattern A over B. Minimum 100 words. Pure technical.
-16. analogy: Map the best practice to {hobby} — e.g. why following a good batting technique matters even when improvising. 6-10 sentences following the 3-part structure in the PERSONALISATION RULE above: (a) describe the specific cricket scenario, (b) map each technical part to its cricket equivalent, (c) state the insight.
-17. code: Third code example — best practice vs anti-pattern, using {hobby}-themed objects.
-18. warning_box: Most common beginner mistake and exactly how to avoid it. Start with "Warning:".
-19. heading (level 2): Real-World Application
-20. paragraph: How this is used in production at scale — specific companies, frameworks, systems. Minimum 80 words.
-21. key_points: 6-7 detailed takeaway bullets — complete, specific insights.
-22. quiz: Conceptual question on the core mechanism. 4 options, correct index, 40+ word explanation.
-23. quiz: Applied scenario question. 4 options, correct index, 40+ word explanation."""
+    IMPORTANT: Do NOT write one paragraph covering all concepts together.
+    Instead, for EACH individual concept in this topic (e.g. Encapsulation, Inheritance, Polymorphism, Abstraction — or whatever the 3-4 key concepts are for THIS lesson):
+      a. heading (level 3): [Concept Name] — e.g. "Encapsulation", "Inheritance"
+      b. paragraph: Explain THIS concept only — definition, how it works, why it exists, what problem it solves. Minimum 80 words. Pure technical.
+      c. analogy: Map THIS specific concept to {hobby}. {analogy_instruction}
+    Repeat a/b/c for each concept. Typically 3-4 concepts = 9-12 sections here.
+5.  code: A single complete, commented code example that demonstrates ALL the concepts above together, using {hobby}-themed class/variable names and realistic sample data.
+6.  paragraph: Walk through the code — explain how each concept appears in the code, why it was written that way, runtime behaviour. Minimum 80 words.
+7.  heading (level 2): How It Works Under the Hood
+8.  paragraph: Internal mechanics — what the runtime/compiler/framework actually does. Performance, memory model, execution flow. Minimum 120 words. Pure technical.
+9.  analogy: {analogy_instruction}
+10. code: Second code example — advanced usage pattern, using {hobby}-themed data.
+11. info_box: Pro Tip — a non-obvious production insight. Start with "Pro Tip:".
+12. heading (level 2): Common Patterns & Best Practices
+13. paragraph: 2-3 established patterns with reasoning — why pattern A over B. Minimum 100 words. Pure technical.
+14. analogy: {analogy_instruction}
+15. code: Third code example — best practice vs anti-pattern, using {hobby}-themed objects.
+16. warning_box: Most common beginner mistake and exactly how to avoid it. Start with "Warning:".
+17. heading (level 2): Real-World Application
+18. paragraph: How this is used in production at scale — specific companies, frameworks, systems. Minimum 80 words.
+19. key_points: 6-7 detailed takeaway bullets — complete, specific insights (not vague summaries).
+20. quiz: Conceptual question on one of the core concepts. 4 options, correct index, 40+ word explanation.
+21. quiz: Applied scenario question — given a real situation, what is the correct approach? 4 options, correct index, 40+ word explanation."""
         else:
             sections = """Include ALL of the following sections in order:
 
-1. heading (level 2): Overview
-2. paragraph: Motivating context — the problem this topic solves, why it was invented. Minimum 100 words.
-3. heading (level 2): Core Concepts
-4. paragraph: The first core concept — theory, mechanics, mental model. Minimum 120 words.
-5. code: First complete, commented code example demonstrating the core concept.
-6. paragraph: Walk through the code — explain each part, why it was written that way, runtime behaviour. Minimum 80 words.
-7. heading (level 2): How It Works Under the Hood
-8. paragraph: Internal mechanics — runtime/compiler/framework internals. Performance, memory, execution flow. Minimum 120 words.
-9. code: Second code example — advanced usage.
-10. info_box: Pro Tip — a non-obvious production insight. Start with "Pro Tip:".
-11. heading (level 2): Common Patterns & Best Practices
-12. paragraph: 2-3 established patterns with reasoning — why pattern A over B. Minimum 100 words.
-13. code: Third code example — best practice vs anti-pattern.
-14. warning_box: Most common beginner mistake and exactly how to avoid it. Start with "Warning:".
-15. heading (level 2): Real-World Application
-16. paragraph: How this is used in production at scale — specific companies, frameworks, systems. Minimum 80 words.
-17. key_points: 6-7 detailed takeaway bullets — complete, specific insights.
-18. quiz: Conceptual question on the core mechanism. 4 options, correct index, 40+ word explanation.
-19. quiz: Applied scenario question. 4 options, correct index, 40+ word explanation."""
+1.  heading (level 2): Overview
+2.  paragraph: Motivating context — the problem this topic solves, why it was invented. Minimum 100 words.
+3.  heading (level 2): Core Concepts
+    IMPORTANT: Do NOT write one paragraph covering all concepts together.
+    Instead, for EACH individual concept in this topic (e.g. Encapsulation, Inheritance, Polymorphism, Abstraction — or whatever the 3-4 key concepts are for THIS lesson):
+      a. heading (level 3): [Concept Name] — e.g. "Encapsulation", "Inheritance"
+      b. paragraph: Explain THIS concept only — definition, how it works, why it exists, what problem it solves. Minimum 80 words.
+    Repeat a/b for each concept. Typically 3-4 concepts = 6-8 sections here.
+4.  code: A single complete, commented code example demonstrating ALL the concepts above together.
+5.  paragraph: Walk through the code — explain how each concept appears, runtime behaviour. Minimum 80 words.
+6.  heading (level 2): How It Works Under the Hood
+7.  paragraph: Internal mechanics — runtime/compiler/framework internals. Performance, memory, execution flow. Minimum 120 words.
+8.  code: Second code example — advanced usage.
+9.  info_box: Pro Tip — a non-obvious production insight. Start with "Pro Tip:".
+10. heading (level 2): Common Patterns & Best Practices
+11. paragraph: 2-3 established patterns with reasoning — why pattern A over B. Minimum 100 words.
+12. code: Third code example — best practice vs anti-pattern.
+13. warning_box: Most common beginner mistake and exactly how to avoid it. Start with "Warning:".
+14. heading (level 2): Real-World Application
+15. paragraph: How this is used in production at scale — specific companies, frameworks, systems. Minimum 80 words.
+16. key_points: 6-7 detailed takeaway bullets — complete, specific insights.
+17. quiz: Conceptual question on one of the core concepts. 4 options, correct index, 40+ word explanation.
+18. quiz: Applied scenario question. 4 options, correct index, 40+ word explanation."""
 
         return ctx + _schema() + f"""Generate a DEEP, comprehensive reading lesson on "{req.lessonTitle}" for the topic "{req.topicName}".
 
-This lesson must be equivalent to a high-quality textbook chapter.
+This lesson must be equivalent to a high-quality textbook chapter. Each core concept MUST get its own named heading (level 3) and dedicated paragraph — never group multiple concepts into a single paragraph.
 {sections}
 
-Set estimatedMinutes to 25-35. Set xpReward to 75."""
+Set estimatedMinutes to 30-40. Set xpReward to 75."""
 
     elif req.lessonType == "exercise":
         if hobby:
@@ -403,6 +418,8 @@ async def generate_lesson(req: LessonRequest) -> LessonContentResponse:
 
         return LessonContentResponse(**lesson_data)
 
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse lesson JSON from Claude: {str(e)}")
     except anthropic.AuthenticationError:
@@ -505,6 +522,8 @@ async def generate_curriculum(req: CurriculumRequest):
         curriculum_data = json.loads(raw_text)
         return curriculum_data
 
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse curriculum JSON: {str(e)}")
     except anthropic.AuthenticationError:

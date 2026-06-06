@@ -1,0 +1,208 @@
+{
+  "lessonId": "tensorflow-keras-33",
+  "title": "Debugging and Profiling TensorFlow Models",
+  "type": "reading",
+  "topicName": "TensorFlow & Keras",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Debugging and profiling TensorFlow models represents one of the most critical and often overlooked aspects of machine learning engineering. When models fail, they frequently fail silently—producing incorrect predictions with no error messages, or consuming memory inefficiently across distributed systems. TensorFlow's complexity arises from its computational graph abstraction, eager and graph execution modes, dynamic shape inference, and distributed training pipelines. Without proper debugging techniques, practitioners spend weeks chasing phantom performance bottlenecks, shape mismatches across tensor operations, or subtle numerical instabilities that corrupt model accuracy by fractions of a percent. Profiling tools reveal where computation actually spends time: whether the bottleneck is GPU kernel execution, data pipeline I/O, or Python interpreter overhead. The distinction matters profoundly—optimizing the wrong bottleneck wastes engineering effort. Additionally, TensorFlow's interaction with hardware (GPUs, TPUs) introduces asynchronous execution and memory fragmentation issues invisible in synchronous Python code. Production systems deploying millions of inferences daily demand both correctness verification and latency optimization. Without these tools, organizations might deploy models that appear to work during development but collapse under production load, or silently degrade in accuracy due to numerical precision issues introduced by quantization or distributed synchronization.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli preparing for a Test match at the MCG. During net practice, his batting coach (like a debugger) films his technique with multiple angles—front camera, side camera, slow-motion capture—to spot if his head position shifts slightly during deliveries, if his stance changes subtly against pace versus spin, or if his backlift timing drifts across bowling spells. Meanwhile, the analytics team (like a profiler) records every aspect of his performance: time spent in the crease on each delivery, runs scored per over, energy expenditure per shot type, and which specific bowlers drain his stamina fastest. Just as the debugger identifies the exact moment the head movement error occurs (delivery number, bowling spell, match situation), TensorFlow's debugger pinpoints where tensor shapes corrupt (which layer, which batch), where numerical precision degrades (which operation, after how many iterations), and where logical errors break inference pipelines. The profiler's output—revealing that Kohli spends 40% of his mental energy against short-pitched bowling from pace bowlers but only 15% against spinners—directly parallels TensorFlow's finding that 60% of inference latency comes from GPU-to-CPU data transfer rather than actual computation. Understanding these diagnostic insights transforms preparation: Kohli won't waste time refining his pull shot if the real issue is footwork against yorkers; similarly, optimizing batch size won't reduce latency if the bottleneck is I/O.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Eager Execution Debugging",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Eager execution in TensorFlow executes operations immediately when called, returning concrete values rather than symbolic tensors. This execution mode fundamentally transforms debugging because operations produce tangible outputs that can be inspected, logged, and traced in real-time using standard Python debugging tools. In graph mode (the traditional TensorFlow paradigm), operations are compiled into an abstract computation graph that executes later, making runtime inspection impossible—you cannot set breakpoints inside a graph function or print intermediate tensor values during execution. Eager execution enables print statements and debugger breakpoints to work naturally, revealing tensor shapes, dtypes, and values at each operation. However, this transparency comes at a performance cost: eager execution skips graph-level optimizations like operation fusion, constant folding, and XLA compilation. The debugging advantage is particularly critical when working with dynamic control flow (if/while statements), shape transformations, and complex data pipelines where the relationship between input and output shapes is non-obvious. Modern TensorFlow development typically starts in eager mode for exploration and debugging, then optionally converts to graph mode via @tf.function decorators for production deployment. Understanding which execution mode is active during debugging prevents subtle bugs where code works in eager mode but breaks when compiled to a graph, or vice versa.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider Jasprit Bumrah analyzing his bowling during a practice session versus analyzing a recorded match video. During live practice (eager execution), Bumrah bowls one delivery, sees the batter's response immediately, adjusts his grip for the next ball, watches how the pitch responds, and corrects his line in real-time—he has instant feedback. His coach can stop him mid-spell, point to his wrist position, and say 'look what happens when you do this'—direct inspection and intervention. Conversely, analyzing match video after the series (graph execution) requires reviewing footage later; he cannot modify his action mid-delivery, and subtle bowling variations (like the exact finger position change that created that yorker) are recorded statically. When Bumrah practices eagerly, he catches technical flaws immediately—a drift in his run-up shows up in the very next delivery he bowls. When he reviews recorded matches, he gets the complete story of what happened but cannot inspect the precise moment a delivery left his hand to understand why it deviated. Eager execution is Bumrah's live practice: every operation returns a concrete result he inspects immediately, enabling him to spot errors like shape mismatches (wrong foot position) or numerical precision loss (insufficient finger spin) as they occur. This real-time feedback transforms debugging from theoretical inspection to practical correction.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Profiling with tf.profiler",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The tf.profiler module provides systematic measurement of execution time and resource consumption across TensorFlow operations. Unlike informal timing with Python's time module (which measures wall-clock duration including Python interpreter overhead), tf.profiler integrates with NVIDIA's CUPTI (for GPUs), XLA profilers, and CPU-level performance counters to attribute execution time directly to specific operations and kernels. Profiling output typically includes three dimensions: wall-clock latency (total time from start to completion), self-time (time spent in the operation excluding child operations), and flops (floating-point operations per second achieved, indicating hardware utilization efficiency). The profiler operates at multiple granularities: trace-level profiling captures every operation in a computation graph with nanosecond precision but produces massive output files (gigabytes for typical training runs); step-level profiling aggregates metrics across batches, revealing which operations dominate overall training time; and memory profiling tracks heap allocation, identifying memory leaks or unexpectedly large intermediate tensors. A critical profiling metric is the GPU utilization percentage: if GPU utilization is below 80% during training, the bottleneck is likely data I/O or Python interpreter overhead, not computation. High GPU utilization with high latency indicates computation-bound operations where optimization requires algorithmic changes. Profiling also reveals redundant operations—kernels called multiple times that could be fused, or tensor transfers between devices that could be eliminated. This quantitative perspective prevents optimization efforts on bottlenecks that consume negligible time.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine analyzing a T20 innings using detailed scoring statistics recorded by the board operator. During Rohit Sharma's 58-ball century, the analyzer wants to know: in which overs did he score most runs (time attribution), how many runs per over for each bowler type (operation-level metrics), and what was his strike rate in powerplay versus death overs (utilization efficiency). The trace-level view is like watching frame-by-frame video of every single delivery—you see exactly when each run is scored, which ball, what shot—incredibly detailed but producing a massive information load. Step-level profiling aggregates this data: 'Rohit scored 25 runs off pace bowlers and 33 off spinners'—useful summary statistics without overwhelming detail. The profiler's GPU utilization metric parallels Rohit's strike rate against a specific bowler: if his strike rate against a particular spinner is only 50 (low utilization), the issue isn't that he's a poor batter but that the bowler's spell is economical—he cannot score freely. Conversely, if he faces a medium-pace bowler with short boundaries and poor field placement but still scores at only 100 strike rate, the constraint is external (field, bowler quality), not his capability. When tf.profiler shows 30% GPU utilization, it's saying 'your hardware isn't working hard enough'—the bottleneck is data flow or Python overhead. When it shows 95% GPU utilization with slow training, it's saying 'your hardware is maxed out'—you need algorithmic optimization.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Debugging Tensor Shapes and Data Types",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Tensor shape mismatches represent one of the most common and frustrating debugging scenarios in TensorFlow. A model might fail at training step 50,000 because a tensor flowing through layer 15 has unexpected dimensions, or because integer and floating-point types are mixed in an operation. Shape debugging is complicated by dynamic shapes, where tensor dimensions are determined at runtime rather than compile-time, making static analysis impossible. TensorFlow's shape system supports three representations: static shapes (known at graph construction time), partial shapes (some dimensions known, others unknown—common in batched data where batch size is variable), and dynamic shapes (determined during execution). The tf.debugging module provides assert operations that validate tensor properties: tf.debugging.assert_rank validates that a tensor has the expected number of dimensions, tf.debugging.assert_shape_equal compares two tensor shapes, and tf.debugging.assert_none_equal checks values. These assertions integrate into the computation graph, executing conditionally during model training and inference. Dtype mismatches often occur when mixing float32 and float64 operations, or when integer indices are accidentally promoted to floats, causing subtle numerical errors that propagate through subsequent computations. The profiler can highlight operations consuming unexpected memory because their input shapes are larger than anticipated—a smoking gun for shape-related bugs. When shapes fail, the error message often points to the operation where the mismatch becomes apparent, not where the root cause occurred, requiring traceback analysis and careful inspection of operations feeding into the failing layer.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider the West Indian cricket team's opening partnership of Chris Gayle and Sunil Narine preparing for a powerplay. The team expects two right-handed openers (static shape assumption), but Narine is actually ambidextrous and switches between left and right stance (dynamic shape). The fielding captain initially sets a field for two right-handers, but when Narine shifts to left-handed stance, the field configuration breaks—the arrangement assumes shape [2, right-handed] but receives [2, mixed-handedness]. Additionally, imagine the scoreboard operator expects runs in integer format but accidentally feeds decimal points (30.5 runs instead of 30 runs)—subsequent calculations become corrupted. The tf.debugging assertions are like the team manager checking before the powerplay: 'verify that we have exactly 2 openers, verify they match expected handedness, verify the scorecard uses integer runs only.' Just as the captain's field placement assumes a specific shape formation of the batting partnership, every neural network layer assumes specific tensor dimensions. If a dense layer expects input shape [batch_size, 128] but receives [batch_size, 64], the matrix multiplication fails—weights of shape [128, 256] cannot multiply vectors of shape [64]. When the model crashes with 'incompatible shapes' errors deep in the network, the root cause was often incorrect reshaping five layers earlier—just as a batsman who misreads line early in an innings makes poor decisions throughout the innings.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Numerical Stability and Precision Debugging",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Numerical stability debugging addresses the silent corruption of model accuracy caused by floating-point arithmetic limitations, not code errors. When training deep networks with many layers, gradients can become vanishingly small (underflow) or explosively large (overflow), causing gradient clipping to become ineffective or loss functions to produce NaN (not a number) values. Numerical precision issues often manifest as divergence in validation loss after many training steps, or as unstable predictions where tiny input variations produce wildly different outputs. The culprits include: log operations applied to values near zero (log(1e-40) produces extreme negative numbers), softmax computed on large logits (exp(1000) overflows), and accumulated rounding errors in reduction operations across distributed training. TensorFlow provides tools to detect these issues: tf.debugging.enable_check_numerics() intercepts all floating-point operations and asserts that outputs are finite (not NaN or infinity). The mixed precision training pattern uses float16 for forward passes (reducing memory and computational cost) but keeps float32 optimizer state to maintain numerical stability. Debugging numerical issues requires understanding the input data ranges, activation distributions across layers, and loss scaling factors in mixed precision training. A model that works with small batch sizes might fail with large batches because accumulated rounding errors compound, or because layer normalization parameters diverge when batch statistics are computed over fewer representative samples. Numerical debugging often requires instrumenting layers to compute and log activation distributions, gradient magnitudes, and weight norms, revealing at which layers precision degrades.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine tracking Sachin Tendulkar's progressive scoring record across his entire career using a hand-tally system where each run is marked with a tally stroke. Over 24,000 test runs recorded this way, tiny marking errors accumulate: one run marked as 2, another as 0.5 instead of 1. By career's end, the cumulative error might show 24,031 runs when he actually scored 24,000—a seemingly small discrepancy that compounds across thousands of matches. This parallels accumulated floating-point rounding in deep networks. Now consider Bumrah bowling a yorker where his feet positions must be precise to millimeter-level accuracy (like activations in neural networks). If his foot position drifts slightly with each delivery—not detectably at first, but cumulatively—by the 20th delivery in his spell his line has shifted 10 centimeters (like gradients underflowing or overflowing). The tf.debugging.enable_check_numerics() function is like a match referee checking intermediate scores every few overs: 'Verify this over's tally is reasonable (not NaN). Verify the running total hasn't jumped by 1000 runs impossibly (not infinity).' Mixed precision training parallels using different measurement systems strategically: record ball speeds (forward pass) in mph for efficiency, but keep precise kilometer measurements for later analysis (float32 optimizer state) to ensure final accuracy. When validation accuracy plateaus mysteriously after 100 epochs, it's often because numerical precision degraded, just as a batsman's technique degrades subtly across a 5-Test series if small form variations compound without correction.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import tensorflow as tf\nimport numpy as np\nfrom datetime import datetime\n\n# Enable eager execution and numerical checks\ntf.config.run_functions_eagerly(True)\n\nclass CricketPlayerBattingModel(tf.keras.Model):\n    \"\"\"Neural network to predict cricket player batting performance.\"\"\"\n    \n    def __init__(self):\n        super().__init__()\n        self.dense1 = tf.keras.layers.Dense(64, activation='relu', name='batting_foundation')\n        self.dense2 = tf.keras.layers.Dense(32, activation='relu', name='technique_analysis')\n        self.dense3 = tf.keras.layers.Dense(1, name='runs_prediction')\n        self.batch_norm = tf.keras.layers.BatchNormalization()\n    \n    def call(self, inputs, training=False):\n        x = self.dense1(inputs)\n        x = self.batch_norm(x, training=training)\n        x = self.dense2(x)\n        x = self.dense3(x)\n        return x\n\n# Create synthetic cricket player statistics dataset\n# Features: innings count, average strike rate, dots faced, sixes hit, career span years\nplayer_stats = np.array([\n    [145, 92.5, 450, 28, 16],  # Rohit Sharma-like profile\n    [198, 88.3, 620, 35, 18],  # Virat Kohli-like profile\n    [112, 85.7, 380, 22, 12],  # Generic opener\n    [167, 94.2, 510, 42, 14],  # Aggressive batter\n    [203, 79.1, 750, 18, 20],  # Conservative accumulator\n], dtype=np.float32)\n\nruns_scored = np.array([[3847], [4812], [2156], [3621], [4298]], dtype=np.float32)\n\n# Normalize inputs\nplayer_stats = (player_stats - player_stats.mean(axis=0)) / (player_stats.std(axis=0) + 1e-7)\n\nprint(\"[DEBUG] Input tensor shape:\", player_stats.shape)\nprint(\"[DEBUG] Target shape:\", runs_scored.shape)\nprint(\"[DEBUG] Input dtype:\", player_stats.dtype)\nprint(\"[DEBUG] Target dtype:\", runs_scored.dtype)\n\n# Initialize model and optimizer\nmodel = CricketPlayerBattingModel()\noptimizer = tf.keras.optimizers.Adam(learning_rate=0.001)\nloss_fn = tf.keras.losses.MeanSquaredError()\n\n# Enable numerical checks to catch NaN/Inf\ntf.debugging.enable_check_numerics()\n\n# Training loop with profiling\nprint(\"\\n[PROFILE] Starting training profiler...\")\n\n# Create profiler\nprofiler = tf.profiler.experimental.Profiler()\nprofiler.start()\n\nfor epoch in range(5):\n    print(f\"\\n=== Epoch {epoch+1} ===\")\n    \n    with tf.GradientTape() as tape:\n        # Forward pass\n        predictions = model(player_stats, training=True)\n        \n        # Calculate loss\n        loss = loss_fn(runs_scored, predictions)\n        \n        # Debug tensor properties\n        tf.debugging.assert_rank(predictions, 2, \n            message=f\"Predictions must be 2D, got rank {len(predictions.shape)}\")\n        tf.debugging.assert_less_equal(tf.reduce_max(tf.abs(predictions)), 1e6,\n            message=\"Predictions contain unreasonably large values\")\n    \n    # Backward pass\n    gradients = tape.gradient(loss, model.trainable_variables)\n    \n    # Check for NaN gradients\n    for i, grad in enumerate(gradients):\n        if grad is not None:\n            has_nan = tf.reduce_any(tf.math.is_nan(grad))\n            has_inf = tf.reduce_any(tf.math.is_inf(grad))\n            if has_nan or has_inf:\n                print(f\"  [WARNING] Gradient {i} contains NaN or Inf!\")\n            else:\n                grad_norm = tf.norm(grad)\n                print(f\"  [DEBUG] Gradient {i} norm: {grad_norm.numpy():.6f}\")\n    \n    # Apply gradients\n    optimizer.apply_gradients(zip(gradients, model.trainable_variables))\n    \n    print(f\"  Loss: {loss.numpy():.6f}\")\n    print(f\"  Predictions min/max: {tf.reduce_min(predictions).numpy():.2f} / {tf.reduce_max(predictions).numpy():.2f}\")\n\nprofiler.stop()\n\n# Generate profiling report\nprint(\"\\n[PROFILE] Generating profiler report...\")\ntf.profiler.experimental.write_raw_pb(\n    profiler.results(),\n    './profiler_data'\n)\nprint(\"[PROFILE] Profiler data written to ./profiler_data\")\n\n# Test inference with shape validation\nprint(\"\\n=== Inference Testing ===\")\ntest_player = np.array([[120, 91.2, 500, 25, 15]], dtype=np.float32)\ntest_player = (test_player - player_stats.mean(axis=0)) / (player_stats.std(axis=0) + 1e-7)\n\nprint(f\"[DEBUG] Test input shape: {test_player.shape}\")\npredicted_runs = model(test_player, training=False)\nprint(f\"[DEBUG] Predicted output shape: {predicted_runs.shape}\")\nprint(f\"[DEBUG] Predicted runs: {predicted_runs.numpy():.2f}\")\nprint(f\"[DEBUG] Output dtype: {predicted_runs.dtype}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "This code example demonstrates the three core debugging concepts in integrated practice. First, eager execution is enabled with tf.config.run_functions_eagerly(True), allowing immediate inspection of tensor values during training rather than building a computation graph. The CricketPlayerBattingModel defines a simple neural network that predicts runs scored based on player statistics. During the training loop, the code performs explicit tensor shape validation using tf.debugging.assert_rank(), verifying that predictions maintain expected dimensionality—this catches shape mismatches before they propagate silently through subsequent computations. The numerical stability checks use tf.debugging.assert_less_equal() to bound prediction values, and manual NaN/Inf detection on gradients to catch numerical explosions before they corrupt model weights. The profiler integration (tf.profiler.experimental.Profiler()) captures execution time metrics across all operations, which would reveal whether time is spent in dense layer computation, batch normalization, or elsewhere. During execution, the code prints debug information at each epoch: gradient norms (detecting vanishing or exploding gradients), loss values (tracking training progress), and prediction ranges (identifying if outputs diverge into invalid regions). The tensor assertions would trigger immediately if predictions became NaN or extremely large, preventing the model from learning corrupted patterns. Finally, inference testing validates that the model's output shape remains [1, 1] regardless of input variations, ensuring the prediction pipeline is robust.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "TensorFlow's execution model operates at multiple levels that interact during debugging and profiling. In eager execution mode, operations execute immediately using Python's runtime; each operation call returns a concrete tensor stored in GPU or CPU memory, with shape and values immediately available for inspection. However, this transparency comes at the cost of missing graph-level optimizations that compile execution later. When using @tf.function or graph mode, TensorFlow traces Python code into a static computation graph represented as intermediate representation (IR) called TFG (TensorFlow Graph), applying compiler optimizations including operation fusion (combining multiple small operations into a single kernel), dead code elimination, and constant folding. The profiler integrates with hardware-level performance counters differently for each device type: on GPUs, it hooks into NVIDIA's CUPTI (CUDA Profiling Tools Interface) to measure kernel execution time and memory transfers; on CPUs, it uses Linux perf counters or similar system profilers; on TPUs, it integrates with TPU profiler APIs. Memory profiling operates by intercepting allocation and deallocation calls, building a timeline of heap state, which reveals memory leaks (allocations never freed), memory fragmentation (many small allocations preventing large allocations), and unexpected large tensors. The distributed training case complicates profiling because operations execute asynchronously across devices and machines; collective operations (all-reduce for gradient aggregation) introduce synchronization points where some devices wait idle, reducing effective GPU utilization. TensorFlow's graph execution also inlines shape computations, making dynamic shapes become static constants at graph trace time—if you trace a function with batch_size=32, the graph hardcodes this value, causing issues when batch_size=64 is later used. Understanding these mechanics explains why a model behaves differently in eager versus graph mode, why profiling reports reveal unexpected overhead, and why distributed training efficiency plateaus below theoretical limits.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider a Test match broadcast production, where eager execution and graph execution represent two different broadcast strategies. In eager execution (live broadcast), the camera crew films every delivery in real-time, and viewers see the action immediately—the bowler's exact run-up, the batter's shoulder position, the ball's seam orientation. This immediate visibility lets commentators point out technical details instantly, and the production team can adjust camera angles mid-delivery if something goes wrong. However, this live approach cannot optimize camera switching—each angle transition requires human decision-making during the over. In contrast, graph mode (pre-recorded broadcast) involves filming the entire match, then editing in post-production to optimize the coverage: unnecessary camera transitions are eliminated (operation fusion), replays of non-critical moments are removed (dead code elimination), commentary is precisely timed, and graphics are enhanced. This produces a tighter, more efficient final broadcast but requires viewing a recording afterward, not live feedback. The profiler analyzing hardware utilization parallels the broadcast ratings team measuring viewer engagement: if 40% of viewers tune out during a particular bowler's spell (low GPU utilization), it's not because the bowler is ineffective but because the broadcast's pacing (data I/O) is causing gaps. When distributed training across multiple stadiums (like a cricket series across different venues) shows poor GPU utilization, it's because devices must synchronize gradient computations—each ground's analytics team must wait for other grounds to finish analysis before sharing insights. The graph tracing that hardcodes batch_size parallels a production crew filming the match assuming exactly 50,000 spectators in the crowd; if actual attendance is 80,000, footage composition breaks because camera positioning was optimized for the expected crowd size.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}
