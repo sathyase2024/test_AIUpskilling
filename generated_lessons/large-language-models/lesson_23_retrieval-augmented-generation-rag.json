@@ -1,0 +1,241 @@
+{
+  "lessonId": "large-language-models-23",
+  "title": "Retrieval-Augmented Generation (RAG)",
+  "type": "lesson",
+  "topicName": "Large Language Models",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Retrieval-Augmented Generation (RAG) addresses a fundamental limitation of large language models: their knowledge is frozen at the point of training, they hallucinate information outside their training distribution, and they cannot access real-time or proprietary data without retraining. Standard LLMs like GPT-4 perform inference using only their parametric knowledge encoded during training, which creates several critical problems in production systems. First, they generate confident but factually incorrect answers (hallucinations) when asked about events, specific documents, or domain-specific knowledge beyond their training data. Second, organizations cannot efficiently incorporate new information—retraining an LLM costs millions and takes months. Third, LLMs lack access to proprietary databases, APIs, or confidential documents that enterprises need to query. RAG solves this by connecting LLMs to external knowledge sources through a retrieve-then-generate pipeline: when a user asks a question, the system first retrieves relevant documents from a knowledge base, then feeds those documents alongside the query to the LLM, which generates an answer grounded in the retrieved context. This architecture emerged from research (Karpukhin et al., 2020; Lewis et al., 2020) demonstrating that retrieval combined with language generation dramatically improves factuality, handles out-of-distribution queries, and enables cost-effective knowledge updates without retraining. RAG has become the dominant pattern for building production AI systems at companies like OpenAI (for plugins), Google, Amazon, and Microsoft because it provides a practical middle ground between frozen model weights and expensive full retraining.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli preparing for a Test match against Australia. Before the series, Kohli studies recent opposition bowler reports, pitch conditions at the Melbourne Cricket Ground, and footage of how Jasprit Bumrah bowled against Australian batsmen last month. During the match, instead of relying only on his pre-match training (which happened weeks ago), Kohli's batting coach feeds him live information from the current innings—'Mitchell Starc is getting lateral movement off the seam; the ball is reversing after 35 overs'—right before he walks out to bat. Kohli's technique and experience (the LLM) are fixed and unchanging, but the real-time context (retrieved information) reshapes every decision he makes at the crease.\n\nThe parallels are direct: Kohli's pre-match preparation is the LLM's training data—extensive but frozen. The live coaching information from the current match is the retrieved context. His decision to play drive or leave the ball is the generated response. The retrieval system (coaches, data analysts feeding him live info) is the vector database and search engine that feeds current facts into the decision loop. Just as Kohli cannot wait weeks for retraining before his next Test, a production system cannot retrain its LLM every time new information arrives.\n\nThis structure reveals why RAG works so well: the model's core capability (Kohli's batting genius) remains constant and is not degraded by constantly feeding it new data. Instead, the external retrieval system becomes the updatable, real-time knowledge layer. The model stays frozen and specialized; the context changes dynamically.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Document Retrieval and Vector Embeddings",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Document retrieval is the first critical stage of RAG: converting unstructured text into semantic representations that can be compared and ranked for relevance. Modern RAG systems use dense vector embeddings—high-dimensional representations (typically 384 to 1536 dimensions) where semantic meaning is encoded as positions in vector space. Models like BERT, OpenAI's text-embedding-3-large, or specialized retrieval encoders transform raw documents and queries into these vectors. The core insight is that documents with similar meaning will have vectors pointing in similar directions in high-dimensional space. For example, 'What is the capital of France?' and 'Paris is the largest city in France' will have embeddings that are close together (high cosine similarity), while 'How do I bake bread?' will have an embedding far away. This semantic similarity is computed via dot product or cosine similarity: documents are ranked by how similar their embeddings are to the query embedding. In production, documents are pre-embedded and stored in a vector database (Pinecone, Weaviate, Milvus, or Postgres with pgvector) with indexing structures like HNSW (Hierarchical Navigable Small World) that enable fast approximate nearest-neighbor search even with millions of documents. Retrieval happens in milliseconds by finding the top-k nearest neighbors to the query vector.",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Rohit Sharma is a captain reviewing centuries of cricket scorecards from his team's matches against England. Instead of reading full match summaries (raw documents), Rohit encodes each match as a single 'essence vector'—a compact representation capturing runs scored, bowlers used, pitch condition, and match outcome. A recent England series scorecard has an essence vector that is very close to (high similarity with) India's last year's match against England, because both involved similar bowlers (James Anderson), similar venues (Lord's), and similar outcomes. But a scorecard from India's domestic T20 league in Mumbai has a vector far away from the England series vector, because it's a completely different context. When Rohit needs strategy for the upcoming England tour, he computes similarity between his 'preparation vector' and all historical match vectors, instantly retrieving the top-5 most similar matches (high cosine similarity) without reading every scorecard manually.\n\nHere, each match summary is a 'document'. The essence vectors are embeddings. The match database is the vector database with HNSW indexing. Rohit's preparation query becomes a query vector. The similarity computation (dot product or cosine similarity) is the retrieval ranking. Fast nearest-neighbor search on millions of matches (instead of linear scan) is the approximate nearest-neighbor index.\n\nThis reveals why semantic embeddings are superior to keyword matching: a query like 'fast bowling with reverse swing' will retrieve relevant matches even if those exact words don't appear, because the semantic meaning (conditions favoring swing bowling) is encoded in the vector space itself.",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Context Window and Prompt Engineering",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Once retrieved documents are obtained, they must be integrated into the LLM's input (the context window or prompt) in a way that maximizes relevance to the query while respecting token limits. LLMs have finite context windows—GPT-4 supports 8k or 128k tokens, Claude 3 Opus supports 200k tokens—and each retrieved document consumes tokens. The retrieval-augmented prompt typically follows a structure: system instructions, retrieved documents formatted as context, user query, and optionally few-shot examples. Prompt engineering in RAG differs from standard LLM prompting because engineers must explicitly instruct the model to use only the provided context and cite sources. A well-engineered RAG prompt includes directives like 'Answer only using the provided documents' to reduce hallucination on out-of-context queries. The order of retrieved documents in the prompt matters significantly—research shows recency bias (the model over-weights the last few documents) and primacy bias (emphasis on first documents), so strategies like middle insertion or shuffle-based ordering can improve performance. Token efficiency is critical: if documents are too long or ranked poorly, they consume context without contributing to answer quality. This is why retrieval quality directly impacts generation quality—bad retrieval means bad documents in the prompt, leading to poor generation regardless of the LLM's capability. Advanced systems use hierarchical chunking (documents split into passages, retrieved at passage level then expanded to document level) and dynamic context window allocation based on query complexity.",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Jasprit Bumrah is preparing for a tricky Test match middle-order batsman (the query is 'How to bowl to Babar Azam'). Bumrah's coach has access to 500 video clips of Babar's previous innings, but Bumrah can only watch and absorb 10 minutes of video (context window limit) before stepping onto the field. The coach doesn't show him all 500 clips randomly. Instead, the coach uses RAG-like retrieval: he retrieves the 5 most relevant clips—Babar's recent performances against left-arm fast bowlers, his struggles with yorkers in Test cricket, his footwork against short-pitch deliveries. The coach arranges these clips strategically: first, the most recent England tour where Babar struggled; then, the specific yorker trap video because that's the strategy they'll use. The coach also gives explicit instructions: 'Focus only on these specific clips—don't improvise from other matches you remember, because that might be outdated.' This is the prompt engineering step.\n\nThe 500 video clips are the vector database. The retrieval algorithm (selecting the 5 most relevant clips based on Bumrah's query vector) is the semantic search. The context window (10 minutes of video) is the LLM's token limit. The coach's arrangement of clips is prompt structuring. The explicit instruction 'use only these clips' is the grounding prompt. The batsman performance prediction is the LLM's generation.\n\nThis reveals the critical balance in RAG: retrieval quality determines what knowledge Bumrah receives, but prompt structuring determines how effectively he uses that knowledge. Poor retrieval (showing clips of opening batsmen instead of middle-order tactics) ruins even a brilliant bowler's preparation.",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Ranking and Relevance Scoring",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Ranking is the mechanism by which RAG systems select which documents to include in the final prompt. Initial ranking comes from semantic similarity (cosine distance between query and document embeddings), but production systems often employ multi-stage ranking pipelines to refine results. The simplest approach is dense retrieval: compute cosine similarity between the query embedding and all indexed document embeddings, return top-k by similarity score. However, cosine similarity alone has limitations—it captures semantic relatedness but not relevance to the specific query intent or task. To improve ranking, systems use rerankers: smaller, specialized models (like cross-encoders or learned-to-rank models from LambdaMART or neural architectures) that take a query-document pair and produce a relevance score. These rerankers can incorporate task-specific signals—for question-answering, they prioritize documents containing answer-like patterns; for summarization, they prioritize documents with high information density. Some systems use hybrid retrieval: combining dense (semantic embedding) and sparse (BM25 keyword matching) scores, since keyword matching captures exact matches and entity mentions that embeddings might miss. Ranking is computationally critical: ranking 1000 candidate documents with a reranker before selecting top-k is expensive, so systems use cascading stages—first-stage dense retrieval narrows candidates to top-100, second-stage reranker reorders to top-10, third-stage LLM generation uses top-10. This cascade ensures both efficiency and quality.",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: India is selecting 11 players for a Test match in Australia. The coach starts with 50 candidates (like first-stage dense retrieval). The initial ranking uses basic criteria: recent form (semantic similarity)—players who scored runs recently rank higher. This narrows the pool to 20 players (top-100 candidates). Next, the selection committee applies a multi-stage reranker—they evaluate not just recent form but specific metrics: 'Who handles short-pitch bowling well? Who has a strong track record against Mitchell Starc specifically? Who fits the playing XI's balance?' This second-stage reranking reduces to 15 strong contenders. Finally, the captain makes the final 11-player selection by considering hybrid signals: current form, historical record against Australia, pitch-specific skills (if MCG favors pace bowling, fast bowlers rank higher), and team balance. The final XI combines players who ranked high on semantic similarity (recent form) and those who rank high on specific task-relevant criteria (Australia-specific experience).\n\nThe 50 initial candidates are the full document database. First-stage dense retrieval (recent form ranking) is cosine similarity. The 20-candidate shortlist is top-100 approximate neighbors. The second-stage reranker (selection committee's multi-criteria evaluation) is the cross-encoder or LambdaMART reranker. Hybrid retrieval (combining form and Australia-specific factors) is combining dense and sparse signals. The final 11-player team is the top-k documents fed to the LLM generation.\n\nThis reveals why multi-stage ranking is necessary in RAG: first-stage retrieval is fast and broad, but later stages refine based on task-specific intent. A player with recent form might not be the best choice for Australia; similarly, semantically similar documents might not be the most relevant to the user's actual question.",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Query Expansion and Reformulation",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Raw user queries are often ambiguous, short, or poorly formulated, which reduces retrieval effectiveness. Query expansion and reformulation techniques enhance the retrieval process by transforming the user's input into multiple enriched queries that better match relevant documents. Query expansion adds semantically related terms: if the user asks 'RAG performance', the system expands this to 'retrieval-augmented generation efficiency, generation quality with retrieval, latency of RAG systems, RAG accuracy benchmarks' and retrieves using all expanded queries, then deduplicates and merges results. Query reformulation uses the LLM itself to rewrite the query for clarity—'I'm making a cake but it's dry' becomes 'How to fix dry cake texture' or 'What moisture content do cakes need', explicitly modeling multiple valid interpretations. Hypothetical document embeddings (HyDE) take reformulation further: the LLM generates a hypothetical answer to the query (even if it's potentially inaccurate), embeds that hypothetical answer, and uses it as the query vector for retrieval. This works because documents that would answer the query well are semantically similar to plausible answers, even if the LLM's hypothetical answer contains hallucinations. Multi-query retrieval combines all these approaches: generate multiple interpretations of the query, retrieve using each, rank the union of results, and pass the best documents to generation. The benefit is robustness—if the original query is unclear, reformulated queries will capture the true intent. The cost is latency: multiple retrieval rounds before generation.",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A rookie bowler asks the experienced coach, 'How do I get more wickets?' This query is vague—it could mean batting technique, field placement, ball selection, or fitness. Instead of answering directly, the coach reformulates: 'Let's break this into multiple questions: How do I bowl with better line and length? How do I set attacking field placements? What's my ideal bowling spell length? Should I develop a slower ball?' Each reformulation retrieves specific training drills, match videos, and coaching insights. The coach also uses a hypothetical approach—'Imagine you just took a five-wicket haul; what did you do differently?'—prompting the bowler to generate a hypothetical performance scenario, which guides retrieval of similar real match footage. Finally, the coach combines insights from all these expanded queries—classic fast bowling technique (retrieved from 'line and length' query), Wasim Akram's field placement strategies (from 'field placement' query), Bumrah's yorker practice routines (from 'slower ball' query)—into a comprehensive coaching plan.\n\nThe vague initial query is the raw user input. Query reformulation (breaking into multiple specific questions) is explicit query expansion. The hypothetical answer (imagining a five-wicket haul) is HyDE. Multiple training drills and videos retrieved for each reformulated query are multi-query retrieval results. The comprehensive coaching plan is the merged, deduplicated, top-ranked results fed to the generation (training session).\n\nThis reveals why query reformulation is essential: a single awkwardly-phrased query might match zero relevant documents, but three reformulated interpretations will collectively cover the true information need, making RAG robust to unclear user input.",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom typing import List, Tuple\nfrom dataclasses import dataclass\nimport json\n\n# ============================================================================\n# RAG System Implementation with Cricket Theme\n# Demonstrates: retrieval, ranking, prompt engineering, generation\n# ============================================================================\n\n@dataclass\nclass CricketMatch:\n    \"\"\"Represents a cricket match document in the knowledge base.\"\"\"\n    match_id: str\n    team_a: str\n    team_b: str\n    venue: str\n    match_summary: str\n    embedding: np.ndarray = None\n    \n    def __post_init__(self):\n        if self.embedding is None:\n            # Simulated embedding: in production, use real embedding model\n            self.embedding = np.random.randn(768) / np.sqrt(768)\n\n\nclass SimpleEmbeddingSimulator:\n    \"\"\"Simulates semantic embeddings for demo purposes.\n    In production: use sentence-transformers, OpenAI embeddings, etc.\"\"\"\n    \n    def __init__(self):\n        self.dimension = 768\n    \n    def embed_text(self",
+      "text": "str) -> np.ndarray:\n        \"\"\"Simulate embedding by hashing text to reproducible vector.\"\"\"\n        np.random.seed(hash(text) % 2**32)\n        return np.random.randn(self.dimension) / np.sqrt(self.dimension)\n\n\nclass VectorDatabase:\n    \"\"\"Vector database storing match documents and embeddings.\"\"\"\n    \n    def __init__(self):\n        self.matches: List[CricketMatch] = []\n        self.embeddings_list: List[np.ndarray] = []\n    \n    def add_match(self",
+      "match": "CricketMatch):\n        \"\"\"Add a match document to the database.\"\"\"\n        self.matches.append(match)\n        self.embeddings_list.append(match.embedding)\n    \n    def retrieve(self",
+      "query_embedding": "np.ndarray",
+      "top_k": "int = 3) -> List[Tuple[CricketMatch, float]]:\n        \"\"\"Retrieve top-k matches by cosine similarity.\n        \n        Args:\n            query_embedding: Query vector (embedding of the question)\n            top_k: Number of top matches to retrieve\n        \n        Returns:\n            List of (match, similarity_score) tuples, sorted by similarity descending\n        \"\"\"\n        if not self.embeddings_list:\n            return []\n        \n        # Stack embeddings into matrix for batch cosine similarity\n        embeddings_matrix = np.vstack(self.embeddings_list)\n        \n        # Compute cosine similarity: (query · doc) / (||query|| * ||doc||)\n        query_norm = np.linalg.norm(query_embedding)\n        doc_norms = np.linalg.norm(embeddings_matrix, axis=1)\n        \n        similarities = np.dot(embeddings_matrix, query_embedding) / (doc_norms * query_norm + 1e-8)\n        \n        # Get top-k indices\n        top_k_indices = np.argsort(similarities)[::-1][:top_k]\n        \n        # Return matches with scores\n        results = [(self.matches[i], float(similarities[i])) for i in top_k_indices]\n        return results\n\n\nclass SimpleReranker:\n    \"\"\"Reranks retrieved documents using task-specific heuristics.\n    In production: use cross-encoders (e.g., sentence-transformers CrossEncoder).\"\"\"\n    \n    def rerank(self",
+      "query": "str",
+      "retrieved_matches": "List[Tuple[CricketMatch, float]]) -> List[Tuple[CricketMatch, float]]:\n        \"\"\"Rerank documents based on relevance signals.\n        \n        Args:\n            query: User's original query\n            retrieved_matches: List of (match, similarity_score) from first-stage retrieval\n        \n        Returns:\n            Reranked list with adjusted scores\n        \"\"\"\n        # Heuristic: boost score if match involves Australia (common in cricket queries)\n        reranked = []\n        for match, score in retrieved_matches:\n            boost = 0.1 if 'Australia' in match.team_a or 'Australia' in match.team_b else 0\n            reranked.append((match, score + boost))\n        \n        return sorted(reranked, key=lambda x: x[1], reverse=True)\n\n\nclass RAGSystem:\n    \"\"\"Complete RAG pipeline: retrieve → rerank → prompt → generate.\"\"\"\n    \n    def __init__(self):\n        self.embedding_model = SimpleEmbeddingSimulator()\n        self.vector_db = VectorDatabase()\n        self.reranker = SimpleReranker()\n    \n    def add_documents(self",
+      "matches": "List[CricketMatch]):\n        \"\"\"Index cricket match documents into vector database.\"\"\"\n        for match in matches:\n            # Generate embedding for match summary\n            match.embedding = self.embedding_model.embed_text(match.match_summary)\n            self.vector_db.add_match(match)\n        print(f\"[RAG] Indexed {len(matches)} cricket matches\")\n    \n    def retrieve_and_rerank(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "top_k": "int = 3) -> List[Tuple[CricketMatch, float]]:\n        \"\"\"First-stage retrieval + second-stage reranking.\n        \n        Args:\n            query: User's question\n            top_k: Number of documents to return\n        \n        Returns:\n            Reranked top-k matches\n        \"\"\"\n        # Stage 1: Dense retrieval by semantic similarity\n        query_embedding = self.embedding_model.embed_text(query)\n        retrieved = self.vector_db.retrieve(query_embedding, top_k=top_k)\n        print(f\"\\n[Retrieval Stage 1] Retrieved {len(retrieved)} matches by semantic similarity\")\n        for match, score in retrieved:\n            print(f\"  - {match.team_a} vs {match.team_b} @ {match.venue} (similarity: {score:.3f})\")\n        \n        # Stage 2: Reranking with task-specific signals\n        reranked = self.reranker.rerank(query, retrieved)\n        print(f\"[Retrieval Stage 2] Reranked matches by relevance\")\n        for match, score in reranked:\n            print(f\"  - {match.team_a} vs {match.team_b} @ {match.venue} (rerank score: {score:.3f})\")\n        \n        return reranked\n    \n    def build_prompt(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str",
+      "context_matches": "List[Tuple[CricketMatch, float]]) -> str:\n        \"\"\"Engineer prompt: system instructions + context + query.\n        \n        This step integrates retrieved documents into the LLM's input.\n        \"\"\"\n        system_instructions = (\n            \"You are a cricket expert. Answer questions using ONLY the provided match context. \"\n            \"If the context doesn't contain relevant information, say 'I don't have information about this.'\"\n        )\n        \n        context = \"\\n\\n\".join([\n            f\"Match {i+1}: {match.team_a} vs {match.team_b}\\nVenue: {match.venue}\\nSummary: {match.match_summary}\"\n            for i, (match, _) in enumerate(context_matches)\n        ])\n        \n        prompt = f\"\"\"System Instructions: {system_instructions}\n\nContext (retrieved cricket match information):\n{context}\n\nQuestion: {query}\n\nAnswer:\"\"\"\n        return prompt\n    \n    def generate_answer(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "query": "str) -> dict:\n        \"\"\"Complete RAG pipeline: retrieve → rerank → build prompt → generate.\n        \n        In production, the 'generate' step calls an actual LLM (OpenAI, Claude, etc.).\n        Here we simulate generation.\n        \"\"\"\n        print(f\"\\n{'='*70}\")\n        print(f\"Query: {query}\")\n        print(f\"{'='*70}\")\n        \n        # Retrieve and rerank\n        context_matches = self.retrieve_and_rerank(query, top_k=3)\n        \n        # Build prompt for LLM\n        prompt = self.build_prompt(query, context_matches)\n        print(f\"\\n[Prompt Engineering] Built prompt with {len(context_matches)} documents:\")\n        print(f\"Prompt preview:\\n{prompt[:300]}...\")\n        \n        # Simulate LLM generation (in production: call actual LLM API)\n        simulated_answer = (\n            f\"Based on the retrieved cricket matches, \"\n            f\"{context_matches[0][0].team_a} demonstrated strong performance against {context_matches[0][0].team_b} \"\n            f\"at {context_matches[0][0].venue}. The key insight from the context is that \"\n            f\"match preparation and venue-specific tactics are critical success factors.\"\n        )\n        \n        return {\n            \"query\": query,\n            \"retrieved_matches\": [(m.match_id, f\"{m.team_a} vs {m.team_b}\") for m, _ in context_matches],\n            \"answer\": simulated_answer,\n            \"prompt_used\": prompt\n        }\n\n\n# ============================================================================\n# Example Usage\n# ============================================================================\n\nif __name__ == \"__main__\":\n    # Create vector database with cricket matches\n    matches = [\n        CricketMatch(\n            match_id=\"ind_vs_aus_mcg_2023\",\n            team_a=\"India\",\n            team_b=\"Australia\",\n            venue=\"Melbourne Cricket Ground\",\n            match_summary=\"India toured Australia for Test series. Virat Kohli scored 150 runs. \"\n                          \"Jasprit Bumrah took 5 wickets. India won by 6 wickets. \"\n                          \"Key factor: fast bowling and batting against short-pitch deliveries.\"\n        ),\n        CricketMatch(\n            match_id=\"ind_vs_eng_lords_2023\",\n            team_a=\"India\",\n            team_b=\"England\",\n            venue=\"Lord's, London\",\n            match_summary=\"India vs England Test at Lord's. Rohit Sharma led India to victory. \"\n                          \"England struggled against Indian spin bowlers. Match was decided by \"\n                          \"effective field placement and disciplined bowling spells.\"\n        ),\n        CricketMatch(\n            match_id=\"ind_vs_pak_t20_2023\",\n            team_a=\"India\",\n            team_b=\"Pakistan\",\n            venue=\"Arun Jaitley Stadium, Delhi\",\n            match_summary=\"India vs Pakistan T20 match. High-scoring encounter. Bumrah's yorkers \"\n                          \"were decisive in the death overs. India's powerplay batting set the tone. \"\n                          \"Pakistan couldn't recover from early wicket losses.\"\n        ),\n        CricketMatch(\n            match_id=\"aus_vs_nz_perth_2023\",\n            team_a=\"Australia\",\n            team_b=\"New Zealand\",\n            venue=\"Perth, Western Australia\",\n            match_summary=\"Australia vs New Zealand Test at Perth. Fast, bouncy pitch favored \"\n                          \"Australian fast bowlers. New Zealand's batting lineup struggled. \"\n                          \"Australia's pace attack of Cummins and Starc dominated.\"\n        )\n    ]\n    \n    # Initialize RAG system and index documents\n    rag = RAGSystem()\n    rag.add_documents(matches)\n    \n    # Query 1: Specific question about India's performance in Australia\n    result1 = rag.generate_answer(\n        \"How did India perform against Australia at MCG? What were key success factors?\"\n    )\n    print(f\"\\n[Generation Result]\")\n    print(f\"Answer: {result1['answer']}\")\n    print(f\"Retrieved matches: {result1['retrieved_matches']}\")\n    \n    # Query 2: Question about fast bowling\n    print(\"\\n\" + \"=\"*70 + \"\\n\")\n    result2 = rag.generate_answer(\n        \"What role did fast bowling play in recent India matches?\"\n    )\n    print(f\"\\n[Generation Result]\")\n    print(f\"Answer: {result2['answer']}\")\n    print(f\"Retrieved matches: {result2['retrieved_matches']}\")",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "language",
+      "content": "python",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "level",
+      "content": 2,
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The code above implements a complete RAG pipeline using cricket match data as domain context. Execution flow follows these stages: (1) Indexing — the `RAGSystem` is initialized with four cricket match documents (India vs Australia at MCG, India vs England at Lord's, etc.). Each match summary is embedded using a semantic embedding simulator (in production, this would use a real embedding model like sentence-transformers). The embeddings are stored in the `VectorDatabase` with match metadata. (2) Retrieval — when a user queries 'How did India perform against Australia at MCG?', the query is embedded and compared against all indexed match embeddings using cosine similarity. The vector database returns the top-3 most similar matches (e.g., the India-Australia MCG match ranks highest because the query mentions both teams and venue). (3) Reranking — the `SimpleReranker` applies task-specific heuristics; matches involving Australia receive a relevance boost, refining the rankings further. (4) Prompt Engineering — the top-ranked matches are formatted into a structured prompt with system instructions ('Answer only using provided context'), retrieved context (match summaries), and the user's query. This prompt construction ensures the LLM will ground its answer in actual data. (5) Generation — in production, this prompt is sent to an LLM (GPT-4, Claude, Llama). Here we simulate the generation step with a hardcoded answer. The key insight is that each pipeline stage (retrieval, reranking, prompt engineering) directly impacts answer quality—poor retrieval returns irrelevant documents, degrading generation regardless of LLM capability. The modular design allows each component (embedding model, reranker, prompt template) to be upgraded independently without retraining the entire system.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}
