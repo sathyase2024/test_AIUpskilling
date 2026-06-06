@@ -84,7 +84,7 @@ const SLUG_ICON: Record<string, string> = {
   'pytorch-deep-learning': '🔥', 'retrieval-augmented-generation': '🔍',
   'ai-agents-agentic-workflows': '🤖', 'large-language-models': '🧠',
   'python-for-ai-ml': 'PY', microservices: '🔗', graphql: '◈', grpc: '📡',
-  'aws': '☁', 'gcp': '☁', docker: '🐳', mongodb: '🍃',
+  gcp: '☁',
 }
 const CAT_ICON: Record<Category, string> = {
   Programming: '💻', Frontend: '🖥', Backend: '🗄', Mobile: '📱',
