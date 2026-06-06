@@ -35,7 +35,7 @@ PROGRESS_PATH = REPO_ROOT / "generation_progress.json"
 AI_WORKER_PATH = REPO_ROOT / "ai-worker"
 
 MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 4096
+MAX_TOKENS = 8192
 HOBBY = "cricket"
 
 # Cost per million tokens (USD)
