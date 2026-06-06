@@ -18,5 +18,5 @@ def get_client():
         key = os.getenv("ANTHROPIC_API_KEY", "")
         if not key:
             raise RuntimeError("ANTHROPIC_API_KEY environment variable is not set")
-        _client = anthropic.Anthropic(api_key=key)
+        _client = anthropic.Anthropic(api_key=key, timeout=60.0)
     return _client

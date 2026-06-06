@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
+import AuthGuard from '@/components/AuthGuard'
 import {
   Flame,
   Zap,
@@ -636,6 +637,7 @@ export default function DashboardPage() {
   const [notifOpen, setNotifOpen] = useState(false)
 
   return (
+    <AuthGuard>
     <div className="min-h-screen" style={{ backgroundColor: '#0a0a0f' }}>
       <Navbar />
 
@@ -710,5 +712,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </AuthGuard>
   )
 }

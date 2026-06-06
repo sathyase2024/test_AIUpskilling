@@ -29,10 +29,14 @@ export function getToken(): string | null {
 
 export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token);
+  // Set a flag cookie so Next.js middleware can gate protected routes server-side.
+  // This is NOT the auth token — the real JWT stays in localStorage.
+  document.cookie = 'skillforge_token=1; path=/; SameSite=Lax; max-age=604800';
 }
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+  document.cookie = 'skillforge_token=; path=/; max-age=0';
 }
 
 // ─── User helpers ───────────────────────────────────────────────────────────────
