@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TopicsModule } from './topics/topics.module';
+import { LessonsModule } from './lessons/lessons.module';
 import { ProgressModule } from './progress/progress.module';
 import { LearningPathsModule } from './learning-paths/learning-paths.module';
 import { AiModule } from './ai/ai.module';
@@ -37,6 +38,7 @@ import { CodingSubmission } from './entities/coding-submission.entity';
     AuthModule,
     UsersModule,
     TopicsModule,
+    LessonsModule,
     ProgressModule,
     LearningPathsModule,
     AiModule,

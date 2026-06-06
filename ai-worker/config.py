@@ -6,7 +6,7 @@ load_dotenv()
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 MODEL = "claude-sonnet-4-6"
-MAX_TOKENS = 8192
+MAX_TOKENS = 16000
 
 _client: Optional[object] = None
 
