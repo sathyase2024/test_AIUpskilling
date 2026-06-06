@@ -33,7 +33,7 @@ async function bootstrap() {
   const configured = (process.env.FRONTEND_URL || '')
     .split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       const allowed =
         !origin ||
         /^https?:\/\/localhost(:\d+)?$/.test(origin) ||
@@ -60,6 +60,6 @@ async function bootstrap() {
   await app.listen(port);
   logger.log(`🚀 SkillForge backend running on http://localhost:${port}`);
   logger.log(`📚 API docs available at http://localhost:${port}/api/docs`);
-  logger.log(`🔓 CORS enabled for: ${origins.join(', ') || 'all origins'}`);
+  logger.log(`🔓 CORS enabled for: *.onrender.com, localhost${configured.length ? ', ' + configured.join(', ') : ''}`);
 }
 bootstrap();
