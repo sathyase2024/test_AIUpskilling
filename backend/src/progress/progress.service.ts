@@ -71,6 +71,22 @@ export class ProgressService {
     return days;
   }
 
+  async getRecentActivity(userId: string) {
+    const rows = await this.progressRepo.find({
+      where: { userId, completed: true },
+      relations: { lesson: true },
+      order: { completedAt: 'DESC' },
+      take: 8,
+    });
+    return rows.map((r) => ({
+      lessonTitle: r.lesson?.title ?? 'Unknown lesson',
+      lessonId: r.lessonId,
+      topicId: r.topicId,
+      xpEarned: r.xpEarned,
+      completedAt: r.completedAt,
+    }));
+  }
+
   async getSkillProgress(userId: string) {
     const categories = ['programming', 'frontend', 'backend', 'devops', 'ai-ml', 'databases'];
 

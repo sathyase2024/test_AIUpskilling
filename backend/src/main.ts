@@ -3,6 +3,8 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './filters/http-exception.filter';
+import cookieParser = require('cookie-parser');
+import helmet from 'helmet';
 
 async function bootstrap() {
   // ── Guard: insecure JWT secret in production ─────────────────────────────────
@@ -17,6 +19,10 @@ async function bootstrap() {
 
   // ── Global exception filter ───────────────────────────────────────────────────
   app.useGlobalFilters(new GlobalExceptionFilter());
+
+  // ── Security headers ──────────────────────────────────────────────────────────
+  app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled: Next.js handles it client-side
+  app.use(cookieParser());
 
   // ── Global validation ────────────────────────────────────────────────────────
   app.useGlobalPipes(

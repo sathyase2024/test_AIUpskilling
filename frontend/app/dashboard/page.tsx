@@ -299,11 +299,26 @@ function StatCards() {
 }
 
 function LearningPath() {
-  const [prog, setProg] = useState(0)
+  const [topic, setTopic] = useState<{ name: string; slug: string; description: string } | null>(null)
+  const [progress, setProgress] = useState(0)
+
   useEffect(() => {
-    const t = setTimeout(() => setProg(65), 500)
-    return () => clearTimeout(t)
+    apiGet<{ topics: Array<{ name: string; slug: string; description: string }> }>('/topics?limit=10')
+      .then((data) => {
+        const first = Array.isArray(data) ? (data as Array<{ name: string; slug: string; description: string }>)[0] : data.topics?.[0]
+        if (first) setTopic(first)
+      })
+      .catch(() => {})
+
+    apiGet<{ completedLessons: number }>('/progress/overview')
+      .then((data) => {
+        const pct = Math.min(100, (data.completedLessons / 35) * 100)
+        setTimeout(() => setProgress(pct), 400)
+      })
+      .catch(() => {})
   }, [])
+
+  const prog = progress
 
   return (
     <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
@@ -313,15 +328,15 @@ function LearningPath() {
             <Target className="w-4 h-4 text-purple-400" />
             <span className="text-white/50 text-xs font-medium uppercase tracking-wider">Active Path</span>
           </div>
-          <h2 className="text-white text-xl font-bold">Full Stack Java Developer</h2>
+          <h2 className="text-white text-xl font-bold">{topic ? topic.name : '—'}</h2>
           <p className="text-white/50 text-sm mt-1">
             Current module:{' '}
-            <span className="text-cyan-400 font-medium">Spring Boot REST APIs</span>
+            <span className="text-cyan-400 font-medium">{topic ? topic.description : '—'}</span>
           </p>
         </div>
         <div className="text-right">
           <span className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-            {prog}%
+            {topic ? `${Math.round(prog)}%` : '—'}
           </span>
           <p className="text-white/40 text-xs mt-0.5">complete</p>
         </div>
@@ -342,11 +357,11 @@ function LearningPath() {
         <div>
           <p className="text-white/40 text-xs mb-1">Next up</p>
           <p className="text-white text-sm font-medium">
-            Lesson 5: Request Validation &amp; Error Handling
+            Continue where you left off
           </p>
         </div>
         <Link
-          href="/learn"
+          href={topic ? `/learn/${topic.slug}` : '/learn'}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-sm font-semibold hover:opacity-90 transition-opacity shrink-0 shadow-lg shadow-purple-500/25"
         >
           <Play className="w-3.5 h-3.5 fill-white" />
@@ -437,7 +452,40 @@ function SkillBars() {
   )
 }
 
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffHours = diffMs / (1000 * 60 * 60)
+  if (diffHours < 1) return 'just now'
+  if (diffHours < 24) return `${Math.floor(diffHours)}h ago`
+  if (diffHours < 48) return 'yesterday'
+  return date.toLocaleDateString()
+}
+
 function RecentActivityFeed() {
+  const [items, setItems] = useState<Array<{
+    lessonTitle: string
+    lessonId: string
+    topicId: string
+    xpEarned: number
+    completedAt: string
+  }>>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    apiGet<Array<{ lessonTitle: string; lessonId: string; topicId: string; xpEarned: number; completedAt: string }>>(
+      '/progress/recent'
+    )
+      .then((data) => {
+        setItems(data)
+        setLoading(false)
+      })
+      .catch(() => {
+        setLoading(false)
+      })
+  }, [])
+
   return (
     <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 h-full">
       <div className="flex items-center gap-2 mb-5">
@@ -445,18 +493,21 @@ function RecentActivityFeed() {
         <h3 className="text-white font-semibold">Recent Activity</h3>
       </div>
       <div className="space-y-1">
-        {recentActivity.map((item, i) => (
+        {!loading && items.length === 0 && (
+          <p className="text-white/40 text-sm py-4 text-center">Complete your first lesson to see activity here</p>
+        )}
+        {items.map((item, i) => (
           <div key={i} className="flex gap-3 py-2.5 border-b border-white/5 last:border-0">
-            <div
-              className={`mt-0.5 shrink-0 w-8 h-8 rounded-full ${item.bgColor} flex items-center justify-center ${item.color}`}
-            >
-              {item.icon}
+            <div className="mt-0.5 shrink-0 w-8 h-8 rounded-full bg-cyan-500/10 flex items-center justify-center text-cyan-400">
+              <CheckCircle className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white/80 text-sm font-medium leading-snug">{item.title}</p>
-              <p className="text-white/40 text-xs mt-0.5">{item.sub}</p>
+              <p className="text-white/80 text-sm font-medium leading-snug">{item.lessonTitle}</p>
+              <p className="text-white/40 text-xs mt-0.5">+{item.xpEarned} XP earned</p>
             </div>
-            <span className="text-white/30 text-xs shrink-0 pt-0.5 whitespace-nowrap">{item.time}</span>
+            <span className="text-white/30 text-xs shrink-0 pt-0.5 whitespace-nowrap">
+              {formatRelativeTime(item.completedAt)}
+            </span>
           </div>
         ))}
       </div>
@@ -464,7 +515,34 @@ function RecentActivityFeed() {
   )
 }
 
+interface TopicItem {
+  name: string
+  slug: string
+  category?: string
+  difficulty?: 'Beginner' | 'Intermediate' | 'Advanced'
+  durationHours?: number
+  enrolledCount?: number
+  imageGradient?: string
+}
+
 function RecommendedCourses() {
+  const [topics, setTopics] = useState<TopicItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    apiGet<TopicItem[] | { topics: TopicItem[] }>('/topics?limit=6')
+      .then((data) => {
+        const arr = Array.isArray(data) ? data : (data as { topics: TopicItem[] }).topics ?? []
+        setTopics(arr)
+        setLoading(false)
+      })
+      .catch(() => {
+        setLoading(false)
+      })
+  }, [])
+
+  const fallbackGradient = 'linear-gradient(135deg,#7c3aed,#06b6d4)'
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -477,43 +555,61 @@ function RecommendedCourses() {
         </Link>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {recommendedCourses.map((c) => (
+        {loading && [0, 1, 2].map((i) => (
           <div
-            key={c.title}
+            key={i}
+            className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden opacity-40 animate-pulse"
+          >
+            <div className="h-28 bg-white/10" />
+            <div className="p-4 space-y-2">
+              <div className="h-3 bg-white/10 rounded w-1/2" />
+              <div className="h-4 bg-white/10 rounded w-3/4" />
+              <div className="h-8 bg-white/10 rounded mt-3" />
+            </div>
+          </div>
+        ))}
+        {!loading && topics.map((c) => (
+          <div
+            key={c.slug}
             className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden group hover:border-white/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-purple-500/10"
           >
             {/* Thumbnail */}
-            <div className={`h-28 bg-gradient-to-br ${c.gradient} flex items-center justify-center relative overflow-hidden`}>
+            <div
+              className="h-28 flex items-center justify-center relative overflow-hidden"
+              style={{ background: c.imageGradient || fallbackGradient }}
+            >
               <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_30%_50%,white,transparent_60%)]" />
               <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                {c.icon}
+                <Sparkles className="w-6 h-6 text-white" />
               </div>
             </div>
             <div className="p-4">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 text-[10px] font-medium border border-purple-500/20">
-                  {c.category}
-                </span>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${difficultyColor(c.difficulty)}`}
-                >
-                  {c.difficulty}
-                </span>
+                {c.category && (
+                  <span className="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 text-[10px] font-medium border border-purple-500/20">
+                    {c.category}
+                  </span>
+                )}
+                {c.difficulty && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${difficultyColor(c.difficulty)}`}
+                  >
+                    {c.difficulty}
+                  </span>
+                )}
               </div>
-              <p className="text-white font-semibold text-sm leading-snug">{c.title}</p>
+              <p className="text-white font-semibold text-sm leading-snug">{c.name}</p>
               <div className="flex items-center justify-between mt-2 mb-3">
                 <div className="flex items-center gap-1">
                   <Clock className="w-3 h-3 text-white/40" />
-                  <span className="text-white/40 text-xs">{c.duration}</span>
+                  <span className="text-white/40 text-xs">{c.durationHours != null ? `${c.durationHours}h` : '—'}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                  <span className="text-white/60 text-xs">{c.rating}</span>
-                  <span className="text-white/30 text-xs">· {c.students}</span>
+                  <span className="text-white/30 text-xs">{c.enrolledCount != null ? `${c.enrolledCount.toLocaleString()} enrolled` : ''}</span>
                 </div>
               </div>
               <Link
-                href="/topics"
+                href={`/learn/${c.slug}`}
                 className="block text-center py-2 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-xs font-semibold hover:opacity-90 transition-opacity shadow-md shadow-purple-500/20"
               >
                 Start Learning
