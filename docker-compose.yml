@@ -46,9 +46,20 @@ services:
       PORT: 3001
       AI_WORKER_URL: http://ai-worker:8000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      GENERATED_LESSONS_DIR: /app/generated_lessons
+    volumes:
+      # Mount pre-generated lesson JSON (read-only) so the backend can seed it.
+      - ./generated_lessons:/app/generated_lessons:ro
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3001/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   ai-worker:
@@ -60,6 +71,12 @@ services:
       - "8000:8000"
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/').status < 500 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   frontend:
@@ -70,9 +87,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

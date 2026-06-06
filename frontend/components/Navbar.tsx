@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState, useRef, useEffect } from 'react'
+import { getStoredUser, logout, type StoredUser } from '@/lib/api'
 import {
   Sparkles,
   Menu,
@@ -102,15 +103,45 @@ const mockNotifications: Notification[] = [
 ------------------------------------------------------- */
 export default function Navbar() {
   const pathname = usePathname()
+  const router   = useRouter()
   const [mobileOpen, setMobileOpen]         = useState(false)
   const [userMenuOpen, setUserMenuOpen]     = useState(false)
   const [notifOpen, setNotifOpen]           = useState(false)
   const [scrolled, setScrolled]             = useState(false)
+  const [user, setUser]                     = useState<StoredUser | null>(null)
+  const [mounted, setMounted]               = useState(false)
 
   const userMenuRef = useRef<HTMLDivElement>(null)
   const notifRef    = useRef<HTMLDivElement>(null)
 
   const unreadCount = mockNotifications.filter(n => !n.read).length
+
+  /* Load the signed-in user from localStorage (client-only) */
+  useEffect(() => {
+    setMounted(true)
+    setUser(getStoredUser())
+  }, [pathname])
+
+  /* Derived display values with sensible fallbacks */
+  const displayName  = user?.name || 'Guest'
+  const displayEmail = user?.email || 'Sign in to sync your progress'
+  const initials = (user?.name || 'G')
+    .split(' ')
+    .map(p => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+  const level = user?.level ?? 1
+  const xp    = user?.xp ?? 0
+
+  const handleLogout = () => {
+    logout()
+    setUser(null)
+    setUserMenuOpen(false)
+    setMobileOpen(false)
+    router.push('/login')
+  }
 
   /* Detect scroll for background opacity change */
   useEffect(() => {
@@ -367,11 +398,11 @@ export default function Navbar() {
                   style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}
                   aria-hidden="true"
                 >
-                  AC
+                  {initials}
                 </div>
                 <div className="hidden sm:block text-left">
-                  <p className="text-xs font-semibold text-white leading-tight">Alex Chen</p>
-                  <p className="text-xs text-white/40 leading-tight">Level 14</p>
+                  <p className="text-xs font-semibold text-white leading-tight">{displayName}</p>
+                  <p className="text-xs text-white/40 leading-tight">Level {level}</p>
                 </div>
                 <ChevronDown
                   className={[
@@ -404,25 +435,25 @@ export default function Navbar() {
                         className="w-10 h-10 rounded-xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
                         style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}
                       >
-                        AC
+                        {initials}
                       </div>
                       <div>
-                        <p className="font-semibold text-white text-sm">Alex Chen</p>
-                        <p className="text-xs text-white/50">alex.chen@example.com</p>
+                        <p className="font-semibold text-white text-sm">{displayName}</p>
+                        <p className="text-xs text-white/50">{displayEmail}</p>
                       </div>
                     </div>
 
                     {/* XP progress bar */}
                     <div className="mt-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-white/50">Level 14</span>
-                        <span className="text-xs" style={{ color: '#a78bfa' }}>8,420 / 10,000 XP</span>
+                        <span className="text-xs text-white/50">Level {level}</span>
+                        <span className="text-xs" style={{ color: '#a78bfa' }}>{xp.toLocaleString()} XP</span>
                       </div>
                       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
                         <div
                           className="h-full rounded-full"
                           style={{
-                            width: '84.2%',
+                            width: `${Math.min(100, (xp % 10000) / 100)}%`,
                             background: 'linear-gradient(90deg, #7c3aed, #06b6d4)',
                           }}
                         />
@@ -452,16 +483,28 @@ export default function Navbar() {
                     ))}
                   </div>
 
-                  {/* Divider + Logout */}
+                  {/* Divider + Logout / Sign in */}
                   <div className="border-t border-white/5 py-1.5">
-                    <button
-                      role="menuitem"
-                      className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/5 transition-colors duration-150"
-                      onClick={() => setUserMenuOpen(false)}
-                    >
-                      <LogOut className="w-4 h-4" aria-hidden="true" />
-                      Sign Out
-                    </button>
+                    {mounted && !user ? (
+                      <Link
+                        href="/login"
+                        role="menuitem"
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors duration-150"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        <User className="w-4 h-4" aria-hidden="true" />
+                        Sign In
+                      </Link>
+                    ) : (
+                      <button
+                        role="menuitem"
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/5 transition-colors duration-150"
+                        onClick={handleLogout}
+                      >
+                        <LogOut className="w-4 h-4" aria-hidden="true" />
+                        Sign Out
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -548,13 +591,13 @@ export default function Navbar() {
               className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}
             >
-              AC
+              {initials}
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">Alex Chen</p>
+              <p className="text-sm font-semibold text-white">{displayName}</p>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-white/40">Lv. 14 ·</span>
-                <span className="text-xs" style={{ color: '#a78bfa' }}>8,420 XP</span>
+                <span className="text-xs text-white/40">Lv. {level} ·</span>
+                <span className="text-xs" style={{ color: '#a78bfa' }}>{xp.toLocaleString()} XP</span>
               </div>
             </div>
           </div>
@@ -568,10 +611,23 @@ export default function Navbar() {
               <Settings className="w-4 h-4" aria-hidden="true" />
               Settings
             </Link>
-            <button className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/5 transition-colors">
-              <LogOut className="w-4 h-4" aria-hidden="true" />
-              Sign Out
-            </button>
+            {mounted && !user ? (
+              <Link
+                href="/login"
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                <User className="w-4 h-4" aria-hidden="true" />
+                Sign In
+              </Link>
+            ) : (
+              <button
+                onClick={handleLogout}
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/5 transition-colors"
+              >
+                <LogOut className="w-4 h-4" aria-hidden="true" />
+                Sign Out
+              </button>
+            )}
           </div>
         </div>
       </div>

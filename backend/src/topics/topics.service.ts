@@ -1,6 +1,8 @@
-import { Injectable, OnApplicationBootstrap, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Topic } from '../entities/topic.entity';
 import { Lesson } from '../entities/lesson.entity';
 
@@ -22,6 +24,49 @@ const SEED_TOPICS = [
   { name: 'Ethical Hacking', slug: 'ethical-hacking', category: 'cybersecurity', description: 'Penetration testing and security fundamentals', difficulty: 'advanced', durationHours: 50, tags: ['security','hacking','pentest','owasp'], imageGradient: 'from-red-600 to-rose-700' },
 ];
 
+// ── Pre-generated AI/ML topics ──────────────────────────────────────────────────
+// These slugs have rich, pre-generated lesson content stored as JSON on disk
+// (one directory per slug under the generated-lessons folder). The folder is
+// resolved at runtime — see seedGeneratedLessons(). Metadata below drives the
+// Topic record; the lessons (with their contentJson) come from the JSON files.
+const GENERATED_TOPIC_META: Record<
+  string,
+  Omit<typeof SEED_TOPICS[number], 'slug'>
+> = {
+  'large-language-models': {
+    name: 'Large Language Models', category: 'ai-ml',
+    description: 'Transformers, attention, tokenization, fine-tuning and prompting — from fundamentals to production LLMs',
+    difficulty: 'advanced', durationHours: 60,
+    tags: ['llm', 'transformers', 'nlp', 'genai', 'ai'], imageGradient: 'from-violet-500 to-fuchsia-600',
+  },
+  'ai-agents-agentic-workflows': {
+    name: 'AI Agents & Agentic Workflows', category: 'ai-ml',
+    description: 'Design autonomous agents, tool use, multi-agent coordination and agentic pipelines',
+    difficulty: 'advanced', durationHours: 50,
+    tags: ['agents', 'llm', 'tools', 'orchestration', 'ai'], imageGradient: 'from-purple-500 to-indigo-600',
+  },
+  'retrieval-augmented-generation': {
+    name: 'Retrieval-Augmented Generation', category: 'ai-ml',
+    description: 'Build RAG pipelines: embeddings, vector stores, chunking, retrieval and grounded generation',
+    difficulty: 'advanced', durationHours: 40,
+    tags: ['rag', 'embeddings', 'vector-db', 'llm', 'ai'], imageGradient: 'from-cyan-500 to-blue-600',
+  },
+  'pytorch-deep-learning': {
+    name: 'PyTorch Deep Learning', category: 'ai-ml',
+    description: 'Tensors, autograd, neural networks and training loops with PyTorch',
+    difficulty: 'intermediate', durationHours: 55,
+    tags: ['pytorch', 'deep-learning', 'neural-networks', 'python', 'ai'], imageGradient: 'from-orange-500 to-red-600',
+  },
+  'python-for-ai-ml': {
+    name: 'Python for AI & ML', category: 'ai-ml',
+    description: 'NumPy, pandas, data wrangling and the scientific Python stack for machine learning',
+    difficulty: 'beginner', durationHours: 45,
+    tags: ['python', 'numpy', 'pandas', 'data', 'ai'], imageGradient: 'from-green-500 to-teal-600',
+  },
+};
+
+const LESSON_TYPES = ['video', 'reading', 'exercise', 'quiz', 'project'] as const;
+
 const LESSON_TEMPLATES = [
   { titleSuffix: '— Introduction & Setup', type: 'reading', durationMinutes: 15, xpReward: 30, orderIndex: 1 },
   { titleSuffix: '— Core Concepts', type: 'reading', durationMinutes: 30, xpReward: 50, orderIndex: 2 },
@@ -32,6 +77,8 @@ const LESSON_TEMPLATES = [
 
 @Injectable()
 export class TopicsService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(TopicsService.name);
+
   constructor(
     @InjectRepository(Topic) private topicRepo: Repository<Topic>,
     @InjectRepository(Lesson) private lessonRepo: Repository<Lesson>,
@@ -40,6 +87,8 @@ export class TopicsService implements OnApplicationBootstrap {
   async onApplicationBootstrap() {
     const count = await this.topicRepo.count();
     if (count === 0) await this.seed();
+    // Idempotent — only inserts slugs that don't already exist.
+    await this.seedGeneratedLessons();
   }
 
   async seed() {
@@ -60,6 +109,111 @@ export class TopicsService implements OnApplicationBootstrap {
         await this.lessonRepo.save(lesson);
       }
     }
+  }
+
+  /**
+   * Resolve the directory that holds pre-generated lesson JSON.
+   * Honours GENERATED_LESSONS_DIR, otherwise tries a few sensible locations
+   * (container mount point and the repo root relative to the running process).
+   */
+  private resolveGeneratedDir(): string | null {
+    const candidates = [
+      process.env.GENERATED_LESSONS_DIR,
+      '/app/generated_lessons',
+      path.resolve(process.cwd(), 'generated_lessons'),
+      path.resolve(process.cwd(), '..', 'generated_lessons'),
+    ].filter(Boolean) as string[];
+
+    for (const dir of candidates) {
+      try {
+        if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) return dir;
+      } catch {
+        // ignore and keep looking
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Seed topics whose lessons have rich, pre-generated content stored as JSON.
+   * Each slug in GENERATED_TOPIC_META maps to a directory of lesson_*.json files.
+   * Safe to call repeatedly: slugs that already exist are skipped.
+   */
+  async seedGeneratedLessons() {
+    const baseDir = this.resolveGeneratedDir();
+    if (!baseDir) {
+      this.logger.warn(
+        'No generated_lessons directory found — skipping pre-generated lesson seeding. ' +
+          'Set GENERATED_LESSONS_DIR or mount the folder to enable it.',
+      );
+      return;
+    }
+
+    let seeded = 0;
+    for (const [slug, meta] of Object.entries(GENERATED_TOPIC_META)) {
+      const existing = await this.topicRepo.findOne({ where: { slug } });
+      if (existing) continue;
+
+      const dir = path.join(baseDir, slug);
+      if (!fs.existsSync(dir)) {
+        this.logger.warn(`Generated content for "${slug}" not found at ${dir} — skipping`);
+        continue;
+      }
+
+      const lessonFiles = fs
+        .readdirSync(dir)
+        .filter((f) => f.startsWith('lesson_') && f.endsWith('.json'))
+        .sort();
+      if (lessonFiles.length === 0) {
+        this.logger.warn(`No lesson files for "${slug}" in ${dir} — skipping`);
+        continue;
+      }
+
+      const topic = (await this.topicRepo.save(
+        this.topicRepo.create({
+          ...meta,
+          slug,
+          rating: 4.7 + Math.random() * 0.3,
+          enrolledCount: Math.floor(Math.random() * 5000) + 500,
+        } as Topic),
+      )) as Topic;
+
+      let order = 1;
+      for (const file of lessonFiles) {
+        let contentJson: Record<string, any>;
+        try {
+          contentJson = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8'));
+        } catch (err: any) {
+          this.logger.error(`Failed to parse ${file}: ${err.message}`);
+          continue;
+        }
+
+        const rawType = String(contentJson.type ?? 'reading');
+        const type = (LESSON_TYPES as readonly string[]).includes(rawType) ? rawType : 'reading';
+        const title = String(contentJson.title ?? `Lesson ${order}`);
+
+        await this.lessonRepo.save(
+          this.lessonRepo.create({
+            topicId: topic.id,
+            title,
+            slug: `${slug}-lesson-${order}`,
+            orderIndex: order,
+            type: type as Lesson['type'],
+            durationMinutes: Number(contentJson.estimatedMinutes) || 30,
+            xpReward: Number(contentJson.xpReward) || 50,
+            content: JSON.stringify(contentJson),
+            contentJson,
+            isGenerated: true,
+          }),
+        );
+        order++;
+      }
+
+      seeded++;
+      this.logger.log(`Seeded generated topic "${slug}" with ${order - 1} lessons`);
+    }
+
+    if (seeded > 0) this.logger.log(`✅ Seeded ${seeded} pre-generated topic(s)`);
   }
 
   async findAll(query: { category?: string; difficulty?: string; search?: string; page?: number; limit?: number }) {

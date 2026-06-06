@@ -4,13 +4,7 @@ import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Sparkles, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, Users } from 'lucide-react'
-import { setToken, apiPost } from '@/lib/api'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface LoginResponse {
-  access_token: string
-}
+import { login } from '@/lib/api'
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -29,8 +23,7 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const data = await apiPost<LoginResponse>('/auth/login', { email, password })
-      setToken(data.access_token)
+      await login(email, password)
       router.push('/dashboard')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Invalid credentials. Please try again.'

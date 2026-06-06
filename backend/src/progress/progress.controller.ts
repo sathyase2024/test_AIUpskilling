@@ -12,20 +12,20 @@ export class ProgressController {
 
   @Post('lessons/:lessonId/complete')
   complete(@Req() req: any, @Param('lessonId') lessonId: string) {
-    return this.progressService.markLessonComplete(req.user.userId, lessonId);
+    return this.progressService.markLessonComplete(req.user.id, lessonId);
   }
 
   @Get('topics/:topicId')
   topicProgress(@Req() req: any, @Param('topicId') topicId: string) {
-    return this.progressService.getTopicProgress(req.user.userId, topicId);
+    return this.progressService.getTopicProgress(req.user.id, topicId);
   }
 
   @Get('overview')
-  overview(@Req() req: any) { return this.progressService.getOverview(req.user.userId); }
+  overview(@Req() req: any) { return this.progressService.getOverview(req.user.id); }
 
   @Get('history')
-  history(@Req() req: any) { return this.progressService.getHistory(req.user.userId); }
+  history(@Req() req: any) { return this.progressService.getHistory(req.user.id); }
 
   @Get('skills')
-  skills(@Req() req: any) { return this.progressService.getSkillProgress(req.user.userId); }
+  skills(@Req() req: any) { return this.progressService.getSkillProgress(req.user.id); }
 }

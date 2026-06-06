@@ -3,6 +3,7 @@
 import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { register } from '@/lib/api'
 import {
   Sparkles,
   Mail,
@@ -23,15 +24,6 @@ import {
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface RegisterResponse {
-  access_token: string
-  user: {
-    id: number
-    name: string
-    email: string
-  }
-}
 
 type PasswordStrength = 'empty' | 'weak' | 'medium' | 'strong'
 
@@ -137,34 +129,22 @@ export default function SignupPage() {
 
     setLoading(true)
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-      const res = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-          hobbies: [...selectedHobbies],
-        }),
+      await register({
+        name,
+        email,
+        password,
+        hobbies: [...selectedHobbies],
       })
-
-      if (!res.ok) {
-        const text = await res.text()
-        try {
-          const parsed = JSON.parse(text)
-          throw new Error(parsed.message ?? 'Registration failed.')
-        } catch {
-          throw new Error('Registration failed. Please try again.')
-        }
-      }
-
-      const data: RegisterResponse = await res.json()
-      localStorage.setItem('skillforge_token', data.access_token)
-      localStorage.setItem('skillforge_user', JSON.stringify(data.user))
       router.push('/dashboard')
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.'
+      // Backend errors arrive as a JSON string body — surface the message field if present.
+      try {
+        const parsed = JSON.parse(message)
+        setError(parsed.message ?? 'Registration failed. Please try again.')
+      } catch {
+        setError(message)
+      }
     } finally {
       setLoading(false)
     }

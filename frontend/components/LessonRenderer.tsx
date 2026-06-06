@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Lightbulb, AlertTriangle, CheckCircle, Code2, BookOpen, HelpCircle } from 'lucide-react'
+import { Lightbulb, AlertTriangle, CheckCircle, Code2, BookOpen, HelpCircle, Sparkles } from 'lucide-react'
 
 interface LessonSection {
-  type: 'heading' | 'paragraph' | 'code' | 'info_box' | 'warning_box' | 'quiz' | 'exercise' | 'key_points'
+  type: 'heading' | 'paragraph' | 'code' | 'info_box' | 'warning_box' | 'quiz' | 'exercise' | 'key_points' | 'analogy'
   content: string
   language?: string
   level?: number
@@ -87,6 +87,17 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
         </div>
       )
 
+    case 'analogy':
+      return (
+        <div className="my-6 p-5 rounded-2xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/5 border border-violet-500/25">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={16} className="text-violet-400 flex-shrink-0" />
+            <span className="text-sm font-semibold text-violet-300">Analogy</span>
+          </div>
+          <p className="text-violet-100/80 text-sm leading-relaxed whitespace-pre-wrap">{section.content}</p>
+        </div>
+      )
+
     case 'key_points':
       return (
         <ul className="my-4 space-y-2">
@@ -100,9 +111,8 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
       )
 
     case 'quiz': {
-      const lines = section.content.split('\n').filter(Boolean)
-      const question = lines[0] ?? section.content
-      const options = lines.slice(1)
+      const question = section.content
+      const options = section.items ?? []
       const selectedAnswer = quizAnswers.get(index)
       const hasAnswered = selectedAnswer !== undefined
       const correctAnswer = section.answer ?? 0
