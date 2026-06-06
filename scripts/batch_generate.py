@@ -543,6 +543,28 @@ def _parse_json_response(raw: str) -> dict:
     except ImportError:
         pass
 
+    # Salvage truncated output: walk back from end to find last complete section,
+    # then close the sections array and root object
+    if start != -1:
+        src = text[start:]
+        for i in range(len(src) - 1, -1, -1):
+            if src[i] == '}':
+                for suffix in (']}', ']}  }', ']\n}'):
+                    candidate = src[:i + 1] + suffix
+                    try:
+                        result = json.loads(candidate)
+                        if isinstance(result, dict):
+                            return result
+                    except json.JSONDecodeError:
+                        pass
+                    try:
+                        from json_repair import repair_json
+                        result = repair_json(candidate, return_objects=True)
+                        if isinstance(result, dict):
+                            return result
+                    except Exception:
+                        pass
+
     return json.loads(text)  # re-raise original error
 
 
@@ -661,8 +683,10 @@ async def generate_single_lesson(
     json_reminder = "\n\nReturn ONLY valid JSON"
     # Prompt suffix used when the model hits the token limit (output truncated)
     brevity_suffix = (
-        "\n\nIMPORTANT: Keep each section's content concise — max 3-4 paragraphs or "
-        "10 code lines per section. Use at most 6 sections total. Return ONLY valid JSON."
+        "\n\nCRITICAL: Your previous response was cut off because it exceeded the token limit. "
+        "You MUST generate a SHORTER response this time. Use EXACTLY 4 sections. "
+        "Each section's 'content' field must be under 120 words. "
+        "No code blocks longer than 8 lines. Return ONLY valid JSON that fits within 3000 tokens."
     )
 
     last_exc = None
