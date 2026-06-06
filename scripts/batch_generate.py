@@ -529,13 +529,18 @@ def _parse_json_response(raw: str) -> dict:
         except json.JSONDecodeError:
             pass
 
-    # json_repair as last resort (handles unescaped quotes, trailing commas, etc.)
+    # json_repair as last resort — try on extracted block first, then full text
     try:
         from json_repair import repair_json
-        repaired = repair_json(text, return_objects=True)
-        if isinstance(repaired, dict):
-            return repaired
-    except Exception:
+        block = text[start:end + 1] if (start != -1 and end > start) else text
+        for candidate in (block, text):
+            try:
+                repaired = repair_json(candidate, return_objects=True)
+                if isinstance(repaired, dict):
+                    return repaired
+            except Exception:
+                pass
+    except ImportError:
         pass
 
     return json.loads(text)  # re-raise original error
@@ -680,6 +685,10 @@ async def generate_single_lesson(
 
             try:
                 lesson_data = _parse_json_response(raw)
+                if not isinstance(lesson_data, dict):
+                    raise json.JSONDecodeError(
+                        f"Expected JSON object, got {type(lesson_data).__name__}", raw, 0
+                    )
             except json.JSONDecodeError as exc:
                 if attempt < 4:
                     print(f"    [lesson {lesson_idx}] JSON parse error ({exc}), retrying with JSON reminder...")
