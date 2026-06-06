@@ -11,7 +11,7 @@ function cookieOptions() {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict' as const,
+    sameSite: 'none' as const,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/',
   };
@@ -43,7 +43,7 @@ export class AuthController {
   @Post('logout')
   @ApiOperation({ summary: 'Clear auth cookie' })
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('access_token', { path: '/' });
+    res.clearCookie('access_token', { path: '/', sameSite: 'none', secure: true });
     return { message: 'Logged out' };
   }
 
