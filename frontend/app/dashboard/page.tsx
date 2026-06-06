@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import AuthGuard from '@/components/AuthGuard'
+import { apiGet } from '@/lib/api'
 import {
   Flame,
   Zap,
@@ -77,15 +78,6 @@ interface Milestone {
 }
 
 // ─── Data ────────────────────────────────────────────────────────────────────
-
-const skills: Skill[] = [
-  { name: 'Java', level: 78, color: 'from-orange-500 to-red-500' },
-  { name: 'Spring Boot', level: 65, color: 'from-green-500 to-emerald-400' },
-  { name: 'React', level: 55, color: 'from-cyan-500 to-blue-500' },
-  { name: 'PostgreSQL', level: 48, color: 'from-blue-600 to-indigo-500' },
-  { name: 'Docker', level: 40, color: 'from-sky-500 to-cyan-400' },
-  { name: 'AWS', level: 30, color: 'from-yellow-500 to-orange-400' },
-]
 
 const milestones: Milestone[] = [
   { label: 'Java Basics', done: true },
@@ -203,42 +195,64 @@ function buildStreakDays(total = 30, streakLength = 15): boolean[] {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCards() {
+  const [overview, setOverview] = useState<{
+    completedLessons: number
+    totalXp: number
+    topicsStarted?: number
+    level: number
+    streak: number
+  } | null>(null)
   const [xpAnim, setXpAnim] = useState(0)
+
   useEffect(() => {
-    const t = setTimeout(() => setXpAnim(72), 400)
-    return () => clearTimeout(t)
+    apiGet<{ completedLessons: number; totalXp: number; topicsStarted?: number; level: number; streak: number }>(
+      '/progress/overview'
+    )
+      .then((data) => {
+        setOverview(data)
+        const pct = (data.totalXp % 1000) / 10
+        setTimeout(() => setXpAnim(pct), 400)
+      })
+      .catch(() => {
+        // leave overview null; values will show as loading state
+      })
   }, [])
+
+  const loading = overview === null
+  const xpProgress = overview ? (overview.totalXp % 1000) / 10 : xpAnim
 
   const cards: StatCard[] = [
     {
       label: 'Current XP',
-      value: '4,250',
-      sub: '750 XP to Level 8',
+      value: loading ? '—' : overview!.totalXp.toLocaleString(),
+      sub: loading
+        ? 'Loading…'
+        : `${1000 - (overview!.totalXp % 1000)} XP to Level ${overview!.level + 1}`,
       icon: <Zap className="w-5 h-5 text-yellow-300" />,
       gradient: 'from-yellow-500/30 to-orange-500/20',
       iconBg: 'bg-yellow-500/20',
-      progress: xpAnim,
+      progress: xpProgress,
     },
     {
       label: 'Courses Completed',
-      value: '12',
-      sub: '+2 this week',
+      value: loading ? '—' : String(overview!.completedLessons),
+      sub: loading ? 'Loading…' : `${overview!.topicsStarted ?? 0} topics started`,
       icon: <BookOpen className="w-5 h-5 text-cyan-300" />,
       gradient: 'from-cyan-500/20 to-blue-500/10',
       iconBg: 'bg-cyan-500/20',
     },
     {
       label: 'Hours Learned',
-      value: '89h',
-      sub: '+4h this week',
+      value: '—',
+      sub: 'Coming soon',
       icon: <Clock className="w-5 h-5 text-purple-300" />,
       gradient: 'from-purple-500/20 to-pink-500/10',
       iconBg: 'bg-purple-500/20',
     },
     {
       label: 'Current Streak',
-      value: '15 days',
-      sub: 'Personal best!',
+      value: loading ? '—' : `${overview!.streak} days`,
+      sub: 'Keep it up!',
       icon: <Flame className="w-5 h-5 text-orange-400" />,
       gradient: 'from-orange-500/20 to-red-500/10',
       iconBg: 'bg-orange-500/20',
@@ -259,7 +273,7 @@ function StatCards() {
               {c.icon}
             </div>
           </div>
-          <div className="relative">
+          <div className={`relative transition-opacity duration-300 ${loading ? 'opacity-40' : 'opacity-100'}`}>
             <p className="text-white/50 text-xs font-medium">{c.label}</p>
             <p className="text-white text-2xl font-bold mt-0.5">{c.value}</p>
             <div className="flex items-center gap-1 mt-1">
@@ -275,7 +289,7 @@ function StatCards() {
                   style={{ width: `${c.progress}%` }}
                 />
               </div>
-              <p className="text-white/30 text-[10px]">Level 7 · {c.progress}% to next</p>
+              <p className="text-white/30 text-[10px]">Level {overview?.level ?? '…'} · {Math.round(c.progress)}% to next</p>
             </div>
           )}
         </div>
@@ -364,11 +378,37 @@ function LearningPath() {
   )
 }
 
+const SKILL_META: Record<string, { name: string; color: string }> = {
+  programming: { name: 'Programming', color: 'from-orange-500 to-red-500' },
+  frontend:    { name: 'Frontend',    color: 'from-cyan-500 to-blue-500' },
+  backend:     { name: 'Backend',     color: 'from-green-500 to-emerald-400' },
+  devops:      { name: 'DevOps',      color: 'from-sky-500 to-cyan-400' },
+  'ai-ml':     { name: 'AI / ML',     color: 'from-purple-500 to-violet-400' },
+  databases:   { name: 'Databases',   color: 'from-blue-600 to-indigo-500' },
+}
+
 function SkillBars() {
+  const [skills, setSkills] = useState<Skill[]>(
+    Object.values(SKILL_META).map((m) => ({ name: m.name, level: 0, color: m.color }))
+  )
   const [animated, setAnimated] = useState(false)
+
   useEffect(() => {
-    const t = setTimeout(() => setAnimated(true), 300)
-    return () => clearTimeout(t)
+    apiGet<Record<string, number>>('/progress/skills')
+      .then((data) => {
+        const mapped = Object.entries(data)
+          .filter(([key]) => SKILL_META[key])
+          .map(([key, pct]) => ({
+            name: SKILL_META[key].name,
+            level: pct,
+            color: SKILL_META[key].color,
+          }))
+        setSkills(mapped)
+        setTimeout(() => setAnimated(true), 300)
+      })
+      .catch(() => {
+        setTimeout(() => setAnimated(true), 300)
+      })
   }, [])
 
   return (
@@ -486,8 +526,8 @@ function RecommendedCourses() {
   )
 }
 
-function StreakCalendar() {
-  const days = buildStreakDays(30, 15)
+function StreakCalendar({ streak }: { streak: number }) {
+  const days = buildStreakDays(30, streak)
 
   return (
     <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
@@ -507,7 +547,7 @@ function StreakCalendar() {
           </div>
         </div>
       </div>
-      <p className="text-white/40 text-sm mb-5">Last 30 days · 15-day current streak</p>
+      <p className="text-white/40 text-sm mb-5">Last 30 days · {streak}-day current streak</p>
       <div className="grid grid-cols-[repeat(15,_1fr)] gap-2">
         {days.map((active, i) => (
           <div
@@ -523,7 +563,7 @@ function StreakCalendar() {
       </div>
       <p className="mt-5 text-sm text-white/60 font-medium">
         🎉 You&apos;re on a roll! Keep learning today to maintain your{' '}
-        <span className="text-orange-400 font-bold">15-day streak</span>.
+        <span className="text-orange-400 font-bold">{streak}-day streak</span>.
       </p>
     </div>
   )
@@ -635,6 +675,19 @@ function DashboardSidebar({
 export default function DashboardPage() {
   const [activeSection, setActiveSection] = useState('overview')
   const [notifOpen, setNotifOpen] = useState(false)
+  const [streak, setStreak] = useState(0)
+
+  useEffect(() => {
+    apiGet<{ id: number | string; name: string; email: string; xp?: number; level?: number; streak?: number; hobbies?: string[] }>(
+      '/users/me'
+    )
+      .then((user) => {
+        setStreak(user.streak ?? 0)
+      })
+      .catch(() => {
+        // leave streak at 0
+      })
+  }, [])
 
   return (
     <AuthGuard>
@@ -682,7 +735,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border border-orange-500/30 bg-orange-500/10">
                 <Flame className="w-5 h-5 text-orange-400" />
                 <div>
-                  <p className="text-white font-bold text-sm leading-none">15 day streak 🔥</p>
+                  <p className="text-white font-bold text-sm leading-none">{streak} day streak 🔥</p>
                   <p className="text-orange-300/70 text-[10px] mt-0.5">Keep it up!</p>
                 </div>
               </div>
@@ -704,7 +757,7 @@ export default function DashboardPage() {
             <RecommendedCourses />
 
             {/* Streak Calendar */}
-            <StreakCalendar />
+            <StreakCalendar streak={streak} />
 
             {/* AI Insights */}
             <AIInsights />
