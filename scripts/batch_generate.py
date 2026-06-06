@@ -467,7 +467,7 @@ def notify_batch_complete(
     total_lessons = sum(s["lessons"] for s in course_stats)
     total_cost = (total_input / 1_000_000 * INPUT_COST_PER_MTOK
                   + total_output / 1_000_000 * OUTPUT_COST_PER_MTOK)
-    subject = f"\U0001f389 SkillForge Batch {batch_label} complete — {total_lessons} lessons generated"
+    subject = f"🎉 SkillForge Batch {batch_label} complete — {total_lessons} lessons generated"
 
     lines = [
         f"Batch {batch_label} generation complete!",
@@ -944,7 +944,6 @@ def main() -> None:
         "--all", action="store_true",
         help="Generate all 60 courses (overrides --batch)"
     )
-          )
     parser.add_argument(
         "--course", type=int, metavar="N",
         help="Single course index 0-59. Overrides --batch and --all."
