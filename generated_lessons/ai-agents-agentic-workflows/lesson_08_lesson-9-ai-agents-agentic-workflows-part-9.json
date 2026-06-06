@@ -1,0 +1,347 @@
+{
+  "lessonId": "ai-agents-agentic-workflows-08",
+  "title": "Lesson 9: AI Agents & Agentic Workflows Part 9",
+  "type": "reading",
+  "topicName": "AI Agents & Agentic Workflows",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At the advanced stage of agentic workflows, we encounter the critical challenge of managing agent autonomy while maintaining system reliability and predictability. As agents become more sophisticated—capable of planning multiple steps ahead, selecting from complex tool sets, and adapting their strategies based on environmental feedback—the systems that coordinate them must evolve from simple command-and-response patterns to sophisticated orchestration frameworks. The core problem that emerges is state management across distributed, asynchronous agent execution. When multiple agents operate concurrently, each maintaining its own context, memory, and decision queue, conflicts arise: two agents might attempt to modify the same resource simultaneously, one agent's action might invalidate another's planned sequence, or an agent might become stuck in a loop of irrelevant actions because its goal representation drifted from the actual task requirement. Without proper isolation, persistence, and coordination mechanisms, agentic systems degrade into chaotic, unpredictable execution patterns where outcomes become non-deterministic and debugging becomes nearly impossible. This lesson addresses hierarchical agent orchestration, conversation memory protocols, failure recovery mechanisms, and cross-agent communication patterns—the foundational infrastructure that enables scaling from toy agents to production systems handling high-stakes decisions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: In Test cricket, the Indian cricket team must coordinate across multiple specialist roles during a five-day innings—Rohit Sharma opening the batting, Virat Kohli anchoring the middle order, and Jasprit Bumrah leading the bowling attack in response to England's strategy. Each player operates with autonomy within their role: Rohit decides when to attack in the powerplay, Virat chooses which deliveries to leave, Bumrah selects his line and length based on batter positioning. However, this autonomy only works because there's a captain (Rohit in this case) who orchestrates the overall strategy, maintains a running scorecard that all players reference, ensures the batting order doesn't change mid-game, and communicates how the bowling attack should evolve if England's run rate accelerates. The dressing room's communication system ensures that if Bumrah bowls a maiden over under intense pressure, the captain knows immediately and can adjust field placement or bowling rotations accordingly. Each player's decisions (which delivery to play, which line to bowl) are autonomous, but they're constrained by shared state (the scorecard showing current run rate, wickets lost, match situation) and hierarchical coordination (the captain's field placements and bowling changes). This mirrors agentic workflow architecture: individual agents act autonomously on their microgoals, but they operate within a shared state management layer, report their actions to a coordinator, and adapt based on globally-visible context.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Agent State Persistence and Context Windows",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Agent state persistence is the mechanism by which an agent maintains knowledge of past interactions, completed subtasks, failed attempts, and learned constraints across multiple execution cycles. Unlike stateless function calls, agents in production systems must remember: which tools have been called and with what results, what goals have been achieved and which remain open, what retry attempts have been exhausted, and what error patterns have emerged. The challenge is that LLM context windows are finite (typically 4K to 200K tokens), yet agents may operate over days or weeks, processing hundreds of thousands of tokens of interaction data. A naive approach—storing all history in the context window—exhausts the window quickly and becomes computationally expensive. The solution involves tiered persistence: short-term working memory (current problem, recent tool results, active goals) lives in the context window for immediate reasoning, medium-term memory (summary of completed tasks, learned patterns, constraint discoveries) is retrieved on-demand from a vector database using semantic similarity, and long-term memory (historical success patterns, user preferences, domain rules) is incorporated via retrieval-augmented generation. The retrieval mechanism itself becomes critical: poor retrieval means an agent re-learns the same lessons repeatedly; over-retrieval means context pollution that drowns the current task. Production systems like AutoGPT and ReAct implement sliding window management where context is continuously pruned, summarized, and archived.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider MS Dhoni managing the Indian cricket team across a three-month Test series. Dhoni maintains three tiers of memory about the opposition's weaknesses. His working memory (current test match) holds immediate facts: Steve Smith's footwork vulnerability against short balls, the condition of the pitch at the MCG suggesting reverse swing after day three, and which bowlers have succeeded on this ground. His medium-term memory (recent series) retrieves patterns from the last Australia tour two years ago: which fielding positions worked against Australia's aggressive openers, which bowling combinations tired their middle order, and which venues favor spin. His long-term memory (career knowledge) includes timeless principles: Australia's tail-enders struggle against pace, their batsmen commit aggressively to short deliveries under pressure, and they field aggressively in their own country. During the current match, Dhoni doesn't recalculate everything from scratch; he consciously retrieves relevant medium-term and long-term memory based on immediate context. When Smith walks out, Dhoni immediately recalls his short-ball vulnerability from medium-term memory and shifts the field accordingly. If Australia's batsmen are attacking aggressively (immediate signal), Dhoni calls upon long-term knowledge of their aggressive commitment patterns and sets a trap. Each tier is stored and indexed differently: working memory in his active mind, medium-term in detailed notes about the recent tour, long-term in his decade-long intuition. This mirrors agent context management: working memory is the LLM context window, medium-term is vector-indexed memory for semantic retrieval, long-term is symbolic rules and learned policies.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Hierarchical Goal Decomposition and Subtask Management",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Hierarchical goal decomposition is the structured process by which a high-level goal is recursively broken into smaller, independently-achievable subtasks, each assigned to an appropriate sub-agent or execution context. A complex user request like 'analyze this CSV of customer churn, identify the top three risk factors, and recommend retention strategies for each segment' cannot be handed to a single agent to solve in one pass. Instead, it decomposes into: Task 1: Load and validate the CSV (handled by a data-loading agent), Task 2: Perform exploratory statistical analysis (handled by a data-analysis agent), Task 3: Extract risk factors via correlation or decision tree analysis (handled by an ML-interpretation agent), Task 4: Segment customers by identified risk patterns (handled by a clustering agent), Task 5: Generate retention strategies per segment (handled by a strategy-generation agent). Each subtask has clear preconditions (which prior tasks must complete), success criteria (how to evaluate correctness), and error handlers (what to do if this task fails, and whether to retry, escalate, or skip). The key architectural insight is that subtasks form a DAG (directed acyclic graph) where dependencies are explicit and parallel execution is possible when tasks are independent. Tools like LangGraph implement this via state graphs where nodes represent subtasks, edges represent dependencies, and the execution engine manages the queue, retries, and state propagation. Without hierarchical decomposition, agents produce either shallow, incomplete answers (because they try to do everything at once and context overflows) or they loop indefinitely trying different approaches without systematic progress.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine the Indian team's preparation for the World Cup final. The head coach Rahul Dravid doesn't create a single undifferentiated strategy; he decomposes the goal 'win the World Cup final' into a hierarchy of subtasks, each assigned to a specialist. The batting coach focuses on Task 1: Analyze the final's opposing team's bowlers and develop stroke-by-stroke guidance for each batter in the order. The bowling coach focuses on Task 2: Identify weaknesses in the opposition's batting lineup and design specific bowling plans (lengths, lines, field placements) for each bowler. The fielding coach focuses on Task 3: Position fielders optimally based on the predicted bowlers-vs-batters matchups. The fitness coach focuses on Task 4: Ensure players' physical and mental stamina for a high-pressure final. Each subtask has clear preconditions (the batting coach needs to know which bowlers will play, which requires Task 2 output), success criteria (the batting strategy is validated by practice sessions), and dependencies (all strategies must be finalized before the match day). The subtasks form a dependency graph: the batting and bowling strategies are independent and can develop in parallel, but the overall field placement strategy depends on both. If the batting coach finishes early but the bowling coach is delayed, the batting coach doesn't wait idly; they refine their strategies or conduct extra practice. The entire orchestration is managed by Dravid, who monitors progress, detects bottlenecks, and re-prioritizes if new information emerges (e.g., an opposing bowler gets injured). This mirrors hierarchical agent decomposition: top-level goal decomposes into parallel subtasks, each with clear interfaces and dependencies, coordinated by a central orchestrator.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Failure Recovery and Rollback Mechanisms",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Failure recovery in agentic workflows addresses the reality that agents operating in complex environments will inevitably encounter errors: API timeouts, invalid tool outputs, constraint violations, or logical contradictions that invalidate prior decisions. A naive approach—halting on first error—is inadequate because agents should attempt recovery before escalating. The architectural pattern is multi-layered: immediate recovery (retry with backoff, try alternative tools), checkpoint recovery (revert to the last known-good state and try a different path), and escalation recovery (surface the problem to a human operator or parent agent). Checkpointing involves periodically saving agent state (current goal, completed subtasks, working memory) to persistent storage, creating a recovery frontier. When an error occurs, the agent can rollback to a prior checkpoint, abandon the failed subtask, and attempt an alternative strategy. The challenge is knowing what to checkpoint: too frequent checkpointing incurs storage and I/O overhead; too infrequent checkpointing means re-doing large amounts of work after a failure. Production systems use heuristics like checkpoint-after-successful-tool-call or checkpoint-at-subtask-boundaries. Another critical mechanism is idempotency enforcement: tools must be designed so that calling them twice with the same parameters produces the same outcome without side effects. This enables safe retry without cascading failures (e.g., debiting a payment twice). Transactional semantics—grouping multiple tool calls into atomic units that either all succeed or all fail—further prevent partial state corruption.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: During a complex Test match chase, Virat Kohli and Ajinkya Rahane must navigate changing conditions and opposition strategies. Early in their partnership, they establish a checkpoint: 'We're 150 runs ahead with 3 wickets in hand; this is a safe position.' As they bat, they face immediate failures—Bumrah from the opposition bowls a brilliant spell that threatens breakthroughs, or Kohli plays a risky shot that nearly gets him run-out. Immediate recovery: Kohli adjusts his footwork to counter Bumrah's angle; Rahane slows the scoring to reduce risk and stabilize the partnership. If the situation deteriorates—say Rahane gets a thick edge that the keeper almost catches—they consider checkpoint recovery: revert to a defensive mentality (lower run rate, seek singles, avoid risky shots), effectively abandoning their aggressive strategy and returning to a known-safe batting approach. Throughout, their checkpoint remains implicit in match awareness: 'We know we can bat defensively and grind out the required runs if necessary.' Each completed over is a micro-checkpoint: 'We survived this over, we're still in control.' If Kohli gets out despite recovery attempts, escalation occurs: Rahane (now senior batter) communicates to the next batter the new status and jointly revise the chase strategy. Idempotency is critical: if Kohli plays a single run at the end of an over to get off strike, repeating that single must produce the same outcome (both batters advance by one run, strike changes); it doesn't accidentally add a second run or change the outcome of the over. This mirrors failure recovery in agentic systems: immediate recovery through tactic adjustment, checkpoint recovery through strategy reversal to known-good states, escalation to human/parent agents, and idempotent operations.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Cross-Agent Communication and Coordination Protocol",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Cross-agent communication is the structured protocol by which independent agents share information, negotiate resource allocation, and synchronize their actions to avoid conflicts and enable cooperative problem-solving. In systems with multiple agents, communication patterns determine efficiency and correctness. The primary challenge is that agents operate asynchronously—Agent A might complete a task while Agent B is still mid-execution—and they may have conflicting information states. Message-passing protocols establish clear semantics: agents publish events (task completed, error detected, resource requested) to a shared message broker or event queue, other agents subscribe to relevant events, and the system guarantees reliable delivery and ordering within causality chains. One established pattern is publish-subscribe: when Agent A completes a subtask, it publishes an event; Agent B, which depends on that subtask, subscribes and is notified. Another is request-response: Agent A explicitly asks Agent B for information or to execute a task, Agent B responds, and communication is synchronous. A third is shared state: agents read and write to a centralized state store (Redis, a database, or an in-memory dict), with optimistic or pessimistic locking to prevent race conditions. The most scalable pattern for complex systems is event-driven architecture with event sourcing: every action is recorded as an immutable event, the system state is the sum of all events up to the current timestamp, and agents derive their view of the world by replaying relevant events. This enables recovery (replay events from a checkpoint), auditability (every action is logged), and causal analysis (understand why an agent made a decision by examining the event sequence it observed).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: During India's ODI squad preparation, the selection committee (composed of independent experts: a batting coach, bowling coach, fielding coach, and team psychologist) must coordinate to select 15 players. Each expert is an agent with autonomous judgment but must communicate decisions to align the final squad. The batting coach evaluates Rohit Sharma's form and publishes an event: 'Rohit is in exceptional form, ready for World Cup.' The bowling coach simultaneously evaluates whether the fast bowling group is balanced and publishes: 'We need one more death-overs specialist.' The fielding coach publishes: 'The current slip-fielders are world-class; no change needed.' The psychologist publishes: 'The squad atmosphere is cohesive, no replacements for team dynamics.' These events flow into a shared squad state. If one coach's decision conflicts with another (e.g., the batting coach wants all-rounder SKY for batting depth, but the bowling coach wants SKY for his bowling allrounder skills), the message-passing system ensures both coaches see each other's position. They negotiate via events: bowling coach publishes 'I need SKY for bowling coverage,' batting coach responds 'Agreed, SKY provides both coverage types.' The shared state records the decision: SKY is selected, and the rationale is stored. If the batting coach suddenly publishes 'Rohit is injured,' every dependent coach is notified immediately, forcing a cascade of re-evaluations. The event log becomes the ground truth: anyone can review the selection history and understand why Jadeja was chosen over Thakur based on the published reasoning events. This mirrors cross-agent communication: publish-subscribe events for async notification, shared state for coordination, explicit message protocols to prevent misunderstandings, and event sourcing for auditability.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import json\nimport asyncio\nfrom typing import Any, Dict, List, Optional\nfrom dataclasses import dataclass, field\nfrom enum import Enum\nfrom datetime import datetime\nimport uuid\n\n# ============================================================================\n# Data Models and Enums\n# ============================================================================\n\nclass TaskStatus(Enum):\n    PENDING = \"pending\"\n    IN_PROGRESS = \"in_progress\"\n    COMPLETED = \"completed\"\n    FAILED = \"failed\"\n    ROLLED_BACK = \"rolled_back\"\n\nclass EventType(Enum):\n    TASK_CREATED = \"task_created\"\n    TASK_STARTED = \"task_started\"\n    TASK_COMPLETED = \"task_completed\"\n    TASK_FAILED = \"task_failed\"\n    CHECKPOINT_CREATED = \"checkpoint_created\"\n    AGENT_REQUEST = \"agent_request\"\n    AGENT_RESPONSE = \"agent_response\"\n\n@dataclass\nclass Event:\n    \"\"\"Immutable event representing an action in the agentic system.\"\"\"\n    event_type: EventType\n    agent_id: str\n    timestamp: datetime\n    data: Dict[str, Any]\n    event_id: str = field(default_factory=lambda: str(uuid.uuid4()))\n    causally_depends_on: Optional[str] = None  # Prior event this depends on\n\n@dataclass\nclass Checkpoint:\n    \"\"\"Snapshot of agent state at a point in time.\"\"\"\n    checkpoint_id: str\n    agent_id: str\n    timestamp: datetime\n    goal: str\n    completed_subtasks: List[str]\n    working_memory: Dict[str, Any]\n    context_window: str  # Recent conversation history\n\n@dataclass\nclass SubTask:\n    \"\"\"A subtask within a hierarchical goal decomposition.\"\"\"\n    task_id: str\n    goal: str\n    status: TaskStatus\n    dependencies: List[str]  # IDs of tasks that must complete first\n    assigned_agent: str\n    result: Optional[str] = None\n    error: Optional[str] = None\n    retry_count: int = 0\n    max_retries: int = 3\n\nclass AgentStateManager:\n    \"\"\"Manages persistent state and context windows for agents.\"\"\"\n    \n    def __init__(self",
+      "agent_id": "str",
+      "context_window_size": "int = 4096):\n        self.agent_id = agent_id\n        self.context_window_size = context_window_size\n        self.working_memory: Dict[str, Any] = {}  # Current problem state\n        self.checkpoints: List[Checkpoint] = []  # Historical snapshots\n        self.event_log: List[Event] = []  # All events (for recovery)\n        self.context_window: str = \"\"  # Recent interactions\n\n    def create_checkpoint(self",
+      "goal": "str",
+      "completed_subtasks": "List[str]) -> Checkpoint:\n        \"\"\"Create a recovery point in case of failure.\"\"\"\n        checkpoint = Checkpoint(\n            checkpoint_id=str(uuid.uuid4()),\n            agent_id=self.agent_id,\n            timestamp=datetime.now(),\n            goal=goal,\n            completed_subtasks=completed_subtasks,\n            working_memory=self.working_memory.copy(),\n            context_window=self.context_window\n        )\n        self.checkpoints.append(checkpoint)\n        print(f\"  [CHECKPOINT] Agent {self.agent_id} created checkpoint {checkpoint.checkpoint_id}\")\n        return checkpoint\n\n    def restore_checkpoint(self",
+      "checkpoint": "Checkpoint) -> None:\n        \"\"\"Restore agent state to a prior checkpoint (rollback).\"\"\"\n        self.working_memory = checkpoint.working_memory.copy()\n        self.context_window = checkpoint.context_window\n        print(f\"  [ROLLBACK] Agent {self.agent_id} restored to checkpoint {checkpoint.checkpoint_id}\")\n\n    def log_event(self",
+      "event": "Event) -> None:\n        \"\"\"Record an event for auditability and recovery.\"\"\"\n        self.event_log.append(event)\n        print(f\"  [EVENT] {event.event_type.value} by {event.agent_id}: {event.data}\")\n\n    def update_context_window(self",
+      "new_content": "str) -> None:\n        \"\"\"Add content to context window, pruning old content if needed.\"\"\"\n        self.context_window += \"\\n\" + new_content\n        if len(self.context_window) > self.context_window_size:\n            # Simple pruning: keep last N chars\n            self.context_window = self.context_window[-self.context_window_size:]\n\nclass Agent:\n    \"\"\"An autonomous agent with state management and error recovery.\"\"\"\n    \n    def __init__(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "agent_id": "str",
+      "role": "str):\n        self.agent_id = agent_id\n        self.role = role\n        self.state_manager = AgentStateManager(agent_id)\n        self.inbox: List[Event] = []  # Messages from other agents\n        self.subscriptions: List[EventType] = []  # Event types this agent cares about\n\n    def subscribe(self",
+      "event_type": "EventType) -> None:\n        \"\"\"Subscribe to events from other agents.\"\"\"\n        self.subscriptions.append(event_type)\n\n    def receive_event(self",
+      "event": "Event) -> None:\n        \"\"\"Receive an event from the message broker.\"\"\"\n        if event.event_type in self.subscriptions:\n            self.inbox.append(event)\n            print(f\"  [INBOX] Agent {self.agent_id} received: {event.event_type.value} from {event.agent_id}\")\n\n    async def execute_subtask(self",
+      "subtask": "SubTask) -> SubTask:\n        \"\"\"Execute a subtask with error recovery.\"\"\"\n        print(f\"\\n[AGENT {self.agent_id}] Executing subtask: {subtask.goal}\")\n        \n        # Create checkpoint before execution\n        checkpoint = self.state_manager.create_checkpoint(\n            goal=subtask.goal,\n            completed_subtasks=[]\n        )\n        \n        try:\n            # Simulate subtask execution (tool call)\n            await asyncio.sleep(0.1)  # Simulate work\n            \n            # Mock tool result with idempotent outcome\n            result = await self._simulate_tool_execution(subtask.goal)\n            \n            # Record success\n            subtask.status = TaskStatus.COMPLETED\n            subtask.result = result\n            \n            # Log event\n            event = Event(\n                event_type=EventType.TASK_COMPLETED,\n                agent_id=self.agent_id,\n                timestamp=datetime.now(),\n                data={\"task_id\": subtask.task_id, \"result\": result},\n                causally_depends_on=checkpoint.checkpoint_id\n            )\n            self.state_manager.log_event(event)\n            self.state_manager.update_context_window(f\"Completed {subtask.goal}: {result}\")\n            \n            print(f\"  ✓ Subtask {subtask.task_id} completed: {result}\")\n            return subtask\n            \n        except Exception as e:\n            print(f\"  ✗ Subtask {subtask.task_id} failed: {str(e)}\")\n            \n            if subtask.retry_count < subtask.max_retries:\n                # Immediate recovery: retry\n                print(f\"  [RECOVERY] Retrying (attempt {subtask.retry_count + 1}/{subtask.max_retries})\")\n                subtask.retry_count += 1\n                return await self.execute_subtask(subtask)\n            else:\n                # Checkpoint recovery: rollback and try alternative\n                print(f\"  [RECOVERY] Max retries exceeded. Rolling back to checkpoint.\")\n                self.state_manager.restore_checkpoint(checkpoint)\n                subtask.status = TaskStatus.ROLLED_BACK\n                subtask.error = str(e)\n                return subtask\n\n    async def _simulate_tool_execution(self",
+      "goal": "str) -> str:\n        \"\"\"Simulate calling an external tool (idempotent).\"\"\"\n        # Deterministic result based on goal (idempotent)\n        if \"batting\" in goal.lower():\n            return \"Batting analysis: aggressive batting strategy recommended\"\n        elif \"bowling\" in goal.lower():\n            return \"Bowling strategy: death-overs focus with fielding adjustments\"\n        elif \"fielding\" in goal.lower():\n            return \"Fielding positions optimized for slip cordon and boundary\"\n        else:\n            return f\"Analysis complete for: {goal}\"\n\nclass MessageBroker:\n    \"\"\"Pub-sub system for cross-agent communication.\"\"\"\n    \n    def __init__(self):\n        self.agents: Dict[str, Agent] = {}\n        self.event_history: List[Event] = []  # Event sourcing\n\n    def register_agent(self",
+      "agent": "Agent) -> None:\n        \"\"\"Register an agent with the broker.\"\"\"\n        self.agents[agent.agent_id] = agent\n        print(f\"[BROKER] Registered agent {agent.agent_id} ({agent.role})\")\n\n    def publish_event(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "event": "Event) -> None:\n        \"\"\"Publish an event to all subscribed agents.\"\"\"\n        self.event_history.append(event)  # Event sourcing\n        for agent_id, agent in self.agents.items():\n            agent.receive_event(event)\n        print(f\"[BROKER] Published event {event.event_type.value}: {event.data}\")\n\nclass WorkflowOrchestrator:\n    \"\"\"Orchestrates hierarchical task decomposition and cross-agent coordination.\"\"\"\n    \n    def __init__(self):\n        self.broker = MessageBroker()\n        self.task_dag: Dict[str, SubTask] = {}  # All subtasks\n        self.task_order: List[str] = []  # Topological order for execution\n\n    def register_agent(self",
+      "agent": "Agent) -> None:\n        \"\"\"Register an agent with the orchestrator.\"\"\"\n        self.broker.register_agent(agent)\n\n    def decompose_goal(self",
+      "goal": "str",
+      "subtask_specs": "List[Dict[str, Any]]) -> None:\n        \"\"\"Hierarchically decompose a high-level goal into subtasks.\"\"\"\n        print(f\"\\n[ORCHESTRATOR] Decomposing goal: {goal}\")\n        \n        for spec in subtask_specs:\n            task = SubTask(\n                task_id=str(uuid.uuid4()),\n                goal=spec[\"goal\"],\n                status=TaskStatus.PENDING,\n                dependencies=spec.get(\"dependencies\", []),\n                assigned_agent=spec[\"agent_id\"]\n            )\n            self.task_dag[task.task_id] = task\n            print(f\"  Created subtask {task.task_id}: {task.goal} (→ {task.assigned_agent})\")\n        \n        # Compute topological order (simplified: assume specs are ordered)\n        self.task_order = [spec[\"goal\"] for spec in subtask_specs]\n\n    async def execute_workflow(self) -> Dict[str, Any]:\n        \"\"\"Execute the hierarchical workflow with failure recovery.\"\"\"\n        print(f\"\\n[ORCHESTRATOR] Starting workflow execution\\n\")\n        \n        results = {}\n        for task_id, subtask in self.task_dag.items():\n            agent = self.broker.agents[subtask.assigned_agent]\n            \n            # Wait for dependencies to complete\n            while any(self.task_dag[dep_id].status != TaskStatus.COMPLETED \n                     for dep_id in subtask.dependencies):\n                await asyncio.sleep(0.05)\n            \n            # Execute subtask\n            subtask.status = TaskStatus.IN_PROGRESS\n            completed_subtask = await agent.execute_subtask(subtask)\n            results[task_id] = completed_subtask\n        \n        print(f\"\\n[ORCHESTRATOR] Workflow execution complete\")\n        return results\n\n# ============================================================================\n# Main: Cricket-themed Agentic Workflow\n# ============================================================================\n\nasync def main():\n    print(\"=\"*70)\n    print(\"Indian Cricket Team World Cup Preparation - Agentic Workflow\")\n    print(\"=\"*70)\n    \n    # Initialize agents (cricket coaches)\n    batting_coach = Agent(\"batting-coach-001\", \"Batting Coach\")\n    bowling_coach = Agent(\"bowling-coach-001\", \"Bowling Coach\")\n    fielding_coach = Agent(\"fielding-coach-001\", \"Fielding Coach\")\n    strategy_coach = Agent(\"strategy-coach-001\", \"Strategy Coordinator\")\n    \n    # Subscribe to relevant events\n    batting_coach.subscribe(EventType.TASK_COMPLETED)\n    bowling_coach.subscribe(EventType.TASK_COMPLETED)\n    fielding_coach.subscribe(EventType.TASK_COMPLETED)\n    strategy_coach.subscribe(EventType.TASK_COMPLETED)\n    \n    # Create orchestrator and register agents\n    orchestrator = WorkflowOrchestrator()\n    orchestrator.register_agent(batting_coach)\n    orchestrator.register_agent(bowling_coach)\n    orchestrator.register_agent(fielding_coach)\n    orchestrator.register_agent(strategy_coach)\n    \n    # Hierarchically decompose the World Cup prep goal\n    orchestrator.decompose_goal(\n        goal=\"Prepare Indian Cricket Team for World Cup Final\",\n        subtask_specs=[\n            {\n                \"goal\": \"Analyze opponent batting lineup and create batting strategy\",\n                \"agent_id\": \"batting-coach-001\",\n                \"dependencies\": []\n            },\n            {\n                \"goal\": \"Design bowling attack plan with death-overs focus\",\n                \"agent_id\": \"bowling-coach-001\",\n                \"dependencies\": []\n            },\n            {\n                \"goal\": \"Optimize fielding positions based on strategies\",\n                \"agent_id\": \"fielding-coach-001\",\n                \"dependencies\": [\"bowling-coach-001\"]  # Depends on bowling plan\n            },\n            {\n                \"goal\": \"Integrate strategies into final match plan\",\n                \"agent_id\": \"strategy-coach-001\",\n                \"dependencies\": [\"batting-coach-001\", \"bowling-coach-001\", \"fielding-coach-001\"]\n            }\n        ]\n    )\n    \n    # Execute the hierarchical workflow\n    results = await orchestrator.execute_workflow()\n    \n    # Print summary\n    print(\"\\n\" + \"=\"*70)\n    print(\"WORKFLOW SUMMARY\")\n    print(\"=\"*70)\n    print(f\"Total subtasks: {len(results)}\")\n    print(f\"Completed: {sum(1 for r in results.values() if r.status == TaskStatus.COMPLETED)}\")\n    print(f\"Rolled back: {sum(1 for r in results.values() if r.status == TaskStatus.ROLLED_BACK)}\")\n    \n    # Event sourcing: show audit trail\n    print(f\"\\nAudit Trail (Event Log):\")\n    for event in orchestrator.broker.event_history:\n        print(f\"  {event.timestamp} - {event.event_type.value} by {event.agent_id}\")\n    \n    # Demonstrate cross-agent communication\n    print(f\"\\nCross-Agent Communication:\")\n    print(f\"  Batting Coach inbox size: {len(batting_coach.inbox)}\")\n    print(f\"  Bowling Coach inbox size: {len(bowling_coach.inbox)}\")\n    print(f\"  Fielding Coach inbox size: {len(fielding_coach.inbox)}\")\n\nif __name__ == \"__main__\":\n    asyncio.run(main())",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "This code demonstrates all core concepts working together in a cricket-themed World Cup preparation scenario. The WorkflowOrchestrator decomposes the high-level goal ('Prepare team for World Cup') into four subtasks assigned to different coach agents. Each Agent maintains its own AgentStateManager, which handles two critical functions: creating checkpoints before executing subtasks (enabling rollback on failure) and logging all events for auditability. The execution flow shows how dependencies are respected—the fielding coach only starts work after the bowling coach completes the bowling strategy, and the strategy coordinator only integrates after all three coaches finish. The MessageBroker implements pub-sub communication: when the batting coach completes its analysis, it publishes a TASK_COMPLETED event that other agents receive in their inboxes. The context window mechanism in AgentStateManager demonstrates how recent interactions are retained for agent reasoning, with automatic pruning when size exceeds a threshold. Error recovery is illustrated through the try-except in execute_subtask: if a subtask fails, it first retries (immediate recovery), then rolls back to the checkpoint (checkpoint recovery). Each tool execution is idempotent—calling 'analyze bowling strategy' multiple times always produces the same result, enabling safe retries without cascading failures.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At runtime, agentic workflows operate through several interacting subsystems that manage concurrency, state consistency, and fault tolerance. The execution model is fundamentally asynchronous: when the orchestrator dispatches a subtask to an agent, it does not block; instead, it tracks a handle to that task and continues orchestrating other independent subtasks. This is critical for performance—in a system with 10+ agents, waiting for each to complete sequentially would be impossibly slow, whereas parallel execution (with dependency-respecting constraints) dramatically improves throughput. The actual dependency graph is represented as a DAG in memory; the orchestrator implements topological sort to determine task ordering, ensuring that a task is not scheduled until all its dependencies are resolved. Internally, the checkpoint mechanism uses serialization: when creating a checkpoint, the agent's entire state—working memory, context window, goal stack—is serialized to JSON or a binary format and persisted to storage (disk, database, or distributed cache). On rollback, deserialization restores the exact prior state, enabling the agent to branch to an alternative execution path from a known-good point. The memory layout is critical: working memory is typically held in RAM for speed (microsecond access), medium-term memory is persisted in a vector database with semantic indexing (millisecond access), and long-term memory is in bulk storage like S3 (second-scale access). The context window itself is a circular buffer: new interactions append to the end, and when size exceeds capacity, the oldest entries are summarized and moved to medium-term storage. Event sourcing—recording every action as an immutable event—enables three powerful capabilities. First, recovery: if the system crashes, replay all events from the last checkpoint and reach the prior state. Second, auditability: every decision is traceable to the sequence of events that preceded it, enabling regulatory compliance and debugging. Third, temporal queries: you can ask 'what was the agent's state at 3:15 PM yesterday?' by replaying events up to that timestamp.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine a Test match between India and Australia where both teams' on-field decision-making systems operate with sophisticated coordination. Consider the 80th over, with Australia batting and trying to build a partnership. The Indian captain (orchestrator) manages multiple decision-making agents in parallel: the pace bowling coach (Agent A) analyzes the current batter's weaknesses (footwork vulnerability to short balls), the spinner coach (Agent B) prepares the spinner's strategy for the next phase, and the field-placement coach (Agent C) waits for decision from both coaches before finalizing field. These agents operate asynchronously—the pace coach might finish analysis in 3 minutes while the spinner coach takes 5 minutes. The captain doesn't wait for both; instead, he uses a dependency graph: 'Only finalize field positions after both bowling strategies are ready.' This is topological sorting—field placement depends on bowling strategies, so it's scheduled last. Now, consider checkpointing: after the 20th over, India's fielding captain notes the current situation in the dressing room: batters' mental state (nervous, playing dots), wickets remaining (4 lost, 6 to go), current run rate (3.2 per over). This is a checkpoint. If Australia suddenly accelerates and India's pace bowling coach realizes his initial strategy (short-ball attack) is failing, the team rolls back mentally to the 20th-over checkpoint and adopts a containment strategy (full-length bowling, defensive fields). The decision-making replay involves reviewing all prior decisions up to that checkpoint. Event sourcing means recording every significant decision: 'Over 20, decided on short-ball attack (reason: batter footwork issues)'; 'Over 35, observed strategy failing (batter adjusting to short balls)'; 'Over 35, rolled back to containment strategy (checkpoint 20).' If the match is interrupted (rain delay, injury), India can reconstruct their strategic position by replaying the event log from the morning session. This mirrors agentic runtime: DAG-based dependency scheduling, asynchronous agent execution, checkpoint-based rollback, and event sourcing for auditability.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import json\nimport heapq\nfrom typing import Dict, List, Set, Tuple\nfrom dataclasses import dataclass\nfrom datetime import datetime\nimport pickle\nimport hashlib\n\n# ============================================================================\n# Advanced: DAG-based Execution with Serialized Checkpoints\n# ============================================================================\n\n@dataclass\nclass ExecutionTrace:\n    \"\"\"Record of an agent's execution for debugging and replay.\"\"\"\n    timestamp: datetime\n    agent_id: str\n    task_id: str\n    action: str  # 'execute', 'checkpoint', 'rollback', 'retry'\n    state_hash: str  # Hash of serialized state for verification\n    parent_checkpoint: str = None\n\nclass DAGScheduler:\n    \"\"\"Schedules task execution respecting dependencies using topological sort.\"\"\"\n    \n    def __init__(self):\n        self.graph: Dict[str, Set[str]] = {}  # adjacency list\n        self.in_degree: Dict[str, int] = {}  # in-degree for topo sort\n        self.execution_queue: List[Tuple[int, str]] = []  # priority queue\n        self.completed_tasks: Set[str] = set()\n\n    def add_task(self",
+      "task_id": "str) -> None:\n        \"\"\"Add a task to the graph.\"\"\"\n        if task_id not in self.graph:\n            self.graph[task_id] = set()\n            self.in_degree[task_id] = 0\n\n    def add_dependency(self",
+      "parent_task": "str",
+      "child_task": "str) -> None:\n        \"\"\"Add directed edge: child depends on parent completing first.\"\"\"\n        self.add_task(parent_task)\n        self.add_task(child_task)\n        if child_task not in self.graph[parent_task]:\n            self.graph[parent_task].add(child_task)\n            self.in_degree[child_task] += 1\n\n    def topological_sort(self) -> List[str]:\n        \"\"\"Return tasks in execution order respecting dependencies.\"\"\"\n        in_degree_copy = self.in_degree.copy()\n        queue = [task for task in self.in_degree if in_degree_copy[task] == 0]\n        sorted_order = []\n        \n        while queue:\n            task = queue.pop(0)\n            sorted_order.append(task)\n            \n            for dependent in self.graph[task]:\n                in_degree_copy[dependent] -= 1\n                if in_degree_copy[dependent] == 0:\n                    queue.append(dependent)\n        \n        if len(sorted_order) != len(self.graph):\n            raise ValueError(\"Circular dependency detected in task graph!\")\n        \n        return sorted_order\n\n    def mark_completed(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "task_id": "str) -> List[str]:\n        \"\"\"Mark a task as completed and return newly-ready tasks.\"\"\"\n        self.completed_tasks.add(task_id)\n        ready_tasks = []\n        \n        for dependent in self.graph[task_id]:\n            deps_completed = all(dep in self.completed_tasks for dep in \n                                 [t for t in self.graph if dependent in self.graph[t]])\n            if deps_completed and dependent not in self.completed_tasks:\n                ready_tasks.append(dependent)\n        \n        return ready_tasks\n\nclass SerializedCheckpoint:\n    \"\"\"Checkpoint with full state serialization for recovery.\"\"\"\n    \n    def __init__(self",
+      "agent_id": "str",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "task_id": "str",
+      "state": "Dict):\n        self.agent_id = agent_id\n        self.task_id = task_id\n        self.timestamp = datetime.now()\n        self.state = state\n        self.serialized = pickle.dumps(state)  # Binary serialization\n        self.state_hash = hashlib.sha256(self.serialized).hexdigest()  # Verification hash\n\n    def restore(self) -> Dict:\n        \"\"\"Deserialize and verify state integrity.\"\"\"\n        restored = pickle.loads(self.serialized)\n        # Verify hash matches (detect corruption)\n        if hashlib.sha256(self.serialized).hexdigest() != self.state_hash:\n            raise RuntimeError(f\"Checkpoint state corrupted for {self.task_id}\")\n        return restored\n\n    def serialize_to_disk(self",
+      "filepath": "str) -> None:\n        \"\"\"Save checkpoint to persistent storage.\"\"\"\n        with open(filepath, 'wb') as f:\n            f.write(self.serialized)\n        print(f\"  [PERSIST] Checkpoint saved to {filepath}\")\n\n    @staticmethod\n    def load_from_disk(filepath: str) -> 'SerializedCheckpoint':\n        \"\"\"Load checkpoint from persistent storage.\"\"\"\n        with open(filepath, 'rb') as f:\n            serialized = f.read()\n        state = pickle.loads(serialized)\n        checkpoint = SerializedCheckpoint(state['agent_id'], state['task_id'], state)\n        print(f\"  [RESTORE] Checkpoint loaded from {filepath}\")\n        return checkpoint\n\nclass EventSourcedAgent:\n    \"\"\"Agent with event sourcing: immutable event log for auditability.\"\"\"\n    \n    def __init__(self",
+      "agent_id": "str",
+      "role": "str):\n        self.agent_id = agent_id\n        self.role = role\n        self.event_log: List[ExecutionTrace] = []  # Immutable log\n        self.checkpoints: Dict[str, SerializedCheckpoint] = {}  # Keyed by task\n        self.current_state: Dict = {\"memories\": [], \"goals\": [], \"completed_tasks\": []}\n\n    def record_event(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "task_id": "str",
+      "action": "str",
+      "state_before": "Dict) -> ExecutionTrace:\n        \"\"\"Record an action in the immutable event log.\"\"\"\n        state_hash = hashlib.sha256(\n            pickle.dumps(state_before)\n        ).hexdigest()\n        \n        trace = ExecutionTrace(\n            timestamp=datetime.now(),\n            agent_id=self.agent_id,\n            task_id=task_id,\n            action=action,\n            state_hash=state_hash\n        )\n        \n        self.event_log.append(trace)\n        print(f\"  [EVENT] {self.agent_id}: {action} on {task_id} | state_hash={state_hash[:8]}...\")\n        return trace\n\n    def create_checkpoint(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "task_id": "str) -> SerializedCheckpoint:\n        \"\"\"Create a serialized checkpoint for recovery.\"\"\"\n        checkpoint = SerializedCheckpoint(\n            agent_id=self.agent_id,\n            task_id=task_id,\n            state=self.current_state.copy()\n        )\n        self.checkpoints[task_id] = checkpoint\n        \n        # Simulate saving to disk\n        checkpoint.serialize_to_disk(f\"/tmp/checkpoint_{self.agent_id}_{task_id}.pkl\")\n        return checkpoint\n\n    def rollback_to_checkpoint(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "task_id": "str) -> None:\n        \"\"\"Restore state to a prior checkpoint.\"\"\"\n        if task_id not in self.checkpoints:\n            raise ValueError(f\"No checkpoint for task {task_id}\")\n        \n        checkpoint = self.checkpoints[task_id]\n        restored_state = checkpoint.restore()\n        self.current_state = restored_state\n        \n        # Log the rollback action\n        self.record_event(task_id, \"rollback\", restored_state)\n        print(f\"  [ROLLBACK] {self.agent_id} restored to checkpoint for {task_id}\")\n\n    def replay_events_until(self",
+      "target_time": "datetime) -> Dict:\n        \"\"\"Replay event log to reconstruct state at a specific time.\"\"\"\n        reconstructed_state = {\"memories\": [], \"goals\": [], \"completed_tasks\": []}\n        \n        for event in self.event_log:\n            if event.timestamp <= target_time:\n                if event.action == \"execute\":\n                    reconstructed_state[\"completed_tasks\"].append(event.task_id)\n                elif event.action == \"rollback\":\n                    # Rollback action: remove the rolled-back task\n                    if event.task_id in reconstructed_state[\"completed_tasks\"]:\n                        reconstructed_state[\"completed_tasks\"].remove(event.task_id)\n        \n        print(f\"  [REPLAY] {self.agent_id}: Reconstructed state at {target_time}\")\n        return reconstructed_state\n\nclass AdvancedOrchestrator:\n    \"\"\"Orchestrator with DAG scheduling, serialized checkpoints, and event sourcing.\"\"\"\n    \n    def __init__(self):\n        self.scheduler = DAGScheduler()\n        self.agents: Dict[str, EventSourcedAgent] = {}\n        self.execution_plan: List[str] = []  # Topological order\n\n    def register_agent(self",
+      "agent": "EventSourcedAgent) -> None:\n        \"\"\"Register an agent with the orchestrator.\"\"\"\n        self.agents[agent.agent_id] = agent\n\n    def define_workflow(self",
+      "tasks": "Dict[str, str]",
+      "dependencies": "List[Tuple[str, str]]) -> None:\n        \"\"\"Define the task graph with dependencies.\"\"\"\n        print(\"\\n[ORCHESTRATOR] Building task dependency graph...\")\n        \n        for task_id in tasks:\n            self.scheduler.add_task(task_id)\n        \n        for parent, child in dependencies:\n            self.scheduler.add_dependency(parent, child)\n            print(f\"  {parent} → {child}\")\n        \n        self.execution_plan = self.scheduler.topological_sort()\n        print(f\"\\nExecution order: {self.execution_plan}\")\n\n    async def execute_with_recovery(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "tasks": "Dict[str, Tuple[str, str]]) -> Dict:\n        \"\"\"Execute tasks respecting dependencies, with checkpoint recovery.\n        \n        Args:\n            tasks: {task_id: (agent_id, goal)}\n        \"\"\"\n        print(\"\\n[ORCHESTRATOR] Starting execution with checkpoint recovery...\\n\")\n        \n        results = {}\n        \n        for task_id in self.execution_plan:\n            agent_id, goal = tasks[task_id]\n            agent = self.agents[agent_id]\n            \n            print(f\"\\n>>> Executing {task_id} (Agent: {agent.role})\")\n            \n            # Pre-execution: create checkpoint\n            checkpoint = agent.create_checkpoint(task_id)\n            agent.record_event(task_id, \"checkpoint_created\", agent.current_state)\n            \n            try:\n                # Simulate task execution\n                print(f\"    Goal: {goal}\")\n                print(f\"    State before: {agent.current_state}\")\n                \n                # Simulate work\n                agent.current_state[\"completed_tasks\"].append(task_id)\n                agent.current_state[\"memories\"].append(f\"Completed: {goal}\")\n                \n                # Record successful execution\n                agent.record_event(task_id, \"execute\", agent.current_state)\n                results[task_id] = {\"status\": \"success\", \"goal\": goal}\n                \n                print(f\"    ✓ Success. State after: {agent.current_state}\")\n                self.scheduler.mark_completed(task_id)\n                \n            except Exception as e:\n                print(f\"    ✗ Failed: {str(e)}\")\n                print(f\"    [RECOVERY] Rolling back to checkpoint...\")\n                \n                # Recover: restore to checkpoint\n                agent.rollback_to_checkpoint(task_id)\n                results[task_id] = {\"status\": \"rolled_back\", \"error\": str(e)}\n        \n        return results\n\n    def print_audit_trail(self) -> None:\n        \"\"\"Print the complete audit trail (event sourcing).\"\"\"\n        print(\"\\n\" + \"=\"*70)\n        print(\"AUDIT TRAIL (Event Sourcing)\")\n        print(\"=\"*70)\n        \n        for agent_id, agent in self.agents.items():\n            print(f\"\\nAgent: {agent.role} ({agent_id})\")\n            for event in agent.event_log:\n                print(f\"  {event.timestamp.strftime('%H:%M:%S')} - \"\n                      f\"{event.action:15} {event.task_id:15} \"\n                      f\"hash={event.state_hash[:8]}...\")\n\n# ============================================================================\n# Main: Advanced Cricket Scenario with DAG and Event Sourcing\n# ============================================================================\n\nasync def advanced_example():\n    print(\"=\"*70)\n    print(\"Advanced: World Cup Prep with DAG Scheduling & Event Sourcing\")\n    print(\"=\"*70)\n    \n    # Create agents\n    batting_agent = EventSourcedAgent(\"rohit-analyst\", \"Batting Coach\")\n    bowling_agent = EventSourcedAgent(\"bumrah-analyst\", \"Bowling Coach\")\n    fielding_agent = EventSourcedAgent(\"kohli-analyst\", \"Fielding Coach\")\n    \n    # Create orchestrator and register agents\n    orchestrator = AdvancedOrchestrator()\n    orchestrator.register_agent(batting_agent)\n    orchestrator.register_agent(bowling_agent)\n    orchestrator.register_agent(fielding_agent)\n    \n    # Define task graph\n    tasks = {\n        \"analyze_opposition_batting\": (\"rohit-analyst\", \"Analyze England's batting lineup\"),\n        \"analyze_opposition_bowling\": (\"bumrah-analyst\", \"Analyze England's bowling attack\"),\n        \"develop_batting_strategy\": (\"rohit-analyst\", \"Create batting response strategy\"),\n        \"develop_bowling_plan\": (\"bumrah-analyst\", \"Design bowling attack with death overs\"),\n        \"optimize_fielding\": (\"kohli-analyst\", \"Set optimal fielding positions\"),\n        \"finalize_match_plan\": (\"rohit-analyst\", \"Integrate all strategies into match plan\"),\n    }\n    \n    # Define dependencies\n    dependencies = [\n        (\"analyze_opposition_batting\", \"develop_batting_strategy\"),\n        (\"analyze_opposition_bowling\", \"develop_bowling_plan\"),\n        (\"develop_bowling_plan\", \"optimize_fielding\"),\n        (\"develop_batting_strategy\", \"finalize_match_plan\"),\n        (\"optimize_fielding\", \"finalize_match_plan\"),\n    ]\n    \n    # Build and execute workflow\n    orchestrator.define_workflow(tasks, dependencies)\n    results = await orchestrator.execute_with_recovery(tasks)\n    \n    # Print results\n    print(\"\\n\" + \"=\"*70)\n    print(\"EXECUTION RESULTS\")\n    print(\"=\"*70)\n    for task_id, result in results.items():\n        print(f\"{task_id}: {result['status']}\")\n    \n    # Print audit trail\n    orchestrator.print_audit_trail()\n    \n    # Demonstrate event replay\n    print(\"\\n\" + \"=\"*70)\n    print(\"EVENT REPLAY\")\n    print(\"=\"*70)\n    replay_time = datetime.now()\n    print(f\"Replaying events up to {replay_time}...\")\n    reconstructed = batting_agent.replay_events_until(replay_time)\n    print(f\"Reconstructed state: {reconstructed}\")\n\nif __name__ == \"__main__\":\n    import asyncio\n    asyncio.run(advanced_example())",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "info_box",
+      "content": "Pro Tip: In production agentic systems, avoid persisting every checkpoint to disk—the I/O overhead becomes prohibitive at scale. Instead, use a tiered checkpointing strategy: keep recent checkpoints (last 10-20 steps) in fast in-memory storage (Redis), periodically compress and archive older checkpoints to S3, and implement lazy loading—only restore from cold storage when a deep rollback is necessary. This balances recovery capability with performance, typically reducing storage I/O by 90% while maintaining sub-second rollback for recent failures.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production agentic systems, three established patterns emerge repeatedly, each solving specific coordination challenges. The first is the supervisor pattern: a designated 'supervisor' agent monitors other agents' progress, detects stalled executions (agents that haven't updated their status in N seconds), and intervenes by either terminating the stalled agent and reassigning its task, or escalating to a human operator. This prevents cascade failures where one agent's hang propagates—imagine if the batting coach got stuck analyzing a cricket video and never released control; without a supervisor, the entire team preparation stalls. The supervisor is implemented as a watchdog timer that periodically polls all agents' heartbeats and enforces timeouts. The second is the circuit breaker pattern: if a particular tool (e.g., calling an external API) fails consistently (e.g., 5 failures in a row), the system 'breaks' the circuit—stops calling that tool and instead returns a cached result or escalates immediately. This prevents cascading failures and latency explosion where agents keep retrying a dead service, wasting computation. The circuit breaker tracks failure counts and transitions through states: Closed (normal operation, calls go through), Open (failures detected, calls rejected immediately), and Half-Open (periodically tries one call to see if the service recovered). The third is the idempotency key pattern: every agent-initiated action (particularly writes to external systems) is tagged with a unique idempotency key. If the agent retries the same action, it passes the same key, and the external system (implemented correctly) recognizes the duplicate and returns the cached result rather than executing again. This prevents the nightmare scenario where an agent retries 'transfer $1M' and accidentally transfers $5M.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: In a complex Test match, three coaching patterns ensure the team doesn't collapse. First, the supervisor pattern: the team's physiotherapist acts as a supervisor monitoring each player's physical state. If a fast bowler hasn't reported his status in 15 minutes, the physio intervenes—checks if the bowler is injured and can't communicate, offers treatment, or substitutes if necessary. Without this supervisor, an injured Bumrah might silently degrade his performance, and the captain wouldn't know. Second, the circuit breaker pattern: the batting coach has a relationship with the pitch curator (external service) to get daily pitch reports. If the curator has given three completely wrong predictions in a row (the pitch behaves opposite to prediction), the batting coach stops trusting new reports, breaks the circuit, and uses cached knowledge from similar historical pitches instead of calling the curator again. This prevents wasting time on unreliable information. Third, the idempotency key pattern: when the captain makes a field change decision (e.g., 'Move the third slip fielder to gully'), every player receives a unique decision-id attached. If communications are poor and the captain repeats the order with the same decision-id, each fielder recognizes it as the same order (not a new order) and doesn't move twice—they acknowledge idempotently. These three patterns prevent cascades: supervisor detects stalls, circuit breaker prevents thrashing on bad inputs, and idempotency ensures retries are safe.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}
