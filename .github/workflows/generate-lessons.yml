@@ -1,20 +1,25 @@
-name: Generate Lessons — Batch
+name: Generate Lessons — SkillForge
 
 on:
   workflow_dispatch:
     inputs:
+      course_index:
+        description: 'Single course index 0-59 (leave empty to use batch_number)'
+        required: false
+        default: ''
+        type: string
       batch_number:
-        description: 'Batch to generate (1-6, or "all" for everything)'
-        required: true
+        description: 'Batch 1-6 or "all" (used only when course_index is empty)'
+        required: false
         default: '1'
         type: choice
         options: ['1', '2', '3', '4', '5', '6', 'all']
 
 jobs:
   generate:
-    name: Generate batch ${{ inputs.batch_number }}
+    name: Generate lessons
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 120
 
     steps:
       - name: Checkout
@@ -31,19 +36,23 @@ jobs:
       - name: Install dependencies
         run: pip install anthropic json-repair
 
-      - name: Run batch generation
+      - name: Run generation
         continue-on-error: true
-        run: |
-          if [ "${{ inputs.batch_number }}" = "all" ]; then
-            python scripts/batch_generate.py --all --concurrency 5
-          else
-            python scripts/batch_generate.py --batch ${{ inputs.batch_number }} --concurrency 5
-          fi
         env:
+          COURSE_INDEX: ${{ inputs.course_index }}
+          BATCH_NUMBER: ${{ inputs.batch_number }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           NOTIFY_EMAIL: ${{ secrets.NOTIFY_EMAIL }}
+        run: |
+          if [ -n "$COURSE_INDEX" ]; then
+            python scripts/batch_generate.py --course "$COURSE_INDEX" --concurrency 3
+          elif [ "$BATCH_NUMBER" = "all" ]; then
+            python scripts/batch_generate.py --all --concurrency 3
+          else
+            python scripts/batch_generate.py --batch "$BATCH_NUMBER" --concurrency 3
+          fi
 
       - name: Commit and push generated lessons
         if: always()
@@ -51,7 +60,7 @@ jobs:
           git config user.email "actions@github.com"
           git config user.name "SkillForge Generator"
           git add generated_lessons/ generation_progress.json
-          git diff --staged --quiet || git commit -m "chore: Generate lessons batch ${{ inputs.batch_number }} [skip ci]"
+          git diff --staged --quiet || git commit -m "chore: Generate lessons [skip ci]"
           git push
 
       - name: Send completion email
@@ -62,7 +71,7 @@ jobs:
           server_port: 587
           username: ${{ secrets.GMAIL_USER }}
           password: ${{ secrets.GMAIL_APP_PASSWORD }}
-          subject: "${{ job.status == 'success' && '✅' || '❌' }} SkillForge Batch ${{ inputs.batch_number }} — ${{ job.status }}"
+          subject: "${{ job.status == 'success' && '✅' || '❌' }} SkillForge — ${{ job.status }}"
           to: ${{ secrets.NOTIFY_EMAIL }}
           from: SkillForge Generator <${{ secrets.GMAIL_USER }}>
-          body: "Batch ${{ inputs.batch_number }} completed with status: ${{ job.status }}. Check GitHub Actions for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          body: "Generation done: ${{ job.status }}. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
