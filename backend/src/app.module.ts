@@ -36,7 +36,7 @@ import { CodingSubmission } from './entities/coding-submission.entity';
         password: cfg.get('DB_PASSWORD', 'postgres'),
         database: cfg.get('DB_NAME', 'skillforge'),
         entities: [User, Topic, Lesson, LearningPath, UserProgress, CodingSubmission],
-        synchronize: cfg.get('NODE_ENV') !== 'production',
+        synchronize: cfg.get('NODE_ENV') !== 'production' || cfg.get('DB_SYNC') === 'true',
         logging: cfg.get('NODE_ENV') === 'development' ? ['error'] : false,
       }),
       inject: [ConfigService],
