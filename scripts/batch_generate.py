@@ -5,7 +5,7 @@ SkillForge — Async batch lesson generation script.
 Usage:
   python scripts/batch_generate.py --batch 1               # generate courses 0-9
   python scripts/batch_generate.py --batch 3 --concurrency 8
-  python scripts/batch_generate.py --all                   # all 60 courses
+  python scripts/batch_generate.py --all                   # all 36 courses
   python scripts/batch_generate.py --all --output-dir /tmp/lessons
 """
 
@@ -35,7 +35,7 @@ PROGRESS_PATH = REPO_ROOT / "generation_progress.json"
 AI_WORKER_PATH = REPO_ROOT / "ai-worker"
 
 MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 8192
+MAX_TOKENS = 16000
 HOBBY = "cricket"
 
 # Cost per million tokens (USD)
@@ -683,10 +683,12 @@ async def generate_single_lesson(
     json_reminder = "\n\nReturn ONLY valid JSON"
     # Prompt suffix used when the model hits the token limit (output truncated)
     brevity_suffix = (
-        "\n\nCRITICAL: Your previous response was cut off because it exceeded the token limit. "
-        "You MUST generate a SHORTER response this time. Use EXACTLY 4 sections. "
-        "Each section's 'content' field must be under 120 words. "
-        "No code blocks longer than 8 lines. Return ONLY valid JSON that fits within 3000 tokens."
+        "\n\nCRITICAL: Your previous response was cut off at the token limit. "
+        "You MUST include ALL sections (Overview, Core Concepts, How It Works Under the Hood, "
+        "Common Patterns & Best Practices, Real-World Application, and 2 quiz sections) — "
+        "do NOT drop any section. Instead, make each section MORE CONCISE: "
+        "paragraphs under 80 words, analogies under 60 words, code blocks under 10 lines, "
+        "key_points max 5 bullets. Return ONLY valid JSON."
     )
 
     last_exc = None
@@ -983,16 +985,16 @@ def main() -> None:
         description="SkillForge async batch lesson generator"
     )
     parser.add_argument(
-        "--batch", type=int, choices=range(1, 7), default=1, metavar="N",
-        help="Batch number 1-6 (generates 10 courses). Default: 1"
+        "--batch", type=int, choices=range(1, 5), default=1, metavar="N",
+        help="Batch number 1-4 (generates 10 courses, except batch 4 which has 6). Default: 1"
     )
     parser.add_argument(
         "--all", action="store_true",
-        help="Generate all 60 courses (overrides --batch)"
+        help="Generate all 36 courses (overrides --batch)"
     )
     parser.add_argument(
         "--course", type=int, metavar="N",
-        help="Single course index 0-59. Overrides --batch and --all."
+        help="Single course index 0-35. Overrides --batch and --all."
     )
     parser.add_argument(
         "--concurrency", type=int, default=3, metavar="N",

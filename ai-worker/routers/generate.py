@@ -372,7 +372,7 @@ async def generate_lesson(req: LessonRequest) -> LessonContentResponse:
 
     try:
         response = get_client().messages.create(
-            model="claude-sonnet-4-6",
+            model=MODEL,
             max_tokens=MAX_TOKENS,
             system=[
                 {
