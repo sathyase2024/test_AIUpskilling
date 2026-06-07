@@ -184,6 +184,192 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems employ three dominant patterns, each optimized for different retrieval scenarios. The **In-Context Learning (ICL)** pattern retrieves top-k documents and concatenates them directly into the prompt—ideal for latency-sensitive applications where you have a small, curated knowledge base (documents < 100K). The **Hierarchical Retrieval** pattern implements two-stage filtering: coarse retrieval via sparse BM25 or dense vectors narrows candidates to 500-1000 documents, then fine-grained re-ranking using cross-encoder models or LLM scoring selects the final 3-5 chunks. This approach scales to large corpora (millions of documents) at the cost of 200-500ms latency. The **Adaptive Retrieval** pattern conditions retrieval on query complexity: simple queries skip retrieval entirely using cached responses, moderate queries use single-pass dense retrieval, and complex queries trigger hierarchical + query expansion. Trade-offs: ICL offers simplicity and cost efficiency but fails on diverse knowledge bases; Hierarchical retrieves higher-quality context but increases infrastructure complexity and inference costs; Adaptive optimizes for P99 latency and cost per query but requires sophisticated routing logic and observability. Production deployments typically combine these patterns, routing requests based on query intent classification and maintaining separate vector indices for different document domains.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: In-Context Learning is like a T20 captain using a fixed batting order for every match—simple, fast, but limited flexibility when facing different bowlers. Hierarchical Retrieval mirrors Test cricket field placements: you start with aggressive slips for pace bowling, then adjust to defensive mid-wicket positioning as conditions change—initial filtering removes weak candidates like slip fielders catching tail-enders, then specialist fielders (re-rankers) position precisely based on batsman tendencies. Adaptive Retrieval is like modern DRS usage: you don't review every delivery (skip retrieval for obvious queries), review borderline LBW decisions (dense retrieval for moderate complexity), but escalate to full ball-tracking and expert analysis for contentious dismissals (hierarchical + expansion for complex queries). Each strategy has deployment costs—more reviews burn your quota, more re-ranking jobs consume GPU resources—so captains and engineers alike must choose strategically based on match conditions and available resources.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Hierarchical Retrieval with Adaptive Routing\nclass AdaptiveRAGBatsman:\n    def __init__(self, bm25_retriever, dense_retriever, reranker, llm):\n        self.bm25 = bm25_retriever  # Sparse, fast stage-one filter\n        self.dense = dense_retriever  # Dense embeddings for nuance\n        self.reranker = reranker  # Cross-encoder for final ranking\n        self.llm = llm\n        self.query_cache = {}  # Cache for simple queries\n    \n    def retrieve_documents(self, query_on_strike, query_complexity):\n        # Query complexity classification: 'simple', 'moderate', 'complex'\n        if query_complexity == 'simple':\n            # Check cache first—like using replayed footage\n            if query_on_strike in self.query_cache:\n                return self.query_cache[query_on_strike]['docs']\n        \n        # Stage 1: Sparse retrieval (fast filtering)\n        bm25_candidates = self.bm25.retrieve(query_on_strike, top_k=500)\n        \n        if query_complexity == 'moderate':\n            # Single dense pass sufficient\n            ranked_docs = self.dense.retrieve(query_on_strike, top_k=5)\n            return ranked_docs\n        \n        # Stage 2: Dense retrieval on filtered set (quality focus)\n        dense_candidates = self.dense.retrieve_batch(\n            [doc.content for doc in bm25_candidates],\n            top_k=20\n        )\n        \n        # Stage 3: Cross-encoder re-ranking (expert judgment)\n        final_docs = self.reranker.rank(\n            query_on_strike,\n            dense_candidates,\n            top_k=5\n        )\n        \n        # Cache successful retrievals\n        if query_complexity == 'simple':\n            self.query_cache[query_on_strike] = {'docs': final_docs, 'timestamp': time.time()}\n        \n        return final_docs\n    \n    def generate(self, query_on_strike):\n        complexity = self.classify_complexity(query_on_strike)\n        docs_at_crease = self.retrieve_documents(query_on_strike, complexity)\n        context_innings = \"\\n\".join([d.content for d in docs_at_crease])\n        response = self.llm.generate(query_on_strike, context_innings)\n        return response\n\n# ANTI-PATTERN: Naive Single-Stage Retrieval (loses games)\nclass NaiveRAGBowler:\n    def __init__(self, dense_retriever, llm):\n        self.dense = dense_retriever  # Only stage\n        self.llm = llm\n    \n    def retrieve_documents(self, query_on_strike):\n        # No complexity awareness, no filtering, no re-ranking\n        # Equivalent to bowling without checking field placement\n        docs = self.dense.retrieve(query_on_strike, top_k=5)\n        return docs  # Hope top-5 are relevant (they often aren't)\n    \n    def generate(self, query_on_strike):\n        # Over-reliant on single retrieval signal\n        docs_at_crease = self.retrieve_documents(query_on_strike)\n        context_innings = \"\\n\".join([d.content for d in docs_at_crease])\n        response = self.llm.generate(query_on_strike, context_innings)\n        # Low precision on complex queries, no cache benefits, scales poorly\n        return response",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is **treating all retrieval as equal quality without re-ranking**. Developers naively assume that if embedding similarity is high, the document is relevant to the query. In reality, dense retrievers suffer from false positives: a document about 'cricket bat manufacturing' might score highly for the query 'best cricket batting techniques' due to vocabulary overlap, but provide zero actionable advice. This causes hallucination and irrelevant context injection into the LLM. **Fix: Always implement a re-ranking stage**, even a simple one. Use a cross-encoder model (e.g., `sentence-transformers/ms-marco-MiniLM-L-12-v2`) to score (query, document) pairs with a fine-tuned relevance classifier. For 5 retrieved documents, this adds only 50-100ms latency but improves precision from ~60% to ~85%. Alternatively, use LLM-based scoring on your top-10 candidates: ask the LLM \"Is this document relevant?\" before context inclusion. Monitor retrieval precision via human-annotated evaluation sets; if precision < 70%, re-ranking is mandatory.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "In-Context Learning: Fast, simple, best for small curated knowledge bases (<100K docs); use for latency-critical applications like chatbots.",
+        "Hierarchical Retrieval: Two-stage (coarse + fine) approach scales to millions of documents; trade latency (~300ms) for precision, essential for enterprise search.",
+        "Adaptive Retrieval: Route requests by query complexity—skip retrieval for simple queries, use single-pass for moderate, hierarchical+expansion for complex; optimizes cost and latency simultaneously.",
+        "Re-ranking is non-negotiable: Dense retrievers alone cause false positives; cross-encoder or LLM-based re-ranking improves precision by 20-30 percentage points.",
+        "Query complexity classification: Implement a lightweight classifier (3-5 rules or small fine-tuned model) to route queries; complexity detection pays for itself in cost savings within weeks.",
+        "Caching patterns: Cache results for frequent simple queries; typical cache hit rates are 30-50%, dramatically reducing inference costs."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for a cricket knowledge base (2 million articles about players, matches, statistics). Your latency budget is 500ms and your LLM inference capacity is limited. Which pattern should you choose?",
+      "items": [
+        "In-Context Learning with top-10 dense retrieval",
+        "Hierarchical Retrieval: BM25 → dense on top-500 → cross-encoder re-ranking",
+        "Adaptive Retrieval with query complexity routing",
+        "Single-stage dense retrieval with caching only"
+      ],
+      "answer": 1,
+      "explanation": "Hierarchical Retrieval is the correct choice. With 2M documents, In-Context Learning fails due to knowledge base size and diversity (option A is inefficient). Single-stage dense retrieval (option D) lacks precision and re-ranking, causing hallucination on complex queries. Adaptive Retrieval (option C) is excellent for production but requires additional infrastructure for complexity classification. Hierarchical Retrieval (option B) perfectly balances your constraints: BM25 filtering (50ms, narrows to 500 candidates) eliminates 99.975% of irrelevant docs, dense retrieval on filtered set (200ms, quality ranking), cross-encoder re-ranking (150ms, final precision boost) totals ~400ms—under your 500ms budget. This approach maximizes precision while respecting latency and LLM capacity limits. In production, you'd layer Adaptive Routing on top of Hierarchical Retrieval for even better cost optimization."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RAG powers production systems at massive scale across tech giants. Google uses RAG in Search Generative Experience (SGE) to ground LLM responses in indexed web documents, handling billions of queries daily. OpenAI integrates RAG with GPT-4 plugins to fetch real-time data and proprietary knowledge. Meta employs RAG in their customer support chatbots across billions of users. Netflix uses RAG-style architectures to combine recommendation embeddings with contextual movie metadata for personalized suggestions. Uber applies RAG to retrieve contextual driver information and dynamic pricing rules in microseconds. Frameworks like LangChain, LlamaIndex, and Haystack standardize RAG pipelines. Systems fail catastrophically when vector databases become stale, retrieval latency exceeds 500ms, or ranking functions return irrelevant chunks—causing hallucinations and poor user trust. Production RAG systems must handle 10,000+ queries/second with sub-100ms latency while maintaining semantic accuracy across millions of documents.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A captain (LLM) needs to make a match-winning decision. Instead of relying only on memory of past games (training data), the captain consults the batting lineup card, pitch conditions report, and recent player statistics (retrieved documents). Google's SGE acts like a captain with live scorecard access; Netflix's recommendation engine is like a coach who instantly reviews a player's form against specific opponents; Uber's dynamic retrieval mirrors a fielding captain adjusting positions based on current batter analysis. When the retrieval system fails—like consulting an outdated lineup—the captain makes poor decisions despite being intelligent.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Production RAG systems face three critical failure modes: (1) **Stale retrieval** — outdated vector indices missing recent information, causing hallucinations about current events; (2) **Latency collapse** — when document databases exceed 500ms query time, user experience degrades and cascading timeouts kill entire services; (3) **Ranking drift** — relevance scoring models trained on old data fail to surface correct documents, reducing answer quality. Always implement cache warming, async retrieval jobs, and continuous relevance evaluation in production RAG.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG grounds LLM outputs in real documents, reducing hallucinations and enabling factual, verifiable responses at production scale.",
+        "Vector embeddings transform text into semantic representations; retrieval finds relevant chunks in milliseconds across billions of documents.",
+        "Ranking and relevance scoring critically determine answer quality—weak rankers surface irrelevant documents despite perfect retrieval.",
+        "Query expansion reformulates user questions to capture intent variations, improving recall for ambiguous or complex cricket-related queries.",
+        "Context window management balances retrieved document quantity against LLM capacity—more chunks don't always improve answers.",
+        "Production RAG requires latency optimization, cache strategies, and continuous metric monitoring to prevent retrieval drift and cascading failures.",
+        "Major platforms (Google, OpenAI, Netflix, Uber, Meta, Airbnb) deploy RAG to serve billions of users with grounded, real-time, contextual AI responses."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket analytics startup wants to build an AI chatbot answering fan questions about historical match statistics. Which RAG failure would most damage user trust?",
+      "items": [
+        "Vector embeddings that occasionally confuse Virat Kohli with AB de Villiers",
+        "A stale vector database missing last week's ODI match data, causing the chatbot to claim 'no record exists' for recent centuries",
+        "Chunk size set to 200 tokens instead of 512 tokens",
+        "Query reformulation that expands 'Kohli century' to 'Kohli hundred' and 'Kohli 100 runs'"
+      ],
+      "answer": 1,
+      "explanation": "Stale retrieval (answer B) directly causes hallucinations and factual incorrectness—users lose trust immediately when the system denies recent, verifiable events. Token size (C) and query reformulation (D) are optimizations. Embedding confusion (A) is less damaging than returning zero results for facts that provably exist. In production sports analytics, recency and factual correctness are non-negotiable; stale data is the #1 RAG failure mode.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of RAG mechanisms with these two knowledge checks. The first quiz focuses on core conceptual understanding, while the second applies RAG principles to a realistic scenario.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In RAG systems, why is vector embedding and semantic similarity search preferred over simple keyword matching when retrieving relevant documents from a knowledge base?",
+      "items": [
+        "Vector embeddings capture semantic meaning, allowing the system to find contextually relevant documents even when exact keywords don't match, similar to how a cricket commentator understands 'boundary hit' and 'six' refer to the same concept despite different wording",
+        "Vector embeddings are faster because they require fewer computational resources than keyword matching algorithms",
+        "Keyword matching is outdated technology that has been completely replaced in modern RAG systems",
+        "Vector embeddings eliminate the need for query expansion and reformulation techniques"
+      ],
+      "answer": 0,
+      "explanation": "Vector embeddings excel at capturing semantic relationships and contextual meaning. When a user queries 'batsman scoring runs' and the knowledge base contains 'player accumulating points,' semantic search via embeddings can identify this relevance because both express the concept of gaining score. Keyword matching would fail here because it only looks for exact or partial word matches. Option B is incorrect because embeddings require significant computational resources. Option C oversimplifies—keyword matching still has use cases. Option D is wrong because query expansion remains valuable even with semantic search, as it can discover additional relevant angles and variations not immediately apparent from the original query.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for a cricket statistics platform. Users ask questions like 'What were Virat Kohli's batting averages in Test matches during 2022?' The retrieval step returns 50 candidate documents. Your ranking and relevance scoring system must decide which 5 documents to send to the LLM's context window. What's the most effective strategy?",
+      "items": [
+        "Return the top 50 documents unchanged; the LLM can filter irrelevant information itself without additional processing",
+        "Combine multiple ranking signals (date recency, exact match score, semantic similarity, and document authority) and apply a relevance threshold to select the highest-scoring documents, discarding low-confidence matches",
+        "Use only the semantic similarity score from vector embeddings, ignoring other ranking factors for simplicity",
+        "Randomly sample 5 documents from the 50 to avoid bias in selection"
+      ],
+      "answer": 1,
+      "explanation": "The optimal strategy mirrors a cricket team's selection process: coaches combine multiple evaluation criteria (batting form, recent performance, match conditions, experience) rather than relying on a single metric. Option B correctly identifies that multi-signal ranking is most effective. Using date recency ensures you get recent statistics; exact keyword matching catches direct references to the query; semantic similarity finds contextually relevant documents; and authority scores prioritize reliable sources. Option A fails because flooding the context window with 50 documents wastes tokens and dilutes signal quality. Option C ignores important ranking dimensions like document reliability and temporal relevance—like selecting a cricket team based only on historical performance ignoring current form. Option D introduces unnecessary randomness where principled ranking would serve users better.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

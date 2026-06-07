@@ -195,6 +195,186 @@
       "answer": -1,
       "explanation": "",
       "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production ONNX deployment follows three dominant patterns, each optimizing for different constraints. The **eager export pattern** converts your PyTorch model immediately after training, ideal for rapid prototyping and continuous deployment pipelines where latency tolerance is moderate (50-200ms). Use this when your inference hardware matches training specs and model architecture is stable. The **traced export pattern** captures computational graphs through dummy forward passes, producing smaller, faster ONNX files by eliminating control flow overhead—critical for mobile/edge deployment where every millisecond and megabyte matters. Trade-off: tracing fails silently on dynamic shapes, requiring careful input specification. The **scripted export pattern** uses TorchScript's compiler to handle complex control flow, loops, and conditionals that tracing misses, essential for models with data-dependent branching. Cost: 10-30% larger model files and slightly reduced inference speed versus traced models, but guaranteed correctness for complex architectures. Choose tracing for CNNs and vision transformers; choose scripting for RNNs, dynamic models, and complex business logic embedded in model code.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The eager export pattern resembles selecting your XI immediately after the toss—fast decision-making, suited for predictable pitch conditions (consistent hardware). Traced export mirrors a disciplined opening batsmen who plays predetermined shots against a fixed bowling attack—optimal for standardized conditions but vulnerable if the bowler suddenly changes strategy (dynamic inputs). Scripted export is like assigning a versatile all-rounder who reads the game in real-time, adjusts to spin or pace, and handles unexpected deliveries through intelligent decision-making. The opening pair (eager + traced) works beautifully against predictable attacks but collapses on turning pitches. The all-rounder (scripted) adapts everywhere but occasionally overthinks simple deliveries, adding microseconds of latency. For T20 cricket (low latency required), you want traced models on GPU clusters. For test cricket (complex negotiations, strategic depth), script your model to handle every condition your inference servers might encounter.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Traced Export with Input Specification\nimport torch\nimport torch.nn as nn\n\nclass BattingAveragePredictor(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.lstm = nn.LSTM(input_size=4, hidden_size=64, num_layers=2, batch_first=True)\n        self.fc = nn.Linear(64, 1)\n    \n    def forward(self, runs_scored, wickets_lost, balls_faced, innings_played):\n        # Fixed-shape input for reliable tracing\n        x = torch.stack([runs_scored, wickets_lost, balls_faced, innings_played], dim=-1)\n        lstm_out, _ = self.lstm(x.unsqueeze(0))\n        avg = self.fc(lstm_out[:, -1, :])\n        return avg\n\nmodel = BattingAveragePredictor()\nmodel.eval()\n\n# Specify exact input shapes for tracing\nruns = torch.randn(1, 20)  # batch_size=1, sequence_length=20\nwickets = torch.randn(1, 20)\nballs = torch.randn(1, 20)\ninnings = torch.randn(1, 20)\n\n# Export with fixed signatures\ntorch.onnx.export(\n    model,\n    (runs, wickets, balls, innings),\n    \"batting_avg_model.onnx\",\n    input_names=['runs_scored', 'wickets_lost', 'balls_faced', 'innings_played'],\n    output_names=['batting_average'],\n    dynamic_axes={  # Only specify truly dynamic dimensions\n        'runs_scored': {0: 'batch_size'},\n        'wickets_lost': {0: 'batch_size'},\n        'batting_average': {0: 'batch_size'}\n    },\n    opset_version=14\n)\n\n# ANTI-PATTERN: Ignoring Input Shape Mismatches\nclass PoorBowlingAnalyzer(nn.Module):\n    def forward(self, deliveries):\n        # Dynamic reshaping causes tracing failure\n        if deliveries.shape[0] > 10:\n            deliveries = deliveries.reshape(-1, 5)\n        return self.fc(deliveries.mean(dim=0))\n\n# ❌ This export silently produces incorrect ONNX\nmodel_bad = PoorBowlingAnalyzer()\nwrong_input = torch.randn(15, 4)  # Traced with 15 samples\ntorch.onnx.export(model_bad, wrong_input, \"bowling_bad.onnx\")  \n# At inference: if input has 8 samples, ONNX fails silently or produces garbage\n\n# ✅ FIX: Use torch.jit.script for control flow\nclass GoodBowlingAnalyzer(nn.Module):\n    def forward(self, deliveries: torch.Tensor) -> torch.Tensor:\n        # Explicit control flow works with scripting\n        reshaped = deliveries.view(deliveries.shape[0], -1)\n        return torch.nn.functional.avg_pool1d(\n            reshaped.unsqueeze(1), kernel_size=reshaped.shape[1]\n        ).squeeze()\n\nscripted = torch.jit.script(GoodBowlingAnalyzer())\ntorch.jit.save(scripted, \"bowling_good.pt\")\n# Load in any framework with torch.jit.load(\"bowling_good.pt\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is exporting models with batch_size=1 in dynamic_axes without testing inference at different batch sizes. This produces ONNX files that work during export but fail in production when inference engines receive batch_size=32. The fix: Always test exported ONNX models with 3+ different batch sizes (1, 8, max_expected) using ONNX Runtime before deployment. Run: `ort_session.run(None, {input_name: np.random.randn(16, 224, 224, 3)})` to validate. Additionally, never trace models containing Python control flow (if/while statements in forward())—these silently bake in the traced condition. Use torch.jit.script() instead, which preserves control flow in the exported graph.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Eager export for rapid prototyping; tracing for vision models; scripting for RNNs and complex logic",
+        "Always specify dynamic_axes for batch dimensions; test exported models at 3+ batch sizes before production",
+        "Avoid Python control flow in traced models—it silently bakes in the traced condition; use torch.jit.script() instead",
+        "Monitor ONNX opset version compatibility with target inference runtime (TensorRT, CoreML, ONNX Runtime)",
+        "Profile traced vs scripted exports on your target hardware; traced models 10-30% faster but less flexible"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're exporting a batting statistics model with LSTM layers and dynamic match-length sequences (10-50 balls per over). Which export strategy is most appropriate?",
+      "items": [
+        "torch.onnx.export with torch.jit.trace() because LSTM is a standard layer",
+        "torch.jit.script() because the model has sequential/temporal dynamics and variable sequence length",
+        "Eager export with opset_version=20 for maximum compatibility",
+        "Traced export with dynamic_axes on the sequence dimension only, no batch dimension"
+      ],
+      "answer": 1,
+      "explanation": "LSTMs with variable-length sequences (dynamic control flow in time dimension) require torch.jit.script() to preserve temporal logic. Tracing would bake in the specific sequence length seen during export (answer A is incorrect). Eager export (C) isn't an ONNX export method. Answer D fails because sequence length *is* dynamic and must be in dynamic_axes. Scripting captures the recurrent pattern across any sequence length, enabling proper cross-platform deployment."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "ONNX export powers production ML systems at scale across industry leaders. Google uses ONNX Runtime for serving recommendation models to billions of users daily, while Meta deploys exported models across Instagram and Facebook inference pipelines handling petabytes of data. Netflix exports PyTorch models to ONNX for real-time personalization across multiple device platforms—phones, smart TVs, web browsers. OpenAI leverages ONNX for efficient inference distribution of language models. Uber exports computer vision models to ONNX for real-time delivery optimization and driver matching. When deployment fails—incompatible tensor formats, missing operator implementations, precision mismatches—systems experience latency spikes (100ms→5s), hallucinated predictions, or complete service degradation affecting millions of users and revenue.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: PyTorch is your practice nets where bowlers perfect their action with video feedback. ONNX is the standardized cricket pitch specification that works in Mumbai, Melbourne, and Manchester—same dimensions, same grass type. Your batsman (model) trains beautifully in nets, but must export to ONNX format to play on any stadium globally. A poorly exported model is like a bowler whose action changes between venues—unpredictable and ineffective. Just as cricket boards specify pitch standards so any team can play anywhere, ONNX standardizes model format so inference engines (TensorRT, CoreML, ORT) can run your model anywhere—cloud, edge devices, browsers—without retraining.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production-grade ONNX export with validation pipeline\nimport torch\nimport onnx\nimport onnxruntime as ort\nfrom pathlib import Path\n\nclass CricketScorePredictor(torch.nn.Module):\n    def __init__(self, hidden_dim=128):\n        super().__init__()\n        self.batting_encoder = torch.nn.Linear(12, hidden_dim)  # 12 batting features\n        self.bowling_encoder = torch.nn.Linear(8, hidden_dim)   # 8 bowling features\n        self.fusion = torch.nn.Linear(hidden_dim * 2, 64)\n        self.predictor = torch.nn.Linear(64, 1)  # runs prediction\n    \n    def forward(self, batting_stats, bowling_stats):\n        bat_feat = torch.relu(self.batting_encoder(batting_stats))\n        bowl_feat = torch.relu(self.bowling_encoder(bowling_stats))\n        fused = torch.relu(self.fusion(torch.cat([bat_feat, bowl_feat], dim=1)))\n        return self.predictor(fused)\n\n# Initialize and train model\nmodel = CricketScorePredictor()\nmodel.eval()\n\n# Production export with comprehensive validation\ndef export_cricket_model_to_onnx(model, save_path='cricket_model.onnx'):\n    # Create dummy inputs matching production schema\n    dummy_batting = torch.randn(1, 12, dtype=torch.float32)\n    dummy_bowling = torch.randn(1, 8, dtype=torch.float32)\n    \n    # Export with opset version 14 for maximum compatibility\n    torch.onnx.export(\n        model,\n        (dummy_batting, dummy_bowling),\n        save_path,\n        input_names=['batting_stats', 'bowling_stats'],\n        output_names=['predicted_runs'],\n        opset_version=14,\n        do_constant_folding=True,\n        verbose=False,\n        export_params=True,\n        dynamic_axes={\n            'batting_stats': {0: 'batch_size'},\n            'bowling_stats': {0: 'batch_size'},\n            'predicted_runs': {0: 'batch_size'}\n        }\n    )\n    \n    # Validate exported model\n    onnx_model = onnx.load(save_path)\n    onnx.checker.check_model(onnx_model)\n    print(f\"✓ ONNX model valid: {save_path}\")\n    \n    # Cross-platform inference validation\n    ort_session = ort.InferenceSession(save_path, providers=['CPUExecutionProvider'])\n    \n    # Compare PyTorch vs ONNX outputs\n    with torch.no_grad():\n        pytorch_out = model(dummy_batting, dummy_bowling).numpy()\n    \n    onnx_out = ort_session.run(\n        None,\n        {'batting_stats': dummy_batting.numpy(), 'bowling_stats': dummy_bowling.numpy()}\n    )[0]\n    \n    # Numerical validation: outputs must match within 1e-5\n    max_diff = abs(pytorch_out - onnx_out).max()\n    assert max_diff < 1e-5, f\"Output mismatch: {max_diff}\"\n    print(f\"✓ PyTorch-ONNX parity confirmed (max diff: {max_diff:.2e})\")\n    \n    return onnx_model\n\n# Execute production export\nonnx_model = export_cricket_model_to_onnx()\n\n# Inference on multiple platforms (simulated)\ndef multi_platform_inference(onnx_path):\n    providers = [\n        'TensorrtExecutionProvider',  # NVIDIA GPUs\n        'CoreMLExecutionProvider',     # iOS/macOS\n        'CPUExecutionProvider'         # Fallback\n    ]\n    \n    test_batting = torch.randn(32, 12).numpy()  # batch of 32 matches\n    test_bowling = torch.randn(32, 8).numpy()\n    \n    for provider in providers:\n        try:\n            session = ort.InferenceSession(onnx_path, providers=[provider])\n            output = session.run(None, {\n                'batting_stats': test_batting,\n                'bowling_stats': test_bowling\n            })\n            print(f\"✓ {provider}: Success (shape: {output[0].shape})\")\n        except Exception as e:\n            print(f\"✗ {provider}: {str(e)[:60]}\")\n\nmulti_platform_inference('cricket_model.onnx')",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Complete production export pipeline with validation, multi-platform testing, and numerical parity checks—essential for mission-critical systems."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: ONNX export pitfalls in production:\n\n1. **Operator Coverage**: Custom PyTorch ops (like complex attention patterns) may have no ONNX equivalent—causes silent export failure or runtime crashes. Always validate with `onnx.checker.check_model()` before deployment.\n\n2. **Numerical Precision Drift**: Float32→Float16 quantization can cause >5% accuracy loss in some models. Netflix learned this the hard way when converted models misranked content. Always validate outputs match ±1e-5 before serving.\n\n3. **Dynamic Shapes**: Models trained with batch_size=1 but exported with dynamic_axes for production batching can expose shape bugs at scale. Airbnb's model failed when batch sizes exceeded training maximum.\n\n4. **Version Hell**: ONNX opset versions matter—opset 12 lacks operators that opset 14 has. Your mobile inference engine may only support opset 11, silently degrading model. Document minimum opset requirements.\n\n5. **Memory Leaks in ONNX Runtime**: Long-running inference servers (Uber's) leak memory if ONNX session isn't properly disposed. Use context managers and profile memory consumption across billions of inferences.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "ONNX export enables PyTorch models to run on mobile, edge, cloud, and browser platforms—essential for Netflix, Meta, Google's cross-platform recommendation systems.",
+        "Always validate exported ONNX models against PyTorch outputs with numerical precision checks (max_diff < 1e-5) before production deployment.",
+        "Dynamic axes enable batch-size flexibility but require careful testing; static shapes are safer for latency-sensitive inference at Uber/Netflix scale.",
+        "Operator coverage and opset versions determine platform compatibility—choose opset conservatively to support maximum inference engines.",
+        "Quantization during export (Float32→Float16) trades speed for accuracy; validate impact before rolling out to millions of users.",
+        "ONNX Runtime multi-provider fallback strategy (TensorRT→CoreML→CPU) ensures graceful degradation across heterogeneous infrastructure.",
+        "Production models require continuous validation pipelines monitoring numerical drift, latency, and memory consumption across billions of daily inferences."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of ONNX export, cross-platform deployment, and optimization techniques covered in this lesson. These quizzes combine conceptual knowledge with real-world application scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You have trained a PyTorch cricket ball trajectory prediction model using mixed precision training with gradient accumulation. When you export it to ONNX format, what is the PRIMARY reason you should set the model to eval() mode before export?",
+      "items": [
+        "To disable dropout layers and batch normalization running statistics updates, ensuring deterministic inference behavior across platforms",
+        "To reduce the model file size by removing all non-essential parameters",
+        "To convert floating-point operations to integer operations for faster inference",
+        "To enable ONNX quantization automatically during the export process"
+      ],
+      "answer": 0,
+      "explanation": "When a PyTorch model is in eval() mode, dropout layers are disabled (no random neuron deactivation) and batch normalization uses accumulated running statistics rather than batch statistics. This is critical for ONNX export because it ensures your model behaves identically across different platforms and inference engines—just like a cricket team's playing strategy remains consistent whether they're at home or away. Option B is incorrect because eval() mode doesn't significantly reduce file size. Option C is wrong because eval() mode doesn't automatically convert to integer operations—that requires explicit quantization. Option D is false because ONNX export doesn't trigger automatic quantization; that's a separate step you must explicitly implement.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket pitch condition classifier (PyTorch model) achieves 94% accuracy on your validation set but drops to 78% accuracy when deployed via ONNX on a mobile platform. You've verified that eval() mode was used during export. What is the MOST LIKELY cause and your first debugging step?",
+      "items": [
+        "The ONNX model was quantized incorrectly; export it with opset_version=12 and use float32 precision throughout",
+        "Input normalization/preprocessing differs between PyTorch inference and ONNX inference; verify that image scaling, cropping, and mean/std normalization are identical on both platforms",
+        "ONNX doesn't support the activation functions you used; rewrite your model using only ReLU activations",
+        "Mobile inference engines automatically apply aggressive pruning; retrain your model with L1 regularization to compensate"
+      ],
+      "answer": 1,
+      "explanation": "The most common cause of accuracy drops during ONNX deployment is a mismatch in input preprocessing—similar to how a cricket pitch curator must apply the same preparation standards everywhere for consistent play. If your PyTorch code normalizes inputs with specific mean/std values but your ONNX deployment doesn't apply the same preprocessing, the model receives fundamentally different data despite identical model weights. This is your first debugging point because it's quick to verify and fix. Option A is overly specific and opset_version changes alone won't cause a 16% accuracy drop. Option C is incorrect because ONNX supports all common activations (ReLU, sigmoid, tanh, etc.). Option D is false because ONNX doesn't automatically prune models during inference, and retraining with L1 regularization wouldn't fix a deployment mismatch—it would just create a different model.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

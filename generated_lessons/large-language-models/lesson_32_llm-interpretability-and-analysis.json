@@ -201,6 +201,202 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production LLM interpretability workflows, three dominant patterns emerge based on computational budget and interpretability depth requirements. First, **attention head pruning with cached attribution** offers 70-85% inference speedup by identifying and removing low-impact heads post-training, ideal for latency-critical applications where you've already validated model behavior. Second, **layer-wise probing on frozen embeddings** provides rapid behavioral diagnosis without full gradient computation, trading 15-20% interpretability fidelity for 8x faster analysis—optimal for continuous monitoring of model drift. Third, **sparse causal intervention during inference** (selective masking of top-k attribution tokens) enables real-time explainability at 2-3% computational overhead, but requires careful threshold calibration to avoid catastrophic performance degradation. Trade-offs: pruning sacrifices adaptability to distribution shift; probing misses cross-layer interaction effects; sparse intervention introduces stochastic variance in explanations. Cost analysis: pruning requires 40-60 GPU hours upfront but zero runtime penalty; probing needs 5-10 GPU hours per analysis cycle; intervention adds 2-5ms per token at scale.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Attention head pruning mirrors selecting your best 11 players before match day—you identify your star performers (high-impact heads) through training analysis and commit to them, gaining speed but losing flexibility if the pitch changes. Layer-wise probing resembles using DRS (Decision Review System) strategically: you don't review every decision exhaustively, just the close ones, accepting occasional misses for faster game flow. Sparse causal intervention is like field placement adjustments between overs—you dynamically mask certain fielding positions (token contributions) based on the bowler's analysis, adding slight overhead but maximizing adaptive defense. Production teams use pruning for stable, high-traffic APIs (like international test matches), probing for weekly model audits (like post-match analysis), and intervention for personalized explanations (like tactical adjustments mid-innings based on batsman tendency). The captain's choice depends on whether you prioritize certainty (full squad analysis), speed (minimal reviews), or adaptability (dynamic field setup).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Computing full attributions for every inference\ndef explain_prediction_slow(model, cricket_query):\n    # Recomputes gradients for EVERY prediction - 10x slowdown\n    embeddings = model.embed(cricket_query)\n    logits = model.forward(embeddings, retain_graph=True)\n    loss = compute_loss(logits)\n    loss.backward()  # Full backprop every time!\n    attribution = embeddings.grad\n    return logits, attribution\n\n# ✅ BEST PRACTICE: Cache attention patterns, use lightweight probes\nclass CricketExplainer:\n    def __init__(self, model, probe_weights):\n        self.model = model\n        self.probe = probe_weights  # Pre-trained, frozen\n        self.head_importance = None  # Cached from prior analysis\n    \n    def explain_prediction_fast(self, cricket_query):\n        with torch.no_grad():\n            embeddings = self.model.embed(cricket_query)\n            hidden_states = self.model.forward(embeddings)\n            # Use lightweight probe instead of full gradient\n            fast_attribution = self.probe(hidden_states[-2])  # Layer -2 only\n            # Mask low-importance attention heads\n            masked_attention = self.filter_attention_heads(\n                hidden_states, threshold=0.15\n            )\n        return hidden_states, fast_attribution\n    \n    def filter_attention_heads(self, states, threshold):\n        # Only compute for top-k heads identified in batch analysis\n        if self.head_importance is None:\n            self.head_importance = self.analyze_heads_batch(states)\n        return states[:, self.head_importance > threshold]\n\n# Usage: 8x speedup, 2% fidelity loss\nexplainer = CricketExplainer(model, probe_weights)\nlogits, attrs = explainer.explain_prediction_fast(\"Who will win the IPL?\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Overfitting attribution patterns to your validation set.** Many teams compute attribution masks on the same distribution used for model evaluation, then apply them in production. When real user queries shift slightly (e.g., different cricket statistics, new players), cached attention head importance scores become invalid, causing explanations to reference irrelevant tokens or miss critical ones. *Fix:* Always validate attribution stability across 3+ held-out distributions. Use rolling window recomputation: recalculate head importance monthly or trigger reanalysis when prediction uncertainty exceeds threshold (e.g., entropy > 0.8). Test your explanation method with adversarial queries (uncommon player names, statistical anomalies) before deployment. Track explanation drift the same way you track prediction drift—monitor whether top-k attributed tokens change unexpectedly between weeks.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Attention pruning (70-85% speedup) suits stable, high-throughput APIs; layer-wise probing (8x faster) fits diagnosis workflows; sparse intervention (2-3% overhead) enables real-time explanations",
+        "Production interpretability requires trade-off analysis: computational cost vs. fidelity vs. adaptability to distribution shift",
+        "Always validate attribution method stability across multiple data distributions—cached patterns degrade under domain shift",
+        "Implement continuous monitoring of explanation drift (token importance changes, attention head volatility) like you monitor model performance",
+        "Use lightweight frozen probes rather than recomputing gradients per inference; pre-compute importance scores in batch analysis"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying an LLM for live cricket commentary generation. Queries arrive at 500 req/sec, and users demand explanations for why the model predicted 'Kohli will score a century.' Gradient-based attribution takes 800ms per query. Which pattern should you implement?",
+      "items": [
+        "Compute full gradients for all queries—interpretability is non-negotiable",
+        "Use cached attention head importance + layer-wise probing on frozen embeddings from layer -2",
+        "Apply sparse causal intervention with dynamic masking of top-20% tokens",
+        "Implement attention head pruning post-training, cache patterns, use lightweight probes"
+      ],
+      "answer": 3,
+      "explanation": "Option 3 (attention pruning + caching + lightweight probes) is correct for this scenario. You need sub-100ms latency to handle 500 req/sec at scale. Full gradient computation (Option 1) is prohibitively slow. Layer-wise probing alone (Option 2) works but probing-only models may miss cross-layer interactions important for commentary quality. Sparse intervention (Option 3a) adds overhead without sufficient speedup. The winning combination: offline analysis identifies high-impact attention heads (pruning), freeze those patterns, deploy lightweight probes on layer -2 embeddings, achieving ~50-80ms explanation latency. This gives 10x speedup vs. full gradients with only 15-20% fidelity loss—acceptable for commentary use case where exact token attribution is less critical than directional explanation.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "LLM interpretability is deployed at massive scale across tech giants to ensure safety, compliance, and trustworthiness. Google uses attention visualization in Gemini to detect hallucinations before deployment. OpenAI applies gradient-based attribution to understand why ChatGPT produces specific outputs, enabling rapid debugging of failure modes. Meta employs probing classifiers on Llama's hidden states to detect and mitigate biases before release. Netflix uses layer-wise relevance propagation to explain recommendation explanations generated by language models. Uber implements causal intervention techniques to ensure their customer service LLMs don't discriminate based on protected attributes. At billion-token scales, interpretability failures cascade into costly errors: misaligned outputs, regulatory violations, eroded user trust. When done wrong, companies face reputational damage, lawsuits, and model rollbacks costing millions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A batter (input token) hits the ball, and the ball travels through the field (transformer layers). Interpretability techniques are like the replays and heat maps—they show exactly which fielders influenced the trajectory most, which moments mattered most, and whether the umpire made the right call. Just as cricket needs instant replays for controversial decisions, production LLMs need interpretability for controversial outputs. Without it, fans (users) won't trust the game, and the league (company) faces backlash.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production-grade interpretability pipeline example\nimport torch\nfrom transformers import AutoTokenizer, AutoModelForCausalLM\n\nclass ProductionInterpreter:\n    def __init__(self, model_name=\"gpt2\"):\n        self.model = AutoModelForCausalLM.from_pretrained(model_name, output_attentions=True)\n        self.tokenizer = AutoTokenizer.from_pretrained(model_name)\n    \n    def explain_generation(self, prompt, max_length=50):\n        \"\"\"Generate text with full interpretability trace\"\"\"\n        inputs = self.tokenizer(prompt, return_tensors=\"pt\")\n        outputs = self.model.generate(\n            inputs['input_ids'],\n            max_length=max_length,\n            output_attentions=True,\n            return_dict_in_generate=True,\n            output_scores=True\n        )\n        \n        # Extract attention weights for all layers and heads\n        attentions = outputs.attentions  # tuple of (batch, heads, seq, seq)\n        token_ids = outputs.sequences[0]\n        tokens = self.tokenizer.decode(token_ids, skip_special_tokens=True)\n        \n        # Aggregate attention: which input tokens influenced final output?\n        final_layer_attention = attentions[-1][0]  # Last layer\n        head_importance = final_layer_attention.mean(dim=0)[-1, :]  # Last token position\n        \n        return {\n            \"generated_text\": tokens,\n            \"attention_weights\": head_importance.detach().numpy(),\n            \"input_tokens\": self.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0]),\n            \"confidence_scores\": outputs.scores\n        }\n\n# Usage at production scale\ninterpreter = ProductionInterpreter()\nresult = interpreter.explain_generation(\"The cricket match was decided by\")\nprint(f\"Generated: {result['generated_text']}\")\nprint(f\"Most influential input tokens: {result['input_tokens'][result['attention_weights'].argsort()[-3:]]}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "This shows how production systems capture attention traces and token importance during generation for downstream analysis and auditing."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Production interpretability at billion-parameter scale faces three critical pitfalls: (1) Computational overhead—extracting full attention weights for every inference multiplies latency by 2-5x, requiring careful sampling strategies. (2) False confidence—a high attention score doesn't always mean causal importance (as shown by gradient studies). (3) Explanation gaming—models learn to produce high attention to 'safe' tokens while the real computation happens in residual streams, requiring multi-method validation. Always cross-validate with gradient-based and causal methods before deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Attention visualization reveals which input tokens influenced predictions, but causation requires gradient or intervention methods.",
+        "Gradient-based attribution scales to production systems by computing input saliency without modifying model architecture.",
+        "Probing classifiers detect encoded knowledge in hidden states; causal intervention confirms if that knowledge actually drives behavior.",
+        "Layer-wise relevance propagation distributes model predictions backward through layers to identify decision-critical neurons and features.",
+        "Production deployment demands multi-method interpretation: attention + gradients + probing catch different failure modes attention alone misses.",
+        "At billion-scale, computational cost and latency constraints force sampling trade-offs; monitor explanation stability across sample batches.",
+        "Interpretability frameworks (LIME, SHAP, Captum) accelerate audits but require domain expertise to avoid spurious correlation pitfalls."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A production LLM at Netflix generates a movie recommendation explanation: 'We recommend this because you watched cricket dramas.' An engineer wants to know if the model truly understood cricket-drama overlap or just pattern-matched keywords. Which interpretability method is MOST appropriate?",
+      "items": [
+        "Attention visualization alone—check if 'cricket' and 'drama' tokens attend to each other",
+        "Probing + causal intervention—test if hidden states encode cricket-genre relationships AND if removing that signal changes predictions",
+        "Gradient-based attribution—compute input token saliency scores",
+        "Layer-wise relevance propagation—backpropagate relevance to input tokens"
+      ],
+      "answer": 1,
+      "explanation": "Attention visualization (A) only shows which tokens were attended to, not causation. Gradient attribution (C) and LRP (D) show which inputs mattered for the output, but neither confirms that the model understands the semantic relationship. Probing + causal intervention (B) is strongest: probing confirms the hidden state encodes cricket-drama relationships, and causal intervention (removing that signal) verifies the prediction actually depends on it. In production, you need both knowledge verification (probing) and causal evidence (intervention) to confidently explain behavior.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of LLM interpretability concepts and techniques. These quizzes cover both foundational knowledge and practical application scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're analyzing an LLM's prediction for sentiment classification. The model correctly identified a review as negative, but you want to understand which tokens contributed most to this decision. You apply gradient-based attribution and notice that the gradient magnitudes are very small across all tokens. What is the most likely explanation for this observation?",
+      "items": [
+        "The model is working correctly; small gradients indicate high confidence in the prediction",
+        "The token embeddings are saturated, causing vanishing gradients that mask the true attribution signal",
+        "The attention mechanism is uniformly distributing information across all layers, making individual token contributions equally weak",
+        "The model has not learned meaningful representations, and no tokens are actually important for the decision"
+      ],
+      "answer": 1,
+      "explanation": "Small gradients in attribution analysis typically indicate saturation or the vanishing gradient problem, not confidence or correctness. When embeddings or hidden states are pushed into saturated regions of activation functions (like tanh or sigmoid), gradients become very small, making it difficult to compute accurate attribution scores. This is similar to a cricket batsman who has already decided their shot well before the ball arrives—the decision mechanism has already 'committed.' The other options are incorrect: (0) small gradients don't indicate confidence; (2) uniform attention distribution would still produce measurable gradients; (3) complete learning failure would show random predictions, not correct ones. Understanding gradient saturation is crucial for troubleshooting attribution methods.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your team deploys an LLM for customer support that generates responses about product specifications. Users report that the model sometimes provides correct information but occasionally hallucinates details. You want to identify which internal model components are responsible for factual accuracy. Which combination of interpretability techniques would be most effective for this diagnosis?",
+      "items": [
+        "Only attention visualization to see which documents the model attended to during generation",
+        "Probing classifiers combined with causal intervention to identify layers that encode factual information and test if disrupting them causes hallucinations",
+        "Only gradient-based attribution applied to the final output token to find influential input tokens",
+        "Layer-wise relevance propagation alone to backpropagate importance scores from the output"
+      ],
+      "answer": 1,
+      "explanation": "Identifying the root cause of hallucinations requires both diagnosis (which layers hold factual knowledge) and causal validation (does removing/disrupting that knowledge cause hallucinations?). Probing classifiers can identify whether specific layers encode factual information by training classifiers on their representations, similar to a cricket analyst identifying which aspects of a batsman's technique correlate with success. Causal intervention then tests whether this correlation is causal by ablating or modifying those layers. Option (0) is incomplete—attention to documents doesn't guarantee factual grounding. Option (2) only shows influential inputs, not internal mechanisms responsible for hallucinations. Option (3) alone provides importance scores but no causal evidence. The combination of probing + intervention provides both localization and causal confirmation needed for reliable diagnosis.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

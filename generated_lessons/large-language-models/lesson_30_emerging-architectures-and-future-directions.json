@@ -180,6 +180,198 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production LLM architectures follow three dominant patterns, each with distinct trade-offs. First, the **Dense-with-Sparse-Layers** pattern interleaves standard transformer blocks with sparse attention at intervals (e.g., every 3rd layer), maintaining expressiveness while reducing compute from O(n²) to O(n log n). This works best for long-context tasks under 100K tokens where latency matters more than throughput. Second, **MoE with gating regularization** uses auxiliary loss coefficients (typically 0.01-0.1 multiplier) to prevent expert collapse and load imbalance; optimal for training on heterogeneous data distributions where different token types benefit from specialized processors. This costs 10-15% extra memory for expert parameters but gains 2-3x effective capacity per token. Third, **Linear Attention with learned kernels** approximates attention via feature maps, reducing complexity to O(n) but with 5-8% accuracy degradation on reasoning tasks—suitable only for streaming inference or where exact attention isn't critical. Hybrid approaches combining MoE routers with linear-attention heads exist but require careful tuning of router temperature and kernel initialization to avoid training instability.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Dense-with-Sparse-Layers is like a team captain placing fielders densely in traditional positions (slip, gully, midwicket) for the first 15 overs, then switching to a sparse attacking field (only boundary riders) when chasing big targets—you save energy while maintaining strategic coverage where it matters. MoE with regularization mirrors having specialist bowlers for different phases: a powerplay pacer, a death-bowling yorker expert, and a spin magician, each routing specific match situations to their strength, but you must prevent one bowler from overworking (expert collapse). Linear Attention is like a fielder tracking ball trajectory using simple geometry rules instead of watching every pixel—faster decision-making but occasionally misses a subtle deflection. Choosing your pattern is like deciding your team composition pre-match: if you're batting second chasing, you need Dense-with-Sparse responsiveness; if you're defending an unknown pitch with varied opposition, MoE's specialization wins; if you're playing T20 rapid-fire exchanges, Linear Attention's speed is crucial.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Naive MoE without load balancing\nclass CricketMoE_BadBowler(nn.Module):\n    def __init__(self, num_bowlers=4):\n        super().__init__()\n        self.bowlers = nn.ModuleList([BowlingExpert() for _ in range(num_bowlers)])\n        self.router = nn.Linear(hidden_dim, num_bowlers)\n    \n    def forward(self, batsman_state):\n        # PROBLEM: No regularization → one bowler gets all the load\n        routing_logits = self.router(batsman_state)\n        expert_weights = F.softmax(routing_logits, dim=-1)\n        # Router learns to send all batsmen to fastest bowler, others starve\n        chosen_bowler = expert_weights.argmax(dim=-1)\n        output = self.bowlers[chosen_bowler](batsman_state)\n        return output\n\n# BEST PRACTICE: MoE with auxiliary loss and top-k gating\nclass CricketMoE_GoodBowler(nn.Module):\n    def __init__(self, num_bowlers=4, top_k=2):\n        super().__init__()\n        self.bowlers = nn.ModuleList([BowlingExpert() for _ in range(num_bowlers)])\n        self.router = nn.Linear(hidden_dim, num_bowlers)\n        self.top_k = top_k\n        self.auxiliary_loss = 0.0\n    \n    def forward(self, batsman_state):\n        routing_logits = self.router(batsman_state)\n        expert_weights = F.softmax(routing_logits, dim=-1)\n        \n        # Top-k gating: distribute to top 2 bowlers only\n        top_k_weights, top_k_indices = torch.topk(expert_weights, self.top_k, dim=-1)\n        top_k_weights = top_k_weights / top_k_weights.sum(dim=-1, keepdim=True)\n        \n        # Compute load balance auxiliary loss\n        load_per_bowler = expert_weights.mean(dim=0)\n        importance_per_bowler = expert_weights.sum(dim=0)\n        self.auxiliary_loss = torch.sum(load_per_bowler * importance_per_bowler) * num_bowlers\n        \n        # Route through top-k bowlers\n        output = torch.zeros_like(batsman_state)\n        for i, bowler_idx in enumerate(top_k_indices.T):\n            output += top_k_weights[:, i:i+1] * self.bowlers[bowler_idx](batsman_state)\n        \n        return output, self.auxiliary_loss * 0.01  # Auxiliary loss coefficient",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Expert Collapse in MoE is the #1 beginner mistake.** Symptom: one or two experts receive 80%+ of routing probability while others are dormant. This happens because the router network is not regularized and naturally converges to exploiting the easiest expert. **Exact fix:** (1) Add auxiliary loss = 0.01 × (load_balance_loss + importance_loss) to training objective, where load_balance_loss penalizes unequal load distribution across experts. (2) Use top-k gating (k=2-3) instead of unrestricted softmax to prevent single-expert dominance. (3) Initialize router weights with Xavier uniform and router bias to log(num_experts) to break symmetry. (4) Increase batch size to 512+ so router sees sufficient diversity. (5) Monitor expert utilization per training step—if any expert activation < 5%, router temperature is too low.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Dense-with-Sparse-Layers saves compute while maintaining quality by concentrating dense attention where it matters most; ideal for 10K-100K context windows.",
+        "MoE requires careful auxiliary loss tuning (coefficient 0.01-0.1) and top-k gating to prevent expert collapse; gains 2-3x capacity at cost of 10-15% memory overhead.",
+        "Linear Attention reduces complexity to O(n) but trades 5-8% accuracy on reasoning—use only for streaming or when latency is critical.",
+        "Hybrid architectures combining patterns need parameter-sharing analysis: mixing MoE routers with linear heads requires careful temperature scaling to prevent training instability.",
+        "Production monitoring must track per-expert load, router entropy, and cache hit rates; misalignment between routing decisions and actual expert capability indicates miscalibration."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a model for real-time cricket commentary generation with 50K-token context (match history + player stats). You have compute budget for either Dense-with-Sparse-Layers or Linear Attention. Which pattern should you choose and why?",
+      "items": [
+        "Linear Attention—lowest latency is always best for real-time systems",
+        "Dense-with-Sparse-Layers—maintains reasoning quality for tactical analysis while keeping latency under 500ms with sparse patterns",
+        "Pure dense attention—context window is too small for efficiency gains to matter",
+        "MoE—best practice for all scenarios including streaming inference"
+      ],
+      "answer": 1,
+      "explanation": "Dense-with-Sparse-Layers is optimal here. The 50K-token context is in the sweet spot where sparsity gains significant compute savings (O(n log n) vs O(n²)) without sacrificing the reasoning quality needed for match analysis and player statistics correlation. Linear Attention at 5-8% accuracy loss would degrade commentary quality for tactical insights. Real-time latency of 500ms is achievable with sparse patterns on modern hardware. MoE is overkill for single-task inference without heterogeneous data routing."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Emerging LLM architectures power production systems at global scale. Google deploys Sparse Attention in Gemini for handling context windows exceeding 1M tokens, reducing compute cost by 40% versus dense attention. OpenAI's GPT-4 uses MoE-inspired selective routing to balance latency and accuracy across 175B+ parameters. Meta's LLaMA utilizes grouped-query attention to accelerate inference on cost-constrained hardware. Netflix applies efficient transformer variants to recommendation ranking serving 250M+ requests daily. Uber uses linear attention mechanisms for real-time ETAssistant routing across 70+ cities. Airbnb deploys hybrid recurrent architectures for search ranking at microsecond latencies. Scaling failures occur when MoE load-balancing neglects token dropping (causing capacity overflow), when sparse patterns aren't aligned with hardware (GPU utilization crashes below 20%), or when hybrid systems lack proper gradient flow during training (divergence at 50B+ tokens).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A dense attention transformer is like a batter examining every single ball from every bowler's historical record before playing a shot—thorough but impossibly slow. Sparse attention is like a batsman recognizing bowler patterns (fast bowler = short balls, spinner = spin direction) and focusing only on relevant deliveries. MoE is like a team coach assigning specialized fielders to positions based on the batter's tendencies—spin specialists to leg-side, pacemen to short fine. Linear attention is like a fielder anticipating the next shot based only on the batsman's recent movement, not their entire career. Hybrid architectures combine a batsman's positional memory (recurrence) with selective pattern matching (sparse attention), making them adaptable across different match conditions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production inference pattern: batsman_model (cricket-themed LLM serving)\nimport torch\nfrom transformers import AutoModelForCausalLM, AutoTokenizer\n\n# Initialize efficient model with sparse + MoE hybrid\nmodel_name = \"meta-llama/Llama-2-70b-hf\"  # MoE variant\ntokenizer = AutoTokenizer.from_pretrained(model_name)\nmodel = AutoModelForCausalLM.from_pretrained(\n    model_name,\n    device_map=\"auto\",\n    torch_dtype=torch.float16,  # Reduce memory: 70B → 35GB\n    load_in_8bit=True  # Further quantization for inference\n)\n\n# Simulate real-time batsman behavior prediction\nbatsman_context = \"The bowler is a fast-medium pacer. The batsman has played 15 dot balls. Next delivery expected at:\"\ninputs = tokenizer(batsman_context, return_tensors=\"pt\").to(model.device)\n\n# Sparse attention: only attend to last 512 tokens (recent deliveries)\nwith torch.no_grad():\n    outputs = model.generate(\n        inputs[\"input_ids\"],\n        max_new_tokens=20,\n        temperature=0.7,\n        top_p=0.9,\n        num_beams=1  # Greedy for latency-critical inference\n    )\n\nprediction = tokenizer.decode(outputs[0], skip_special_tokens=True)\nprint(f\"Batsman's predicted shot: {prediction}\")\n\n# Monitor inference latency & expert utilization\nprint(f\"\\nInference latency: {model.generation_latency_ms:.2f}ms\")\nprint(f\"Active experts: {model.num_active_experts}/8\")\nprint(f\"Load balance ratio: {model.load_balance_ratio:.3f}\")  # Target: > 0.9",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "This demonstrates production-grade inference with quantization, sparse attention windows, and MoE load monitoring—critical patterns for serving models at 100M+ QPS like Netflix/Uber."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Common production failures—(1) MoE 'expert collapse': all tokens route to 1–2 experts → bottleneck; add auxiliary loss: `aux_loss = 0.01 * (router_entropy.mean() + load_variance.mean())`. (2) Sparse attention 'missing context': attending only to recent 512 tokens loses long-range dependencies; validate with BoolQ benchmark (drop > 5% = broken). (3) Linear attention 'numerical instability': kernel matrix inversion at scale causes overflow; use log-space stabilization. (4) Quantization precision loss: 8-bit MoE routing scores round→wrong expert selection; test at 20B+ tokens before deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Sparse attention reduces FLOPS from O(n²) to O(n·log n), enabling 1M+ token contexts used by Google Gemini.",
+        "Mixture of Experts scales parameter count without proportional compute; successful deployment requires load-balancing auxiliary losses.",
+        "Linear attention mechanisms trade O(n²) memory for O(n) but sacrifice dense pattern matching; best for latency-critical systems.",
+        "Hybrid recurrent architectures combine positional memory with selective attention; outperform pure transformers on reasoning tasks.",
+        "Quantization (8-bit/4-bit) is mandatory for production inference; reduces model size 4–8× but requires auxiliary loss tuning.",
+        "Hardware alignment matters: sparse patterns must match GPU warp structures; misalignment drops utilization from 90% to 20%.",
+        "Production failures emerge at scale (50B+ tokens): monitor expert load balance, attention entropy, and gradient flow continuously."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket team using MoE architecture has 8 specialist bowlers (experts). If all-rounder batsmen always get routed to the same fast bowler, what is the primary failure mode?",
+      "items": [
+        "Expert collapse: one expert overloaded while others idle, reducing throughput and increasing latency",
+        "Load balancing succeeds because the router learned the optimal assignment",
+        "Sparse attention patterns prevent the fast bowler from seeing the batsman's recent shots",
+        "Linear attention kernels become numerically unstable and require re-quantization"
+      ],
+      "answer": 0,
+      "explanation": "Expert collapse is the classic MoE failure: when the router network routes most tokens to a single expert, that expert becomes a bottleneck. Other experts remain idle (wasted parameters). This is combated with auxiliary losses that penalize imbalanced routing distributions. The other options describe unrelated architectural issues."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of emerging LLM architectures with these two knowledge checks. The first quiz focuses on conceptual mastery of the mechanisms we've covered. The second applies these concepts to real-world scenarios you might encounter when building or optimizing language models.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In Mixture of Experts (MoE) architectures, what is the primary advantage of using a gating network to route tokens to different expert modules?",
+      "items": [
+        "It enables conditional computation where only relevant experts activate for each token, reducing computational cost while maintaining model capacity",
+        "It ensures that all experts are used equally, preventing any single expert from becoming specialized",
+        "It allows the model to use attention mechanisms instead of feed-forward layers, making training faster",
+        "It guarantees that the model will achieve perfect accuracy on all downstream tasks without fine-tuning"
+      ],
+      "answer": 0,
+      "explanation": "The gating network is the routing mechanism in MoE that intelligently selects which experts should process each token. This conditional computation is crucial because it enables the model to have high capacity (many experts) without proportionally increasing compute per forward pass. Only the selected experts activate for each token, similar to a cricket team selecting specific bowlers for different match situations rather than using all bowlers simultaneously. Options B and C misunderstand the core benefit—MoE doesn't require equal expert usage nor does it replace feed-forward layers. Option D overstates capabilities; no architecture guarantees perfect performance without task-specific adaptation.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your team is deploying an LLM for real-time cricket commentary generation. The model needs to process lengthy match narratives (8K tokens) with tight latency requirements (under 500ms per inference). Standard transformer attention is becoming a bottleneck. Which architectural approach would you prioritize and why?",
+      "items": [
+        "Implement linear attention variants with lower complexity (O(n) instead of O(n²)), possibly combined with sparse attention patterns for long-range dependencies in match context",
+        "Simply increase the batch size and use more GPUs—this will always solve latency problems regardless of architecture",
+        "Switch to a pure recurrent architecture like an LSTM to avoid attention entirely, as it has constant memory requirements",
+        "Add more layers to the standard transformer to increase model capacity, which naturally reduces inference time"
+      ],
+      "answer": 0,
+      "explanation": "Linear attention variants and sparse patterns are the right choice for this scenario. Standard quadratic attention becomes prohibitively expensive at 8K tokens, but linear attention reduces this to O(n), enabling faster processing while maintaining performance. Sparse attention can strategically attend to important match context (like wicket events or boundary sequences) without attending to every token pair. This mirrors cricket strategy where bowlers focus on key match situations rather than every single ball. Option B is incorrect—more compute doesn't fix algorithmic complexity. Option C loses benefits of attention mechanisms for long-range match narrative understanding. Option D is counterintuitive; more layers actually increase latency since each layer must process all tokens.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

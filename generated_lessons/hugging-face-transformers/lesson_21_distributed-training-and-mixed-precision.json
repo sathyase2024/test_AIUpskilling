@@ -198,6 +198,196 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production distributed training follows three established patterns, each optimized for different constraints. **Pattern 1: Data Parallelism with Mixed Precision (DP+MP)** is the standard for most workloads—replicate the model across GPUs, perform forward/backward passes on different data batches, synchronize gradients, and use FP16 computation with FP32 master weights. Use this when you have moderate model sizes (under 7B parameters) and access to 2-8 GPUs with sufficient interconnect bandwidth; trade-off is communication overhead scales linearly with batch size. **Pattern 2: Gradient Accumulation + Mixed Precision** applies when you cannot fit large effective batch sizes due to memory constraints but need them for convergence; accumulate gradients over N steps before synchronization, reducing communication frequency by N×. Use this for fine-tuning or when per-GPU memory is limited (typical with VRAM <24GB); trade-off is wall-clock time increases and staleness of gradient information grows. **Pattern 3: Sharded Model Parallelism with Mixed Precision (ZeRO)** partitions model parameters, gradients, and optimizer states across devices—essential for large models (7B+). Use ZeRO-2 (gradient sharding) for models 1-13B parameters, ZeRO-3 (parameter sharding) for 13B+; trade-off is communication becomes the bottleneck and requires optimized collective operations. Selection depends on model size, available hardware, and latency requirements.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: **Data Parallelism + Mixed Precision** is like assigning identical batting lineups to multiple cricket teams playing simultaneously on separate pitches—each team faces different bowling attacks (batches), but they all use the same batting strategy (model weights) and synchronize their performance statistics at the end of each over (gradient sync). **Gradient Accumulation** resembles a captain choosing to bat for multiple overs before reviewing the bowling attack—it's economical when you have fewer fielders (lower GPU memory) but still need to build substantial runs (large effective batch). **ZeRO Model Parallelism** mirrors splitting a single cricket team across multiple grounds: each player operates in a different location (GPU), they share information about match state only when necessary (sparse communication), and when batting in partnership, they maintain awareness of each other's runs to avoid redundant scoring—essential when your squad is too large for one ground but too coordinated to ignore.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Data Parallelism + Mixed Precision + Gradient Accumulation\nfrom torch.cuda.amp import autocast, GradScaler\nfrom torch.nn.parallel import DistributedDataParallel as DDP\nfrom transformers import AutoModelForSequenceClassification, Trainer, TrainingArguments\n\n# Initialize distributed environment\ntorch.distributed.init_process_group(backend='nccl')\nlocal_rank = int(os.environ['LOCAL_RANK'])\ntorch.cuda.set_device(local_rank)\n\n# Load model with appropriate precision context\nmodel = AutoModelForSequenceClassification.from_pretrained('bert-base-uncased')\nmodel = model.to(local_rank)\nmodel = DDP(model, device_ids=[local_rank])\n\n# Use Trainer API with optimized settings\ntraining_args = TrainingArguments(\n    output_dir='./cricket_classifier',\n    per_device_train_batch_size=32,\n    gradient_accumulation_steps=4,  # Effective batch = 32*4*num_gpus\n    fp16=True,  # Enable mixed precision\n    gradient_checkpointing=True,  # Save memory\n    ddp_find_unused_parameters=False,\n    max_steps=10000,\n    warmup_steps=500,\n    learning_rate=2e-5,\n    logging_steps=100,\n    save_strategy='steps',\n    save_steps=1000,\n)\n\ntrainer = Trainer(\n    model=model,\n    args=training_args,\n    train_dataset=train_dataset,\n    callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]\n)\ntrainer.train()\n\n# ANTI-PATTERN: Manual training loop with improper synchronization\nimport torch.nn.functional as F\n\n# ❌ BAD: No gradient accumulation, synchronizing every step\nfor epoch in range(num_epochs):\n    for batch_idx, (wicket_data, dismissal_type) in enumerate(train_loader):\n        predictions = model(wicket_data.to(local_rank))\n        loss = F.cross_entropy(predictions, dismissal_type.to(local_rank))\n        loss.backward()  # Immediate sync via DDP hook—wasteful!\n        optimizer.step()\n        optimizer.zero_grad()\n        \n        # ❌ BAD: Printing during training causes deadlock in DDP\n        if batch_idx % 10 == 0:\n            print(f'Loss: {loss.item()}')  # Only rank 0 should print\n\n# ❌ ANTI-PATTERN: Mixed precision without loss scaling\nscaler = None  # Forgot to initialize GradScaler!\nwith autocast():\n    loss = model(inputs).loss\nloss.backward()  # FP16 gradients may underflow without scaling\noptimizer.step()\n\n# ✅ CORRECT: With proper loss scaling\nscaler = GradScaler()\nwith autocast():\n    loss = model(inputs).loss\nscaler.scale(loss).backward()\nscaler.step(optimizer)\nscaler.update()\noptimizer.zero_grad()",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Not synchronizing gradients across all processes before optimizer step**. This is the most common beginner mistake when manually implementing DDP training. It happens when you forget to call `loss.backward()` on all ranks or when you conditionally skip backward passes on some processes. The symptom: training appears to work but losses diverge unpredictably and model performance plateaus. **Fix**: Ensure `loss.backward()` executes on every rank in every iteration, even if the loss value differs. Use `torch.distributed.barrier()` before optimizer steps if using custom training loops. Better: use the `Trainer` API which handles this automatically. For gradient accumulation, only skip `.step()` and `.zero_grad()` conditionally, but always execute `.backward()`.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Use Trainer API for standard DP+MP workloads—it handles synchronization and loss scaling automatically",
+        "Gradient accumulation reduces communication frequency; effective batch = per_device_batch × accumulation_steps × num_gpus",
+        "Always use GradScaler with mixed precision to prevent gradient underflow in FP16",
+        "Monitor communication cost: if loss spikes after gradient sync, reduce per_device_batch or increase accumulation_steps",
+        "ZeRO (Tensor Parallelism) requires model refactoring; use only when model exceeds single GPU memory even with gradient checkpointing",
+        "Match warmup_steps to total_steps; typical ratio is 5-10% of training steps",
+        "For distributed debugging, add `torch.distributed.barrier()` checkpoints and log only on rank 0 to avoid deadlocks"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket match prediction model (12B parameters) on 4 A100 GPUs with 80GB each. You've set per_device_batch_size=8, gradient_accumulation_steps=16, and fp16=True. Each step takes 3 seconds. What is your effective batch size and approximate time per gradient update?",
+      "items": [
+        "Effective batch = 8 samples, ~3 seconds per update",
+        "Effective batch = 512 samples, ~48 seconds per update",
+        "Effective batch = 128 samples, ~3 seconds per update",
+        "Effective batch = 2048 samples, ~48 seconds per update"
+      ],
+      "answer": 1,
+      "explanation": "Effective batch size = per_device_batch_size × gradient_accumulation_steps × num_gpus = 8 × 16 × 4 = 512 samples. Since you accumulate over 16 steps and each step takes 3 seconds, time to one gradient update = 16 × 3 = 48 seconds (you don't step optimizer until all accumulations complete). This is a common pattern for 12B models where per-GPU memory limits prevent larger micro-batches."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Distributed training with mixed precision powers production AI systems at scale across industry leaders. Google uses these techniques in TPUv4 clusters to train massive language models, reducing training time from weeks to days while cutting infrastructure costs by 40%. Meta's Llama training pipeline leverages distributed training across thousands of GPUs with mixed precision to achieve 65% faster convergence. OpenAI applies gradient accumulation and dynamic loss scaling when fine-tuning GPT models for customer deployments, handling batches exceeding 1 million tokens. Netflix uses distributed mixed-precision training for recommendation models processing billions of user interactions daily. When implemented incorrectly—such as insufficient loss scaling or improper gradient synchronization—models experience training collapse, numerical instability, or 10x slower convergence. Uber's real-time ranking models require precise gradient coordination across 256+ GPUs; synchronization failures result in stale model updates affecting routing decisions for millions of rides.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Distributed training is like a cricket team practicing on multiple pitches simultaneously. Data parallelism splits batsmen across fields (data sharding). Mixed precision is batting aggressively in early overs (FP16 speed) then switching to conservative technique in death overs (FP32 precision). Gradient accumulation is like a batsman reviewing multiple deliveries before committing to the final shot. Loss scaling is like adjusting field placement after each ball—without proper scaling, bowlers lose precision on where to aim.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production-grade distributed mixed-precision training example\nfrom transformers import AutoModelForSequenceClassification, Trainer, TrainingArguments\nfrom datasets import load_dataset\nimport torch\n\n# Load cricket match prediction dataset\ndataset = load_dataset('cricket_match_outcomes')\nmodel = AutoModelForSequenceClassification.from_pretrained(\n    'bert-base-uncased',\n    num_labels=3  # win, loss, draw\n)\n\ntraining_args = TrainingArguments(\n    output_dir='./cricket_model',\n    num_train_epochs=3,\n    per_device_train_batch_size=32,\n    per_device_eval_batch_size=64,\n    learning_rate=2e-5,\n    # Distributed training configuration\n    dataloader_num_workers=4,\n    ddp_find_unused_parameters=False,\n    # Mixed precision settings\n    fp16=True,  # Enable FP16\n    fp16_opt_level='O2',  # Optimization level\n    gradient_accumulation_steps=4,\n    # Loss scaling (automatic with fp16=True)\n    # Synchronization\n    gradient_checkpointing=True,\n    max_grad_norm=1.0,\n    logging_steps=100,\n    save_strategy='epoch',\n    eval_strategy='epoch',\n)\n\ntrainer = Trainer(\n    model=model,\n    args=training_args,\n    train_dataset=dataset['train'],\n    eval_dataset=dataset['validation'],\n)\n\n# Launch distributed training across available GPUs\ntrainer.train()",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Distributed training failures in production are costly. Without proper gradient synchronization, different GPUs optimize different parameters, creating model divergence. Insufficient loss scaling causes gradient underflow in FP16, resulting in zero gradients and training stagnation. Always monitor gradient norms across all processes; use `ddp_find_unused_parameters=False` only when you've verified all model parameters are used. Test your distributed setup on a small dataset first—synchronization bugs often appear only at scale.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Data parallelism replicates models across GPUs; each processes different data batches, synchronized via AllReduce during backprop.",
+        "Gradient accumulation simulates larger batches by summing gradients over multiple forward-backward passes before updating weights.",
+        "Mixed precision training uses FP16 for speed, FP32 for numerical stability in loss and critical computations.",
+        "Dynamic loss scaling automatically adjusts FP16 scaling factors to prevent gradient overflow and underflow.",
+        "Synchronization across distributed processes requires careful orchestration; AllReduce overhead scales with model size and GPU count.",
+        "Production systems at Google, Meta, OpenAI reduce training time 40-65% using these techniques on models with billions of parameters.",
+        "Common failures: gradient collapse, NaN loss, stale updates—all preventable with proper gradient checking and loss scaling validation."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a BERT model across 8 A100 GPUs for cricket match prediction. After 500 training steps, loss becomes NaN. What's the most likely cause when using FP16 mixed precision?",
+      "items": [
+        "Gradient overflow causing FP16 saturation; loss scaling factor too low",
+        "Data parallelism split unevenly across GPUs",
+        "Learning rate is too high in FP32 mode",
+        "AllReduce synchronization failed"
+      ],
+      "answer": 0,
+      "explanation": "Gradient overflow in FP16 is the primary cause of NaN loss when mixed precision training is used. FP16 has a smaller range (max ~65,000) than FP32 (max ~3.4e38). Without adequate loss scaling, gradients exceed FP16's representable range, causing overflow to infinity/NaN. The solution is increasing the loss scaling factor (starting at 2^14=16,384 and doubling when no overflow is detected). Option B (uneven data split) affects convergence speed, not NaN. Option C (high LR in FP32) wouldn't selectively cause NaN in mixed precision. Option D (AllReduce failure) would cause divergence across GPUs, not NaN."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of distributed training and mixed precision with these two assessments. The first quiz focuses on conceptual mechanisms, while the second presents a real-world scenario where you must apply your knowledge to make architectural decisions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In mixed precision training with dynamic loss scaling, why is it important to scale the loss before the backward pass rather than scaling gradients after the backward pass?",
+      "items": [
+        "Scaling before backward pass prevents gradient underflow by keeping intermediate activations in float32 range, while scaling after would lose precision information already discarded during the forward pass computation in float16.",
+        "Scaling gradients after backward pass is computationally faster and uses less memory.",
+        "The timing of scaling doesn't matter; both approaches produce identical results.",
+        "Scaling before backward ensures all weights remain in float16 throughout training."
+      ],
+      "answer": 0,
+      "explanation": "This is correct because the loss scaling must occur before the backward pass to preserve gradient information. When you compute loss in float16, very small gradient values (especially for early layers) can underflow to zero. By scaling the loss up before backward propagation, you ensure gradients remain representable in float16 throughout the computation graph. Scaling after backward pass would be too late—the precision loss would have already occurred during gradient computation. Option 1 is wrong because memory usage isn't the primary concern. Option 2 is incorrect—timing fundamentally affects numerical stability. Option 3 misunderstands that this is a critical numerical technique, not just an implementation detail."
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a large transformer cricket match prediction model on 4 GPUs with batch size 32 per GPU (128 total). You notice training loss plateaus despite increasing epochs, and you suspect the model isn't converging properly. You've already implemented gradient accumulation (accumulation steps=2) and mixed precision with dynamic loss scaling. What would you investigate first?",
+      "items": [
+        "Disable mixed precision entirely and retrain with float32 to eliminate numerical instability as the root cause.",
+        "Check if the dynamic loss scale has converged to very small values or if NaN/Inf values appear in loss history, indicating loss scaling is not adapting properly to gradient magnitudes.",
+        "Increase the number of GPUs from 4 to 8 to force faster convergence.",
+        "Reduce the learning rate by half since the plateau indicates the optimizer is overshooting the optimal weights."
+      ],
+      "answer": 1,
+      "explanation": "This is correct because loss scale adaptation is a critical control mechanism in mixed precision training. If the scale factor becomes too small, gradients lose precision even after scaling. If it grows too large, you risk overflow and NaN values. A plateaued loss combined with dynamic loss scaling suggests the scaling mechanism isn't matching actual gradient magnitudes—checking logs for scale changes, NaN/Inf events, and comparing to expected scales is the diagnostic step. Option 0 is premature; mixed precision itself works well, so disabling it doesn't target the real issue. Option 2 adds hardware without diagnosing the problem. Option 3 addresses symptoms (plateau) without understanding the root cause of mixed precision miscalibration. Always validate the adaptive mechanism first before changing hyperparameters."
     }
   ]
 }

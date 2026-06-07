@@ -198,6 +198,197 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production-grade training loops follow three dominant patterns, each optimized for different constraints. The **checkpoint-and-resume pattern** saves model state at regular intervals, enabling fault tolerance and long-running experiments on unstable hardware—essential when training spans days across distributed clusters. Trade-off: increased I/O overhead and storage requirements. The **evaluation-during-training pattern** interleaves validation metrics with training steps, allowing early stopping when performance plateaus; this prevents wasted compute but requires maintaining separate data loaders and validation logic. The **gradient checkpointing pattern** trades compute for memory by recomputing activations during backpropagation rather than storing them—critical for 7B+ parameter models on consumer GPUs, but increases wall-clock time by 20-30%. The **curriculum learning pattern** sequences training data by difficulty, improving convergence speed and final metrics; requires upfront data annotation effort but reduces overall training iterations by 15-25%. Choose checkpoint-and-resume for reliability-critical pipelines, evaluation-during-training for resource-constrained environments, gradient checkpointing for memory-bound scenarios, and curriculum learning when dataset complexity is heterogeneous. Combining these patterns multiplicatively improves robustness—most teams use checkpoint-resume + evaluation together as baseline.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Checkpoint-and-resume is like declaring the innings at a strategic moment—you preserve your position and can resume batting later without losing accumulated runs. Evaluation-during-training mirrors the captain's DRS reviews: you check whether your bowling strategy is working mid-match and adjust field placement accordingly. Gradient checkpointing is like using fewer fielders in deep positions (trading immediate safety for mobility)—you have less coverage at any instant but more flexibility to respond. Curriculum learning is like facing a bowling attack that progressively increases in pace—you start against medium pace to build confidence, then graduate to fast bowlers, improving your technique more effectively than jumping straight to hostile short-pitch bowling. Just as a captain monitors the scoreboard, momentum, and opposition weaknesses to decide whether to attack or consolidate, you monitor validation loss, training velocity, and GPU memory to pick your pattern.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Checkpoint-and-Resume with Evaluation Pattern\nimport os\nfrom pathlib import Path\n\nclass CricketModelTrainer:\n    def __init__(self, model, optimizer, device, checkpoint_dir='./cricket_checkpoints'):\n        self.model = model\n        self.optimizer = optimizer\n        self.device = device\n        self.checkpoint_dir = Path(checkpoint_dir)\n        self.checkpoint_dir.mkdir(exist_ok=True)\n        self.best_batting_average = float('-inf')  # Track best validation metric\n\n    def save_checkpoint(self, epoch, batting_stats):\n        \"\"\"Save model, optimizer, and metrics state\"\"\"\n        checkpoint_path = self.checkpoint_dir / f'cricket_epoch_{epoch}.pt'\n        torch.save({\n            'epoch': epoch,\n            'model_state_dict': self.model.state_dict(),\n            'optimizer_state_dict': self.optimizer.state_dict(),\n            'batting_average': batting_stats['batting_average'],\n            'training_loss': batting_stats['loss']\n        }, checkpoint_path)\n        return checkpoint_path\n\n    def load_checkpoint(self, checkpoint_path):\n        \"\"\"Resume from saved state\"\"\"\n        checkpoint = torch.load(checkpoint_path, map_location=self.device)\n        self.model.load_state_dict(checkpoint['model_state_dict'])\n        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])\n        return checkpoint['epoch']\n\n    def train_with_validation(self, train_loader, val_loader, epochs, patience=3):\n        \"\"\"Full training loop with checkpointing and early stopping\"\"\"\n        patience_counter = 0\n        \n        for epoch in range(epochs):\n            # Training phase\n            self.model.train()\n            bowling_loss = 0.0\n            for batch_idx, (cricket_data, runs_target) in enumerate(train_loader):\n                cricket_data = cricket_data.to(self.device)\n                runs_target = runs_target.to(self.device)\n                \n                self.optimizer.zero_grad()\n                predictions = self.model(cricket_data)\n                loss = torch.nn.functional.mse_loss(predictions, runs_target)\n                loss.backward()\n                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)\n                self.optimizer.step()\n                \n                bowling_loss += loss.item()\n            \n            avg_training_loss = bowling_loss / len(train_loader)\n            \n            # Validation phase\n            self.model.eval()\n            batting_average = 0.0\n            with torch.no_grad():\n                for cricket_data, runs_target in val_loader:\n                    cricket_data = cricket_data.to(self.device)\n                    predictions = self.model(cricket_data)\n                    # Calculate batting average (validation metric)\n                    batting_average += torch.mean((predictions - runs_target) ** 2).item()\n            \n            batting_average /= len(val_loader)\n            \n            # Checkpoint if improved\n            if batting_average > self.best_batting_average:\n                self.best_batting_average = batting_average\n                self.save_checkpoint(epoch, {\n                    'batting_average': batting_average,\n                    'loss': avg_training_loss\n                })\n                patience_counter = 0\n                print(f\"Epoch {epoch}: New best batting_average={batting_average:.4f} ✓\")\n            else:\n                patience_counter += 1\n                if patience_counter >= patience:\n                    print(f\"Early stopping at epoch {epoch}\")\n                    break\n\n# ANTI-PATTERN: Training without checkpoints or validation\nclass PoorCricketTrainer:\n    def __init__(self, model, optimizer, device):\n        self.model = model\n        self.optimizer = optimizer\n        self.device = device\n    \n    def train_no_checkpoints(self, train_loader, epochs):\n        \"\"\"❌ No checkpointing = lost progress if interrupted\n           ❌ No validation = overfitting undetected\n           ❌ No gradient clipping = unstable training\"\"\"\n        for epoch in range(epochs):\n            for cricket_data, runs_target in train_loader:\n                cricket_data = cricket_data.to(self.device)\n                self.optimizer.zero_grad()\n                predictions = self.model(cricket_data)\n                loss = torch.nn.functional.mse_loss(predictions, runs_target)\n                loss.backward()  # ⚠️ Unbounded gradients\n                self.optimizer.step()\n            # ⚠️ If training crashes here, entire progress is lost\n            # ⚠️ No way to know if validation performance improved",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Checkpoint serialization inconsistency. Most common beginner mistake: saving only `model.state_dict()` and reloading into a fresh optimizer, losing learning rate schedules, momentum buffers, and step counts. This silently breaks training velocity and often causes learning rate crashes or exploding losses on resume. **Exact fix**: Always save the complete training state as shown in best practice—include `optimizer.state_dict()`, `epoch`, and any learning rate scheduler state. Before resuming, load optimizer state BEFORE creating new batches: `optimizer.load_state_dict(checkpoint['optimizer_state_dict'])`. Verify with `assert optimizer.param_groups[0]['lr'] == expected_lr` after load. Test checkpoint-resume cycle on a dummy model before production runs.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Checkpoint-and-resume is fault-tolerance insurance—10 seconds of I/O overhead saves hours of lost training",
+        "Interleave validation during training to enable early stopping—monitor both training and validation loss simultaneously",
+        "Gradient checkpointing reduces memory by 30-40% for 7B+ models at 20-30% compute cost—use only when GPU memory is bottleneck",
+        "Curriculum learning requires upfront data curation but reduces total training iterations by 15-25%—worthwhile for heterogeneous datasets",
+        "Always save and restore optimizer state including momentum buffers—reloading only weights silently breaks convergence dynamics",
+        "Combine multiple patterns: production systems typically use checkpoint-resume + evaluation + gradient clipping minimum"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your transformer model is trained for 48 hours on 4 GPUs. At hour 47, a power outage occurs. You saved only `model.state_dict()` at checkpoints. What happens when you reload and resume training?",
+      "items": [
+        "Training resumes normally with the same learning rate and momentum state",
+        "Learning rate resets to initial value; momentum buffers are lost, causing training instability",
+        "A clear error message prevents resuming; you must start over",
+        "The model trains 25% faster because optimizer state is lighter"
+      ],
+      "answer": 1,
+      "explanation": "Saving only `model.state_dict()` loses all optimizer state including learning rate schedules, momentum buffers (for Adam/SGD), and step counts. When you reload into a fresh optimizer, the learning rate defaults to initial value and momentum history is lost, causing sudden training instability and often divergence. The correct approach saves the entire checkpoint dict including optimizer state, enabling seamless resumption. This is why the best practice code explicitly saves and loads `optimizer.state_dict()`."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Custom training loops power production NLP systems at scale across major tech companies. Google uses custom PyTorch loops in Vertex AI for fine-tuning BERT variants on billion-token datasets, handling distributed training across 1000+ TPUs. Meta's LLaMA training leveraged custom loops with gradient checkpointing to train 70B parameter models on 2M tokens. OpenAI uses similar patterns for GPT fine-tuning at massive scale with sophisticated loss scaling and mixed precision. Netflix employs these techniques for personalized recommendation text embeddings across millions of user interactions. Uber powers its NLU pipeline with custom-trained transformers processing 50M+ daily queries. When done incorrectly—skipping gradient accumulation, mishandling device placement, or ignoring loss scaling—training diverges catastrophically, wastes compute budgets ($100K+ per failed run), and produces non-convergent models. Production systems require rigorous validation of gradients, checkpoint recovery mechanisms, and careful batch size tuning to prevent numerical instability at billion-parameter scales.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A batter (model) trains by facing thousands of deliveries (batches) across multiple matches (epochs). Custom training loops let you control exactly how the batter learns—adjusting stance (learning rate), resting between overs (gradient accumulation), using special equipment (mixed precision), and playing on different grounds (multi-GPU devices). Just as a cricket team must coordinate fielders across the ground to win championships, distributed training must coordinate GPU memory, synchronize gradients across devices, and maintain numerical stability. Poor coordination—like fielders not communicating—causes dropped catches (NaN losses) and match losses (training failure).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Production training at scale amplifies small mistakes. A learning rate too high across 8 GPUs becomes catastrophic. Incorrect gradient synchronization corrupts model weights across the team. Always validate gradients using `torch.autograd.gradcheck()` before large-scale runs. Implement checkpointing every N batches—losing a 48-hour training run costs thousands in compute. Monitor loss curves for NaN emergence; it indicates numerical instability requiring immediate intervention (reduce batch size, increase loss scaling, or clip gradients).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Custom training loops enable fine-grained control over gradient flow, loss computation, and device synchronization required for billion-parameter production models.",
+        "Gradient accumulation simulates larger batch sizes without OOM errors; critical for memory-constrained training on high-end GPUs and TPU clusters.",
+        "Mixed precision training (FP16 weights, FP32 gradients) cuts memory usage by 50% and speeds training 2-3x; loss scaling prevents gradient underflow in FP16.",
+        "Multi-GPU training demands careful gradient synchronization, device placement, and collective communication; improper handling causes divergence or numerical instability.",
+        "Production systems must implement robust checkpointing, gradient clipping, NaN detection, and learning rate scheduling to prevent billion-dollar compute waste.",
+        "Distributed training requires understanding backward pass mechanics: DDP synchronizes gradients, gathers losses, and handles device-to-device communication transparently.",
+        "Test custom loops on small datasets first; validate gradient norms match expected ranges before scaling to multi-GPU or production workloads spanning weeks."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your custom training loop trains a 7B parameter model on 8 A100 GPUs. After 12 hours, loss becomes NaN. Which is the most likely cause?",
+      "items": [
+        "Learning rate too high OR loss scaling factor too low in mixed precision mode",
+        "Batch size is too small",
+        "Using FP32 instead of FP16 weights",
+        "Gradient accumulation steps set to 1"
+      ],
+      "answer": 0,
+      "explanation": "NaN loss at scale almost always stems from numerical instability: either learning rate is too aggressive causing exploding gradients, or (in mixed precision) the loss scaling factor is insufficient, causing FP16 gradient underflow to zeros. Smaller batches reduce noise but don't cause NaN. FP32 prevents underflow issues. Gradient accumulation step size doesn't directly cause NaN unless combined with a learning rate mismatch. The fix: reduce learning rate, increase loss scaling, or enable gradient clipping.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of custom training loops with these two knowledge checks. The first quiz focuses on core conceptual mechanisms, while the second presents a real-world scenario where you'll apply your learning.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "When training a transformer model with gradient accumulation over 4 steps before a backward pass, what happens to the gradient values computed in steps 1–3?",
+      "items": [
+        "They are discarded and recomputed during the backward pass",
+        "They are accumulated (added) in the loss variable, and the backward pass sums them together",
+        "They are stored in memory and scaled down by the accumulation steps before the optimizer step",
+        "They are zeroed out to prevent interference with step 4's gradients"
+      ],
+      "answer": 1,
+      "explanation": "During gradient accumulation, losses from each micro-batch are backpropagated without zeroing gradients between steps. The backward() call on accumulated_loss (which sums losses from steps 1–3) causes PyTorch to add gradients to the .grad buffers of all parameters, accumulating them. Only after all accumulation steps do we call optimizer.step() and then zero_grad(). This differs from discarding gradients (incorrect—we intentionally keep them), storing and scaling them separately (incorrect—PyTorch handles this via backward), or zeroing them mid-accumulation (incorrect—that would break accumulation). Gradient accumulation simulates larger batch sizes by spreading computation across multiple forward–backward cycles."
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket commentary classifier on a single GPU (16GB VRAM). Your model is an 8-layer BERT, and your target batch size is 128. During your first training run with batch_size=128, you run out of memory. What is the most practical first step to resolve this?",
+      "items": [
+        "Switch to a smaller model architecture (e.g., DistilBERT) immediately",
+        "Implement gradient accumulation with a smaller per-step batch size (e.g., 16) and accumulation_steps=8",
+        "Enable mixed precision training (fp16) and keep batch_size=128 unchanged",
+        "Reduce your target batch size to 64 and train without gradient accumulation"
+      ],
+      "answer": 1,
+      "explanation": "Gradient accumulation is the ideal first remedy because it preserves your target batch size semantically (128 samples' worth of gradient updates) while reducing per-step memory usage. Using smaller per-step batches (16 × 8 accumulation steps = 128 target equivalent) spreads forward and backward passes across iterations, letting memory be released between steps. Switching models or reducing batch size directly sacrifices training dynamics. While mixed precision (fp16) helps, it's often a secondary optimization; gradient accumulation directly addresses memory pressure by design. Combined with fp16, accumulation becomes even more powerful. This mirrors how a cricket team manages player workload: accumulating performances across matches rather than demanding all effort in a single inning."
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Gradient accumulation is like a batsman building their innings across multiple overs rather than trying to score 150 runs in a single over. Each over (accumulation step) contributes to the total score (accumulated gradient), and only when the innings is complete do you declare (optimizer.step()). Pushing too hard in one over (large batch size) risks getting out; spreading effort strategically (smaller batches, multiple steps) ensures stability and success.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
     }
   ]
 }

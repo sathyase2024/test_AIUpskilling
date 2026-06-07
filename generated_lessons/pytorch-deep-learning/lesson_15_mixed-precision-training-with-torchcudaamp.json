@@ -186,6 +186,193 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three established production patterns dominate mixed precision training: (1) Autocast + GradScaler for standard supervised learning, ideal when your model has diverse layer types and you want automatic type casting without manual intervention—trade-off is reduced transparency in numerical precision; (2) Manual casting for fine-grained control in research or when specific layers must remain FP32 (e.g., batch normalization, loss computation), offering maximum flexibility but requiring careful architecture design and higher maintenance overhead; (3) Distributed mixed precision with DDP, essential for multi-GPU training where synchronization costs dominate—requires coordinating gradient scaling across ranks and careful handling of loss synchronization before scaling. The GradScaler pattern suits most practitioners because it balances automation with safety, preventing gradient underflow while maintaining convergence guarantees. Manual casting becomes necessary when autocast's heuristics fail—common in transformer architectures where attention softmax stability matters. Distributed patterns demand rigorous testing since gradient overflow/underflow manifests differently across devices, and synchronization bugs can silently corrupt training despite reasonable loss curves.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Autocast + GradScaler is like a captain using a balanced field placement—you set general principles (which fielders go where) and let the formation adapt to each batter without micromanaging every position. Manual casting resembles setting a specialized field for a specific bowler's strategy against one batsman—it requires expertise but gives you precise control when standard tactics fail. Distributed mixed precision mirrors coordinating a bowling rotation across multiple matches simultaneously: you can't just optimize one bowler's spell; you must synchronize changes across all bowlers, communicate results back to the captain, and ensure no miscommunication happens between grounds. The GradScaler is like DRS (Decision Review System)—it catches numerical errors (like an umpire's mistake) before they corrupt your match outcome, but you only trigger reviews when absolutely necessary to avoid wasting your allocation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ✅ BEST PRACTICE: Autocast + GradScaler with proper loss scaling\nimport torch\nfrom torch.cuda.amp import autocast, GradScaler\n\nmodel = YourModel().cuda()\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\nscaler = GradScaler(init_scale=65536.0, backoff_factor=0.5, growth_factor=2.0)\n\nfor epoch in range(num_epochs):\n    for batch_idx, (batsman_data, bowler_target) in enumerate(cricket_loader):\n        optimizer.zero_grad()\n        \n        # Autocast handles mixed precision automatically\n        with autocast(dtype=torch.float16):\n            innings_logits = model(batsman_data)\n            loss = criterion(innings_logits, bowler_target)\n        \n        # Scale loss to prevent underflow\n        scaler.scale(loss).backward()\n        \n        # Unscale before clipping (gradient magnitude still in FP32)\n        scaler.unscale_(optimizer)\n        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)\n        \n        # Step with automatic scaling adjustment\n        scaler.step(optimizer)\n        scaler.update()\n\n# ❌ ANTI-PATTERN: Manual casting without proper coordination\nfor batch_idx, (batsman_data, bowler_target) in enumerate(cricket_loader):\n    optimizer.zero_grad()\n    \n    # Dangerous: mixing FP16 and FP32 without scaling leads to gradient underflow\n    batsman_data = batsman_data.half()  # FP16\n    innings_logits = model(batsman_data)  # Mixed precision but no tracking\n    loss = criterion(innings_logits, bowler_target.half())  # Loss in FP16\n    \n    loss.backward()  # Gradients may underflow to zero\n    optimizer.step()  # Parameters never update properly\n    # Result: Model training stalls silently",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Forgetting to call scaler.unscale_() before gradient clipping causes clipped gradients to be in the wrong scale. The gradient magnitudes are scaled UP by the loss scale (e.g., 65536×), so clipping the scaled gradients produces tiny effective gradients after optimizer.step() unscales them again. Fix: Always unscale before clipping—scaler.unscale_(optimizer) restores true gradient magnitudes in FP32, then clip_grad_norm_() clips the actual values, then scaler.step() applies the scaled gradients. This ordering is critical for convergence.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Autocast + GradScaler is the production standard: autocast handles dtype switching, GradScaler prevents gradient underflow/overflow through dynamic scaling",
+        "Always unscale gradients before clipping to ensure clipping operates on true magnitudes, not scaled values",
+        "Manual casting trades convenience for control—use only when autocast's heuristics fail (e.g., numerical stability in custom ops)",
+        "Distributed training requires syncing scaler state across ranks and careful loss reduction before scaling to prevent rank-wise divergence",
+        "Monitor scaler.get_scale() and loss/grad statistics during training to detect scaling issues early—sudden scale drops indicate frequent overflow"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a multi-GPU distributed training setup, when should you call scaler.unscale_() relative to allreduce operations?",
+      "items": [
+        "Before allreduce to ensure gradients sync at true magnitudes",
+        "After allreduce but before clipping to average scaled gradients across ranks",
+        "This operation is only needed in single-GPU training",
+        "It depends on whether you're using DDP or manual synchronization"
+      ],
+      "answer": 0,
+      "explanation": "Unscale must happen BEFORE allreduce because allreduce synchronizes gradient values across ranks. If you allreduce scaled gradients (already multiplied by loss_scale), averaging them produces incorrect magnitudes. The correct sequence: unscale (restore true FP32 gradients), allreduce (synchronize across ranks), clip if needed, then scaler.step() applies optimization with scaling re-applied. Unscaling after allreduce would incorrectly weight some ranks' gradients by the loss scale and others by 1.0, breaking convergence guarantees.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Mixed precision training powers production AI systems at scale. Google uses it in TPU-based training for BERT and T5 models, reducing training time by 40-60% while maintaining accuracy. Meta deployed mixed precision across PyTorch's Distributed Data Parallel framework for training models like LLaMA, handling billions of parameters across thousands of GPUs. OpenAI leverages torch.cuda.amp for efficiently training GPT variants at massive scale. Netflix uses mixed precision in recommendation systems processing petabytes of user interaction data. Uber applies it to real-time demand prediction models. When done incorrectly—improper loss scaling, missing gradient clipping, or unmanaged accumulation—models suffer gradient overflow/underflow, NaN convergence failures, or accuracy degradation of 2-5%. At billion-parameter scale, even 0.1% accuracy loss translates to millions in inference cost and user experience impact.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Mixed precision is like a team using both fast bowlers (float16—explosive but risky) and spinners (float32—reliable but slower). During the powerplay innings (training phases with large gradients), you deploy aggressive fast bowlers to finish quickly. But in death overs (late-stage training with tiny gradients), you switch to steady spinners to maintain control. Loss scaling is your captain's strategy—artificially amplifying the field placement (gradient magnitude) before the bowler delivers, then rescaling after the ball leaves the hand (backward pass). Drop the scaling mid-delivery and your batters miss easy catches (gradient underflow); forget to rescale and the ball flies into the stands (overflow). The winning team (converged model) needs both strategies perfectly timed.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production-grade mixed precision training with distributed setup\nimport torch\nimport torch.nn as nn\nfrom torch.cuda.amp import autocast, GradScaler\nfrom torch.nn.parallel import DistributedDataParallel as DDP\n\nclass CricketPerformanceModel(nn.Module):\n    \"\"\"Predicts player performance: runs, wickets, catch probability\"\"\"\n    def __init__(self):\n        super().__init__()\n        self.backbone = nn.Sequential(\n            nn.Linear(512, 2048),\n            nn.ReLU(),\n            nn.Linear(2048, 2048),\n            nn.ReLU(),\n            nn.Linear(2048, 512)\n        )\n        self.runs_head = nn.Linear(512, 1)\n        self.wickets_head = nn.Linear(512, 1)\n        self.catch_head = nn.Linear(512, 1)\n    \n    def forward(self, x):\n        features = self.backbone(x)\n        return {\n            'runs': self.runs_head(features),\n            'wickets': self.wickets_head(features),\n            'catch_prob': torch.sigmoid(self.catch_head(features))\n        }\n\n# Production training loop\ndef train_with_amp(rank, world_size):\n    # Setup distributed training\n    torch.cuda.set_device(rank)\n    model = CricketPerformanceModel().cuda()\n    model = DDP(model, device_ids=[rank])\n    \n    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)\n    scaler = GradScaler(init_scale=65536.0, growth_factor=2.0, \n                       backoff_factor=0.5, growth_interval=2000)\n    \n    criterion_runs = nn.MSELoss()\n    criterion_wickets = nn.BCEWithLogitsLoss()\n    criterion_catch = nn.BCELoss()\n    \n    accumulation_steps = 4\n    max_grad_norm = 1.0\n    \n    for epoch in range(100):\n        for batch_idx, (match_data, run_targets, wicket_targets, catch_targets) in enumerate(train_loader):\n            match_data = match_data.cuda()\n            run_targets = run_targets.cuda()\n            wicket_targets = wicket_targets.cuda()\n            catch_targets = catch_targets.cuda()\n            \n            # Forward pass with autocast\n            with autocast(dtype=torch.float16):\n                outputs = model(match_data)\n                loss_runs = criterion_runs(outputs['runs'], run_targets)\n                loss_wickets = criterion_wickets(outputs['wickets'], wicket_targets)\n                loss_catch = criterion_catch(outputs['catch_prob'], catch_targets)\n                total_loss = (loss_runs + loss_wickets + loss_catch) / accumulation_steps\n            \n            # Backward pass with scaler\n            scaler.scale(total_loss).backward()\n            \n            # Gradient accumulation and clipping\n            if (batch_idx + 1) % accumulation_steps == 0:\n                scaler.unscale_(optimizer)\n                torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)\n                scaler.step(optimizer)\n                scaler.update()\n                optimizer.zero_grad()\n                \n                if rank == 0 and batch_idx % 100 == 0:\n                    print(f\"Epoch {epoch}, Batch {batch_idx}, Loss: {total_loss.item():.4f}, \"\n                          f\"Scale: {scaler.get_scale():.0f}\")\n\n# Inference in float16 (deployment)\ndef predict_player_performance(model, match_stats):\n    model.eval()\n    with torch.inference_mode(), autocast(dtype=torch.float16):\n        predictions = model(match_stats)\n    return predictions",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Production mixed precision requires monitoring. Track scaler.get_scale() — if it repeatedly hits min_scale, your loss scaling is undershooting (increase init_scale). If it never updates, your gradients are too stable (decrease growth_interval). Distributed training amplifies synchronization issues: ensure all ranks apply identical grad clipping thresholds. In multi-GPU setups, unscale before clip_grad_norm or you'll clip incorrectly scaled gradients. Always validate model accuracy post-training on float32 inference to catch silent precision-induced degradation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Mixed precision (float16 ops, float32 weights) cuts memory by ~50% and speeds training 2-3x without accuracy loss.",
+        "torch.cuda.amp.autocast selectively casts operations; GradScaler prevents gradient underflow via dynamic loss scaling.",
+        "Gradient accumulation, clipping, and checkpointing are orthogonal techniques—combine them in production for billion-parameter models.",
+        "Loss scaling strategy is critical: unscale before gradient clipping, use growth_interval to prevent thrashing, monitor scale value.",
+        "Distributed training with DDP + mixed precision requires rank-synchronized clipping thresholds and careful unscale ordering.",
+        "Production deployments at Google, Meta, OpenAI, Netflix achieve 40-60% training speedup; incorrect setup causes NaN divergence or 2-5% accuracy loss.",
+        "Custom backward passes and gradient checkpointing enable training architectures otherwise impossible; combine with mixed precision for practical viability."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of mixed precision training with these two quizzes. Quiz 1 focuses on conceptual knowledge of core mechanisms, while Quiz 2 applies these concepts to real-world scenarios you'll encounter when optimizing deep learning models.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In mixed precision training with torch.cuda.amp, why do we cast the loss to float32 before calling backward() instead of keeping it in float16?",
+      "items": [
+        "Float16 has insufficient numerical precision for gradient computation; loss scaling and backpropagation require the wider dynamic range and precision of float32 to prevent gradient underflow and maintain training stability",
+        "Float32 computations are faster on modern GPUs and will speed up the entire training process",
+        "PyTorch requires all loss values to be float32 by default and will raise an error otherwise",
+        "Float16 cannot represent negative numbers, which are needed when computing gradients with respect to loss"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is the first option. Mixed precision training uses float16 for forward passes to save memory and computation, but gradients computed in float16 suffer from severe underflow because the gradient values are often very small (1e-4 to 1e-7 range). Float32 has a much wider dynamic range, allowing these tiny gradients to be represented accurately. Loss scaling multiplies the loss by a large factor before backward pass, pushing gradients into the representable range of float16, but the loss itself must be float32 to maintain precision during the scaling and reduction operations. The second option is incorrect—float32 is actually slower. The third is incorrect because PyTorch doesn't enforce this requirement automatically. The fourth is factually wrong; float16 can represent negative numbers just fine."
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket ball trajectory prediction model. After 500 iterations, you notice the loss suddenly becomes NaN. You're using mixed precision training with GradScaler. What is the most likely cause and best first diagnostic step?",
+      "items": [
+        "The learning rate is too low; you need to increase it by 10x immediately to escape the local minimum",
+        "The loss scaling factor has grown too large, causing overflow in float16 computations. Check the scale value using scaler.get_scale() and review gradient magnitudes in your batch",
+        "Your model architecture is fundamentally incompatible with float16; you must switch to full float32 training",
+        "This is normal behavior in deep learning and NaN values will eventually stabilize if you continue training"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is the second option. NaN in mixed precision training typically results from numerical overflow in float16 arithmetic, which occurs when the loss scale becomes too aggressive and pushes values beyond float16's maximum representable value (~65,000). GradScaler automatically adjusts the scale, but debugging requires checking get_scale() and inspecting gradient statistics. The first option is incorrect—low learning rate causes slow training, not NaN. The third is wrong because many successful models use mixed precision with float16. The fourth is dangerous advice; NaN doesn't self-correct and indicates a genuine numerical instability requiring investigation. This scenario mirrors a cricket player losing form mid-season—you need to diagnose the specific technical issue (bowling action, footwork, etc.) rather than make drastic changes."
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Just as a batsman transitions from aggressive stroke-play (high risk/high reward) during powerplays to defensive technique (careful singles) in tight situations, mixed precision training shifts between aggressive float16 computations for speed and cautious float32 operations for numerical stability where precision matters most. The loss scale acts like the pitch conditions—when it's too dry (scale too high), the ball behaves erratically (overflow); when it's too wet (scale too low), the ball doesn't move enough (underflow).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
     }
   ]
 }

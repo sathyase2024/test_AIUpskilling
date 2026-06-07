@@ -184,6 +184,183 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production Agentic RAG systems typically employ three established patterns, each optimized for different trade-offs. The **iterative refinement pattern** executes multiple retrieve-generate cycles where the agent decides whether to query additional context based on confidence scores, ideal for complex multi-hop reasoning tasks but increasing latency by 200-400ms per iteration. The **parallel batch retrieval pattern** fetches from multiple knowledge sources simultaneously (vector DB, knowledge graphs, structured databases), reducing wall-clock time but requiring sophisticated fusion logic to reconcile conflicting information and increasing token consumption by 30-50%. The **hybrid sparse-dense retrieval pattern** combines BM25 lexical matching with embedding-based similarity, achieving 15-25% higher recall than single methods alone but doubling retrieval compute costs. Choose iterative refinement when answer quality justifies latency; use parallel retrieval for time-critical applications where redundancy prevents failures; apply hybrid retrieval when your corpus contains both structured and unstructured data. Token costs scale non-linearly: iterative patterns cost O(n) tokens per query, while batch patterns cost O(m) where m is the number of sources, making sparse-dense retrieval the most cost-efficient for most production workloads.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Iterative refinement mirrors a captain's tactical review between innings—assess the batsman's weaknesses, adjust bowling strategy (query for more context), test new lines (generate response), then review again. Parallel batch retrieval is like setting a fielding strategy with multiple contingency plans simultaneously: slip fielders, fine leg, and deep square leg all positioned at once to cover different shot possibilities rather than adjusting one at a time. The hybrid sparse-dense approach parallels using both traditional scouting (lexical pattern recognition from match stats) and modern analytics (embedding-based performance metrics)—neither alone captures the full picture, but combined they predict player form with higher accuracy. The iterative pattern costs time but guarantees precision; parallel retrieval risks resource waste but maximizes coverage; hybrid methods balance both concerns, much like how effective captains balance aggressive field placements with defensive safety nets.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Single-pass retrieval with no adaptation\nclass NaiveRAGBatter:\n    def generate_response(self, query):\n        # Retrieve once, generate once—no agent decision loop\n        docs = self.retriever.fetch(query, top_k=5)\n        response = self.llm.generate(\n            context=docs,\n            query=query\n        )\n        return response  # Returns without checking confidence\n\n# BEST PRACTICE: Agentic loop with confidence-based iteration\nclass AdaptiveRAGBatter:\n    def generate_response(self, query, max_iterations=3):\n        context_runs = []  # Like tracking multiple innings\n        confidence_threshold = 0.75\n        \n        for iteration in range(max_iterations):\n            # Retrieve with relevance scoring\n            docs = self.retriever.fetch(\n                query, \n                top_k=5,\n                return_scores=True\n            )\n            \n            # Generate with explicit confidence output\n            response, confidence = self.llm.generate_with_confidence(\n                context=docs,\n                query=query\n            )\n            \n            context_runs.append({\n                'iteration': iteration,\n                'response': response,\n                'confidence': confidence,\n                'doc_quality': min([score for _, score in docs])\n            })\n            \n            # Agent decision: continue if low confidence\n            if confidence > confidence_threshold:\n                return response  # Wicket secured\n            \n            if iteration < max_iterations - 1:\n                # Reformulate query for next retrieval cycle\n                query = self._reformulate_query(response, docs)\n        \n        # Return best attempt from all runs\n        return max(context_runs, key=lambda x: x['confidence'])['response']\n    \n    def _reformulate_query(self, response, previous_docs):\n        # Ask LLM: \"What additional context would improve this?\"\n        return self.llm.reformulate(\n            original_query=query,\n            current_response=response,\n            retrieved_context=previous_docs\n        )",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Context Contamination in Iterative Loops**. The most common beginner mistake is passing previous generations into subsequent retrieval queries without isolation, creating feedback loops where the LLM's hallucinations get reinforced. If iteration 1 generates an incorrect detail and that detail appears in the reformulated query for iteration 2, the retrieved documents may amplify the error rather than correct it. **Fix**: Maintain a separate \"query intent\" representation that extracts only the original user intent, not the LLM's previous outputs. Use query reformulation that explicitly asks \"what is missing from the context\" rather than \"improve this response.\" Implement a contamination filter that removes any tokens from previous responses before building the next retrieval query. Track semantic divergence between iterations—if the reformulated query's embeddings drift >0.3 cosine distance from the original, restart with the original query instead of continuing the chain.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Iterative refinement trades latency for quality; optimal when confidence scoring indicates uncertainty (< 0.75)",
+        "Parallel batch retrieval from multiple sources increases recall by 15-25% but requires conflict resolution logic",
+        "Hybrid sparse-dense retrieval (BM25 + embeddings) is most cost-efficient for mixed structured/unstructured corpora",
+        "Query reformulation must preserve original intent while expressing information gaps, not previous generation errors",
+        "Monitor token costs per pattern: iterative O(n) per iteration, batch O(m) across sources, hybrid O(m+n) combined",
+        "Contamination in feedback loops occurs when LLM outputs feed back into retrieval—use intent extraction to prevent"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for complex legal document analysis. The first generation produces a response with 60% confidence. Your budget allows for 500 additional tokens per query. Which pattern should you implement?",
+      "items": [
+        "Parallel batch retrieval from legal database, case law DB, and statute DB simultaneously",
+        "Iterative refinement with 1-2 additional retrieve-generate cycles to boost confidence",
+        "Hybrid sparse-dense retrieval optimized for legal terminology",
+        "All three patterns combined sequentially"
+      ],
+      "answer": 1,
+      "explanation": "Iterative refinement is optimal here because: (1) confidence of 60% is well below the 75% threshold, indicating genuine uncertainty, (2) legal reasoning benefits from multi-hop analysis where each iteration clarifies missing elements, (3) 500 additional tokens support 1-2 refinement cycles without exceeding budget. Parallel batch (A) would waste tokens on redundant retrieval when the issue is reasoning quality, not source coverage. Hybrid retrieval (C) alone doesn't address the confidence problem. Sequential all-three (D) would consume ~1500+ tokens and is unnecessary when targeted iteration solves the specific issue."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Agentic RAG powers production systems at scale across major tech companies. Google uses RAG in Search Generative Experience (SGE) to retrieve and synthesize real-time information across billions of documents. OpenAI integrates RAG in ChatGPT's retrieval plugins to ground responses in current data. Netflix employs agentic retrieval for personalized content recommendations by dynamically querying user behavior and catalog metadata. Uber uses RAG to retrieve contextual information for real-time pricing, safety protocols, and driver guidance. Meta leverages agentic RAG in its recommendation systems and search infrastructure. At this scale, failures cascade: slow retrieval increases latency (unacceptable for sub-100ms SLAs), wrong context degrades answer quality, and inefficient token usage multiplies costs across millions of daily requests. Companies like Anthropic and Cohere now offer managed RAG infrastructure to handle these challenges.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your batting order (prompt strategy) is useless without scouting the field conditions (retrieval). A captain who sends in the wrong batsman for the pitch is like an LLM without RAG—unprepared. In T20 cricket, the captain constantly adjusts tactics mid-match based on live data (opponent weaknesses, weather shifts)—that's agentic RAG dynamically adapting retrieval queries based on context. Just as a world-class team needs fast fielders (low-latency retrieval) and tight bowling plans (re-ranking), production RAG systems need both speed and precision to win at scale.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Agentic RAG enables LLMs to dynamically choose what to retrieve based on reasoning, not static keyword matching.",
+        "Semantic embeddings and cross-encoder re-ranking are critical to ensuring relevance; wrong context causes cascading hallucinations.",
+        "Token limits force trade-offs: compress context strategically or lose critical nuance in answers.",
+        "Production RAG at scale (Google, OpenAI, Netflix) requires sub-100ms latency, caching, and intelligent pruning to remain cost-effective.",
+        "Chain-of-thought prompting with retrieved context improves factual grounding and reduces AI-generated false claims.",
+        "Dynamic re-ranking and multi-hop retrieval adapt retrieval strategy based on intermediate reasoning, mirroring human expert behavior.",
+        "Prompt engineering and careful context framing determine whether retrieved information is leveraged correctly or ignored by the LLM."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Why do companies like Google and OpenAI use agentic RAG instead of simple keyword matching for retrieval?",
+      "items": [
+        "Agentic RAG allows dynamic reasoning about what to retrieve, adapting strategy based on intermediate results",
+        "Keyword matching is faster and always produces correct answers",
+        "Agentic RAG eliminates the need for embeddings and vector databases",
+        "Simple keyword matching already handles complex multi-step queries perfectly"
+      ],
+      "answer": 0,
+      "explanation": "Agentic RAG enables LLMs to reason about retrieval decisions in real time, dynamically adjusting which documents to fetch based on the conversation context. Keyword matching is rigid and misses semantic relationships. Embeddings remain essential, and keyword matching fails on complex queries requiring multiple reasoning steps.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of Agentic RAG with these two knowledge checks. The first quiz focuses on conceptual mechanisms, while the second presents a real-world scenario requiring applied decision-making.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In Agentic RAG, when a retrieval agent decides to perform multiple sequential retrievals instead of stopping after the first query, what is the primary mechanism that enables this adaptive behavior?",
+      "items": [
+        "The agent evaluates retrieved context relevance and determines if additional information is needed to answer the user's question",
+        "The system automatically retrieves all documents in the knowledge base regardless of relevance scores",
+        "The embedding model recalculates similarity scores with higher precision after each retrieval",
+        "The token limit counter forces the system to retrieve smaller document chunks on each iteration"
+      ],
+      "answer": 0,
+      "explanation": "Agentic RAG's adaptive nature stems from the agent's ability to assess whether retrieved context sufficiently addresses the query. Unlike static RAG, the agent uses reasoning loops to evaluate context quality and decide if iterative refinement is necessary. Option B is incorrect because agentic systems don't blindly retrieve all documents—they make intelligent decisions. Option C misunderstands embedding behavior; similarity scores are calculated once per query-document pair. Option D confuses token management with retrieval triggering; token limits are constraints, not drivers of multi-step retrieval decisions.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket analytics chatbot using Agentic RAG. A user asks: 'Which batsman had the best average in T20 matches against pace bowlers with a left-arm seam action in the last 2 years?' The initial retrieval returns 8 documents covering general T20 statistics. What should your agentic retrieval strategy do next?",
+      "items": [
+        "Generate a final answer using only the 8 documents, regardless of specificity, to minimize retrieval costs",
+        "Perform a re-ranking pass on the 8 documents, then execute a second targeted retrieval with a refined query filter for left-arm seam bowlers specifically",
+        "Expand the knowledge base indefinitely and retrieve all historical T20 match records until the exact answer is found",
+        "Stop retrieving and ask the user to simplify their question to match the documents already retrieved"
+      ],
+      "answer": 1,
+      "explanation": "This scenario demonstrates agentic decision-making under specificity constraints. The correct approach combines two mechanisms: first, re-ranking the initial results to surface the most relevant documents about T20 batting, then performing a second targeted retrieval with a refined query emphasizing the specific constraint (left-arm seam bowlers). This iterative refinement is core to Agentic RAG—the agent recognizes the initial retrieval is too broad and adaptively narrows its search. Option A sacrifices accuracy for efficiency, which defeats RAG's purpose. Option C is computationally wasteful and impractical. Option D shifts responsibility to the user rather than leveraging the agent's adaptive capabilities. The agentic approach balances accuracy, cost, and context window management.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

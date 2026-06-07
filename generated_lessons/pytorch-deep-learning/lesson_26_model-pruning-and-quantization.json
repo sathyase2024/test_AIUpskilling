@@ -195,6 +195,199 @@
       "answer": -1,
       "explanation": "",
       "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production model optimization follows three dominant patterns: (1) Post-training quantization (PTQ) applied after training completes, offering minimal code changes and fastest deployment timelines but sacrificing accuracy recovery potential; (2) Quantization-aware training (QAT) integrated during training, enabling 2-4% accuracy recovery through learnable quantization parameters at the cost of 30-50% longer training time; (3) Mixed-precision strategies combining AMP with selective layer quantization, balancing speed and accuracy by quantizing latency-critical layers (convolutions, embeddings) while keeping attention mechanisms in FP32. Choose PTQ for legacy models or tight deployment deadlines where <2% accuracy loss is acceptable. Select QAT when accuracy is mission-critical and you control the training pipeline. Deploy mixed-precision for transformer-heavy architectures where certain components (query-key products) are numerically sensitive. Trade-offs involve memory footprint reduction (4-8× for INT8) versus inference speedup variance across hardware (2-3× on CPUs, 1.2-1.5× on GPUs due to kernel efficiency), and calibration data requirements (100-1000 representative samples for PTQ statistics).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Post-training quantization mirrors setting your final field placement after analyzing the batsman's entire innings—quick to implement but rigid if the batsman changes strategy. Quantization-aware training is like practicing specific bowling rotations during pre-match training, allowing bowlers to calibrate their variations before match day. Mixed-precision strategies resemble DRS usage decisions: you keep your reviews (FP32 precision) for critical moments like LBW calls (attention mechanisms) but run with standard on-field decisions (INT8) for straightforward deliveries (convolutions). QAT is investment in preparation time for guaranteed performance, while PTQ is the aggressive field-setting when you've limited time between matches. The choice depends on whether you're defending a championship (QAT for accuracy) or chasing quick runs (PTQ for speed).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Quantization-Aware Training with proper calibration\nimport torch\nimport torch.nn as nn\nfrom torch.ao.quantization import prepare_qat, convert\n\nclass BowlerNet(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.batting_layer = nn.Linear(64, 128)\n        self.fielding_layer = nn.Linear(128, 11)\n    \n    def forward(self, x):\n        x = self.batting_layer(x)\n        x = torch.relu(x)\n        x = self.fielding_layer(x)\n        return x\n\n# Correct approach: Prepare model with proper backend\nmodel_qat = BowlerNet()\nmodel_qat.qconfig = torch.ao.quantization.get_default_qat_qconfig('fbgemm')\ntorch.ao.quantization.prepare_qat(model_qat, inplace=True)\n\n# Train with calibration\nfor epoch in range(10):\n    cricket_ball = torch.randn(32, 64)\n    output = model_qat(cricket_ball)\n    loss = criterion(output, targets)\n    loss.backward()\n    optimizer.step()\n\nquantized_model = torch.ao.quantization.convert(model_qat, inplace=True)\n\n# ANTI-PATTERN: Quantizing without calibration or preparation\n# ❌ DON'T DO THIS:\nmodel_bad = BowlerNet()\n# Directly quantizing without prepare() causes undefined behavior\nquantized_bad = torch.quantization.quantize_dynamic(model_bad, {nn.Linear}, dtype=torch.qint8)\n# Results in unpredictable accuracy drops and potential runtime errors\n\n# BEST PRACTICE: Mixed-precision with layer-specific strategies\nfrom torch.cuda.amp import autocast\n\nwith autocast(dtype=torch.float16):\n    # Convolutions and embeddings benefit from FP16\n    cricket_features = model.convolution_layer(input_data)\n    \nwith autocast(enabled=False):  # Force FP32 for attention\n    # Attention mechanisms stay in FP32 for numerical stability\n    attention_scores = model.attention_layer(cricket_features)\n\noutput = model.decoder(attention_scores)  # Float16 again",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Applying INT8 quantization to attention layers without calibration data. Attention computation involves softmax operations where small numerical changes (INT8 vs FP32 precision) drastically alter probability distributions. Fix: (1) Reserve 5-10% of your validation set as quantization calibration data; (2) Use `torch.ao.quantization.observer.HistogramObserver` instead of `MinMaxObserver` for non-uniform INT8 ranges; (3) Run calibration forward passes: `with torch.no_grad(): [model(batch) for batch in calib_loader]` before converting; (4) Validate accuracy on this calibration set—if drop exceeds 2%, revert attention layers to FP32 or use dynamic quantization instead.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Post-training quantization (PTQ): fastest to deploy, minimal accuracy recovery, suitable for inference-only pipelines",
+        "Quantization-aware training (QAT): highest accuracy retention (2-4% recovery), requires retraining, necessary for performance-critical applications",
+        "Mixed-precision combines FP16 and FP32 selectively—keep attention and softmax in FP32, quantize convolutions and linear layers to INT8",
+        "Calibration is mandatory for PTQ: use representative data distribution to compute INT8 ranges (min/max or histograms)",
+        "Layer-specific validation: always measure per-layer accuracy impact; some architectures (RNNs, attention) are quantization-sensitive",
+        "Hardware-aware optimization: INT8 speedup varies (2-3× on CPU, 1.2-1.5× on GPU); profile on target device before committing to quantization strategy"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket prediction model achieves 94% accuracy in FP32. After applying post-training INT8 quantization without calibration data, accuracy drops to 87%. What is the most likely cause and best fix?",
+      "items": [
+        "Model weights are too large; retrain with smaller learning rates",
+        "Quantization ranges (min/max) were computed from incomplete weight distribution; use proper calibration data with HistogramObserver to capture true INT8 ranges",
+        "INT8 is fundamentally incompatible with your architecture; switch to FP16 mixed-precision instead",
+        "Batch normalization layers weren't frozen; add model.eval() before quantization"
+      ],
+      "answer": 1,
+      "explanation": "Post-training quantization without calibration on representative data produces misaligned INT8 quantization ranges. The MinMaxObserver uses only extreme weight values, missing the actual distribution. HistogramObserver and proper calibration datasets (forward passes through representative cricket data) create accurate quantization statistics. This is the standard fix for 5-7% accuracy drops in PTQ scenarios."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Model pruning and quantization power production systems at massive scale across tech giants. Google deploys quantized models in TensorFlow Lite across billions of Android devices, reducing latency from 500ms to 50ms for on-device inference. Netflix uses pruned recommendation models to serve personalized suggestions to 250 million subscribers with minimal latency. Meta optimized BERT models through INT8 quantization, cutting model size by 75% while maintaining 99.9% accuracy—critical for serving billions of inference requests daily. Uber applies dynamic pruning to real-time pricing models processing 15 million requests per minute across 70+ cities. OpenAI uses quantization techniques for efficient API deployment. Airbnb prunes search ranking models to fit edge-device constraints. When done wrong: uncontrolled pruning causes ranking collapse (Netflix saw 12% CTR drop in early experiments), incorrect quantization thresholds break model convergence (batch normalization layers become unstable), and aggressive sparsity creates memory fragmentation causing actual inference slowdowns despite \"smaller\" models.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your bowling squad (neural network) has 11 players, but some bowlers rarely get selected and rarely impact match outcomes. Pruning identifies these bench-warmers and removes them entirely—your team stays lean but still competitive. Quantization is like switching from detailed ball-by-ball statistics (FP32) to simplified ratings (INT8): you lose fine granularity but decisions happen faster, storage shrinks, and the team performs nearly identically. Just as removing a crucial middle-order batter would collapse your innings, aggressive pruning of critical layers tanks accuracy. And like rounding century scores to nearest 10 works fine for commentary but breaks precise handicap calculations, over-aggressive quantization fails in attention mechanisms where precision matters.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import torch\nimport torch.nn as nn\nfrom torch.quantization import quantize_dynamic, prepare_qat, convert\nfrom torch.nn.utils.prune import l1_unstructured, global_unstructured\n\n# Simulating a cricket bowling recommendation model\nclass BowlerSelectorNet(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.batting_features = nn.Linear(10, 64)  # Opponent stats\n        self.bowling_features = nn.Linear(15, 128)  # Our bowlers' stats\n        self.fusion = nn.Linear(192, 64)\n        self.selector = nn.Linear(64, 11)  # Choose from 11 bowlers\n    \n    def forward(self, batting, bowling):\n        b_feat = torch.relu(self.batting_features(batting))\n        bowl_feat = torch.relu(self.bowling_features(bowling))\n        combined = torch.cat([b_feat, bowl_feat], dim=1)\n        hidden = torch.relu(self.fusion(combined))\n        return self.selector(hidden)\n\n# Production deployment pipeline\nmodel = BowlerSelectorNet()\n\n# Step 1: Pruning - remove low-impact connections\nfor module in model.modules():\n    if isinstance(module, nn.Linear):\n        l1_unstructured(module, name='weight', amount=0.3)\n\n# Step 2: Make pruning permanent\nfor module in model.modules():\n    if hasattr(module, 'weight_orig'):\n        nn.utils.prune.remove(module, 'weight')\n\nprint(f\"Pruned model size: {sum(p.numel() for p in model.parameters())/1e6:.2f}M params\")\n\n# Step 3: Quantization for edge deployment\nquantized_model = quantize_dynamic(\n    model,\n    {nn.Linear},  # Apply to all Linear layers\n    dtype=torch.qint8  # 8-bit integer quantization\n)\n\n# Save for mobile/edge deployment\ntorch.jit.script(quantized_model).save('bowler_selector_quantized.pt')\nprint(f\"Quantized model loaded for edge inference\")\n\n# Verify accuracy loss is minimal\ntest_batting = torch.randn(32, 10)\ntest_bowling = torch.randn(32, 15)\noriginal_out = model(test_batting, test_bowling)\nquantized_out = quantized_model(test_batting, test_bowling)\nmax_diff = (original_out - quantized_out).abs().max().item()\nprint(f\"Max output difference after quantization: {max_diff:.6f}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Production workflow: pruning removes 30% of low-impact weights, quantization converts FP32→INT8 for 4× memory savings, and JIT scripting enables deployment across CPUs/mobile without Python overhead. The max_diff metric validates that output changes stay negligible."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Pruning before fine-tuning often fails—prune AFTER training. Pruning 40%+ suddenly creates training instability; use iterative pruning (10% per cycle) in production. Quantization of attention mechanisms requires special handling; LayerNorm+Attention are sensitive to INT8 truncation. Never quantize models without calibration data representing your production distribution. Combining aggressive pruning (>50%) with INT8 quantization often causes >5% accuracy drops; always validate on real data.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Pruning removes low-magnitude weights post-training; quantization converts FP32→lower-bit formats for 4-8× memory compression and faster inference.",
+        "Google, Netflix, Meta, Uber deploy pruned/quantized models at billion-scale; uncontrolled pruning causes ranking collapse and slow inference from memory fragmentation.",
+        "Iterative pruning (10% per cycle) outperforms aggressive one-shot pruning; combine with fine-tuning to recover accuracy within 1-2% degradation.",
+        "INT8 quantization requires calibration data; attention/LayerNorm layers are precision-sensitive and may need special per-channel or mixed-precision handling.",
+        "QAT (Quantization-Aware Training) simulates quantization during training, preventing accuracy collapse better than post-training quantization for >5% sparsity.",
+        "Production checklist: validate on distribution-matched test sets, measure actual inference latency (not just FLOP reduction), profile memory before/after, enable INT8 only where proven safe.",
+        "Pruning + quantization together achieve 20-30× compression; but aggressive combinations risk >5% accuracy loss—always A/B test against baseline performance."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket analytics platform processes 10 million daily queries using a BERT-based player ranking model. Current latency is 200ms per query, consuming 8GB GPU memory. You decide to prune 40% of weights then apply INT8 quantization. What's the HIGHEST-risk step?",
+      "items": [
+        "Applying INT8 quantization to the query_embedding layer without per-channel calibration",
+        "Pruning 40% in one pass then immediately deploying without fine-tuning",
+        "Using the full training dataset for quantization calibration instead of a representative subset",
+        "Post-training quantization on attention mechanisms without special handling"
+      ],
+      "answer": 1,
+      "explanation": "Aggressive one-shot pruning (40% immediately) typically causes >3% accuracy collapse and training instability. It should be done iteratively (10% per cycle) with fine-tuning between cycles. Option A is risky but solvable with per-channel quantization. Option C is actually fine—larger calibration sets are safer. Option D is dangerous but less immediately catastrophic than ignoring fine-tuning after 40% pruning."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of model pruning and quantization concepts with these two comprehensive quizzes. The first focuses on conceptual mastery of core mechanisms, while the second presents a real-world scenario where you must apply your knowledge.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the context of structured pruning for neural networks, why is removing entire channels or filters generally more effective than unstructured pruning when deploying models on standard hardware?",
+      "items": [
+        "Structured pruning preserves tensor shapes, allowing hardware accelerators to maintain vectorization and memory efficiency without sparse tensor overhead.",
+        "Unstructured pruning requires custom CUDA kernels that are incompatible with GPU hardware.",
+        "Structured pruning always produces smaller models regardless of sparsity percentage.",
+        "Unstructured pruning cannot be applied to convolutional layers, only to fully connected layers."
+      ],
+      "answer": 0,
+      "explanation": "Structured pruning removes entire channels/filters, maintaining dense tensor operations that leverage standard hardware vectorization (SIMD, tensor cores). Unstructured pruning creates sparse patterns requiring specialized sparse tensor libraries and custom kernels—not always available or efficient on deployment hardware. Unstructured pruning can achieve higher sparsity percentages but sacrifices inference speed on standard hardware. Option 1 is correct because dense operations post-pruning allow frameworks like TensorRT and standard GPU kernels to maintain performance. Options 2 and 3 misrepresent hardware constraints. Option 4 is factually wrong—unstructured pruning applies to all layer types.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a cricket ball trajectory prediction model to edge devices (mobile phones) with 2GB RAM. The model currently runs at 95% accuracy using FP32 weights. During quantization to INT8, you notice accuracy drops to 87% and inference latency only improves by 15%. What is your best next action?",
+      "items": [
+        "Apply quantization-aware training (QAT) with calibration data, then fine-tune on a validation set to recover accuracy while maintaining INT8 benefits.",
+        "Immediately reject INT8 quantization and use FP16 instead, as the accuracy loss is unacceptable.",
+        "Accept the 87% accuracy since edge deployment always requires accuracy compromises.",
+        "Use mixed-precision quantization: keep critical layers (ball detection heads) in FP32 and quantize secondary layers to INT8."
+      ],
+      "answer": 0,
+      "explanation": "Quantization-aware training (QAT) explicitly simulates quantization during training, allowing the model to learn robust weight distributions for lower precision. This typically recovers 5-8% accuracy loss from naive post-training quantization. A 95%→87% drop suggests the model wasn't optimized for INT8—QAT with proper calibration data can reduce this substantially. Option 1 addresses root cause. Option 2 abandons optimization prematurely; FP16 offers only 2× compression vs. 4× for INT8. Option 3 accepts unacceptable accuracy without exploring solutions. Option 4 (mixed-precision) is useful but doesn't solve the underlying quantization mismatch; QAT should be tried first. For cricket trajectory prediction, 87% accuracy may miss critical patterns, making QAT the principled next step.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

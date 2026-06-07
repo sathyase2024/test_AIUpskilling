@@ -195,6 +195,202 @@
       "answer": -1,
       "explanation": "",
       "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch deployment follows several established patterns, each optimized for specific constraints. The Eager Mode pattern prioritizes development flexibility and debugging capability, ideal for research and prototyping where model architecture changes frequently—trade-off is slower inference due to Python overhead. TorchScript compilation converts dynamic Python code to static graphs, reducing latency by 40-60% and enabling deployment without Python runtime, essential for resource-constrained edge devices—cost is reduced model flexibility and debugging complexity. Quantization-Aware Training (QAT) simulates quantization during training, achieving 4-8x model compression with minimal accuracy loss (typically <1%), mandatory for sub-100MB deployment targets on mobile—requires retraining but provides superior accuracy-to-size ratios versus post-training quantization. ONNX export creates framework-agnostic intermediate representation, enabling cross-platform deployment and vendor optimization (TensorRT, CoreML)—adds conversion overhead but eliminates PyTorch dependency. Choosing patterns depends on inference latency requirements (milliseconds vs seconds), model size constraints (MB budgets), hardware diversity (CPU/GPU/NPU), and maintenance burden. Most production systems layer these: train in Eager mode, convert to TorchScript, apply quantization, export via ONNX for hardware-specific optimization.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Eager Mode is like having 11 fielders who rearrange positions every delivery—maximum flexibility to counter each batter's weakness, but slower to execute and requires constant communication. TorchScript is like a pre-set field with fixed positions printed on a laminated card—faster decisions, no runtime discussion overhead, but inflexible if the batter suddenly changes strategy. Quantization-Aware Training mirrors DRS (Decision Review System) planning: you rehearse which decisions to challenge during training so you make faster calls during the match without deep analysis. ONNX export is like having a universal rulebook that works in both Test cricket and T20 formats—your strategic plan translates across tournaments without rewriting everything. The captain's job is selecting the right approach for today's match conditions: use Eager flexibility for practice matches (development), switch to TorchScript rigidity for high-stakes tests (production), apply DRS-style quantization for tight budgets, and standardize via ONNX when deploying across multiple venue formats (hardware platforms).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Layered deployment strategy\nimport torch\nimport torch.nn as nn\nfrom torch.quantization import quantize_dynamic\n\nclass BattingAnalysisModel(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.feature_extractor = nn.Sequential(\n            nn.Linear(14, 64),  # 14 cricket stats features\n            nn.ReLU(),\n            nn.Linear(64, 32)\n        )\n        self.classifier = nn.Linear(32, 3)  # Strike rate: low/medium/high\n    \n    def forward(self, player_stats):\n        features = self.feature_extractor(player_stats)\n        return self.classifier(features)\n\n# Stage 1: Train in Eager mode (development)\nmodel = BattingAnalysisModel()\noptimizer = torch.optim.Adam(model.parameters(), lr=0.001)\n\n# Stage 2: Convert to TorchScript (portability)\ntorchscript_model = torch.jit.script(model)\ntorch.jit.save(torchscript_model, 'batting_model.pt')\n\n# Stage 3: Apply quantization (edge deployment)\nquantized_model = quantize_dynamic(\n    model,\n    {nn.Linear},  # Quantize only linear layers\n    dtype=torch.qint8\n)\nprint(f\"Model size: {torch.jit.save(quantized_model, 'batting_quantized.pt')}\")\n\n# ANTI-PATTERN: Monolithic approach\nclass CricketPredictorBad(nn.Module):\n    # ❌ Not scriptable (uses Python lists, dynamic shapes)\n    def forward(self, stats):\n        features = []\n        for i in range(len(stats)):  # Dynamic loop\n            features.append(stats[i] * 2)\n        return torch.stack(features)\n\n# ❌ Directly quantizing without calibration\nmodel.eval()\nquantized_bad = torch.quantization.quantize_qat(model)  # Missing qconfig setup\n\n# ❌ Not benchmarking layer contributions\n# Quantizes expensive layers that give minimal speedup",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Quantization Accuracy Collapse. Most common beginner mistake is applying quantization to models without proper calibration, resulting in 5-15% accuracy drops that make the model unusable. This happens because INT8 ranges are set without seeing representative data. FIX: (1) Collect 100-500 representative inference samples from your validation set. (2) Enable calibration before quantization: `torch.quantization.prepare_qat(model, qconfig_dict)` with a representative batch. (3) Run several forward passes through calibration data so quantization statistics are learned. (4) Only then apply `torch.quantization.convert(model)` to finalize. (5) Validate accuracy on full validation set—if drop exceeds 1%, use mixed-precision quantization (INT8 for heavy layers, FP32 for sensitive layers) or increase calibration data. Always benchmark: print per-layer quantization ranges with `model.qconfig` inspection before committing to deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Eager Mode: Maximum flexibility, Python-dependent, slowest inference—use for research/prototyping",
+        "TorchScript: 40-60% latency reduction, production-ready, requires static code patterns",
+        "Quantization-Aware Training: 4-8x compression with <1% accuracy loss, essential for mobile targets",
+        "ONNX Export: Framework-agnostic, enables vendor optimization (TensorRT/CoreML), single conversion overhead",
+        "Layer pattern selection: Train eager → TorchScript conversion → apply quantization → ONNX export",
+        "Calibration is non-negotiable: quantization without representative data causes accuracy collapse",
+        "Profile first: measure which layers consume 80% of latency before optimization"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a bowling trajectory prediction model to IPL stadium edge devices with 50MB storage and 100ms latency SLA. Your current model is 200MB and infers in 400ms. Which layered approach is most cost-effective?",
+      "items": [
+        "Apply TorchScript only (static graphs reduce inference time to 150ms, meets latency but not size)",
+        "Use quantization alone (achieves 50MB target but TorchScript → TorchScript quantization leaves 400ms latency unresolved)",
+        "TorchScript (150ms) → Dynamic Quantization (50MB, adds 20ms overhead = 170ms total) → ONNX export for stadium hardware acceleration",
+        "Eager mode with batch processing (defeats 100ms per-request SLA)"
+      ],
+      "answer": 2,
+      "explanation": "Answer C is correct. TorchScript cuts latency to ~150ms (2.6x reduction via graph compilation). Dynamic quantization brings model to 50-55MB (4x compression). The 20ms quantization overhead is acceptable (170ms total vs 100ms SLA requires stadium hardware like NVIDIA Jetson with TensorRT optimization from ONNX export, which provides additional 30-40% acceleration). Answer A fails the 50MB constraint. Answer B's sequencing is correct but misses ONNX hardware-specific optimization that closes the SLA gap. Answer D abandons the real-time requirement entirely.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "PyTorch mobile and edge deployment powers production systems at scale across tech giants. Google deploys optimized models on Android devices through TensorFlow Lite and PyTorch Mobile for on-device ML. Meta uses edge inference for real-time content recommendations in their mobile apps serving billions daily. Netflix optimizes model serving across edge servers for personalized recommendations under 100ms latency constraints. Uber runs inference on driver smartphones for real-time navigation and fare prediction. OpenAI optimizes GPT inference for edge deployment on consumer hardware. Airbnb uses mobile models for search ranking on guests' devices. When done wrong—unoptimized models exceed bandwidth limits (100MB+ downloads), battery drain exceeds 30% per hour, or inference latency hits 5+ seconds, destroying user experience. Production failures occur when quantization introduces unacceptable accuracy loss (>2%), memory spikes crash devices, or models diverge from training due to platform differences.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your batting team (model) practices on a perfect pitch (GPU servers), but match day happens on varied grounds (edge devices). You can't bring the entire practice setup to the stadium—you must adapt your swing technique (quantization, pruning) to perform optimally on unfamiliar conditions (mobile CPUs, limited RAM). Just as a batsman adjusts stance for spin bowlers on turning pitches, your model adapts through distillation, lightweight architectures, and runtime optimizations. The captain's strategy documents (model checkpoints) must travel light in the team bus (mobile deployment package), containing only essential plays, not every possible scenario rehearsed at the academy.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import torch\nimport torch.nn as nn\nfrom torch.utils.mobile_optimizer import optimize_for_mobile\n\n# Batsman performance prediction model\nclass BatsmanPerformanceModel(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.embed = nn.Embedding(100, 16)  # Player embeddings\n        self.fc1 = nn.Linear(16 + 5, 32)  # 5 features: avg, sr, matches, pitch, opposition\n        self.fc2 = nn.Linear(32, 16)\n        self.output = nn.Linear(16, 1)  # Runs prediction\n        \n    def forward(self, batsman_id, features):\n        emb = self.embed(batsman_id)\n        x = torch.cat([emb, features], dim=-1)\n        x = torch.relu(self.fc1(x))\n        x = torch.relu(self.fc2(x))\n        return self.output(x)\n\n# Quantization for mobile deployment\nmodel = BatsmanPerformanceModel()\nmodel.eval()\n\n# Static quantization\nmodel_quantized = torch.quantization.quantize_dynamic(\n    model, {nn.Linear}, dtype=torch.qint8\n)\n\n# Export for mobile\nscripted_model = torch.jit.script(model_quantized)\noptimized_model = optimize_for_mobile(scripted_model)\noptimized_model._save_for_lite_interpreter(\"batsman_model.ptl\")\n\nprint(f\"Original size: {sum(p.numel() for p in model.parameters())} params\")\nprint(f\"Quantized size: {sum(p.numel() for p in model_quantized.parameters())} params\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Mobile deployment constraints are HARD limits. A model that works on GPU may crash on-device due to: (1) Memory overflows—peak RAM during inference must stay <50% device RAM; (2) Accuracy drift—quantization can reduce accuracy 3-5%, unacceptable for safety-critical tasks; (3) Latency spikes—GC pauses or thermal throttling can cause 10x slowdown; (4) Version mismatches—PyTorch versions on dev vs production devices cause silent failures. Always profile on TARGET devices, not emulators. Test on worst-case devices (low-RAM, old OS). Never trust benchmark numbers—deploy to 1% of users first.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Quantization (INT8) reduces model size 4x and speeds inference 2-3x with <2% accuracy loss for mobile deployment.",
+        "Knowledge distillation compresses teacher models into lightweight student networks by mimicking logits on edge devices.",
+        "Dynamic graphs enable flexible model shapes and control flow on heterogeneous hardware without recompilation.",
+        "Gradient accumulation amortizes communication costs in distributed training, critical for bandwidth-limited edge clusters.",
+        "Mixed precision training (FP16) cuts memory by 50% and accelerates computation on GPUs while maintaining FP32 precision.",
+        "Model pruning removes 80-90% of weights without accuracy loss, essential for latency-sensitive inference pipelines.",
+        "Profile real deployment targets using torch.profiler to catch memory spikes, thermal throttling, and GC pauses before production."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You deploy a cricket analytics model to stadium edge devices for real-time player performance prediction. The model achieves 92% accuracy on GPU servers but 87% on mobile devices after quantization. What's the PRIMARY risk and best mitigation?",
+      "items": [
+        "Accuracy loss is acceptable; deploy immediately since mobile hardware is inferior",
+        "Run A/B test on 5% of stadiums first; validate 5% accuracy drop doesn't degrade user decisions",
+        "Retrain with quantization-aware training (QAT) to recover accuracy; test on production devices",
+        "Revert to FP32 models; mobile hardware can handle the latency"
+      ],
+      "answer": 2,
+      "explanation": "Quantization-aware training (QAT) simulates quantization during training, allowing the model to adapt and recover lost accuracy. Simply deploying with 5% loss is risky for decision-critical tasks. A/B testing helps but doesn't solve the underlying problem. FP32 models defeat the purpose of mobile deployment due to size/latency constraints. QAT + target device testing is production best practice."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of PyTorch Mobile and Edge Deployment with these two knowledge checks. The first quiz focuses on conceptual mastery of core mechanisms, while the second tests your ability to apply these concepts to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the context of quantization for edge deployment, what is the primary purpose of calibration in post-training quantization (PTQ)?",
+      "items": [
+        "To determine optimal scale and zero-point values for mapping floating-point weights and activations to integer ranges",
+        "To train the model weights from scratch using only integer arithmetic",
+        "To increase the model's accuracy by adding extra layers before deployment",
+        "To remove unused parameters and reduce the model file size"
+      ],
+      "answer": 0,
+      "explanation": "Calibration in PTQ uses representative data to compute statistics (min/max values) for each layer, enabling accurate mapping from FP32 to INT8 or other lower-precision formats. This ensures quantized models maintain acceptable accuracy by finding the best scale factor and zero-point for each tensor. Option 1 is incorrect because training from scratch would be quantization-aware training (QAT), not PTQ. Option 2 doesn't describe calibration's role. Option 3 is counterproductive—adding layers increases model size. Option 4 describes pruning, a separate optimization technique not directly related to calibration.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your team is deploying a cricket ball trajectory prediction model to mobile devices used by coaching staff during matches. The model currently runs in 2.5 seconds on a flagship phone but must execute in under 500ms. You've already applied quantization and achieved 40% latency reduction. What should be your next optimization strategy?",
+      "items": [
+        "Apply knowledge distillation to train a smaller student model that mimics the teacher model's behavior, then quantize the smaller model",
+        "Immediately switch to a different deep learning framework that's faster on mobile devices",
+        "Increase the batch size to 64 to process more cricket frames simultaneously on the device",
+        "Remove all regularization techniques like dropout to speed up inference"
+      ],
+      "answer": 0,
+      "explanation": "Knowledge distillation creates a compact student model that learns from the larger teacher, typically achieving 2-4x speedup when combined with quantization—this directly addresses your latency requirement. The student model has fewer parameters and layers, making it ideal for mobile deployment while maintaining prediction quality for trajectory analysis. Option 1 is ineffective because switching frameworks introduces uncertainty and may not solve the architectural bottleneck. Option 2 would worsen latency—larger batch sizes are incompatible with real-time single-frame inference on mobile devices. Option 3 is irrelevant; dropout and regularization don't affect inference speed, only training. The student-teacher approach provides principled, measurable latency improvements.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

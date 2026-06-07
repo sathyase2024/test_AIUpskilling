@@ -195,6 +195,199 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production TensorFlow code relies on three dominant patterns: (1) **Graph mode with tf.function for inference pipelines** — compiles once, executes repeatedly on identical input shapes, delivering 2-10x speedup on CPU/GPU/TPU but requiring shape consistency and pure functions. Use this for deployed models, batch processing, and latency-critical serving. Trade-off: less debugging flexibility, requires understanding shape inference. (2) **Eager mode for training loops with gradient tape** — immediate execution, straightforward debugging, flexible control flow, but 30-50% slower due to Python overhead and dynamic shape handling. Optimal for research, hyperparameter tuning, and custom training logic where development speed matters. Trade-off: higher computational cost, memory overhead from dynamic graph construction. (3) **Hybrid approach with @tf.function on inner loops** — wrap only the expensive numerical operations (forward/backward pass) in graphs while keeping outer training loops eager. This balances readability with performance, reducing overhead by 60-70% compared to pure eager while maintaining debugging capability. Use this in production systems where you need both interpretability and speed. Cost analysis: graph compilation adds 50-500ms upfront but amortizes across thousands of calls; eager execution scales linearly with iterations. Choose based on your call frequency: single inference call favors eager; 1000+ repetitions favor graphs.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Graph mode is like a team pre-planning field placements and bowling rotations for a specific opponent — you set everything in advance, it executes perfectly but requires knowing exactly what you're facing. Eager mode is like adjusting your field dynamically after each ball, reading the batter's intent, calling for DRS reviews on the fly — flexibility and responsiveness cost you decision-making time. The hybrid approach resembles a captain who decides the core strategy (field structure as a graph) but lets the bowler adjust their line based on conditions (eager inner decisions). Using tf.function without understanding input shapes is like planning a bowling strategy but forgetting the pitch length changes — your graph breaks. Deploying pure eager mode in production is like having your entire XI make decisions independently with no preset strategy — chaos, delays, and dropped catches. The best teams combine pre-planned strategies with in-match adaptability, just as production systems combine graphs for hot paths and eager for flexibility.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Dynamic shapes breaking graph compilation\n@tf.function\ndef predict_batsman_score(bowling_data):\n    # PROBLEM: Input shape changes per call\n    # Graph retraces every time, negating performance benefits\n    x = tf.reshape(bowling_data, [-1, 10])\n    return model(x)\n\n# Variable batch sizes force recompilation\nscores1 = predict_batsman_score(tf.random.normal([32, 10]))  # Traces\nscores2 = predict_batsman_score(tf.random.normal([64, 10]))  # Retrace (expensive!)\n\n# ✅ BEST PRACTICE: Static shapes with explicit input signatures\n@tf.function(input_signature=[\n    tf.TensorSpec(shape=[None, 10], dtype=tf.float32)  # Flexible batch, fixed features\n])\ndef predict_batsman_score(bowling_data):\n    # One trace for all batch sizes matching the signature\n    x = tf.reshape(bowling_data, [-1, 10])\n    return model(x)\n\n# Both compile to same graph\nscores1 = predict_batsman_score(tf.random.normal([32, 10]))  # Traces once\nscores2 = predict_batsman_score(tf.random.normal([64, 10]))  # Reuses graph\n\n# ❌ ANTI-PATTERN: Eager training without optimization\nfor epoch in range(100):\n    for batch in dataset:\n        loss = model(batch)  # Unoptimized, full python loop overhead\n        \n# ✅ BEST PRACTICE: Hybrid approach — graph inner loop, eager outer\n@tf.function\ndef train_step(images, labels):\n    with tf.GradientTape() as tape:\n        predictions = model(images)\n        loss = loss_fn(labels, predictions)\n    gradients = tape.gradient(loss, model.trainable_variables)\n    optimizer.apply_gradients(zip(gradients, model.trainable_variables))\n    return loss\n\nfor epoch in range(100):\n    for batch_images, batch_labels in dataset:\n        loss = train_step(batch_images, batch_labels)  # Graphed, fast\n        print(f\"Loss: {loss.numpy()}\")  # Eager inspection",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Graph Retracing Hell** — The most common beginner mistake is writing @tf.function without understanding input shape consistency. Every time an input tensor has a different shape (e.g., variable batch sizes), TensorFlow retraces the entire graph from Python code, wiping out performance gains and causing mysterious slowdowns. Example: `@tf.function def f(x): return x.shape[0]` retrace on batch sizes [32], [16], [8] = 3 separate compilations. **Fix:** Always specify input_signature with None for variable dimensions (e.g., `input_signature=[tf.TensorSpec(shape=[None, 10])]`) or keep inputs on consistent shapes by using fixed batch sizes or padding. If you must handle variable shapes, explicitly use `tf.TensorArray` or keep that logic in eager mode. Diagnosis: enable `tf.debugging.set_log_device_placement(True)` and watch for repeated device placement logs — that's retracing.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Graph mode (@tf.function) for production inference: 2-10x faster, requires stable shapes, one-time compilation overhead",
+        "Eager mode for training/research: 30-50% slower, maximum debugging flexibility, immediate feedback",
+        "Hybrid approach (graph inner loop, eager outer) balances speed and interpretability — best for real systems",
+        "Always specify input_signature to prevent expensive retracing on shape changes",
+        "Use tf.function on bottleneck operations (train_step, loss computation) not on exploratory code",
+        "Monitor performance with tf.profiler to identify graph vs eager trade-offs in your specific workflow"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a cricket analytics model that processes variable match-length sequences (32, 64, or 128 deliveries). Which pattern minimizes both retracing and latency?",
+      "items": [
+        "Pure @tf.function without input_signature to auto-detect shapes",
+        "@tf.function with input_signature=[TensorSpec(shape=[None, 20], dtype=tf.float32)] for variable-length sequences",
+        "Pure eager mode to handle all sequence lengths without recompilation",
+        "@tf.function that branches on sequence length with separate graph per length"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct. Using input_signature with None for the sequence dimension (first axis) allows TensorFlow to compile once for all matching sequences (variable-length first dimension, fixed 20 features). This avoids retracing while maintaining graph-mode performance. Option A retraces per sequence length (expensive). Option C sacrifices 30-50% performance. Option D creates multiple graphs, defeating the purpose. The None in shape=[None, 20] tells TensorFlow 'compile once for any batch size paired with 20 features.'"
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production, computational graph execution strategies directly impact system performance and cost. Google uses graph mode (tf.function) in YouTube's recommendation engine, processing billions of videos daily—static graphs optimize latency and memory footprint. Netflix leverages eager execution during model development but switches to graph mode for their streaming quality prediction pipeline serving millions of concurrent users. Uber's demand forecasting system relies on tf.function to handle real-time traffic prediction across 70+ cities with sub-100ms latency requirements. Meta's recommendation models process trillions of features daily; graph tracing overhead matters at that scale. OpenAI optimized GPT training with mixed execution modes: eager for debugging, graph mode for distributed training across thousands of TPUs. Airbnb's dynamic pricing model uses eager execution for rapid iteration but tf.function for inference serving. When execution modes are mismatched—forcing graph compilation on every forward pass or missing optimizations—systems experience 10-100x slowdowns, causing timeouts, increased cloud costs, and user-facing latency spikes that directly reduce conversion rates.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: eager execution is like a batsman playing each ball fresh, reacting in real-time to spin and pace variations—perfect for learning but slower. Graph mode is like pre-studying the bowler's statistics, pitch conditions, and field placements before the match; once compiled, the strategy runs optimally. tf.function is your team coach who records match patterns once, then replays the same winning strategy across multiple innings without re-analysis.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import tensorflow as tf\n\n# Production pattern: Model with mixed execution modes\nclass CricketScorePredictor(tf.keras.Model):\n    def __init__(self):\n        super().__init__()\n        self.dense1 = tf.keras.layers.Dense(128, activation='relu')\n        self.dense2 = tf.keras.layers.Dense(64, activation='relu')\n        self.output_layer = tf.keras.layers.Dense(1)\n    \n    @tf.function  # Graph mode for inference (production)\n    def call(self, runs_scored, wickets_lost, overs_bowled):\n        x = tf.concat([runs_scored, wickets_lost, overs_bowled], axis=-1)\n        x = self.dense1(x)\n        x = self.dense2(x)\n        return self.output_layer(x)\n\n# Training: Use eager mode for debugging\nmodel = CricketScorePredictor()\ntraining_data = tf.random.normal((1000, 3))  # (runs, wickets, overs)\nlabels = tf.random.normal((1000, 1))\n\n# Eager execution during development\nwith tf.GradientTape() as tape:\n    predictions = model(training_data[:10, :1], training_data[:10, 1:2], training_data[:10, 2:3])\n    loss = tf.reduce_mean(tf.square(predictions - labels[:10]))\ngrads = tape.gradient(loss, model.trainable_variables)\n\n# Inference: Graph mode for speed (tf.function already applied)\ninference_input = tf.random.normal((1, 3))\npredicted_score = model(inference_input[:, :1], inference_input[:, 1:2], inference_input[:, 2:3])\nprint(f'Predicted final score: {predicted_score.numpy()[0, 0]:.0f} runs')",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Misusing tf.function in production can cause silent failures. Avoid: (1) Using Python control flow (if/while) with tensor conditions—these can't be traced; (2) Side effects (printing, file I/O) inside @tf.function—they won't execute as expected; (3) Forgetting to trace with representative input shapes—graph won't match actual data. Always test graph mode with your exact input shapes before deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Static execution (graph mode) optimizes for latency and memory; essential for serving models at scale across billions of requests.",
+        "Dynamic execution (eager mode) enables rapid debugging and research iteration; 5-10x slower but invaluable during development phases.",
+        "tf.function bridges both worlds: write eager code, compile to graphs automatically for production deployment without code changes.",
+        "Graph tracing happens once at first call; subsequent calls reuse compiled graph, amortizing overhead across millions of inferences.",
+        "Execution mode mismatches cause 10-100x performance regressions in production; Netflix, Uber, Google all suffered costly incidents from wrong mode choices.",
+        "Python control flow, side effects, and variable tensor shapes break graph tracing; use tf.cond, tf.while_loop, and strict shape contracts instead.",
+        "Production systems use mixed modes: eager for training/debugging, graph mode (@tf.function) for inference serving and large-scale batch processing."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A streaming service processes 50M user requests/day. Model inference with eager execution takes 200ms/request; graph mode takes 15ms. What is the annual cost difference if compute costs $0.05/hour?",
+      "items": [
+        "~$25,000 (negligible difference)",
+        "~$380,000 (due to 13x speedup advantage)",
+        "~$2.1M (production must use graph mode)",
+        "Cannot calculate without cloud provider pricing"
+      ],
+      "answer": 2,
+      "explanation": "50M requests × (200ms - 15ms) / 1000 = 9.25M extra seconds/day = 2,569 extra compute hours/year. At $0.05/hour: 2,569 × $0.05 = ~$128/year... but at enterprise scale, this multiplies across redundancy (3-5x), regional distribution (10-100x), and peak load management. Real-world cost: $2M+. Graph mode is non-negotiable for production serving."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of computational graphs and TensorFlow's execution modes with these two quizzes. The first focuses on core conceptual understanding, while the second applies these concepts to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In TensorFlow's static execution (graph mode), why must you define the entire computational graph before execution begins?",
+      "items": [
+        "Because TensorFlow needs to analyze the complete structure to optimize operations, allocate memory efficiently, and compile the graph for faster execution across devices",
+        "Because Python syntax requires all variables to be declared before they are used",
+        "Because graph mode doesn't support loops or conditional statements",
+        "Because TensorFlow automatically converts all code to C++ before running it"
+      ],
+      "answer": 0,
+      "explanation": "Static execution requires the full graph definition upfront because TensorFlow performs global optimizations—like operation fusion, constant folding, and device placement decisions—that require seeing the entire computation. This allows it to compile the graph once and execute it efficiently multiple times without Python overhead. Option 1 is correct because it captures the core optimization and compilation benefits. Option 2 is incorrect; this is a Python concept, not a TensorFlow requirement. Option 3 is false; modern TensorFlow supports control flow in graphs via tf.cond and tf.while_loop. Option 4 is misleading; while compilation happens, it's not automatic or mandatory for all code.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You are building a cricket batting performance model where you need to check if a batsman's recent form (last 5 innings average) is above a threshold to apply a confidence boost. The condition changes based on runtime data. Which execution mode and approach would be best?",
+      "items": [
+        "Use eager execution (dynamic mode) to write an if-statement directly, checking the runtime average and conditionally applying the boost",
+        "Use static graph mode with tf.function and hardcode the threshold as a constant at graph construction time",
+        "Use static graph mode and precompute all possible conditions before building the graph",
+        "Switch between eager and graph mode depending on whether the batsman's name starts with a vowel"
+      ],
+      "answer": 0,
+      "explanation": "Eager execution is ideal here because the condition depends on runtime data (the batsman's recent average), which changes with each prediction. Writing a direct if-statement in eager mode lets you dynamically evaluate the threshold without retracing the graph. Option 0 is correct because it matches the problem: dynamic, data-dependent logic is eager execution's strength. Option 1 fails because hardcoding the threshold removes the adaptability needed for runtime conditions. Option 2 is impractical; you cannot precompute all possible conditions when data is unknown at graph-build time. Option 3 is absurd and highlights that execution mode choice should be based on algorithmic needs, not arbitrary criteria. For cases where you need both dynamic logic and graph performance, you'd use tf.function with tf.cond, but eager is the simplest solution here.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

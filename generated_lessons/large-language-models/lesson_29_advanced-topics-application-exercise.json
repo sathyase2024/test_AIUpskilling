@@ -154,6 +154,282 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The RAG system operates through a multi-stage pipeline that manages context windows, token allocation, and vector similarity computations in real-time. When a user query arrives, the retrieval mechanism performs approximate nearest neighbor search across your embeddings vector space, typically using HNSW (Hierarchical Navigable Small World) or IVF indices for sub-linear complexity. The LLM maintains a rolling context buffer where retrieved documents are ranked by relevance scores and truncated to fit within token limits (usually 2k-4k tokens for context). During generation, the model uses causal self-attention to weight previously retrieved passages, distributing probability mass across both retrieved context and learned parameters. Memory overhead scales linearly with embedding dimensions (typically 768-1536) and quadratically with sequence length during attention computation. Token streaming enables real-time output without waiting for full response generation, critical for interactive applications. Temperature and top-p sampling parameters control hallucination rates by constraining the probability distribution at decode time.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma batting in an ODI match—his internal decision-making process mirrors how RAG works. Before each delivery, Rohit mentally retrieves relevant information from his experience: past performances against this bowler (retrieval), match situation and pitch conditions (context window management), and specific techniques to employ (ranking by relevance). Jasprit Bumrah, bowling from the opposite end, uses momentum from previous deliveries (token streaming and sequential generation) while adjusting his line based on real-time feedback (attention mechanism reweighting). Virat Kohli in the commentary box synthesizes multiple data points—recent batting statistics, weather patterns, fielder positions—to predict outcomes (vector similarity search), then communicates this contextually appropriate analysis (temperature-controlled sampling). The key revelation: just as a cricket player doesn't memorize every possible match scenario but rather retrieves and adapts relevant patterns under pressure, LLMs don't store all training data but dynamically retrieve and synthesize relevant context to generate coherent, contextually grounded responses.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom collections import deque\nimport time\n\nclass CricketRAGEngine:\n    \"\"\"Internal mechanics of retrieval and generation pipeline.\"\"\"\n    \n    def __init__(self, context_window_size=4096, embedding_dim=768):\n        self.context_window = deque(maxlen=context_window_size)\n        self.embedding_dim = embedding_dim\n        self.attention_cache = {}  # KV cache for transformer\n        self.token_budget = context_window_size\n        self.retrieval_latency = []\n    \n    def retrieve_match_statistics(self, query_embedding, document_embeddings, top_k=5):\n        \"\"\"Approximate nearest neighbor retrieval with HNSW-like behavior.\"\"\"\n        similarity_scores = np.dot(document_embeddings, query_embedding) / (\n            np.linalg.norm(document_embeddings, axis=1) * np.linalg.norm(query_embedding) + 1e-8\n        )\n        top_indices = np.argsort(similarity_scores)[-top_k:][::-1]\n        retrieval_start = time.time()\n        # Simulate hierarchical search\n        results = [\n            {\"index\": idx, \"relevance\": similarity_scores[idx]}\n            for idx in top_indices\n        ]\n        self.retrieval_latency.append(time.time() - retrieval_start)\n        return results\n    \n    def manage_context_buffer(self, retrieved_docs, available_tokens):\n        \"\"\"Allocate token budget across retrieved passages (like squad selection).\"\"\"\n        ranked_docs = sorted(retrieved_docs, key=lambda x: x[\"relevance\"], reverse=True)\n        selected_docs = []\n        token_count = 0\n        \n        for doc in ranked_docs:\n            doc_tokens = len(doc[\"content\"].split())  # Simplified tokenization\n            if token_count + doc_tokens <= available_tokens:\n                selected_docs.append(doc)\n                token_count += doc_tokens\n            else:\n                break  # Token budget exhausted (like dismissals in an inning)\n        \n        return selected_docs, token_count\n    \n    def compute_causal_attention(self, query_tokens, context_tokens, temperature=0.7):\n        \"\"\"Simulate attention weighting over retrieved context.\"\"\"\n        attention_weights = np.random.exponential(scale=temperature, size=len(context_tokens))\n        attention_weights = attention_weights / np.sum(attention_weights)  # Normalize\n        \n        # Top-p sampling (nucleus sampling) to reduce hallucination\n        sorted_indices = np.argsort(attention_weights)[::-1]\n        cumsum = np.cumsum(attention_weights[sorted_indices])\n        cutoff_idx = np.where(cumsum <= 0.9)[0][-1]  # Keep top 90% probability\n        \n        sampled_indices = sorted_indices[:cutoff_idx+1]\n        return {\"selected_context_indices\": sampled_indices, \"attention_dist\": attention_weights}\n    \n    def stream_tokens_like_rohit_batting(self, generation_length=50):\n        \"\"\"Yield tokens in real-time (streaming) rather than buffering full response.\"\"\"\n        for token_position in range(generation_length):\n            # Simulate token generation with positional awareness\n            token_logits = np.random.randn(10000)  # Vocabulary size\n            next_token_prob = np.exp(token_logits) / np.sum(np.exp(token_logits))\n            sampled_token = np.random.choice(10000, p=next_token_prob)\n            yield {\"token_id\": sampled_token, \"position\": token_position}\n\n# Usage: Cricket match commentary generation\nrag_engine = CricketRAGEngine(context_window_size=2048, embedding_dim=768)\n\n# Mock data: Query about Rohit's strike rate\nrohit_query_embedding = np.random.randn(768)\nmatches_embeddings = np.random.randn(100, 768)  # 100 past matches\n\n# Retrieve relevant matches\nrelevant_matches = rag_engine.retrieve_match_statistics(\n    rohit_query_embedding, matches_embeddings, top_k=5\n)\nprint(f\"Retrieved {len(relevant_matches)} relevant match records\")\n\n# Manage token allocation\nmock_docs = [\n    {\"content\": \"Rohit Sharma scored 150 runs off 100 balls against Pakistan\", \"relevance\": 0.95},\n    {\"content\": \"Strike rate improved by 12% in recent ODI series\", \"relevance\": 0.87}\n]\nselected_docs, tokens_used = rag_engine.manage_context_buffer(mock_docs, 1024)\nprint(f\"Selected {len(selected_docs)} documents using {tokens_used} tokens\")\n\n# Stream generation\nfor token_chunk in rag_engine.stream_tokens_like_rohit_batting(generation_length=10):\n    print(f\"Token {token_chunk['position']}: {token_chunk['token_id']}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Context window truncation can drop important information. Always validate that your retrieval mechanism captures domain-critical passages—in cricket analytics, missing a player's recent form data due to token limits invalidates predictions. Monitor retrieval latency in production: 100ms+ retrieval adds perceptible delay. Beware of attention weights collapsing to retrieved context, ignoring learned LLM knowledge. Test temperature/top-p combinations thoroughly; values too conservative (temp < 0.3) risk repetitive outputs, too liberal (temp > 1.5) introduce factual errors.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG runtime uses approximate nearest neighbor search (HNSW/IVF) to avoid O(n) similarity scans across all embeddings",
+        "Token budgeting is critical: retrieved documents compete for space in the context window, mirroring squad selection constraints",
+        "Causal self-attention computes context relevance dynamically; earlier tokens influence generation without look-ahead",
+        "Token streaming decouples generation from output buffering, enabling real-time interaction rather than batch processing",
+        "Temperature and top-p sampling directly control hallucination rates by constraining the probability distribution",
+        "KV-cache management reduces recomputation during token generation, making inference linear rather than quadratic in sequence length"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the RAG pipeline, why does approximate nearest neighbor search (HNSW) outperform brute-force similarity computation as embedding collections scale to millions of documents?",
+      "items": [
+        "It uses hierarchical layer-based indexing to skip irrelevant regions of the vector space, reducing average-case complexity from O(n) to O(log n)",
+        "It stores embeddings in compressed format, requiring less memory bandwidth",
+        "It pre-filters embeddings by magnitude before computing dot products",
+        "It only searches embeddings from the most recent documents in the corpus"
+      ],
+      "answer": 0,
+      "explanation": "HNSW (Hierarchical Navigable Small World) constructs a multi-layer graph where each layer is progressively sparser. Retrieval navigates from coarse to fine layers, pruning entire regions of the embedding space that cannot contain nearest neighbors. This hierarchical structure achieves sub-linear complexity. Options B and C describe optimizations that don't fundamentally change complexity class. Option D loses historical information critical to RAG quality. Understanding this principle is essential when choosing retrieval backends for production systems."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems demand adherence to three established patterns. First, the **Retrieval Caching Pattern** pre-computes and caches embeddings for static knowledge bases, reducing inference latency from milliseconds to microseconds and eliminating redundant vector operations. Use this when your corpus changes infrequently (cricket rules, historical statistics). The trade-off: storage overhead increases linearly with corpus size; a 10M document base requires 40GB+ of vector cache. Second, **Semantic Reranking** applies a lightweight cross-encoder after dense retrieval, filtering the top-100 candidates down to top-5, dramatically improving relevance. This costs 2-3x more compute than retrieval alone but prevents hallucinations from irrelevant context. Use when precision matters (medical, legal domains) over speed. Third, **Adaptive Context Windowing** dynamically adjusts the number of retrieved documents based on query complexity—simple queries get 3 documents, complex ones get 15. This balances cost (tokens × price) against answer quality, reducing expenditure by 40-60% versus fixed-window approaches.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Retrieval Caching mirrors having your fielders pre-positioned based on historical batter statistics—you've already studied the opponent, so reactions are instantaneous. Semantic Reranking is like your captain's DRS review strategy: you don't challenge every LBW decision, only those with >80% confidence, conserving reviews for high-impact moments. Adaptive Context Windowing resembles rotating your bowling attack—against a weak tail-ender, you might use your 12th man bowler (1 document), but against Virat Kohli, you deploy your strike bowlers (15 documents and reinforced context). Field placement (retrieval strategy) must match the batter's strengths, just as your RAG system must match query complexity. Some captains always set a deep mid-wicket regardless of situation (fixed patterns)—they lose; adaptive captains win by reading the moment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Semantic Reranking with Adaptive Windowing\nfrom sentence_transformers import CrossEncoder\nimport numpy as np\n\nclass AdaptiveRAGRetriever:\n    def __init__(self, dense_retriever, reranker_model=\"cross-encoder/ms-marco-MiniLM-L-12-v2\"):\n        self.dense_retriever = dense_retriever\n        self.reranker = CrossEncoder(reranker_model)\n        self.complexity_threshold = 0.6\n    \n    def retrieve_batsman_stats(self, query, query_embedding):\n        # Dense retrieval: get top-100 candidates\n        candidates = self.dense_retriever.search(query_embedding, k=100)\n        \n        # Compute query complexity (entropy-based)\n        query_complexity = self._compute_complexity(query)\n        adaptive_k = int(3 + (query_complexity * 12))  # 3-15 docs\n        \n        # Rerank with cross-encoder\n        rerank_pairs = [[query, doc['text']] for doc in candidates]\n        scores = self.reranker.predict(rerank_pairs)\n        \n        # Return adaptive top-k\n        ranked_indices = np.argsort(scores)[::-1]\n        return [candidates[i] for i in ranked_indices[:adaptive_k]]\n    \n    def _compute_complexity(self, query):\n        # Simple heuristic: word count + question marks\n        return min(len(query.split()) / 30 + query.count('?') * 0.2, 1.0)\n\n# ANTI-PATTERN: Fixed Retrieval Without Reranking\nclass NaiveRAGRetriever:\n    def retrieve_batsman_stats(self, query, query_embedding):\n        # ❌ Always returns exactly 10 documents, no quality filtering\n        # ❌ No reranking: rank-10 might be garbage despite dense similarity\n        # ❌ Costs same tokens for simple and complex queries\n        candidates = self.dense_retriever.search(query_embedding, k=10)\n        return candidates  # Raw results, no filtering",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Context Contamination Through Naive Chunk Overlap**. The most common beginner mistake is retrieving overlapping document chunks without tracking their provenance, causing the LLM to see the same fact repeated across multiple \"retrieved sources\" and hallucinating confidence in false information. If your cricket_stats_db chunks player bios with 50% overlap and queries about \"Virat Kohli batting average\" return 5 chunks that all cite the same Wikipedia page, the model sees this as 5 independent confirmations when it's really one source mentioned 5 times. **Fix:** (1) Assign unique source_ids to each chunk and deduplicate retrieved results by source before sending to the LLM; (2) Add chunk metadata (document_id, page_number, timestamp) to your embeddings; (3) Implement a deduplication layer: `retrieved_docs = list({doc['source_id']: doc for doc in candidates}.values())` before context assembly. This reduces hallucinations by 30-40% in production systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Retrieval Caching reduces latency for static knowledge bases; use when corpus updates < daily",
+        "Semantic Reranking improves precision 15-25% but doubles compute cost—essential for high-stakes domains",
+        "Adaptive Context Windowing cuts token costs 40-60% by matching retrieval quantity to query complexity",
+        "Always deduplicate chunks by source_id before sending context to LLM to prevent hallucination cascades",
+        "Monitor retrieval-reranking correlation: if reranker score and dense similarity diverge >0.4, your embedding model and task are misaligned"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket analytics RAG system. Query: 'Compare Virat Kohli's average in home Tests vs away Tests across decades.' Your dense retriever returns 50 candidates with relevance scores 0.78-0.55. What's the best approach?",
+      "items": [
+        "Return top-50 candidates directly—more data is always better",
+        "Use semantic reranking to filter to top-8, then compute query complexity to adjust to 10-12 documents based on the multi-part nature of the question",
+        "Always return exactly 5 documents for consistency",
+        "Skip retrieval entirely and use fine-tuned model knowledge"
+      ],
+      "answer": 1,
+      "explanation": "Option B combines semantic reranking (precision) with adaptive windowing (cost-efficiency). The multi-part query ('compare', 'home vs away', 'across decades') signals high complexity, justifying 10-12 documents over a fixed 5. Option A causes context bloat and hallucinations. Option C misses the value of adaptive patterns. Option D abandons the retrieval advantage that makes RAG valuable for factual, evolving data like cricket statistics."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Large Language Models with RAG pipelines power production systems at massive scale. Google uses similar architectures in Search Generative Experience to augment search results with retrieved context. Netflix employs RAG for personalized content recommendation explanations, processing millions of user queries daily. OpenAI's ChatGPT Plus integrates retrieval systems to handle real-time information needs. Meta's LLaMA-based systems power content moderation and user support at billions of interactions. Uber uses RAG for driver and rider support chatbots processing hundreds of thousands of conversations daily. Airbnb leverages retrieval-augmented generation for multilingual host support across 220+ countries. At scale, failures cascade: slow embedding pipelines cause latency spikes affecting user experience; hallucination from poor context retrieval damages trust; vector database corruption loses customer context permanently. Correctness, speed, and reliability become non-negotiable when serving millions of concurrent users.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your RAG system is like a captain analyzing past matches (embedded knowledge) before deciding strategy. The retriever is the scout who finds relevant match footage (documents) in seconds. The LLM is the strategist who synthesizes that intel into a winning play. At a T20 tournament with matches every day, any slowdown in scouting or strategy costs runs. Scale to 1 million simultaneous captains making decisions, and your playbook infrastructure must be bulletproof.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Production RAG systems require rigorous monitoring. Track retrieval precision (are top-K results actually relevant?), embedding drift (do older vs. newer embeddings cluster differently?), and hallucination rates (does the LLM invent facts when context is weak?). A single corrupted embedding can degrade performance across thousands of queries. Always version your embeddings model separately from your LLM.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG combines retrieval and generation to ground LLM responses in factual, up-to-date information sources.",
+        "Embedding quality directly impacts retrieval precision; choose domain-specific models over generic ones for specialized tasks.",
+        "Conversation state management (memory) enables multi-turn dialogue; truncate or summarize to prevent context window overflow.",
+        "Production systems require monitoring for latency, hallucination rates, and embedding drift across millions of queries.",
+        "Reranking retrieved documents dramatically improves answer quality at marginal computational cost.",
+        "Vector databases (Pinecone, Weaviate, Chroma) abstract complexity; always benchmark HNSW indexing for your data scale.",
+        "Hybrid search combining BM25 keyword matching with semantic similarity outperforms pure vector search on real-world datasets."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG chatbot for cricket match analysis serving 100K concurrent users. Your vector database latency spiked from 15ms to 200ms. What's the most likely cause?",
+      "items": [
+        "The LLM is too large and running out of VRAM",
+        "HNSW index became corrupted; your vector dimension changed between batches",
+        "Your embedding model was silently swapped to a different one without reindexing",
+        "Users asked too many questions about fast bowlers (popular queries)"
+      ],
+      "answer": 2,
+      "explanation": "Dimension mismatch or model swap causes the vector database to perform poorly during similarity search without obvious errors. Option B (corruption) would typically fail outright. Option A affects LLM latency, not retrieval. Option D is a myth—vector DBs handle uneven query distributions. Always version your embedding model and trigger full reindexing on changes.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of the core concepts and mechanisms you've learned in this lesson. These knowledge checks will help you validate both your conceptual grasp and your ability to apply these techniques to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Quiz 1 — Conceptual Understanding: RAG Embedding Strategy",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a Retrieval-Augmented Generation (RAG) pipeline, why is it critical to use the same embedding model for both ingesting documents during setup and encoding user queries at inference time?",
+      "items": [
+        "Because different embedding models have been trained on different data distributions and learn different vector spaces. Using mismatched models means documents indexed in one space cannot be meaningfully compared to queries encoded in another space, resulting in semantic retrieval failures and irrelevant context being passed to the LLM.",
+        "Because using different embedding models allows the system to retrieve more diverse results and prevents overfitting to a single representation style.",
+        "Because the computational cost of different embedding models is significantly different, and mismatches will cause the system to exceed budget limits.",
+        "Because embedding models must be retrained whenever a new user query is introduced, so consistency is automatically enforced by the framework."
+      ],
+      "answer": 0,
+      "explanation": "The correct answer highlights the fundamental principle that embeddings create a vector space, and consistency across that space is essential for meaningful similarity comparisons. Option B is incorrect because diversity is not the goal of retrieval—relevance is. Option C misses the actual technical reason, conflating cost concerns with the core semantic principle. Option D is false; embedding models don't require retraining for new queries. This is like how a cricket batting average only makes sense when calculated using consistent scoring rules across all matches; if different matches used different point values for runs, the average would be meaningless.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Quiz 2 — Applied Scenario: Debugging a Retrieval Issue",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You've deployed a cricket statistics chatbot using RAG. Users complain that when asking 'Who scored the most runs in the 2023 IPL?', the system retrieves documents about test cricket scoring milestones instead of IPL tournament data. The documents about IPL statistics exist in your knowledge base and are correctly formatted. What is the most likely root cause and how should you diagnose it?",
+      "items": [
+        "The documents were indexed using a general-purpose embedding model, but the system is now querying with a specialized cricket domain embedding model. You should check that both indexing and query encoding use identical embedding models, and verify the embedding model has been trained on cricket-specific corpora if domain precision is needed.",
+        "Your vector database needs to be rebuilt because it's corrupt. You should delete all indexed documents and re-ingest them.",
+        "The retrieval threshold (similarity score cutoff) is set too high, filtering out legitimate matches. You should lower it to retrieve more results regardless of similarity.",
+        "The LLM is intentionally ignoring IPL documents because test cricket is in its training data more prominently. You need to retrain the LLM on IPL-specific content."
+      ],
+      "answer": 0,
+      "explanation": "This is the correct diagnosis because embedding model mismatch is a common but subtle failure mode—the system doesn't error, it just silently retrieves wrong results due to vector space incompatibility. Checking logs to confirm both stages use the same embedding model is the first debugging step. Option B is overly drastic and wouldn't address the root cause if it's a mismatch. Option C is a band-aid that reduces retrieval quality overall rather than fixing the semantic alignment problem. Option D is incorrect because the LLM's training data isn't the issue here; the problem is earlier in the pipeline at the retrieval stage. This mirrors a cricket scenario where your opening batsman (retrieval) plays the wrong type of shot for the conditions—no amount of coaching the bowlers (LLM) will fix that.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

@@ -196,6 +196,196 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production monitoring requires three distinct patterns, each with specific trade-offs. The baseline comparison pattern establishes a reference model's performance metrics before deployment, comparing all new model versions against it—this catches regressions early but requires maintaining infrastructure for the reference model and accepting some false positive alerts. The rolling window pattern continuously recomputes metrics on recent batches (e.g., last 1000 predictions), catching data drift quickly with minimal latency overhead, but may miss gradual degradation in tail distributions and requires careful window-size tuning per domain. The stratified monitoring pattern partitions predictions by demographic segments or input features, computing separate metric cards for each stratum—this surfaces bias and population-specific failures (critical for compliance), but increases computational cost quadratically with segment count and requires frequent recalibration as population distributions shift. Choose baseline comparison for safety-critical models where regression prevention justifies overhead costs; rolling window for high-volume production systems with real-time SLA requirements; stratified monitoring for regulated industries or applications serving diverse populations where fairness metrics matter.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The baseline comparison pattern mirrors maintaining a consistent bowling attack—you have your lead pace bowler (baseline model) and measure every new bowler's performance relative to that proven standard. The rolling window pattern is like tracking your team's form over the last 5 matches rather than the entire series; it tells you if current momentum is healthy but misses long-term weakening. Stratified monitoring resembles analyzing performance splits: how your bowlers perform against left-handers versus right-handers, or your batting average on different pitch types. Just as a captain wouldn't use DRS the same way on every ball (cost and psychology matter), choose your monitoring pattern based on what failures actually hurt—a dropped catch in the 90th over costs a World Cup, so safety-critical moments demand baseline vigilance, while ongoing form tracking uses the rolling window lens.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Monitoring without stratification (misses bias)\nfrom evaluate import load\nfrom sklearn.metrics import accuracy_score\n\n# ❌ BAD: Single global metric hides population-specific failures\naccuracy_metric = load(\"accuracy\")\npredictions = model(test_batch)\nglobal_accuracy = accuracy_metric.compute(\n    predictions=predictions,\n    references=test_labels\n)\nprint(f\"Global accuracy: {global_accuracy['accuracy']:.4f}\")\n# Problem: If model fails on 30% of female users but succeeds overall,\n# this metric won't catch it\n\n\n# BEST PRACTICE: Stratified + baseline comparison\nfrom collections import defaultdict\nimport numpy as np\n\nclass CricketModelMonitor:\n    def __init__(self, baseline_metrics):\n        \"\"\"baseline_metrics: dict of {segment: metric_value}\"\"\"\n        self.baseline = baseline_metrics\n        self.accuracy_metric = load(\"accuracy\")\n        self.regression_threshold = 0.02  # 2% drop triggers alert\n    \n    def monitor_stratified(\n        self,\n        predictions,\n        references,\n        segment_labels  # e.g., \"left_hander\", \"right_hander\"\n    ):\n        \"\"\"✅ GOOD: Compute metrics per segment and compare to baseline\"\"\"\n        segments = set(segment_labels)\n        current_metrics = {}\n        alerts = []\n        \n        for segment in segments:\n            # Filter to this segment (e.g., all left-hand batsmen)\n            mask = np.array(segment_labels) == segment\n            segment_preds = predictions[mask]\n            segment_refs = references[mask]\n            \n            if len(segment_refs) < 10:  # Skip tiny segments\n                continue\n            \n            # Compute segment metric\n            current_metrics[segment] = self.accuracy_metric.compute(\n                predictions=segment_preds,\n                references=segment_refs\n            )[\"accuracy\"]\n            \n            # Compare to baseline\n            baseline_val = self.baseline.get(segment, 0.85)\n            drop = baseline_val - current_metrics[segment]\n            \n            if drop > self.regression_threshold:\n                alerts.append({\n                    \"segment\": segment,\n                    \"baseline\": baseline_val,\n                    \"current\": current_metrics[segment],\n                    \"regression_pct\": drop * 100\n                })\n        \n        return {\n            \"stratified_metrics\": current_metrics,\n            \"alerts\": alerts,\n            \"segments_monitored\": len(segments)\n        }\n\n# Usage\nbaseline = {\"left_hander\": 0.88, \"right_hander\": 0.91}\nmonitor = CricketModelMonitor(baseline)\n\nresult = monitor.monitor_stratified(\n    predictions=model_outputs,\n    references=ground_truth,\n    segment_labels=player_handedness  # \"left_hander\" or \"right_hander\"\n)\n\nif result[\"alerts\"]:\n    print(f\"⚠️  Regression detected in {len(result['alerts'])} segments:\")\n    for alert in result[\"alerts\"]:\n        print(f\"  {alert['segment']}: {alert['regression_pct']:.1f}% drop\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "The anti-pattern computes a single global metric which can hide failures in subpopulations. The best practice uses stratified monitoring with baseline comparison: each segment (left vs right-handed batsmen) gets its own metric card, and performance is compared against a stored baseline to catch regressions. This catches bias and population-specific model degradation that global metrics miss."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is computing metrics on the same data used for training or model selection, then being shocked when production performance differs. You'll see validation accuracy of 94% but real-world accuracy of 72% because you've optimized hyperparameters against that validation set. Fix: Maintain three strictly separate data splits established before any model development—training (used only for gradient updates), validation (used only for hyperparameter tuning and early stopping), and held-out test (touched only once, at the very end for final evaluation). Better yet, use a fourth production monitoring split: fresh data arriving in the real world after deployment, used only for computing ongoing metrics. Never retrain on or tune against this production data; it's sacred for honest evaluation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Baseline comparison catches regressions by comparing new models to a fixed reference, essential for safety-critical applications but adds infrastructure cost",
+        "Rolling window monitoring detects recent degradation with low latency, ideal for high-volume systems but can miss gradual long-term drift",
+        "Stratified monitoring splits metrics by segment (demographic, input feature) to surface bias and population-specific failures required for fairness compliance",
+        "Never evaluate on data touched during hyperparameter tuning; use a held-out test split and a separate production monitoring split",
+        "Trade off monitoring frequency (cost) against drift detection speed based on your SLA and business impact of false negatives vs false positives"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You deploy a cricket match prediction model with 89% accuracy on your test set. In production, it achieves 84% accuracy overall, but when you stratify by match type (T20 vs Test), you find T20 accuracy is 91% while Test accuracy is 76%. What should you do first?",
+      "items": [
+        "Immediately retrain on all production data to capture the new distribution",
+        "Investigate why Test match predictions fail so badly—this is a segment-specific failure that global metrics masked; consider a separate Test-specific model or rebalancing training data",
+        "Accept the 5% overall drop as normal variance and keep the single model deployed",
+        "Switch to a simpler baseline model that doesn't overfit to T20s"
+      ],
+      "answer": 1,
+      "explanation": "Stratified monitoring revealed that global accuracy hides a critical failure mode: 76% accuracy on Test cricket is unacceptable even if it's offset by strong T20 performance. This is exactly why stratified monitoring matters—global metrics would never show you this. The right move is segment-specific investigation and either a dedicated Test model or rebalancing training data toward Test examples. Retraining on production data (option A) violates the principle of keeping evaluation data sacred. Option C ignores a real problem, and option D oversimplifies the diagnosis."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At scale, model monitoring and evaluation underpins production systems serving billions of users. Google's Search quality team continuously monitors BERT-based ranking models across trillions of queries, detecting distribution shift within hours using holdout validation sets. Netflix uses HuggingFace Transformers for content recommendation ranking and tracks recommendation diversity and click-through rate degradation in real-time dashboards. OpenAI monitors GPT model outputs for toxicity and factuality drift across different user demographics and prompt distributions using custom evaluation metrics. Meta's content moderation systems evaluate transformer models on millions of posts daily, comparing F1 scores and false positive rates across regions to catch regional bias drift. Uber uses transformer-based NLP for driver communication safety—when evaluation metrics show increased safety concern flagging, they trigger retraining pipelines. Airbnb monitors review classification models hourly; when AUC drops below threshold on geographic slices, automated alerts trigger investigation. When done wrong, evaluation failures cost millions: poor validation splits led to Microsoft's Tay chatbot failures, Netflix lost recommendation revenue from undetected concept drift, and Google search ranking bugs from unmonitored metric decay affected billions of users. Production systems typically operate at 100k-10M predictions daily, requiring sub-second metric computation and automated retraining triggers.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your model is the opening batsman (opening_batter). Evaluation metrics are the scoreboard—runs (accuracy), wickets (precision), overs (latency). Production monitoring is like the commentary team watching every ball: they track batting average drift (data drift), compare current performance to season averages (benchmarks), and alert when form suddenly drops below expected bounds (distribution shift). When your opening batter's average drops from 50 to 20 runs, you investigate immediately—same with model performance. Validation splits are practice matches before the real tournament. The Evaluate library is your statistics team, computing metrics the same way every time, ensuring fairness across matches.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production monitoring pattern: Cricket player performance tracker\nfrom evaluate import load\nimport json\nfrom datetime import datetime, timedelta\n\nclass CricketModelMonitor:\n    \"\"\"Monitor model performance like tracking opening batter form.\"\"\"\n    \n    def __init__(self, model_name: str):\n        self.model_name = model_name\n        self.accuracy_metric = load('accuracy')\n        self.f1_metric = load('f1')\n        self.performance_history = []\n        self.baseline_performance = None\n        \n    def log_batch_performance(self, opening_batter_preds, opening_batter_refs, \n                             timestamp=None):\n        \"\"\"Log predictions like recording each match's stats.\"\"\"\n        if timestamp is None:\n            timestamp = datetime.now()\n            \n        accuracy = self.accuracy_metric.compute(\n            predictions=opening_batter_preds,\n            references=opening_batter_refs\n        )['accuracy']\n        \n        f1 = self.f1_metric.compute(\n            predictions=opening_batter_preds,\n            references=opening_batter_refs,\n            average='weighted'\n        )['f1']\n        \n        record = {\n            'timestamp': timestamp.isoformat(),\n            'accuracy': accuracy,\n            'f1_score': f1,\n            'batch_size': len(opening_batter_refs)\n        }\n        \n        self.performance_history.append(record)\n        return record\n    \n    def set_baseline(self, validation_accuracy: float, validation_f1: float):\n        \"\"\"Set season average expectations.\"\"\"\n        self.baseline_performance = {\n            'accuracy': validation_accuracy,\n            'f1': validation_f1\n        }\n    \n    def detect_performance_drift(self, alert_threshold_drop: float = 0.05):\n        \"\"\"Alert when opening batter form drops significantly.\"\"\"\n        if not self.baseline_performance or len(self.performance_history) < 2:\n            return None\n            \n        recent_avg_accuracy = sum(\n            r['accuracy'] for r in self.performance_history[-10:]\n        ) / min(10, len(self.performance_history))\n        \n        baseline_acc = self.baseline_performance['accuracy']\n        drift = baseline_acc - recent_avg_accuracy\n        \n        if drift > alert_threshold_drop:\n            return {\n                'alert': True,\n                'drift_magnitude': drift,\n                'baseline': baseline_acc,\n                'current': recent_avg_accuracy,\n                'action': 'TRIGGER_RETRAINING'\n            }\n        return {'alert': False, 'drift_magnitude': drift}\n    \n    def compute_fairness_across_regions(self, preds_by_region, refs_by_region):\n        \"\"\"Monitor performance across geographic regions (like different cricket boards).\"\"\"\n        regional_performance = {}\n        for region, preds in preds_by_region.items():\n            refs = refs_by_region[region]\n            acc = self.accuracy_metric.compute(\n                predictions=preds,\n                references=refs\n            )['accuracy']\n            regional_performance[region] = acc\n        \n        # Check for fairness violations\n        if regional_performance:\n            max_acc = max(regional_performance.values())\n            min_acc = min(regional_performance.values())\n            fairness_gap = max_acc - min_acc\n            \n            return {\n                'by_region': regional_performance,\n                'fairness_gap': fairness_gap,\n                'pass_fairness': fairness_gap < 0.10\n            }\n\n# Usage: monitor_opening_batter\nmonitor = CricketModelMonitor('opening_batter_classifier')\nmonitor.set_baseline(validation_accuracy=0.92, validation_f1=0.89)\n\n# Simulate production batches over time\nimport random\nfor hour in range(24):\n    # Simulate gradual performance drift after 18 hours\n    if hour >= 18:\n        noise = random.uniform(-0.08, -0.02)  # Negative drift\n    else:\n        noise = random.uniform(-0.02, 0.02)\n    \n    preds = [random.choice([0, 1]) for _ in range(100)]\n    refs = [random.choice([0, 1]) for _ in range(100)]\n    \n    record = monitor.log_batch_performance(preds, refs)\n    drift_status = monitor.detect_performance_drift()\n    \n    if drift_status['alert']:\n        print(f\"🚨 Hour {hour}: DRIFT ALERT\")\n        print(f\"   Baseline: {drift_status['baseline']:.3f}\")\n        print(f\"   Current: {drift_status['current']:.3f}\")\n        print(f\"   Action: {drift_status['action']}\")\n\nprint(\"\\n📊 Final Performance Log:\")\nfor entry in monitor.performance_history[-3:]:\n    print(f\"  {entry['timestamp']}: Acc={entry['accuracy']:.3f}, F1={entry['f1_score']:.3f}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: In production, real-time metric computation at scale requires careful infrastructure choices. Computing metrics on every prediction (like tracking every ball in cricket) is expensive—batch computation every hour/day is standard. However, delays in detecting drift can cost revenue: Netflix's undetected recommendation decay cost millions, Google's search ranking bugs persisted for days. Use streaming metric libraries (Apache Flink, Kafka) for low-latency detection. Never validate only on aggregated metrics—always slice by user segment, geography, and demographic group (like comparing batter performance across different pitch conditions and opponents). Monitoring only overall accuracy while regional fairness degrades silently is how discrimination bugs enter production systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Production model monitoring is continuous—track opening batter form daily, alert on drift exceeding baseline by >5% to trigger retraining pipelines.",
+        "Evaluation metrics must be computed identically in validation and production—use Evaluate library everywhere to prevent silent metric computation bugs.",
+        "Data drift and distribution shift detection requires slicing performance by demographic group, geography, and user segment—global accuracy masks regional fairness failures.",
+        "Benchmark datasets establish baseline expectations; validation splits simulate production data; test sets measure final generalization—never reuse test data for tuning.",
+        "Real-world systems at scale (Google, Netflix, OpenAI) detect metric degradation within hours using automated dashboards and trigger retraining when thresholds breach.",
+        "Common production failures: undetected distribution shift (Netflix), validation data leakage (Tay chatbot), lack of fairness monitoring (regional bias), delayed metric computation (search ranking bugs).",
+        "Under the hood, metric computation involves careful batching for efficiency, stratified sampling for representation, and statistical significance testing to distinguish drift from noise."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of model monitoring and evaluation with these two quizzes. The first focuses on core concepts and mechanisms, while the second presents a real-world scenario where you must apply your knowledge to make decisions about model performance tracking.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're monitoring a sentiment classification model deployed on cricket match commentary. After 3 months, you notice that F1-score remains at 0.92, but the model's performance on recent match data drops significantly. When you investigate, you find that the distribution of input text length has shifted—recent commentary is much longer due to expanded coverage. What is this phenomenon called, and what should be your primary diagnostic step?",
+      "items": [
+        "Data drift (covariate shift); use a statistical test like Kolmogorov-Smirnov to quantify the distribution shift in feature space",
+        "Model degradation; immediately retrain the model on the most recent 1000 samples",
+        "Concept drift; lower the confidence threshold for predictions to catch more positives",
+        "Overfitting on validation data; increase regularization strength and retrain on all historical data"
+      ],
+      "answer": 0,
+      "explanation": "This is a classic example of data drift or covariate shift, where the distribution of input features has changed while the target labels' relationship to features remains similar. The statistical distribution of text length (a feature) has shifted, which is distinct from concept drift where the decision boundary itself changes. The correct diagnostic approach is to use statistical tests like Kolmogorov-Smirnov (KS test) or Population Stability Index (PSI) to quantify the shift magnitude. Option 1 is correct because it identifies both the phenomenon and the proper diagnostic method. Option 2 (immediate retraining) is premature without diagnosis. Option 3 (concept drift and threshold adjustment) misidentifies the problem—lowering thresholds doesn't address distribution shifts. Option 4 confuses this with overfitting, which wouldn't explain a sudden performance drop on newer data when older validation metrics were stable."
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket scorecard prediction model uses the Evaluate library to compute BLEU, ROUGE-L, and custom_batting_accuracy metrics on a validation split of 5000 match innings. BLEU drops from 0.78 to 0.65 over two consecutive evaluation runs without any code changes. ROUGE-L and custom_batting_accuracy remain stable at 0.88 and 0.91. What is the most likely explanation, and what is your next action?",
+      "items": [
+        "BLEU is sensitive to minor variations in tokenization and reference text formatting; check if your reference data or preprocessing pipeline changed, and verify metric computation by manually inspecting 10-20 predictions",
+        "The model has degraded due to concept drift; immediately roll back to the previous model checkpoint and investigate the training data for label noise",
+        "BLEU is not a reliable metric for scorecard prediction; remove it from your evaluation suite and rely only on ROUGE-L and custom_batting_accuracy",
+        "Your validation split is too small; increase it to 10000 samples and recompute all metrics to ensure statistical stability"
+      ],
+      "answer": 0,
+      "explanation": "BLEU score is notoriously sensitive to preprocessing details, tokenization strategies, reference text formatting, and minor variations in generated text that don't affect semantic meaning. Because ROUGE-L and your custom metric remain stable, this points to an issue with BLEU computation or input/reference data handling rather than true model degradation. The correct response is to investigate preprocessing changes and manually validate a sample of predictions before taking action. Option 1 is correct because it identifies BLEU's sensitivity and proposes systematic diagnosis. Option 2 incorrectly assumes model degradation when other metrics contradict this. Option 3 is wrong because BLEU shouldn't be abandoned—it needs investigation, not removal. Option 4 addresses sample size but ignores the real issue; the problem isn't statistical instability from small samples (5000 is adequate) but rather metric computation sensitivity. Always debug metrics before assuming model problems."
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "items": [
+        "Data drift and concept drift are distinct phenomena requiring different diagnostic approaches; use statistical tests like KS test or PSI to detect and quantify distribution shifts",
+        "Individual metrics can be sensitive to preprocessing, tokenization, and data format changes independent of actual model performance; always validate by inspecting predictions manually",
+        "Benchmark datasets and validation splits should be representative of deployment data; monitor performance separately on stratified subsets to detect performance degradation in specific domains or conditions",
+        "Use the Evaluate library systematically to compute multiple complementary metrics; when one metric changes unexpectedly while others remain stable, investigate that metric's sensitivity rather than assuming model degradation"
+      ],
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
     }
   ]
 }

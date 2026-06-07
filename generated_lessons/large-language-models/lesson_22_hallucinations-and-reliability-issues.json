@@ -205,6 +205,187 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns have emerged for managing hallucination risk: (1) **RAG-First Pattern** — retrieve grounded context before generation, optimal for domain-specific applications where ground truth exists (medical, legal, financial). Trade-off: 15-40% latency increase, higher infrastructure cost, but 60-85% reduction in factual hallucinations. (2) **Confidence Scoring with Fallback** — use model uncertainty estimates to route low-confidence queries to human review or simpler rule-based systems. Trade-off: requires calibrated probability outputs (not all models provide), adds complexity but preserves speed for high-confidence cases. (3) **Multi-Agent Verification** — run multiple model instances with different prompts/temperatures, aggregate outputs via voting or consistency checks. Trade-off: 3-5x compute cost, but achieves enterprise-grade reliability (95%+ accuracy on factual claims) for critical applications. Choose RAG for knowledge-intensive tasks, confidence routing for risk-sensitive low-volume queries, multi-agent verification only when cost of errors exceeds compute expense.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: RAG-First is like field placement before a delivery—you gather intelligence (scout the batter, read conditions) before committing resources, reducing surprise outcomes. Confidence Scoring mirrors DRS usage strategy: you only challenge marginal LBW decisions (low-confidence cases) and accept obvious ones, preserving reviews for when uncertainty is highest. Multi-Agent Verification resembles using multiple bowling rotations across an innings—if fast bowlers, spinners, and medium-pacers all beat the batter the same way, you trust the pattern; disagreement signals uncertainty. The RAG approach favors preparation (slower, safer), confidence routing favors efficiency (quick decisions on clear-cut situations), while multi-agent mirrors a captain's caution in crucial moments—each pattern trades speed, cost, and reliability differently based on match stakes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Trusting model output directly without grounding\nclass BatterAnalyzer_Unreliable:\n    def predict_weakness(self, batter_name):\n        prompt = f\"What is {batter_name}'s weakness?\"\n        response = llm.generate(prompt)  # Hallucination risk: 35-50%\n        return response\n\n# BEST PRACTICE 1: RAG-First with document retrieval\nclass BatterAnalyzer_RAG:\n    def predict_weakness(self, batter_name):\n        stats_doc = knowledge_base.retrieve(f\"stats:{batter_name}\", top_k=3)\n        match_history = knowledge_base.retrieve(f\"matches:{batter_name}\", top_k=5)\n        context = f\"Recent stats:\\n{stats_doc}\\nMatch history:\\n{match_history}\"\n        prompt = f\"Given this data, what is {batter_name}'s weakness?\\n{context}\"\n        response = llm.generate(prompt)  # Hallucination risk: 5-15%\n        return response\n\n# BEST PRACTICE 2: Confidence Scoring with fallback\nclass BatterAnalyzer_Confident:\n    def predict_weakness(self, batter_name):\n        prompt = f\"What is {batter_name}'s weakness?\"\n        response, confidence = llm.generate_with_confidence(prompt)\n        if confidence < 0.7:  # Threshold tuned for domain\n            return self._fallback_rule_based(batter_name)\n        return response\n    \n    def _fallback_rule_based(self, batter_name):\n        stats = database.query(f\"SELECT * FROM players WHERE name='{batter_name}'\")\n        if stats['avg_vs_spin'] < stats['avg_vs_pace']:\n            return \"Vulnerable to spin bowling\"\n        return \"Requires human expert review\"\n\n# BEST PRACTICE 3: Multi-Agent Verification\nclass BatterAnalyzer_Verified:\n    def predict_weakness(self, batter_name):\n        responses = []\n        for i in range(3):  # Run 3 instances with different temps\n            prompt = f\"What is {batter_name}'s primary weakness?\"\n            resp = llm.generate(prompt, temperature=0.3 + i*0.2)\n            responses.append(resp)\n        \n        agreement_score = self._measure_agreement(responses)\n        if agreement_score > 0.75:\n            return responses[0]  # High confidence\n        return f\"Conflicting assessments: {responses} - Escalate to coach\"\n    \n    def _measure_agreement(self, responses):\n        # Embeddings-based semantic similarity\n        embeddings = [embed(r) for r in responses]\n        return sum(cosine_similarity(embeddings[0], e) for e in embeddings[1:]) / 2",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is deploying RAG systems without validating retrieval quality—assuming that because context is present, hallucinations vanish. In reality, if your knowledge base contains outdated statistics (e.g., 2-year-old match data), the model will confidently generate false insights from stale context. **How to fix it:** (1) Implement retrieval evaluation separately—measure precision/recall of your document retrieval independently (target: >85% precision for top-k=3). (2) Add a metadata freshness filter: only retrieve documents updated within N days (e.g., stats updated this season). (3) A/B test with annotated factual claims—have a domain expert (cricket analyst) verify 50-100 model outputs monthly and track hallucination rate trending. Without this, you're replacing obvious hallucinations with subtle, harder-to-detect ones rooted in outdated grounding.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "RAG-First minimizes hallucination by grounding generation in retrieved facts; optimal for knowledge-heavy domains but adds latency and infrastructure cost.",
+        "Confidence Scoring routes uncertain cases to humans or fallbacks, preserving speed for high-confidence queries; requires well-calibrated uncertainty estimates.",
+        "Multi-Agent Verification achieves near-enterprise reliability via consensus but multiplies compute costs by 3-5x; use only when error cost justifies expense.",
+        "Pattern selection depends on domain (medical/legal favor RAG), query volume (high-volume favor routing), and error tolerance (critical systems use verification).",
+        "Validation is critical: measure retrieval quality, monitor freshness, and continuously audit model outputs with domain experts to detect degradation."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a system to recommend bowling strategies for upcoming matches. Your dataset has match recordings from the past 18 months, but some player form data is 8 months old. Which pattern is most appropriate and why?",
+      "items": [
+        "Multi-Agent Verification—use consensus across models to overcome data staleness.",
+        "RAG-First with freshness filtering—retrieve only recent match data (last 6 months) to ensure recommendations reflect current form.",
+        "Confidence Scoring alone—let the model decide what data is relevant.",
+        "No structured pattern needed—LLMs handle temporal reasoning automatically."
+      ],
+      "answer": 1,
+      "explanation": "RAG-First with freshness filtering is correct because it combines grounding (preventing hallucination) with temporal awareness. By filtering retrievals to recent matches, you avoid feeding the model stale player-form data that would lead to outdated and false strategic recommendations. Multi-Agent Verification doesn't address the staleness problem (3 models trained on old data still produce old recommendations). Confidence Scoring alone won't fix outdated inputs. LLMs do not reliably handle temporal reasoning without explicit guidance, making this a data quality problem requiring architectural intervention at the retrieval layer."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At production scale, hallucinations cause millions in costs and reputation damage. Google's AI Overview feature faced backlash when it hallucinated dangerous advice (e.g., 'eat rocks for calcium'), affecting billions of search users. OpenAI implements RAG pipelines across ChatGPT Plus and enterprise APIs, reducing hallucinations by 40-60% in financial and medical domains. Netflix uses LLMs for recommendation explanations with strict fact-checking against their metadata store—hallucinated show descriptions damage user trust. Uber's trip summarization system failed initially when it hallucinated driver behaviors, necessitating retrieval against trip logs. Meta deployed constitutional AI methods across Llama models, reducing harmful hallucinations by requiring retrieved context validation. Airbnb's listing descriptions require grounding in actual property data. When done wrong: customer service chatbots give false pricing, medical systems recommend non-existent treatments, legal AI cites fabricated cases, and enterprise search returns misleading answers. These failures trigger regulatory scrutiny, lawsuits, and user churn at scale of millions daily.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A batsman (LLM) must hit runs only within the fielded ground (training data). When the batsman invents new shots and claims they're legal—that's hallucination. RAG is like a fielding coach (retriever) who whispers the exact ground rules before each delivery, ensuring the batsman stays within bounds. Without coaching, even brilliant batsmen invent fouls.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Production systems must never rely on LLM outputs alone for facts in regulated domains (healthcare, finance, law). Always implement RAG + human review pipelines. A single hallucinated medical diagnosis or legal citation can trigger compliance violations and lawsuits. Test hallucination rates before deployment; aim for <2% in mission-critical systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Hallucinations occur when LLMs generate plausible but false information without grounding in training data.",
+        "Intrinsic hallucinations contradict facts; extrinsic ones introduce information beyond training scope.",
+        "RAG systems reduce hallucinations 40-60% by retrieving verified sources before generation.",
+        "Production failures in healthcare, finance, and legal domains cost millions; require human-in-loop validation.",
+        "Detect hallucinations via consistency checks, semantic similarity, and entailment models; no single method is perfect.",
+        "Major platforms (Google, OpenAI, Meta, Netflix) implement constitutional AI and retrieval pipelines to mitigate risks.",
+        "Always test hallucination rates and use confidence scoring; never deploy without fallback to trusted data sources."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Which of the following is the BEST mitigation strategy for hallucinations in a customer-facing product at scale?",
+      "items": [
+        "Use a larger model; bigger models hallucinate less",
+        "Implement RAG with retrieval from verified knowledge bases and add human review for edge cases",
+        "Fine-tune on curated data to prevent all hallucinations",
+        "Disable the model's ability to generate novel text"
+      ],
+      "answer": 1,
+      "explanation": "While larger models help somewhat, RAG with retrieval + human review is the industry standard at scale (Google, OpenAI, Uber, Netflix). It grounds outputs in facts and catches failures. Fine-tuning alone doesn't prevent hallucinations, and disabling novel text removes utility.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of hallucinations and reliability in LLMs with these two knowledge checks. The first focuses on the core mechanisms you've learned; the second applies those concepts to real-world decision-making scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket analyst is using an LLM to retrieve historical statistics about a batsman's performance against fast bowlers. The model generates a specific average of 52.3 runs per match from 2015–2018, but this statistic was never actually recorded in any official cricket database. What type of hallucination has occurred, and what is the PRIMARY mechanism behind it?",
+      "items": [
+        "Intrinsic hallucination caused by the model's internal knowledge decay and lack of grounding in factual sources",
+        "Extrinsic hallucination because the model failed to retrieve the correct document from its RAG system",
+        "A parametric hallucination resulting from the batsman's name being tokenized incorrectly",
+        "A calibration error due to the analyst asking the question in an ambiguous way"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is A: Intrinsic hallucination caused by knowledge decay and lack of grounding. This scenario describes an intrinsic hallucination because the model generates plausible-sounding but completely fabricated statistics from its internal parameters, without relying on external retrieval. The model has no grounded facts to fall back on, so it produces a hallucination based on patterns it learned during training. Option B is incorrect because no RAG system was mentioned as being used—this is purely a parametric generation problem. Option C is wrong because tokenization errors would produce nonsensical text or missing information, not coherent false statistics. Option D misattributes the cause to the question format rather than the model's internal inability to distinguish fact from plausible fiction."
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket team's performance analytics platform uses an LLM to answer questions like 'What is our all-rounder's career batting average against spin bowlers?' You notice the system occasionally generates statistics that sound accurate but cannot be verified. You have access to a database of all match records and can implement RAG. Given that some questions require real-time match data and others ask about historical patterns, which mitigation strategy would BEST reduce hallucinations while maintaining system responsiveness?",
+      "items": [
+        "Implement RAG for all queries without exception, accepting latency increases as a necessary trade-off for perfect accuracy",
+        "Use RAG selectively: route factual queries about historical statistics to the RAG system, and allow free-form pattern analysis questions to use the LLM alone",
+        "Disable the LLM entirely and replace it with a rule-based system that only returns pre-computed statistics from the database",
+        "Implement confidence scoring and ask the user to manually verify all outputs before accepting them as reliable"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B: Use RAG selectively by routing factual queries to RAG while allowing pattern analysis to use the LLM alone. This balances accuracy, speed, and utility. Factual questions about historical statistics are high-risk for hallucinations and must be grounded in retrieved documents, making RAG essential for those queries. Pattern-finding and analytical questions that don't require exact facts can leverage the LLM's reasoning without the latency penalty of full RAG. Option A is overly rigid—applying RAG to every query wastes computational resources on questions that don't require grounding and introduces unnecessary latency. Option C eliminates the LLM's valuable capability for analysis and nuanced interpretation, reducing platform usefulness. Option D (confidence scoring + manual verification) is a weak mitigation that shifts the burden to users and doesn't actually prevent hallucinations; the model may be confident about false facts, and users cannot always verify complex claims."
     }
   ]
 }

@@ -197,6 +197,169 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production fine-tuning workflows, three dominant patterns emerge based on computational constraints and task complexity. Full fine-tuning remains the gold standard when you have substantial GPU memory (24GB+) and a large, high-quality dataset (10k+ examples); it delivers superior task performance but incurs significant infrastructure costs and longer training cycles. LoRA (Low-Rank Adaptation) is the pragmatic middle ground for most teams—it consumes 90% less VRAM while retaining 95%+ of full fine-tuning quality, making it ideal for resource-constrained environments and rapid experimentation across multiple task variants. Prompt engineering with in-context learning trades off training cost entirely (zero GPU time) against inference latency and context window limitations—use this pattern exclusively when you have <1000 examples or need immediate deployment without retraining. The cost-benefit calculation shifts with scale: at 100 examples, prompt engineering dominates; at 10k examples, LoRA becomes optimal; at 100k examples, full fine-tuning's superior convergence justifies the expense. Multi-task fine-tuning (training on 3-5 related tasks simultaneously) improves generalization by 12-18% but requires careful task weighting and longer convergence times. Catastrophic forgetting mitigation through elastic weight consolidation (EWC) or continual learning approaches becomes essential when fine-tuning sequentially on new domains.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Full fine-tuning is like preparing your entire squad with custom training regimens for a specific opponent—expensive in time and resources, but maximizes performance when you have deep knowledge of the match conditions. LoRA is analogous to targeted bowling rotation and field placement adjustments—you're not replacing your entire team, just optimizing key positions and strategies with minimal disruption to your base gameplan. Prompt engineering mirrors reading the pitch and adjusting your batting approach without formal coaching—quick to execute and works well for familiar conditions, but has limits when facing genuinely novel challenges. Multi-task fine-tuning is like training your team to excel in both Test and ODI formats simultaneously; it builds adaptability but requires balancing contradictory demands. Catastrophic forgetting prevention resembles maintaining muscle memory from previous seasons while learning new techniques—you need deliberate strategies (like EWC) to retain old skills while acquiring new ones, otherwise you lose your foundation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: LoRA fine-tuning with strategic hyperparameter tuning\nfrom peft import LoraConfig, get_peft_model\nimport torch\n\nclass MatchSpecificTuner:\n    def __init__(self, base_model, task_name=\"cricket_commentary\"):\n        self.base_model = base_model\n        \n        # LoRA config optimized for domain-specific tasks\n        self.lora_config = LoraConfig(\n            r=16,  # Low rank for efficiency\n            lora_alpha=32,\n            target_modules=[\"q_proj\", \"v_proj\"],  # Focus on attention layers\n            lora_dropout=0.05,\n            bias=\"none\",\n            task_type=\"CAUSAL_LM\"\n        )\n        self.model = get_peft_model(base_model, self.lora_config)\n        self.optimizer = torch.optim.AdamW(\n            self.model.parameters(), \n            lr=5e-4,  # Conservative learning rate\n            weight_decay=0.01\n        )\n    \n    def train_step(self, batch_innings, labels):\n        outputs = self.model(batch_innings, labels=labels)\n        loss = outputs.loss\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)\n        self.optimizer.step()\n        return loss.item()\n\n# ANTI-PATTERN: Naive full fine-tuning without regularization\nclass NaiveFullTuner:\n    def __init__(self, base_model):\n        # WARNING: This approach causes catastrophic forgetting\n        self.model = base_model\n        self.optimizer = torch.optim.SGD(\n            self.model.parameters(), \n            lr=0.1  # Far too aggressive\n        )\n    \n    def train_step(self, batch_innings, labels):\n        outputs = self.model(batch_innings, labels=labels)\n        loss = outputs.loss\n        loss.backward()\n        # No gradient clipping = unstable training\n        self.optimizer.step()\n        return loss.item()\n\n# Best practice usage\ntuner = MatchSpecificTuner(model)\nfor epoch in range(3):\n    for batch in cricket_training_data:\n        loss = tuner.train_step(batch['input_ids'], batch['labels'])\n        print(f\"Training loss: {loss:.4f}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Learning rate mismatch is the #1 beginner mistake in fine-tuning. Many practitioners apply pre-training learning rates (1e-4 to 5e-5) to fine-tuning, causing either imperceptible updates or catastrophic forgetting. FIX: Use 5x higher learning rates for full fine-tuning (5e-5 to 2e-4) and 10x higher for LoRA (5e-4 to 2e-3). Always implement learning rate warmup (500-1000 steps) and use gradient clipping (max_norm=1.0) with validation loss monitoring every 100 steps. If validation loss increases for 3 consecutive checkpoints, reduce learning rate by 50% immediately.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Full fine-tuning dominates at 100k+ examples; LoRA optimal at 1k-50k examples; prompt engineering best for <1k examples",
+        "LoRA reduces VRAM by 90% while preserving 95%+ quality through low-rank weight updates to attention layers",
+        "Learning rates for fine-tuning must be 5-10x higher than pre-training rates; use warmup and gradient clipping religiously",
+        "Catastrophic forgetting occurs when updating all parameters without regularization; mitigate with EWC or frozen base layers",
+        "Multi-task fine-tuning improves generalization 12-18% but requires careful task weighting and longer training",
+        "Validate on held-out domain data every 100 steps to detect overfitting and learning rate instability early"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You have 5,000 labeled cricket commentary examples and 1 GPU with 16GB VRAM. Your base model is 7B parameters. Which fine-tuning pattern should you choose?",
+      "items": [
+        "Full fine-tuning—maximum performance justifies the cost",
+        "LoRA with r=16—optimal balance of efficiency and quality for this data size and hardware",
+        "Prompt engineering—5,000 examples is too few to fine-tune",
+        "Distributed full fine-tuning across multiple GPUs"
+      ],
+      "answer": 1,
+      "explanation": "At 5,000 examples with 16GB VRAM, LoRA is the optimal choice. Full fine-tuning would require 24GB+ VRAM and isn't necessary since you have a moderate dataset size. Prompt engineering is viable but throws away the supervised data advantage. LoRA r=16 with target_modules=[q_proj, v_proj] will fit comfortably in 16GB while capturing 95%+ of full fine-tuning quality. This is the production standard for resource-constrained domain adaptation."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Fine-tuning language models powers production systems across major tech companies at massive scale. Google uses fine-tuned models for search ranking and Gmail smart reply, processing billions of queries daily. OpenAI fine-tunes GPT models for enterprise clients through their API, enabling custom chatbots and domain-specific reasoning. Meta deploys fine-tuned LLaMA variants for content moderation across Facebook and Instagram's 3+ billion users. Netflix fine-tunes models for personalized recommendation explanations, while Uber uses them for customer support automation across 70+ countries. When done poorly, fine-tuning causes catastrophic failures: poor data quality leads to biased outputs, inadequate alignment causes harmful responses, and overfitting breaks generalization on out-of-distribution queries. Companies using frameworks like Hugging Face Transformers, PyTorch Lightning, and Ray Tune report 40-70% reduction in inference costs and 2-3x faster model adaptation cycles. At scale (100M+ parameters), memory management and distributed training become critical—Meta's approach uses FSDP (Fully Sharded Data Parallel) to fine-tune 70B models efficiently.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A base LLM is like a world-class batsman with proven fundamentals. Fine-tuning for a specific task is like coaching that batsman to master a particular format—ODI vs Test vs T20. Google's search fine-tuning is like coaching for aggressive T20 batting (speed, ranking signals), while OpenAI's enterprise fine-tuning is like Test cricket coaching (patience, depth, nuance). Poor data quality is like practicing against bowling machines with worn-out balls—you develop bad muscle memory. Netflix's explanation fine-tuning is like a batsman learning to call their own shots confidently without a coach.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Fine-tuning adapts pre-trained models to specific tasks with targeted data, reducing training time and computational costs significantly.",
+        "Parameter-Efficient Fine-Tuning (LoRA, QLoRA) enables tuning billion-parameter models on consumer GPUs without full model retraining.",
+        "Data quality, curation, and alignment are more critical than dataset size—100 high-quality examples beat 10K noisy ones.",
+        "Instruction fine-tuning and RLHF alignment prevent harmful outputs and improve user satisfaction across production systems.",
+        "Cold start problems require careful initialization, mixture-of-experts approaches, and incremental data labeling for new domains.",
+        "Production fine-tuning at scale demands distributed training frameworks, monitoring for drift, and continuous evaluation protocols.",
+        "Common failures include overfitting to narrow training distributions, catastrophic forgetting of base knowledge, and inadequate safety alignment."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of fine-tuning language models with these two quizzes. The first focuses on core concepts and mechanisms, while the second presents a real-world scenario where you must apply your knowledge to make practical decisions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You are fine-tuning a base LLM on cricket commentary data. During training, you notice the loss decreases steadily for 100 steps, then plateaus completely. The model's validation accuracy on new commentary hasn't improved in 50 steps. Which of the following best explains this behavior and what should you do?",
+      "items": [
+        "The model has reached optimal convergence. Stop training immediately to avoid overfitting and deploy the model to production.",
+        "The learning rate is too high, causing the optimizer to oscillate around the minimum. Reduce the learning rate and resume training, or implement learning rate scheduling.",
+        "Parameter-efficient fine-tuning methods like LoRA are interfering with gradient flow. Switch to full fine-tuning of all model weights.",
+        "The training data is exhausted and you need to collect 10x more cricket commentary examples before any further progress is possible."
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. A plateauing loss combined with no validation improvement after 50 steps indicates the optimizer is stuck, likely due to an inappropriately high learning rate or the learning rate schedule not adapting well to the current phase of training. Reducing the learning rate or implementing decay strategies (cosine annealing, step decay) allows finer adjustments in parameter space. Answer A is incorrect because deployment without validation improvement risks poor performance on unseen data. Answer C misunderstands PEFT—LoRA actually preserves gradient flow through the rank decomposition. Answer D is premature; plateauing can be resolved with hyperparameter tuning before collecting more data. The key insight from 'How It Works Under the Hood' is that optimization dynamics matter critically in fine-tuning.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your team wants to fine-tune a 7B parameter LLM to predict cricket match outcomes based on pre-match statistics and player form. You have only 500 labeled examples (innings-level predictions). The model will be deployed internally for coaching staff. Which approach is most appropriate?",
+      "items": [
+        "Perform full fine-tuning on all 7B parameters using data augmentation to generate 50,000 synthetic examples from your 500 real examples.",
+        "Apply Parameter-Efficient Fine-Tuning (LoRA or prefix tuning) with careful data quality curation, validation splits, and early stopping to prevent overfitting on your limited real dataset.",
+        "Skip fine-tuning entirely and use the base model with in-context learning by providing match examples in the prompt, since 500 examples is too few.",
+        "Collect another 10,000 labeled examples before attempting any fine-tuning, as deep learning requires orders of magnitude more data."
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. With only 500 real examples, PEFT methods like LoRA are ideal because they: (1) require fewer examples to avoid catastrophic forgetting, (2) are computationally efficient, (3) reduce overfitting risk compared to full fine-tuning. Careful curation of your 500 examples (removing noise, ensuring label quality), proper validation splits, and early stopping based on validation performance address the 'Cold Start' challenge. Answer A is incorrect because synthetic data augmentation on statistical cricket predictions often introduces distribution shift and label noise—real human expertise is irreplaceable here. Answer C underutilizes your 500 labeled examples; in-context learning works well for demonstrations but dedicated fine-tuning will improve task-specific performance measurably. Answer D is overly conservative; modern PEFT can work effectively with hundreds of high-quality examples, especially for internal use cases with tolerant stakeholders. The 'Data Quality, Curation, and Cold Start' section emphasizes that example quality matters far more than quantity in low-resource scenarios.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

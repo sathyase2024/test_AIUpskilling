@@ -178,6 +178,183 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production seq2seq systems, three dominant patterns emerge based on latency, memory, and accuracy trade-offs. **Beam Search with early stopping** balances quality against inference time—maintaining a fixed number of hypotheses (beam_width, typically 4-8) while pruning low-probability branches early. Use this when you have moderate computational budgets and need 2-5% quality improvements over greedy decoding. **Constrained decoding** (prefix forcing, lexical constraints) ensures outputs respect domain requirements—critical for medical translation or code generation where invalid tokens cause downstream failures. The overhead is 10-15% slower decoding but eliminates post-processing validation. **Length normalization and temperature scaling** address exposure bias without retraining: length normalization prevents bias toward shorter sequences (common in beam search), while temperature (0.7-1.2) controls randomness. Temperature < 1.0 sharpens probability distributions for deterministic tasks; > 1.0 increases diversity for creative applications. Choose length normalization universally; temperature tuning is task-specific and adds negligible computational cost but requires validation on held-out data.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Greedy decoding is like aggressive batting—playing each ball on instinct without considering field placement, often getting out early. Beam search resembles a captain maintaining multiple strategic options simultaneously: keeping 4-5 batsmen with different styles ready, each representing a potential match-winning path. Constrained decoding is like DRS usage—you voluntarily restrict your options (reviews are limited) because the cost of invalid decisions (wasting reviews) is catastrophic. Length normalization prevents the tendency to play short singles when you actually need boundaries; it penalizes conservative, short-term thinking. Temperature scaling lets you adjust aggression: low temperature (0.5) is like a Test match where you're calculating every run; high temperature (1.5) is like T20 where you're backing aggressive shots despite higher variance. Choosing the right pattern is like field placement before each delivery—you must know the batter's tendencies (task characteristics) and match conditions (computational constraints).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Greedy decoding with no length penalties\nfrom transformers import MarianMTModel, MarianTokenizer\n\ntokenizer = MarianTokenizer.from_pretrained('Helsinki-NLP/Opus-MT-en-fr')\nmodel = MarianMTModel.from_pretrained('Helsinki-NLP/Opus-MT-en-fr')\n\ninputs = tokenizer(\"The cricket match lasted five days.\", return_tensors=\"pt\")\n# Greedy decoding favors short outputs—truncates long translations\noutputs = model.generate(**inputs, max_length=50)  # Too short, biased output\ntranslation = tokenizer.decode(outputs[0], skip_special_tokens=True)\n\n# ✅ BEST PRACTICE: Beam search with length normalization\ninputs = tokenizer(\"The cricket match lasted five days.\", return_tensors=\"pt\")\noutputs = model.generate(\n    **inputs,\n    max_length=100,\n    num_beams=4,           # Maintain 4 hypothesis paths\n    length_penalty=0.6,    # Penalize overly short sequences\n    early_stopping=True,   # Stop when all beams find EOS\n    temperature=0.7,       # Sharpen probabilities for consistency\n    num_return_sequences=1\n)\ntranslation = tokenizer.decode(outputs[0], skip_special_tokens=True)\nprint(f\"Translation: {translation}\")\n\n# ✅ CONSTRAINED DECODING: Ensure \"cricket\" appears in translation\nfrom transformers import PhrasalConstraint\n\nconstraint_token_ids = tokenizer(\"cricket\", add_special_tokens=False).input_ids\nconstraints = [PhrasalConstraint(constraint_token_ids)]\n\noutputs = model.generate(\n    **inputs,\n    constraints=constraints,  # Force output to include \"cricket\"\n    num_beams=4,\n    max_length=100\n)\nprint(f\"Constrained: {tokenizer.decode(outputs[0], skip_special_tokens=True)}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is using `num_beams=1` (greedy decoding) in production and wondering why translations are suspiciously short and repetitive. This happens because greedy decoding combined with the default `length_penalty=1.0` heavily penalizes longer sequences—the model learns to generate EOS tokens early to minimize loss. The fix is immediate: always set `num_beams >= 4` and `length_penalty=0.6-0.8` for seq2seq tasks. If you're memory-constrained, use `num_beams=2` instead of removing beams entirely. Test on your validation set: if 70%+ of outputs end before 80% of expected length, you have a length penalty problem, not a model problem.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Beam search trades O(beam_width) memory for ~2-5% BLEU improvement; typically beam_width=4 is the sweet spot",
+        "Length normalization (0.6-0.9) is essential for seq2seq; counteracts inherent bias toward shorter sequences",
+        "Constrained decoding ensures domain validity but requires pre-computing token IDs for constraints",
+        "Temperature scaling is free parameter tuning; <1.0 for consistency, >1.0 for diversity",
+        "Always validate on hold-out test set: decoding hyperparameters are task-specific, not universal",
+        "Early stopping with beam search reduces inference time by 20-40% without quality loss"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying an English→French translation model and notice outputs are consistently 20-30% shorter than reference translations. Your current config uses num_beams=1 and length_penalty=1.0. Which change will most likely fix this without retraining?",
+      "items": [
+        "Increase max_length parameter to 200",
+        "Set num_beams=4 and length_penalty=0.6",
+        "Lower temperature to 0.3",
+        "Add more training data with longer sentences"
+      ],
+      "answer": 1,
+      "explanation": "The issue is algorithmic bias in greedy decoding combined with aggressive length penalty. num_beams=4 enables beam search (exploring multiple paths) and length_penalty=0.6 actively rewards longer sequences. Increasing max_length doesn't address the penalty; temperature affects randomness not length; more data won't fix the decoding algorithm. This is the classic length penalty problem—option B directly solves it and typically restores proper length distribution within 10 minutes of redeployment."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Sequence-to-sequence models power translation systems at massive scale across industry leaders. Google Translate processes over 500 million daily translation requests using transformer-based models, handling 133+ language pairs with sub-100ms latency per request. Meta's M2M-100 model enables direct translation between 100 languages without pivoting through English, reducing inference overhead by 40%. OpenAI integrates seq2seq principles in GPT training for multilingual understanding. At Uber, translation models localize real-time ride descriptions across 70+ countries, requiring sub-second inference for driver-passenger communication. Netflix uses similar architectures for subtitle generation and localization at scale—processing petabytes of video metadata annually. When scaling fails, typical breakdowns include: token limit violations causing truncated translations, attention complexity becoming O(n²) memory bottleneck on long documents, exposure bias compounding in beam search, and training-inference mismatch causing grammatically correct but semantically inaccurate translations that degrade user experience by 15-25% in production A/B tests.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The encoder is your opening batsman analyzing the bowling attack (input text); the decoder is the middle-order batsman executing shots based on pitch conditions (encoder outputs). Attention mechanisms are like the batsman reading the bowler's intent before each delivery. Teacher forcing during training is like having a coach feed you perfect deliveries in nets; but match day (inference) throws unexpected variations. Cross-attention is when the batter tracks the bowler's action and field placement simultaneously to decide which shot plays best.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production-scale translation with batching and error handling\nfrom transformers import AutoTokenizer, AutoModelForSeq2SeqLM\nimport torch\n\nmodel_name = \"google/mt5-base\"  # Multilingual T5\ntokenizer = AutoTokenizer.from_pretrained(model_name)\nmodel = AutoModelForSeq2SeqLM.from_pretrained(model_name)\n\n# Real-world batch processing (like handling multiple matches simultaneously)\nbatch_texts = [\n    \"The batsman hit a century in the final over.\",\n    \"The bowler took five wickets with an exceptional spell.\"\n]\n\n# Tokenize with dynamic padding (reduces memory waste)\ninputs = tokenizer(\n    batch_texts,\n    max_length=512,\n    truncation=True,\n    padding=\"longest\",  # Pad to longest in batch, not max_length\n    return_tensors=\"pt\"\n)\n\n# Generate with length penalty (prevents overly short translations)\nwith torch.no_grad():\n    outputs = model.generate(\n        inputs[\"input_ids\"],\n        attention_mask=inputs[\"attention_mask\"],\n        max_length=128,\n        num_beams=4,  # Beam search (4-beam typical for production)\n        length_penalty=0.6,  # Encourages moderate-length outputs\n        early_stopping=True,\n        temperature=0.7  # Reduces hallucination\n    )\n\ntranslations = tokenizer.batch_decode(outputs, skip_special_tokens=True)\nfor original, translated in zip(batch_texts, translations):\n    print(f\"Source: {original}\")\n    print(f\"Target: {translated}\\n\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Production seq2seq systems fail silently in three critical ways: (1) Token limit overflow—long cricket match commentaries exceed max_length, triggering truncation that loses crucial context. (2) Beam search stalling—decoder generates repetitive phrases like \"the the the\" when temperature is too low or no early_stopping is set. (3) Exposure bias cascade—model trained on teacher-forced gold tokens never learns to recover from its own errors, causing error propagation where one mistranslation corrupts subsequent tokens. Always implement input length validation, diversity penalties (repetition_penalty ≥ 1.0), and validation on out-of-distribution data.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Encoder processes input sequence in parallel; decoder generates output token-by-token with causal masking, creating asymmetric computational flow.",
+        "Attention mechanisms enable decoder to focus on relevant encoder hidden states; cross-attention bridges encoder-decoder information flow dynamically.",
+        "Teacher forcing speeds training but creates distribution mismatch—model sees gold tokens during training but its own predictions at inference, degrading accuracy.",
+        "Autoregressive decoding generates one token per step using previous outputs as context; beam search explores multiple hypothesis paths to find higher-probability sequences.",
+        "Training-inference mismatch is solved via scheduled sampling or reinforcement learning; production systems use temperature scaling and length penalties to prevent degenerate outputs.",
+        "Scaled production deployment requires batch processing, dynamic padding, monitoring for token truncation, beam search diversity penalties, and fallback mechanisms for edge cases.",
+        "Hugging Face Transformers abstracts complex encoder-decoder logic via AutoModelForSeq2SeqLM, enabling rapid prototyping while enabling fine-tuning on domain-specific data like cricket commentary translation."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of sequence-to-sequence translation models with these two knowledge checks. The first quiz focuses on core mechanisms, while the second presents a real-world scenario where you'll apply what you've learned.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a sequence-to-sequence translation model, why is teacher forcing primarily used during training but not during inference?",
+      "items": [
+        "Teacher forcing provides ground-truth target tokens during training to stabilize learning, while inference must rely on model-generated tokens to simulate real-world usage; using teacher forcing at inference would hide exposure to model errors and cause distribution mismatch at test time.",
+        "Teacher forcing makes the model train faster, but it is computationally too expensive to use during inference.",
+        "Teacher forcing is a regularization technique that prevents overfitting, and using it during inference would cause the model to memorize the training data.",
+        "Teacher forcing allows the model to generate multiple translations in parallel, which is unnecessary during inference when only one translation is needed."
+      ],
+      "answer": 0,
+      "explanation": "Teacher forcing is crucial during training because it feeds the correct target tokens from the reference translation at each decoding step, allowing the encoder-decoder to learn efficiently from ground truth. However, at inference time, the model must generate tokens autoregressively—each generated token becomes the input for the next step. If we used teacher forcing during inference, the model would never encounter its own prediction errors during training, leading to a training-inference mismatch. The model hasn't learned to recover from mistakes because it was always given correct tokens. This exposure gap causes significant degradation at test time. Option B is incorrect because teacher forcing is not about speed; it's about input supervision. Option C confuses regularization with the actual mechanism. Option D misunderstands the autoregressive generation process—inference still generates one token at a time, not in parallel."
+    },
+    {
+      "type": "quiz",
+      "content": "You're fine-tuning a pre-trained mBART model to translate cricket match commentary from English to Hindi. During evaluation, your model performs well on the validation set (BLEU score: 28), but when you deploy it and users provide live commentary input, the translation quality drops significantly. What is the most likely cause, and how would you address it?",
+      "items": [
+        "The validation set contains artificially clean, grammatically perfect sentences, whereas live commentary includes informal language, incomplete sentences, and domain-specific cricket terminology. You should augment your training data with noisy, real-world cricket commentary samples and implement scheduled sampling during training to expose the model to its own errors progressively.",
+        "The model has overfit to the validation set because you used too many training epochs. You should reduce the number of epochs and increase the batch size to prevent overfitting.",
+        "The pre-trained mBART model was trained on formal text, not cricket commentary. You should replace it with a model specifically trained on sports data, as no amount of fine-tuning can bridge this domain gap.",
+        "The issue is that you are using BLEU score for evaluation, which doesn't correlate with human judgment. You should only use human evaluation metrics like METEOR or ROUGE instead."
+      ],
+      "answer": 0,
+      "explanation": "This scenario describes a classic distribution shift problem. The validation set (typically curated and clean) doesn't represent the real-world input distribution of live, informal cricket commentary with domain jargon, disfluencies, and incomplete phrases. The model hasn't learned to handle the messy reality. The solution involves two complementary strategies: (1) augment the fine-tuning dataset with realistic, noisy cricket commentary samples to better match the deployment distribution, and (2) use scheduled sampling during training, which gradually transitions from teacher forcing to model-generated tokens. This exposes the decoder to its own errors in a controlled way, reducing the training-inference mismatch. Option B is incorrect—reducing epochs and increasing batch size won't address distribution shift; the model would still be trained primarily on clean data. Option C is overly pessimistic; fine-tuning a pre-trained model on domain-specific cricket data is effective because the base model's linguistic knowledge transfers well. Option D confuses evaluation metrics with the root cause; BLEU is still a standard automatic metric, and the issue isn't the metric but the mismatch between training and deployment data."
     }
   ]
 }

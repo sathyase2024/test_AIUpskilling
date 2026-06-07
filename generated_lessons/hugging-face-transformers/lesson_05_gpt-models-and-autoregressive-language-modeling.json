@@ -195,6 +195,204 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production GPT deployments follow three dominant patterns, each optimized for different constraints. **Greedy Decoding** selects the highest probability token at each step—fastest (single forward pass per token), deterministic, but prone to repetition and suboptimal sequences; use when latency is critical and repetition penalties are applied. **Beam Search** maintains top-K hypotheses and explores multiple paths, recovering from early mistakes and producing higher-quality outputs, but costs K times more computation and memory; essential for tasks like machine translation where quality justifies 5-10x latency overhead. **Nucleus (Top-p) Sampling** filters tokens by cumulative probability, balancing diversity and coherence without temperature brittleness; ideal for creative tasks where both quality and variability matter. Trade-offs are stark: greedy is 10-100x faster than beam search but generates lower BLEU scores; sampling adds ~30% latency over greedy while improving human preference ratings by 15-25%. Choose greedy for real-time chat APIs, beam for offline batch translation/summarization, and sampling for creative generation. Context window management determines whether you truncate input (lose information, faster), use sliding windows (preserve relevance, higher cost), or implement sparse attention (compromise). These decisions compound: a 4K context window with beam search (K=5) on an 8B model costs 20x more than greedy with 512 tokens.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Greedy decoding is like aggressive batting—commit to the first opportunity (highest probability shot), maximize run rate, but risk getting out if the decision was premature. Beam search mirrors a captain's field placement strategy: maintain multiple defensive formations (K=5 hypotheses) and adapt as the ball moves, trading setup time for better outcomes against uncertainty. Nucleus sampling is like DRS (Decision Review System) usage—you don't challenge every decision, only filter unclear calls by a confidence threshold, keeping the game moving while maintaining accuracy. Context window decisions resemble choosing between aggressive field placements (small window, fast decisions) versus defensive spreads (large window, more information but slower field adjustments). For a fast-paced T20 match, you'd use greedy decoding (aggressive, quick); for a test match where quality matters, you'd invest in beam search (careful, exploratory); for commentary generation, nucleus sampling keeps both spontaneity and coherence like a good DRS usage pattern.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Task-appropriate generation strategy with batching and monitoring\nfrom transformers import AutoModelForCausalLM, AutoTokenizer\nimport torch\n\ntokenizer = AutoTokenizer.from_pretrained(\"gpt2\")\nmodel = AutoModelForCausalLM.from_pretrained(\"gpt2\")\n\n# Batch of cricket commentary prompts\nbatches_cricket = [\n    \"The batsman Virat plays a drives through covers,\",\n    \"Bumrah steams in for the final over,\",\n]\n\n# BEST PRACTICE: Use appropriate generation method per use-case\ninputs = tokenizer(batches_cricket, return_tensors=\"pt\", padding=True)\n\n# Real-time chat API: Greedy with length penalty\ngreedy_outputs = model.generate(\n    inputs[\"input_ids\"],\n    max_new_tokens=50,\n    do_sample=False,\n    num_beams=1,\n    repetition_penalty=1.2,  # Prevent repetition in fast generation\n    pad_token_id=tokenizer.eos_token_id,\n)\n\n# Offline summarization: Beam search for quality\nbeam_outputs = model.generate(\n    inputs[\"input_ids\"],\n    max_new_tokens=50,\n    num_beams=5,\n    early_stopping=True,\n    no_repeat_ngram_size=2,\n    pad_token_id=tokenizer.eos_token_id,\n)\n\n# Creative generation: Nucleus sampling\nnucleus_outputs = model.generate(\n    inputs[\"input_ids\"],\n    max_new_tokens=50,\n    do_sample=True,\n    top_p=0.92,\n    temperature=0.8,\n    pad_token_id=tokenizer.eos_token_id,\n)\n\nprint(\"Greedy (fast):\", tokenizer.decode(greedy_outputs[0]))\nprint(\"Beam (quality):\", tokenizer.decode(beam_outputs[0]))\nprint(\"Sampling (creative):\", tokenizer.decode(nucleus_outputs[0]))\n\n# ❌ ANTI-PATTERN: No repetition control + unbounded generation\n# bad_outputs = model.generate(\n#     inputs[\"input_ids\"],\n#     max_new_tokens=1000,  # Dangerously high\n#     do_sample=True,\n#     top_p=0.99,  # Too permissive, allows low-prob tokens\n#     # Missing: repetition_penalty, no_repeat_ngram_size\n# )  # Results in repetitive, incoherent text and high latency",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Unbounded Context and Token Explosion in Loops**. Beginners often generate tokens without a context length check or max_new_tokens limit, causing the model to generate until it hits the absolute token limit (e.g., 2048 tokens), leading to 100x+ latency overhead, memory overflow, and incoherent outputs in the tail. Exactly how to fix it: (1) Always set `max_new_tokens` to a reasonable value (50-200 for chat, 512 for summaries) before calling `generate()`, (2) Monitor generated token count in production with `output_sequences.shape[1]` and alert if approaching context limit, (3) Use `min_length` + `max_new_tokens` together to enforce a bounded range, (4) Implement a hard timeout on generation (e.g., 5 seconds) to prevent runaway inference. Example: `outputs = model.generate(input_ids, max_new_tokens=100, min_length=10)` ensures tokens stay within 10-100, preventing both truncation and explosion.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Greedy decoding is fastest (1 forward pass/token) but risks suboptimal sequences; use for real-time applications with repetition penalties",
+        "Beam search explores multiple hypotheses, improving quality 15-25% but costing K times more compute; optimal for offline batch tasks",
+        "Nucleus (top-p) sampling balances diversity and coherence by filtering tokens by cumulative probability; ideal for creative generation",
+        "Always set max_new_tokens explicitly—unbounded generation is the #1 cause of latency spikes and OOM errors in production",
+        "Context window trade-offs: small windows (fast, lossy) vs. large windows (slow, complete) vs. sliding/sparse attention (balanced)",
+        "Batch generation whenever possible; tokenizer padding + attention_mask enable efficient multi-sample inference"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a real-time cricket commentary bot for live matches with <100ms latency requirements. Which generation strategy should you use?",
+      "items": [
+        "Beam search with num_beams=5 for highest quality",
+        "Greedy decoding with repetition_penalty=1.2 for speed",
+        "Nucleus sampling with top_p=0.9 for creativity",
+        "Exhaustive search over all possible next tokens"
+      ],
+      "answer": 1,
+      "explanation": "Greedy decoding is the only strategy meeting sub-100ms latency: it requires just 1 forward pass per token. Beam search (K=5) would be 5x slower; nucleus sampling adds sampling overhead. The repetition_penalty=1.2 prevents repetitive commentary (e.g., 'and and and') common in fast generation. Quality is secondary to latency in live scenarios; repetition penalties provide the best quality/speed trade-off."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "GPT-based autoregressive models power production systems at scale across tech giants. OpenAI's ChatGPT processes millions of requests daily through Azure infrastructure, while Google deploys Bard (built on similar principles) across search and workspace products. Meta's LLaMA models fuel internal tools and research at datacenter scale. Netflix uses transformer-based models for personalized content recommendations and summary generation. Uber leverages GPT models for support chatbots handling thousands of concurrent conversations. At scale, common failure modes include: context window exhaustion causing truncated responses, computational costs exceeding budgets during peak traffic, hallucination leading to factually incorrect outputs in customer-facing systems, and latency violations breaking SLAs. Token limitations become critical—a 2K context window cannot summarize 100-page documents. Production systems require careful prompt engineering, temperature tuning, token budget constraints, and fallback mechanisms when models fail or timeout.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: OpenAI's API is like a world-class opening batsman. Netflix's internal model is like a reliable middle-order player. Both know their strengths—one plays aggressive shots (creative text), the other plays according to the field (structured recommendations). When the context window runs out, it's like running out of overs—you must finish your innings with what you have. Token costs are like player salary caps; exceed them and your team goes bankrupt. Production failures happen when batsmen face a bowler (prompt) they weren't trained against, leading to unexpected outcomes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Deploying GPT models in production without token budgets, rate limiting, and fallback handlers leads to runaway costs and service degradation. Always test context window limits with your actual data distribution. Autoregressive generation is inherently sequential—cannot be parallelized across tokens, making latency a critical bottleneck for real-time applications. Implement prompt injection safeguards; malicious inputs can manipulate model behavior at scale.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "from transformers import AutoModelForCausalLM, AutoTokenizer\nimport torch\n\n# Production-scale batsman_model with inference optimization\nmodel_name = \"gpt2\"  # Replace with production model\ntokenizer = AutoTokenizer.from_pretrained(model_name)\nmodel = AutoModelForCausalLM.from_pretrained(\n    model_name,\n    torch_dtype=torch.float16,  # Cost optimization\n    device_map=\"auto\"  # Multi-GPU support like Netflix\n)\n\n# Production constraints (cricket innings limits)\nmax_tokens = 256  # Token budget\ntemp = 0.7  # Consistency\n\ninput_cricket = \"The opening batsman scored\"\ninput_ids = tokenizer.encode(input_cricket, return_tensors=\"pt\")\n\n# Generate with production safeguards\nwith torch.no_grad():\n    outputs = model.generate(\n        input_ids,\n        max_new_tokens=max_tokens,\n        temperature=temp,\n        top_p=0.9,  # Nucleus sampling prevents hallucination\n        do_sample=True,\n        num_beams=1,  # Beam search adds latency; use 1 for real-time\n        pad_token_id=tokenizer.eos_token_id\n    )\n\nresponse = tokenizer.decode(outputs[0], skip_special_tokens=True)\nprint(f\"Batsman said: {response}\")\nprint(f\"Total tokens used: {outputs.shape[1]}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Autoregressive models predict one token at a time using only past context—foundation of GPT and ChatGPT systems",
+        "Context window size directly limits how much document history the model can see; exceeding it truncates input like cutting cricket mid-innings",
+        "Causal masking prevents the model from attending to future tokens during training, ensuring sequential generation matches inference behavior",
+        "Next-token prediction loss is the training objective; minimizing it optimizes probability of correct continuation sequences",
+        "Production deployments require token budgets, temperature tuning, and rate limiting to control costs and prevent hallucination",
+        "Temperature and sampling strategies balance creativity versus consistency; higher temp increases hallucination risk in customer-facing systems",
+        "Inference latency scales with sequence length; parallel decoding and caching strategies are essential for real-time applications at scale"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A production system uses GPT-2 with a 1K token context window to summarize cricket match reports averaging 5K tokens. What is the primary consequence?",
+      "items": [
+        "The model will summarize only the first 1K tokens, potentially missing critical match details and final scores",
+        "The tokenizer will automatically compress 5K tokens into 1K without information loss",
+        "Hugging Face will raise an error and block the request",
+        "Temperature will automatically increase to compensate for missing context"
+      ],
+      "answer": 0,
+      "explanation": "Context window is a hard limit—tokens beyond it are truncated before reaching the model. If you have 5K token documents but only 1K context window, you'll lose 80% of information. This is why production systems use longer-context models (GPT-4 Turbo with 128K tokens) or implement document chunking strategies. Tokenizers don't compress; they encode. Hugging Face won't auto-error. Temperature doesn't compensate for missing context—it only controls randomness in sampling. The batsman can only score runs on balls they face; if the match summary ends before the final innings, they miss the climax."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of GPT models and autoregressive language modeling with these two quizzes. The first focuses on core conceptual mechanisms, while the second applies your knowledge to real-world scenarios you'll encounter when building with Hugging Face Transformers.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In autoregressive language modeling, why is causal masking essential during training, and what would happen if you removed it?",
+      "items": [
+        "Causal masking prevents the model from attending to future tokens, ensuring it learns to predict tokens based only on past context—removing it would allow 'cheating' by looking ahead, breaking the autoregressive assumption and creating a model that cannot function at inference time.",
+        "Causal masking speeds up training by reducing computation; without it, training would be slow but the model would still learn correctly.",
+        "Causal masking is only needed during inference to generate tokens sequentially; during training it is optional and does not affect learning.",
+        "Causal masking ensures equal attention to all tokens in the sequence; removing it would cause the model to focus only on recent tokens and forget older context."
+      ],
+      "answer": 0,
+      "explanation": "Causal masking is fundamental to autoregressive training. It enforces that each token can only attend to tokens that came before it in the sequence, preventing the model from 'peeking' at future tokens during training. If removed, the model would learn to use information from the entire sequence (past and future) to predict each token. At inference time, however, you only have past tokens available—future tokens don't exist yet. A model trained without causal masking would have learned a different function and would perform poorly when deployed, since it relied on future information that it cannot access during generation. This is why the training objective must exactly match the inference behavior: both must respect the autoregressive, left-to-right generation pattern. Option B is incorrect because masking doesn't significantly affect speed. Option C is wrong because masking is critical during training, not just inference. Option D misunderstands masking's purpose; it doesn't control token weighting equally."
+    },
+    {
+      "type": "quiz",
+      "content": "You are building a cricket commentary generator using GPT-2. Your model trained well on 512-token sequences, but users want to generate long match summaries spanning 2000 tokens. You attempt to feed a 2000-token context at inference and the model crashes. What is the primary issue and how should you address it?",
+      "items": [
+        "The context window is fixed at 512 tokens because that is the maximum sequence length the model was trained on; you should either truncate inputs to 512 tokens, use sliding window inference, or fine-tune a model with a larger context window.",
+        "Your GPU memory is insufficient; upgrading to a larger GPU will automatically allow the model to handle 2000-token sequences.",
+        "The model's vocabulary doesn't support sequences longer than 512 tokens; you need to retrain the entire tokenizer with a larger token inventory.",
+        "There is a bug in your code; simply restarting the script will allow it to handle 2000-token inputs without any model changes."
+      ],
+      "answer": 0,
+      "explanation": "GPT models have a fixed context window determined during pretraining (in this case, 512 tokens for GPT-2). This is a hard architectural constraint—the positional encodings, attention mask shape, and all learned parameters are designed for that maximum length. You cannot simply feed 2000 tokens to a model trained on 512-token sequences without modification. The proper solutions are: (1) truncate input to the maximum context length and lose earlier context, (2) use a sliding window approach where you generate tokens in chunks and slide the context forward, or (3) retrain or fine-tune a version of the model with a larger context window (though this requires significant computational resources). Option B is incorrect; GPU memory might be a practical limitation, but it's not the primary architectural issue here. Option C is wrong; the tokenizer's vocabulary size is separate from context length. Option D confuses a code bug with a fundamental model limitation—restarting won't change the model's architecture. Understanding context window limits is critical for production deployment."
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A batsman at the crease can only see balls that have already been bowled (past tokens). During practice drills (training), we enforce this rule strictly—the batter cannot peek at the next ball coming down the pitch. If we let them 'see the future,' they'd learn batting strategies that only work with perfect foresight. But in a real match (inference), they can only see balls as they arrive. That's why causal masking during training perfectly mirrors the constraints of the actual game—both operate left-to-right, moment-by-moment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
     }
   ]
 }

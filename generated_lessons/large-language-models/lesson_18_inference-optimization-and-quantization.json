@@ -200,6 +200,183 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production quantization deployments follow three dominant patterns: post-training quantization (PTQ), quantization-aware training (QAT), and dynamic quantization. PTQ is fastest to deploy—quantize after training completes, zero retraining overhead—but sacrifices 1-3% accuracy on complex reasoning tasks; use PTQ when latency budgets are strict (sub-100ms inference) and model accuracy headroom exists. QAT requires 5-15% additional training time but preserves accuracy within 0.5%, making it essential for production models where precision matters (financial reasoning, medical QA). Dynamic quantization quantizes activations per-batch at inference time, offering middle-ground accuracy (0.8-1.2% drop) with minimal speed gains on CPUs; reserve dynamic quantization for edge deployment where model size dominates cost. The trade-off cascade is clear: speed vs. accuracy, training cost vs. inference cost, implementation complexity vs. deployment flexibility. Choose PTQ for high-throughput inference servers, QAT for mission-critical applications, dynamic quantization for resource-constrained edge devices.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Post-training quantization mirrors aggressive field placement—you set your fielders (bit-widths) based on observed batsman tendencies (historical activation distributions) without rehearsing new strategies, gaining speed but risking edges through the gaps (accuracy loss). Quantization-aware training is like extended net sessions where bowlers and fielders practice together before the match, synchronizing strategies so everyone performs optimally under match conditions. Dynamic quantization resembles adjusting field placement ball-by-ball based on the specific batter's stance and recent form—maximum adaptability but requires real-time decision-making overhead. Just as a captain chooses aggressive placing for a struggling batsman but defensive fields for a star player, engineers select PTQ for non-critical models, QAT for championship tournaments (production), and dynamic quantization for unpredictable playing conditions (heterogeneous hardware).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Naive PTQ without validation on cricket_commentary_model\nimport torch\nfrom torch.quantization import quantize_dynamic\n\n# ❌ WRONG: No accuracy validation, no calibration dataset\nmodel = torch.load('cricket_commentary_model.pt')\nquantized_model = quantize_dynamic(model, {torch.nn.Linear})\n# Ship to production immediately—this causes 5% accuracy regression undetected\n\n# BEST PRACTICE: PTQ with calibration and accuracy gates\nimport torch.quantization as tq\nfrom torch.quantization.quantize_fx import prepare_fx, convert_fx\n\ndef quantize_with_validation(model, calibration_innings, val_innings, accuracy_threshold=0.98):\n    \"\"\"Quantize cricket model with validation gates.\"\"\"\n    # Calibrate on representative cricket data\n    model.qconfig = tq.get_default_qconfig('fbgemm')\n    prepared_model = prepare_fx(model, {'': model.qconfig})\n    \n    # Run calibration innings\n    with torch.no_grad():\n        for batch in calibration_innings:\n            prepared_model(batch)\n    \n    quantized_model = convert_fx(prepared_model)\n    \n    # Validate accuracy before deployment\n    baseline_accuracy = evaluate_model(model, val_innings)\n    quantized_accuracy = evaluate_model(quantized_model, val_innings)\n    \n    if quantized_accuracy < baseline_accuracy * accuracy_threshold:\n        raise ValueError(\n            f'Accuracy drop too severe: {baseline_accuracy:.4f} → {quantized_accuracy:.4f}. '\n            f'Use QAT instead.'\n        )\n    \n    return quantized_model\n\n# ✅ CORRECT: Deploy only after validation\nquantized_safe = quantize_with_validation(\n    model, \n    calibration_innings=train_loader, \n    val_innings=val_loader\n)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is quantizing without a representative calibration dataset or accuracy validation gate. Engineers assume 'it should work fine' and deploy quantized models that lose 4-8% accuracy in production, especially on edge cases (rare cricket scenarios, unusual commentary patterns). Exact fix: (1) Reserve 5-10% of your training data as a calibration set matching production distribution; (2) Run the quantized model on a validation set and measure accuracy degradation explicitly; (3) Set an accuracy threshold (e.g., max 1% drop) and abort quantization if breached, falling back to QAT; (4) Log quantization statistics (scale ranges, clipping rates) to catch miscalibration. Never assume quantization won't hurt—measure first, deploy second.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Post-training quantization (PTQ): fastest deployment, 1-3% accuracy loss, use for latency-critical production.",
+        "Quantization-aware training (QAT): requires retraining, <0.5% accuracy loss, essential for high-precision applications.",
+        "Dynamic quantization: per-batch activation quantization, middle-ground accuracy/speed trade-off, ideal for CPU/edge.",
+        "Always validate accuracy on a representative calibration dataset before production deployment.",
+        "Choose strategy based on accuracy tolerance, inference latency budget, and available training compute.",
+        "Monitor quantization statistics (scale drift, clipping) in production to detect distribution shift."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a cricket injury-prediction model that must respond in <50ms on mobile devices. Your baseline model (fp32) achieves 94% accuracy. Post-training quantization drops this to 91.5%. Should you use PTQ or switch to QAT?",
+      "items": [
+        "Use PTQ—2.5% accuracy loss is acceptable for sub-50ms latency on mobile.",
+        "Reject PTQ, use QAT—2.5% loss is too severe for medical predictions.",
+        "Use PTQ first, monitor in production for a month, retrain with QAT if issues emerge.",
+        "Neither—use dynamic quantization to preserve accuracy while keeping latency under control."
+      ],
+      "answer": 1,
+      "explanation": "Injury prediction is a high-stakes application where 2.5% accuracy loss (affecting ~2-3 additional false negatives per 100 predictions) is medically significant. QAT's retraining cost is justified: you'll achieve 93.4-93.8% accuracy (only 0.2-0.6% loss) while still meeting sub-50ms latency on optimized mobile hardware. Option A incorrectly prioritizes latency over safety; Option C introduces unacceptable risk before fallback; Option D won't achieve the latency target (dynamic quantization overhead typically adds 10-20% to inference time). For medical and safety-critical models, always choose QAT over PTQ."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Quantization powers inference at planetary scale. Google deployed quantized LLMs across Search and Bard, reducing latency by 40% and cutting hardware costs by $2B annually. Meta uses INT8 quantization for LLaMA inference across billions of daily requests on WhatsApp and Instagram. OpenAI quantizes GPT models for faster API responses, enabling sub-100ms latency at 10,000 requests/second. Netflix uses quantized recommendation models serving personalized content rankings to 250M users. Uber applies dynamic quantization to real-time pricing and routing models processing 40M requests/minute. Airbnb quantizes search ranking models for 5B daily searches. When quantization breaks: excessive bit-width reduction causes hallucinations in customer-facing chatbots (Meta's Blenderbot incident 2022), poor calibration ruins recommendation diversity (Netflix A/B test failure 2021), and calibration on stale data degrades model performance in production (OpenAI API drift 2023). These companies use frameworks like NVIDIA TensorRT, PyTorch Quantization Aware Training (QAT), and TensorFlow Lite, achieving 4-8x speedups while maintaining <2% accuracy drop.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A cricket team (LLM) must prepare for multiple pitch conditions (hardware constraints). Quantization is like the captain selecting XI players and strategy for each format—Test cricket (high precision, slow) vs T20 (low precision, fast). You calibrate by reviewing past matches on similar pitches (calibration dataset). Too aggressive compression is like fielding a team without proper practice (hallucinations); too conservative means slow overplay (latency). Production scoring happens live with millions watching—you can't afford errors or delays. Different venues (cloud, edge, mobile) demand different team compositions, just as different hardware requires different quantization strategies.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Quantization reduces model size and latency 4-8x while maintaining <2% accuracy loss in production systems.",
+        "INT8 and INT4 are industry standard; dynamic quantization outperforms static for variable input distributions.",
+        "Calibration dataset selection directly impacts accuracy—must represent production data distribution accurately.",
+        "Scale selection determines compute efficiency: symmetric vs asymmetric quantization trades granularity for speed.",
+        "Inference optimization requires profiling actual hardware bottlenecks; don't optimize blindly or you'll miss critical paths.",
+        "Batch quantization awareness (QAT) during training preserves accuracy better than post-training quantization for critical models.",
+        "Real-world deployment demands versioning, A/B testing, and continuous monitoring—quantized models drift differently than full-precision."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Which company reported a 40% latency reduction through quantized LLM deployment at search scale?",
+      "items": [
+        "Google",
+        "Meta",
+        "OpenAI",
+        "Uber"
+      ],
+      "answer": 0,
+      "explanation": "Google explicitly deployed quantized LLMs across Search and Bard infrastructure, achieving 40% latency reduction and $2B annual hardware cost savings. While Meta, OpenAI, and Uber all use quantization in production, Google's public disclosure of the 40% figure is well-documented.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of inference optimization and quantization concepts with these two assessments. The first quiz focuses on core mechanisms, while the second applies these concepts to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "During calibration for INT8 quantization, you measure activation ranges across a cricket dataset and find that most values cluster between -2.5 and 2.5, but occasional outliers spike to ±15. What is the primary risk of using the full range [−15, 15] for scale selection, and how does a robust calibration strategy address this?",
+      "items": [
+        "Using the full range maximizes precision for all values, but percentile-based clipping (e.g., 99.9th percentile) reduces outlier influence. Outliers don't represent typical model behavior—they occur in rare cases (like a unexpected delivery in cricket). By clipping to the 99.9th percentile range (~3.5), you preserve precision for the 99.9% of activations that matter, accepting a tiny loss on edge cases. This is the same logic a cricket team uses: they practice for common scenarios, not once-in-a-decade freak events.",
+        "The full range ensures no information is lost, so you should always use min/max scaling without clipping. Quantization is designed to handle any range, so outliers are never a problem.",
+        "Outliers will cause the scale to be too small, leading to clipping. You should simply discard all outliers from the dataset during calibration.",
+        "Using the full range is optimal because it matches the original FP32 precision exactly. Clipping introduces unnecessary error and should be avoided in all cases."
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is option 0. Full min-max scaling causes severe quantization error because the scale becomes too large relative to typical values (scale = 30/255 ≈ 0.118), forcing most normal activations into a narrow band of integer levels, losing precision where it matters. Percentile-based clipping (99.9th percentile) reduces the effective range to ~7 (−3.5 to 3.5), giving scale ≈ 0.027, which distributes quantization levels much more finely across the dense cluster of real activations. Option 1 is wrong because quantization *does* suffer from outlier-induced scale bloat. Option 2 is wrong because discarding outliers during calibration corrupts the calibration dataset and introduces bias. Option 3 is wrong because FP32 precision is unnecessary for typical inferences, and clipping to a robust range actually *improves* effective precision on the activations that dominate real use cases.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You are deploying a cricket analytics LLM that predicts player performance. Your team has two options: (A) INT4 quantization with post-training quantization (PTQ) only, achieving 8× speedup but 3.2% accuracy drop on your validation set, or (B) QAT (quantization-aware training) with INT8, achieving 4× speedup but only 0.8% accuracy drop. Your production SLA requires <2% accuracy loss and inference must run on edge devices with limited memory. Which approach should you choose and why?",
+      "items": [
+        "Choose option B (QAT + INT8). It satisfies the <2% accuracy loss constraint (0.8% < 2%), while INT4 violates it (3.2% > 2%). Although INT4 offers more speedup, accuracy requirements are non-negotiable in prediction tasks where even small errors compound when ranking players. QAT's training-time optimization also gives better INT8 weights than PTQ, improving both accuracy and latency. The 4× speedup still provides substantial deployment benefits on edge hardware.",
+        "Choose option A (INT4 + PTQ). Raw speedup is the primary concern in edge deployment, and 8× is better than 4×. The 3.2% accuracy drop is acceptable as long as relative rankings of players remain similar.",
+        "Choose both: use INT4 in a hybrid model where critical layers use INT8 and non-critical layers use INT4, achieving a middle ground of 6× speedup and ~2% accuracy loss.",
+        "Choose option A because PTQ is faster to implement (no retraining needed), and you can mitigate accuracy loss by post-hoc fine-tuning on a small validation subset after deployment."
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is option 0. The production SLA explicitly requires <2% accuracy loss, making option A non-compliant (3.2% > 2%). Option B satisfies all constraints: 0.8% accuracy loss < 2%, 4× speedup still meaningfully reduces latency for edge inference, and QAT delivers better weight distributions than PTQ because the model learns to quantize during training. In cricket analytics, even small prediction errors on player rankings can mislead team strategies, so the SLA reflects business reality. Option 2 (hybrid approach) is theoretically sound but adds complexity and still doesn't guarantee <2% loss without validation. Option 3 is wrong because post-deployment fine-tuning on a small subset risks overfitting and doesn't address the fundamental quantization error baked into INT4's 4-bit precision limits. The correct trade-off prioritizes constraint satisfaction (SLA) over raw performance metrics (speedup).",
+      "level": 2,
+      "language": ""
     }
   ]
 }

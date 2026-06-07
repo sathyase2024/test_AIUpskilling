@@ -150,6 +150,262 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RAG's internal mechanics operate through a multi-stage retrieval and integration pipeline. At runtime, the system maintains an in-memory vector index that maps embeddings to document chunks with O(1) lookup complexity using approximate nearest neighbor (ANN) algorithms like HNSW or LSH. When a query arrives, it undergoes embedding generation using the same encoder that indexed the corpus, ensuring semantic alignment. The retrieval phase executes parallel vector similarity searches across sharded indices, typically returning top-k candidates within milliseconds. Retrieved chunks then enter a reranking phase where cross-encoder models apply learned relevance metrics, filtering out low-confidence matches before context window constraints trigger aggressive summarization or truncation. Finally, the prompt assembler constructs a context-aware input sequence, interleaving system instructions, retrieved passages, and user queries while respecting token budgets enforced by the language model's maximum sequence length. Memory overhead scales linearly with corpus size and embedding dimensionality; typical production deployments cache embeddings on GPU VRAM or distributed key-value stores to minimize latency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma's team preparing to bat against Jasprit Bumrah's bowling attack in an IPL match. Before Rohit walks to the crease, his team reviews video footage of Bumrah's recent deliveries (corpus indexing) and stores key patterns—yorker frequencies, bouncer angles, slower ball tendencies—in a fast-access highlight reel (vector index). When Rohit faces the first ball, his batting coach instantly recalls the 5 most relevant Bumrah dismissals from similar match situations (retrieval phase with top-k). The coaching staff cross-checks which moments are actually relevant to TODAY's pitch and weather conditions (reranking with cross-encoder), filtering out irrelevant archive footage. Rohit's brain integrates this context—'Bumrah bowled short last time, so expect a yorker now'—into his batting decision (context integration into prompt). The entire cognitive loop—recall, filter, integrate, decide—happens in seconds with minimal memory footprint because only essential patterns are cached, not entire match records. This reveals that RAG's power lies not in storing everything, but in rapid, intelligent retrieval and filtering of only what matters for the immediate decision.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom collections import defaultdict\nimport time\n\nclass CricketRAGEngine:\n    \"\"\"Internal RAG mechanics with cricket domain example.\"\"\"\n    \n    def __init__(self, embedding_dim=384, max_context_tokens=512):\n        self.embedding_dim = embedding_dim\n        self.max_context_tokens = max_context_tokens\n        self.vector_index = {}  # player_name -> embedding\n        self.chunk_store = defaultdict(list)  # player_name -> [chunks]\n        self.rerank_cache = {}  # query_hash -> rerank_scores\n        \n    def index_cricket_knowledge(self, player_name, chunks, embeddings):\n        \"\"\"Index player performance data with embeddings.\"\"\"\n        self.vector_index[player_name] = embeddings\n        self.chunk_store[player_name] = chunks\n        print(f\"Indexed {player_name}: {len(chunks)} chunks, dim={embeddings.shape}\")\n    \n    def retrieve_relevant_innings(self, query_embedding, top_k=5):\n        \"\"\"Retrieve top-k relevant player performances via vector similarity.\"\"\"\n        similarities = {}\n        for player, player_embedding in self.vector_index.items():\n            # Cosine similarity O(d) per player\n            sim = np.dot(query_embedding, player_embedding) / (\n                np.linalg.norm(query_embedding) * np.linalg.norm(player_embedding) + 1e-8\n            )\n            similarities[player] = sim\n        \n        top_players = sorted(similarities.items(), key=lambda x: x[1], reverse=True)[:top_k]\n        return top_players  # [(player, score), ...]\n    \n    def rerank_with_cross_encoder(self, query, candidates):\n        \"\"\"Filter candidates using learned relevance (simulated cross-encoder).\"\"\"\n        reranked = []\n        for player, retrieval_score in candidates:\n            # Simulated cross-encoder: context-aware relevance\n            relevance_boost = 1.0\n            if \"kohli\" in query.lower() and \"test\" in query.lower():\n                if player == \"Virat Kohli\":\n                    relevance_boost = 1.3\n            \n            final_score = retrieval_score * relevance_boost\n            if final_score > 0.4:  # Threshold filtering\n                reranked.append((player, final_score))\n        \n        return sorted(reranked, key=lambda x: x[1], reverse=True)\n    \n    def assemble_context(self, query, top_players):\n        \"\"\"Assemble final prompt with token budget enforcement.\"\"\"\n        context_parts = [f\"Query: {query}\\n\"]\n        token_count = len(query.split())\n        \n        for player, score in top_players:\n            player_context = f\"\\n[Relevance: {score:.2f}] {player}:\\n\"\n            player_context += \"\\n\".join(self.chunk_store[player][:2])  # Top 2 chunks\n            \n            chunk_tokens = len(player_context.split())\n            if token_count + chunk_tokens > self.max_context_tokens:\n                # Truncate to fit budget\n                available = self.max_context_tokens - token_count\n                player_context = \" \".join(player_context.split()[:available])\n                context_parts.append(player_context)\n                break\n            \n            context_parts.append(player_context)\n            token_count += chunk_tokens\n        \n        return \"\\n\".join(context_parts)\n    \n    def process_query(self, query_text, query_embedding):\n        \"\"\"Full RAG pipeline: retrieve -> rerank -> integrate.\"\"\"\n        start = time.time()\n        \n        # Stage 1: Retrieval (vector similarity)\n        candidates = self.retrieve_relevant_innings(query_embedding, top_k=5)\n        retrieval_time = time.time() - start\n        \n        # Stage 2: Reranking (cross-encoder filtering)\n        reranked = self.rerank_with_cross_encoder(query_text, candidates)\n        rerank_time = time.time() - start - retrieval_time\n        \n        # Stage 3: Context assembly (prompt structuring)\n        final_context = self.assemble_context(query_text, reranked)\n        assembly_time = time.time() - start - retrieval_time - rerank_time\n        \n        return {\n            \"context\": final_context,\n            \"timings\": {\n                \"retrieval_ms\": retrieval_time * 1000,\n                \"reranking_ms\": rerank_time * 1000,\n                \"assembly_ms\": assembly_time * 1000\n            },\n            \"reranked_candidates\": reranked\n        }\n\n# Usage example\nrag = CricketRAGEngine(embedding_dim=384, max_context_tokens=512)\n\n# Index cricket data\nrag.index_cricket_knowledge(\n    \"Rohit Sharma\",\n    [\"Scored 264* vs Sri Lanka in 2014\", \"Led MI to 5 IPL titles\"],\n    np.random.randn(384)\n)\nrag.index_cricket_knowledge(\n    \"Virat Kohli\",\n    [\"Test century machine with 80+ centuries\", \"ODI batting average 58.57\"],\n    np.random.randn(384)\n)\n\n# Process query\nquery = \"best test batsman technique against pace\"\nquery_emb = np.random.randn(384)\nresult = rag.process_query(query, query_emb)\n\nprint(f\"Context:\\n{result['context']}\")\nprint(f\"\\nTimings: {result['timings']}\")\nprint(f\"Reranked: {result['reranked_candidates']}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Under-the-hood RAG implementations expose multiple security surfaces. Vector indices can be inverted to approximate original documents; reranking models may leak training data through learned relevance patterns; token budgeting via truncation can inadvertently drop PII-masking instructions; and cached embeddings in distributed systems may persist sensitive context across query sessions. Always validate that your embedding model and reranker do not memorize or expose sensitive information, and implement explicit PII scrubbing BEFORE indexing and AFTER retrieval.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG runtime operates as a multi-stage pipeline: embedding → retrieval (O(1) ANN lookup) → reranking (cross-encoder filtering) → context assembly (token budgeting and prompt construction).",
+        "Vector indices are typically stored on GPU VRAM or distributed KV stores; chunks and metadata live in searchable databases; reranking scores may be cached to avoid recomputation.",
+        "Token budgets enforce hard limits on context length; aggressive truncation can drop critical PII-masking directives, exposing sensitive data downstream.",
+        "Approximate nearest neighbor algorithms (HNSW, LSH) trade perfect recall for latency; this means some relevant (and potentially sensitive) chunks may be missed by design.",
+        "Reranking models learn patterns from training data; if trained on corpora containing PII, the model may implicitly memorize and surface sensitive information in relevance scores.",
+        "Cache coherency across distributed indices requires explicit invalidation; stale embeddings or chunks with old PII masking may persist in production systems."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a RAG system, what is the primary performance bottleneck when retrieving from a corpus of 10M documents with 384-dimensional embeddings, and how does token budgeting exacerbate PII exposure?",
+      "items": [
+        "Vector similarity computation is O(n); token budgeting truncates context unpredictably, potentially dropping PII-redaction instructions before they reach the LLM.",
+        "Cross-encoder reranking requires loading 10M model outputs; token budgeting speeds up retrieval but always preserves PII masks.",
+        "Embedding storage requires 15GB VRAM; token budgeting has no impact on PII handling.",
+        "Query expansion increases latency; PII is never at risk because embeddings are anonymized by default."
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is A. While approximate nearest neighbor (ANN) algorithms reduce the vector similarity search to sublinear complexity in practice, corpus-scale systems still face O(n) worst-case cost. More critically, strict token budgets force truncation of retrieved chunks in FIFO order, which can inadvertently drop context-critical PII-redaction instructions (e.g., 'Mask all SSN patterns') before they reach the LLM, leaving sensitive data exposed in the final output. Options B, C, and D incorrectly minimize the risk or misrepresent the mechanics.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems employ three dominant architectural patterns, each optimized for different retrieval-security trade-offs. The **Isolated Retrieval Pattern** maintains complete separation between the vector database and LLM inference layer—queries never directly expose raw documents to the model, reducing PII leakage surface area by ~85% but adding 150-300ms latency overhead due to network serialization. The **Filtered Embedding Pattern** pre-computes access control metadata during indexing, embedding user permission levels into vector space itself; this enables sub-millisecond filtering but requires expensive re-indexing when permissions change. The **Hybrid Reranking Pattern** performs coarse retrieval across all indexed data, then applies fine-grained PII redaction and access control in a separate reranking stage before context assembly—it balances latency (50-100ms overhead) with security guarantees and supports dynamic policies without re-indexing. Choose Isolated when handling highly sensitive domains (healthcare, finance) where latency is acceptable; Filtered when you have stable, role-based permission structures; Hybrid when you need real-time policy updates with multi-tenant SaaS architectures. Cost implications: Isolated adds 2-3x compute for orchestration, Filtered increases storage by 15-25% for metadata, Hybrid requires dedicated reranking infrastructure (GPU or specialized models) but scales most gracefully with millions of documents.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The Isolated Retrieval Pattern is like using a specialist fielding coach who communicates only strategic insights to your bowlers rather than showing them raw match footage—extra layer prevents information overload but requires coordination time. The Filtered Embedding Pattern resembles pre-assigning fielding positions based on a batsman's known weakness before they even arrive at the crease—it's efficient once set, but rigid if the batsman's technique evolves. The Hybrid Reranking Pattern mirrors modern cricket's DRS system: you get a preliminary umpire decision (coarse retrieval), then apply video analysis and technology (fine-grained filtering) before final verdict—it adds latency but maximizes accuracy and adapts to edge cases like unclear edges or ball position. Choose your pattern like choosing field placement: aggressive formations (Isolated) for crucial moments despite extra coordination cost, preset strategies (Filtered) for predictable opponents, or dynamic resets (Hybrid) when facing unpredictable play conditions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Hybrid Reranking Pattern with PII redaction\nfrom typing import List, Dict\nimport hashlib\n\nclass CricketMatchRAG:\n    def __init__(self, vector_db, access_control):\n        self.vector_db = vector_db\n        self.access_control = access_control\n        self.pii_patterns = ['player_contact', 'salary_info', 'medical_records']\n    \n    def retrieve_and_redact(self, query: str, user_id: str) -> List[Dict]:\n        # Stage 1: Coarse retrieval (fast, no filtering)\n        candidates = self.vector_db.semantic_search(query, top_k=50)\n        \n        # Stage 2: Access control filtering\n        permitted = [\n            doc for doc in candidates \n            if self.access_control.can_access(user_id, doc['document_id'])\n        ]\n        \n        # Stage 3: PII redaction\n        redacted = []\n        for doc in permitted[:10]:\n            cleaned = self._redact_sensitive_fields(doc, user_id)\n            redacted.append(cleaned)\n        \n        return redacted\n    \n    def _redact_sensitive_fields(self, document: Dict, user_id: str) -> Dict:\n        \"\"\"Remove or hash PII based on user clearance level\"\"\"\n        clearance = self.access_control.get_clearance(user_id)\n        redacted = document.copy()\n        \n        if clearance < 3:  # restricted access\n            for field in self.pii_patterns:\n                if field in redacted:\n                    redacted[field] = f\"[REDACTED-{hashlib.md5(str(redacted[field]).encode()).hexdigest()[:8]}]\"\n        \n        return redacted\n\n# ANTI-PATTERN: Retrieving all data then filtering (exposes PII)\nclass UnsafeCricketRAG:\n    def retrieve_unsafe(self, query: str) -> str:\n        # ❌ WRONG: Retrieves everything to LLM context\n        all_docs = self.vector_db.semantic_search(query, top_k=100)\n        # ❌ WRONG: Passes raw data including salaries, contact info\n        context = \"\\n\".join([doc['full_content'] for doc in all_docs])\n        return self.llm.generate(f\"Query: {query}\\nContext: {context}\")\n        # ⚠️ RISK: LLM may echo sensitive data in response, logs expose PII",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Most Common Beginner Mistake** — Filtering PII *after* embedding and retrieval instead of *before*. Developers often assume redacting the final context window prevents information leakage, but vector similarity search itself can leak sensitive data: an LLM querying 'salary information' will retrieve payroll documents ranked by semantic relevance regardless of later redaction, and the retrieval log itself becomes a privacy audit trail. **Exact Fix**: (1) Tag documents with access control labels during indexing, not retrieval; (2) Filter vector search results by user_id BEFORE computing similarity scores, not after; (3) Implement early-exit filtering so unauthorized documents never enter the ranking pipeline. Use the Filtered Embedding or Hybrid Reranking patterns above—both enforce security *during* retrieval, not *after*.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Isolated Retrieval Pattern: Network-separated LLM prevents raw document exposure; 85% PII leakage reduction but +150-300ms latency—ideal for healthcare/finance",
+        "Filtered Embedding Pattern: Pre-compute access control in vector space; zero latency overhead but rigid permissions requiring re-indexing on policy changes",
+        "Hybrid Reranking Pattern: Coarse retrieval + fine-grained filtering in separate stage; ~50-100ms overhead with dynamic policies and graceful multi-tenant scaling",
+        "Apply PII redaction *during* retrieval (access control filtering), not after—retrieving sensitive documents then redacting still leaks information via similarity rankings and logs",
+        "Cost trade-off: Isolated adds 2-3x compute, Filtered adds 15-25% storage overhead, Hybrid requires dedicated reranking infrastructure but best long-term scalability"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for a cricket franchise with player salary data. Coaches can see all player stats; scouts can see only public performance metrics. Which pattern allows real-time permission updates without re-indexing?",
+      "items": [
+        "Isolated Retrieval Pattern (network-separated filtering)",
+        "Filtered Embedding Pattern (access control pre-computed in vectors)",
+        "Hybrid Reranking Pattern (dynamic filtering post-retrieval)",
+        "All patterns support real-time updates equally"
+      ],
+      "answer": 2,
+      "explanation": "Hybrid Reranking Pattern applies access control as a separate, fine-grained filtering stage *after* coarse retrieval but *before* context assembly. This allows you to change permission policies dynamically (coaches vs. scouts) without re-indexing the vector database. Isolated requires network coordination (not dynamic per-query), Filtered requires re-indexing embeddings when permissions change. Hybrid's two-stage architecture makes it the only production pattern supporting both real-time policy updates and multi-tenant security."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RAG systems power production systems at massive scale across leading tech companies. Google integrates RAG into Search Generative Experience (SGE) to ground answers in indexed web documents, processing billions of queries daily. OpenAI's ChatGPT uses RAG-like retrieval for plugins and knowledge cutoff handling. Netflix leverages RAG for content recommendation explanations with millions of user interactions. Uber uses RAG to retrieve real-time transportation policies and safety guidelines for user-facing chatbots handling millions of daily requests. Meta deploys RAG across recommendation systems to retrieve contextual signals for billions of users. Airbnb uses semantic retrieval for personalized property recommendations at global scale. Frameworks like LangChain, LlamaIndex, and Anthropic's Claude API provide production-ready RAG pipelines. Systems break when PII leaks through retrieved contexts, embeddings expose sensitive patterns, or retrieved contexts conflict with safety policies—requiring robust filtering, access controls, and audit logging across retrieval pipelines.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A batsman (query) steps up to face the bowler (retriever). The fielding captain (vector database) must position fielders (indexed documents) strategically—but some fielders carry confidential match stats (PII) that shouldn't be revealed to spectators (users). The captain must prevent those fielders from fielding sensitive balls while ensuring the best defensive players still get deployed. Dropping catches (missing relevant documents) and revealing team strategies (leaking context) both lose the match. Production cricket requires security protocols, access controls, and audit trails—just like RAG systems at scale.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Production RAG systems at scale face compounding PII risks. Billions of documents indexed means proportionally higher exposure if filtering fails. Embeddings trained on sensitive data can leak patterns through similarity searches. Retrieved contexts cached for performance may contain user information accessible across sessions. Implement mandatory PII detection pre-indexing, post-retrieval filtering, differential privacy in embeddings, and comprehensive audit logging. Regular penetration testing and data minimization policies are non-negotiable for regulated industries (healthcare, finance, telecom).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG powers production systems at Google, OpenAI, Netflix, Uber, Meta, Airbnb—processing billions of queries with strict security requirements.",
+        "PII leakage through retrieved contexts is the highest-risk failure mode; implement pre-indexing and post-retrieval filtering layers.",
+        "Semantic embeddings can inadvertently encode sensitive patterns; use differential privacy and representation laundering for embeddings.",
+        "Chunking and context windows must balance relevance against information exposure; smaller chunks reduce PII surface area.",
+        "Query expansion and reranking can amplify PII risks by retrieving tangential sensitive documents; restrict expansion vocabularies.",
+        "Prompt structuring must isolate retrieved context from user interactions; never leak retrieval confidence scores or source metadata.",
+        "Production systems require audit logging, access controls, and regular penetration testing to maintain PII protection at scale."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A production RAG system handles 10 billion daily queries across millions of documents. Which architectural choice MOST reduces PII exposure?",
+      "items": [
+        "Increase chunk size to reduce total indexed chunks and improve retrieval speed",
+        "Implement pre-indexing PII detection + post-retrieval filtering + differential privacy on embeddings",
+        "Use larger embedding dimensions to capture more semantic detail about documents",
+        "Cache retrieved contexts globally to reduce redundant vector lookups"
+      ],
+      "answer": 1,
+      "explanation": "Option B combines the three critical layers: prevention (pre-indexing detection), containment (post-retrieval filtering), and obfuscation (differential privacy). This defense-in-depth approach is standard at Google, Meta, and OpenAI. Options A and C increase exposure surface. Option D creates caching vulnerabilities. At 10B queries/day, layered filtering prevents catastrophic PII leaks that regulatory bodies (GDPR, HIPAA, CCPA) would penalize heavily.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of RAG security principles and PII handling strategies with these two knowledge checks. The first quiz focuses on conceptual foundations, while the second applies these concepts to a realistic scenario.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a RAG system processing cricket player statistics, you need to prevent sensitive information (like contract salaries and injury histories) from being retrieved and exposed in generated responses. Which of the following is the PRIMARY mechanism for controlling what data gets retrieved from your knowledge base?",
+      "items": [
+        "Implementing fine-grained access controls and PII masking at the vector retrieval stage before context is passed to the LLM",
+        "Using a stronger language model that naturally refuses to discuss sensitive topics",
+        "Storing all sensitive data in a separate database that the RAG system cannot access",
+        "Adding a disclaimer in the system prompt warning users that sensitive data may appear"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is implementing fine-grained access controls and PII masking at the vector retrieval stage. This is the PRIMARY control point because it prevents sensitive information from ever entering the context window that gets passed to the LLM—you control the problem at its source. Option B is incorrect because LLM refusal is unreliable and doesn't prevent retrieval; sensitive data could still be pulled into context. Option C is impractical because cricket systems need access to legitimate statistics and player information. Option D is ineffective because disclaimers don't prevent actual data leakage—the sensitive information would already be in the generated response. RAG security requires architectural controls, not warnings."
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket analytics RAG system indexes match reports containing player names, locations, and timestamps. A query asks: 'Which batsmen were injured in Mumbai last month?' You want to retrieve relevant match context without exposing personally identifiable injury details. What should you do?",
+      "items": [
+        "Retrieve only aggregated statistics and mask specific player names and injury details before feeding results to the LLM context window",
+        "Decline to answer questions about injuries entirely to avoid any PII exposure risk",
+        "Retrieve full match reports and rely on the LLM's instruction-following to filter sensitive fields in its response",
+        "Store injury data in a separate vector database that requires explicit authentication to access"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is retrieving aggregated statistics while masking sensitive details before context integration. This balances utility and privacy by allowing the system to answer legitimate analytical questions while preventing exposure of personally identifiable injury information. Option B over-corrects by blocking useful queries entirely—RAG systems should be functional, not just safe. Option C is dangerously incorrect because relying on LLM instruction-following for PII protection is unreliable; the model may leak masked information during generation, and attackers can prompt-inject to bypass instructions. Option D adds unnecessary complexity; access controls on separate databases don't solve the problem once data reaches the LLM context. The proper approach is preventive filtering at the retrieval and chunking boundary, before sensitive content ever reaches the language model's input."
     }
   ]
 }

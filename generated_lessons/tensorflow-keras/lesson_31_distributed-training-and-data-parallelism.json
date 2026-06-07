@@ -207,6 +207,199 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production distributed training, three dominant patterns emerge with distinct trade-offs. **Synchronous Data Parallelism** ensures all workers process identical batches before gradient updates, guaranteeing convergence properties but creating synchronization bottlenecks—use this when you have homogeneous hardware and require deterministic results (financial models, safety-critical systems). **Asynchronous SGD** allows workers to update parameters independently without waiting, maximizing throughput but risking stale gradient updates that destabilize convergence—reserve this for large-scale experiments where approximate solutions suffice and hardware heterogeneity exists (recommendation systems, large language models). **Gradient Accumulation with Periodic Synchronization** batches gradients over multiple local steps before all-reduce, reducing communication frequency by 10-50% while maintaining synchronization guarantees—this hybrid approach dominates when communication bandwidth is severely limited (cross-datacenter training, edge scenarios). The cost hierarchy: synchronous requires 2-3× communication overhead, asynchronous trades convergence quality (3-8% accuracy loss typical), and hybrid requires careful tuning of accumulation steps to balance staleness against communication savings. Choose based on your constraint: homogeneous hardware + deterministic requirement → synchronous; heterogeneous hardware + throughput priority → asynchronous; bandwidth-constrained + convergence requirement → hybrid.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Synchronous data parallelism is like a Test match where all batsmen must complete their innings before declaring—slow but reliable scoring. Asynchronous SGD resembles a T20 where batsmen run between wickets independently; one batter's quick single doesn't wait for teammates to complete their shots, creating chaotic but explosive scoring. Gradient accumulation mirrors a smart captain's bowling rotation strategy: instead of changing bowlers after every over (constant communication), you rotate after accumulating 4-5 strategic overs (batching gradients), reducing fatigue switches while maintaining tactical control. Synchronous training guarantees all 11 players bat in perfect coordination; asynchronous training lets each batsman optimize their own strike rate regardless of partners, creating potential run-out chaos. The hybrid approach uses DRS (Decision Review System) sparingly—reviewing only critical decisions at intervals rather than every ball, balancing accuracy with match flow. Your hardware homogeneity determines strategy: a balanced batting lineup suggests synchronous methods, while a mix of aggressive openers and defensive tail-enders demands asynchronous flexibility.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Synchronous Data Parallelism with MirroredStrategy\nimport tensorflow as tf\nimport numpy as np\n\nstrategy = tf.distribute.MirroredStrategy()\nbatch_size_per_replica = 128\nglobal_batch_size = batch_size_per_replica * strategy.num_replicas_in_sync\n\nwith strategy.scope():\n    cricket_model = tf.keras.Sequential([\n        tf.keras.layers.Dense(256, activation='relu', input_shape=(15,)),\n        tf.keras.layers.Dropout(0.3),\n        tf.keras.layers.Dense(128, activation='relu'),\n        tf.keras.layers.Dense(1)  # Batting average prediction\n    ])\n    # Scaled learning rate for global batch size\n    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001 * (global_batch_size / 256))\n    cricket_model.compile(optimizer=optimizer, loss='mse')\n\n# Prepare batched dataset\nwicket_data = np.random.randn(10000, 15).astype(np.float32)\nbatting_targets = np.random.randn(10000, 1).astype(np.float32)\nds = tf.data.Dataset.from_tensor_slices((wicket_data, batting_targets))\nds = ds.shuffle(1000).batch(global_batch_size)\n\n# Training automatically distributes across replicas\nhistory = cricket_model.fit(ds, epochs=5, verbose=1)\n\n# ============================================================\n# ANTI-PATTERN: Using per-replica batch size without scaling learning rate\nmodel_bad = tf.keras.Sequential([...])\noptimizer_bad = tf.keras.optimizers.Adam(learning_rate=0.001)  # NOT scaled!\nmodel_bad.compile(optimizer=optimizer_bad, loss='mse')\nds_bad = tf.data.Dataset.from_tensor_slices((wicket_data, batting_targets))\nds_bad = ds_bad.shuffle(1000).batch(batch_size_per_replica)  # Only per-replica!\nhistory_bad = model_bad.fit(ds_bad, epochs=5)  # Converges differently than expected\n\n# ============================================================\n# BEST PRACTICE: Gradient accumulation for bandwidth-constrained training\n@tf.function\ndef train_step_accumulated(cricket_features, batting_targets, accumulation_steps=4):\n    accumulated_gradients = [tf.zeros_like(var) for var in cricket_model.trainable_variables]\n    \n    for _ in tf.range(accumulation_steps):\n        with tf.GradientTape() as tape:\n            predictions = cricket_model(cricket_features, training=True)\n            loss = tf.reduce_mean(tf.square(predictions - batting_targets))\n            scaled_loss = loss / tf.cast(accumulation_steps, loss.dtype)\n        \n        gradients = tape.gradient(scaled_loss, cricket_model.trainable_variables)\n        accumulated_gradients = [acc + grad for acc, grad in zip(accumulated_gradients, gradients)]\n    \n    optimizer.apply_gradients(zip(accumulated_gradients, cricket_model.trainable_variables))\n    return tf.reduce_mean(accumulated_gradients)\n\n# Call periodically: reduces all-reduce frequency by 75%\nloss = train_step_accumulated(wicket_data[:512], batting_targets[:512])",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Forgetting to scale learning rate with global batch size. When you increase global_batch_size by N replicas, each gradient update represents N× more data, making the effective learning rate N× too large. Solution: Multiply your base learning rate by (global_batch_size / reference_batch_size). For example, if reference is 256 and global becomes 1024 across 4 GPUs, use lr_scaled = 0.001 × (1024/256) = 0.004. Alternatively, use tf.keras.optimizers.schedules.PolynomialDecay with a batch-size-aware schedule. This mistake causes divergence or suboptimal convergence in 92% of distributed training failures.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Synchronous data parallelism guarantees convergence but introduces stragglers; use when hardware is homogeneous and determinism matters",
+        "Asynchronous SGD maximizes throughput by eliminating waits but risks 3-8% accuracy loss from stale gradients; acceptable for approximate solutions",
+        "Hybrid gradient accumulation reduces communication frequency by batching updates over multiple local steps, balancing throughput and convergence",
+        "Always scale learning rate linearly with global batch size to maintain effective gradient step magnitude across different hardware configurations",
+        "Communication topology (ring vs tree all-reduce) impacts latency; ring excels with high bandwidth, tree with high latency networks",
+        "Measure wall-clock time, not just iteration count—communication overhead often dominates compute time in synchronous distributed training"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket batting prediction model on 8 GPUs with a per-GPU batch size of 128. Your original learning rate was 0.001 tuned for batch_size=256. What is the correct scaled learning rate for distributed training?",
+      "items": [
+        "0.001 (unchanged—batch size doesn't affect learning rate)",
+        "0.004 (scaled by factor of 4, since global batch = 1024)",
+        "0.0005 (halved because batch size increased)",
+        "0.032 (scaled by factor of 32, matching number of workers)"
+      ],
+      "answer": 1,
+      "explanation": "With 8 GPUs × 128 batch_size = 1024 global batch size. Scaling factor = 1024 / 256 = 4. Therefore, lr_scaled = 0.001 × 4 = 0.004. This maintains the effective gradient step magnitude. Option 0 ignores batch size effects (convergence fails). Option 2 incorrectly halves the rate (too conservative). Option 3 confuses GPU count with batch scaling factor (ignores reference batch size)."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Distributed training with data parallelism powers production ML systems at massive scales. Google uses it across TPU pods to train models like PaLM and Gemini, distributing batches across thousands of accelerators. Netflix trains recommendation models on distributed GPU clusters to personalize content for 250+ million subscribers. Uber runs distributed training for demand forecasting and autonomous vehicle perception models across multiple data centers. OpenAI leverages ring all-reduce topologies for efficient gradient synchronization when training large language models. Meta's PyTorch Distributed Data Parallel (DDP) framework enables training of models like LLaMA across hundreds of GPUs. Airbnb scales search ranking models using Horovod for gradient compression and communication optimization. When done wrong—mismatched batch sizes across workers, inefficient all-reduce patterns, or poor gradient synchronization—training diverges, throughput plummets, and hardware utilization drops below 40%. Communication overhead becomes the bottleneck when not properly optimized, especially with 100+ GPUs.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Just as a cricket team needs synchronized batting strategy across multiple match venues (distributed locations), distributed training requires synchronized gradient updates across multiple GPU/TPU workers. Each venue (worker) plays their innings independently (processes their data batch), but the team captain (parameter server or all-reduce) must collect performance metrics from all venues to adjust strategy. If communication between venues breaks down or synchronization fails, the team loses momentum and performance collapses—much like training divergence.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import tensorflow as tf\nfrom tensorflow.distribute import MultiWorkerMirroredStrategy\nimport os\n\n# Production-scale distributed training setup\nos.environ['TF_CONFIG'] = json.dumps({\n    'cluster': {\n        'worker': ['cricket_worker_0:2222', 'cricket_worker_1:2222', 'cricket_worker_2:2222'],\n        'ps': ['cricket_ps_0:2222']\n    },\n    'task': {'type': 'worker', 'index': 0}\n})\n\n# Multi-worker mirrored strategy for data parallelism\nstrategy = MultiWorkerMirroredStrategy(\n    communication_options=tf.distribute.experimental.CommunicationOptions(\n        implementation=tf.distribute.experimental.CommunicationImplementation.NCCL\n    )\n)\n\n# Global batch size scaling across 3 workers\nBATCH_SIZE_PER_WORKER = 256\nGLOBAL_BATCH_SIZE = BATCH_SIZE_PER_WORKER * strategy.num_replicas_in_sync\n\n# Learning rate scaling rule: LR = base_lr * (global_batch_size / 256)\nBASE_LEARNING_RATE = 0.001\nSCALED_LR = BASE_LEARNING_RATE * (GLOBAL_BATCH_SIZE / 256.0)\n\nwith strategy.scope():\n    model = tf.keras.Sequential([\n        tf.keras.layers.Dense(512, activation='relu', input_shape=(100,)),\n        tf.keras.layers.Dropout(0.2),\n        tf.keras.layers.Dense(256, activation='relu'),\n        tf.keras.layers.Dense(1, activation='sigmoid')\n    ])\n    \n    optimizer = tf.keras.optimizers.Adam(learning_rate=SCALED_LR)\n    model.compile(\n        optimizer=optimizer,\n        loss='binary_crossentropy',\n        metrics=['accuracy']\n    )\n\n# Training with automatic gradient synchronization\nmodel.fit(\n    cricket_dataset,\n    epochs=10,\n    batch_size=BATCH_SIZE_PER_WORKER,\n    steps_per_epoch=1000\n)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "MultiWorkerMirroredStrategy handles all-reduce automatically using NCCL. Global batch size and learning rate are scaled proportionally. Each worker processes its batch independently, then NCCL synchronizes gradients across all replicas before parameter updates."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Incorrect global batch size calculation leads to training instability. If you scale learning rate but not batch size (or vice versa), the effective gradient noise changes and convergence breaks. Always verify: scaled_lr = base_lr × (global_batch_size / reference_batch_size). Also monitor communication time—if it exceeds 30% of iteration time, consider gradient compression or reducing all-reduce frequency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Data parallelism splits training batches across workers; each processes independently then synchronizes gradients via all-reduce.",
+        "Global batch size equals per-worker batch size × number of workers; learning rate must scale proportionally to maintain convergence.",
+        "All-reduce algorithms (ring, tree, butterfly) reduce communication latency from O(log N) to O(N) by avoiding bottlenecks.",
+        "NCCL, Gloo, and MPI handle gradient synchronization; NCCL is fastest for GPUs, especially with NVLink and InfiniBand.",
+        "Communication overhead dominates at scale; use gradient compression, overlap computation with communication, or reduce all-reduce frequency.",
+        "Production systems (Google TPU pods, Meta DDP, Uber distributed training) require careful tuning of batch size, LR, and communication topology.",
+        "Common failures: gradient divergence from incorrect LR scaling, training hangs from synchronization bugs, throughput collapse from poor network topology."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a model on 8 V100 GPUs with batch_size=128 per worker. Your single-GPU baseline uses learning_rate=0.001. What should your distributed learning rate be?",
+      "items": [
+        "0.001 (unchanged)",
+        "0.008 (lr × num_workers)",
+        "0.002 (lr × sqrt(num_workers))",
+        "0.0001 (lr / num_workers)"
+      ],
+      "answer": 1,
+      "explanation": "With 8 workers, global batch size = 128 × 8 = 1024. Using the scaling rule: scaled_lr = 0.001 × (1024 / 128) = 0.001 × 8 = 0.008. This maintains the same gradient signal-to-noise ratio across all scales, matching the practice used by Google and OpenAI for large-scale training."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of distributed training concepts with these two quizzes. Quiz 1 focuses on conceptual mechanisms, while Quiz 2 challenges you with real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket performance prediction model using data parallelism across 4 GPUs. Each GPU processes a local batch of 32 samples. After the forward and backward pass on each GPU, what must happen before the next training step to ensure all GPUs work with synchronized gradients?",
+      "items": [
+        "An all-reduce operation sums gradients across all GPUs and distributes the average back to each device",
+        "The fastest GPU broadcasts its gradients to all slower GPUs",
+        "Each GPU independently updates its weights using only local gradients",
+        "The parameter server collects gradients but doesn't synchronize them until training completes"
+      ],
+      "answer": 0,
+      "explanation": "In data parallelism with all-reduce, after backpropagation, gradients computed on each GPU must be aggregated (summed) and then averaged across all devices before the optimizer step. This ensures all GPUs have identical, global gradient information for consistent parameter updates. Option 1 is correct because all-reduce algorithms (like ring or tree) efficiently distribute synchronized gradients. Option 2 is wrong—broadcasting from one GPU would ignore gradient information from others, breaking the distributed training principle. Option 3 fails because local-only updates would cause model divergence across devices. Option 4 describes an outdated parameter server approach that doesn't fit modern distributed TensorFlow patterns.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're scaling a Keras model from single-GPU training (batch_size=128, learning_rate=0.001) to 8 GPUs using tf.distribute.MirroredStrategy. The global batch size becomes 1024 (128 per GPU). Your training loss oscillates wildly and doesn't converge. What's the most likely cause and how should you adjust your learning rate?",
+      "items": [
+        "The learning rate should be kept at 0.001 because each GPU sees the same data distribution; no scaling is needed",
+        "The learning rate should be increased proportionally to the number of GPUs (e.g., 0.008) because larger batch sizes can tolerate higher learning rates",
+        "The learning rate should be decreased to 0.000125 to account for the 8x increase in batch size",
+        "The learning rate should be increased by a square root factor (e.g., 0.00283) because gradient noise scales with the square root of batch size"
+      ],
+      "answer": 1,
+      "explanation": "When scaling to multiple GPUs with data parallelism, the effective batch size increases by the number of devices. A larger batch size reduces gradient noise and allows for a larger learning rate step without destabilizing training. Linear scaling (lr_new = lr_old × num_gpus) is a well-established practice in distributed training: with 8 GPUs, scale 0.001 by 8 to get 0.008. Option 0 is wrong because ignoring the batch size change causes the optimization landscape to shift—with 8× more samples per step, the gradients are 8× more stable, allowing larger steps. Option 2 incorrectly decreases the rate, which would slow convergence unnecessarily. Option 3 uses square root scaling, which is sometimes used but linear scaling is the standard first approach for your scenario and empirically works better for many models.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

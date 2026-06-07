@@ -208,6 +208,185 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production deployments leverage three dominant patterns based on computational constraints and task complexity. **LoRA-first pattern** applies when you have moderate GPU memory (8-24GB) and need rapid iteration across multiple downstream tasks—optimal for multi-tenant platforms where different customers fine-tune the same base model. **Adapter cascade pattern** suits scenarios requiring sequential task specialization where adapters are stacked progressively; this incurs ~10-15% inference latency overhead but enables composable knowledge. **QAT + LoRA hybrid** becomes essential for edge deployment or inference-constrained environments (mobile, embedded systems); quantization reduces model size by 75-90% while LoRA maintains task-specific performance, though requires careful calibration to prevent catastrophic forgetting. The cost-benefit analysis hinges on three variables: memory footprint (LoRA ~0.1% vs Adapters ~2% of model parameters), inference latency (prefix-tuning adds 5-8ms per token due to KV cache overhead), and convergence speed (LoRA typically requires 40% fewer training steps than full fine-tuning). Choose LoRA when scaling horizontally across tasks; choose adapters when stacking is valuable; choose QAT when inference resources are the bottleneck.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: **LoRA-first** mirrors your primary bowling attack—you have your best pace bowler (base model) and selectively add fielders (low-rank matrices) in strategic positions for different match situations without restructuring the entire team. **Adapter cascade** is like rotating your bowling lineup based on pitch conditions; each bowler brings specialized skills that compound (first bowler sets pressure, second exploits weakness, third finishes). **QAT + LoRA hybrid** resembles using DRS strategically—you compress information (quantize) to your key decisions (LoRA) rather than reviewing every delivery, balancing accuracy against decision time. The field placement patterns (where you station adapters) depend on opponent weakness analysis (task domain characteristics), just as you'd place slips for a pacer versus mid-field for a spinner. Understanding when to *set* a pattern versus *modify* it during an innings is the difference between novice and expert deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Applying same LoRA rank across all layers\nfrom peft import LoraConfig, get_peft_model\nimport torch\n\n# Bad: Uniform rank ignores layer importance\nbad_config = LoraConfig(\n    r=16,  # Same rank everywhere—wasteful in early layers\n    lora_alpha=32,\n    target_modules=['q_proj', 'v_proj', 'k_proj', 'up_proj', 'down_proj'],\n    lora_dropout=0.05,\n    bias='none'\n)\n\n# ✅ BEST PRACTICE: Layer-wise adaptive rank allocation\nbest_config = LoraConfig(\n    r=8,  # Lower rank for early layers (pattern recognition)\n    lora_alpha=16,\n    target_modules=['q_proj', 'v_proj'],  # Focus on attention heads\n    lora_dropout=0.1,  # Higher dropout prevents overfitting on small datasets\n    bias='none',\n    layers_to_transform=[10, 11, 12, 13, 14, 15]  # Allocate budget to final layers\n)\n\nmodel = get_peft_model(base_model, best_config)\n\n# Anti-pattern: No validation monitoring\nfor epoch in range(num_epochs):\n    train_loss = train_one_epoch(model, train_loader)\n    # Missing: validation checkpoint, early stopping, rank scaling\n\n# Best practice: Progressive rank allocation with validation\nfrom pathlib import Path\n\nbest_val_loss = float('inf')\npatience_counter = 0\n\nfor epoch in range(num_epochs):\n    train_loss = train_one_epoch(model, train_loader)\n    val_loss = evaluate(model, val_loader)\n    \n    # Save only when validation improves\n    if val_loss < best_val_loss:\n        best_val_loss = val_loss\n        model.save_pretrained(f'./checkpoints/epoch_{epoch}')\n        patience_counter = 0\n    else:\n        patience_counter += 1\n    \n    # Early stopping if no improvement\n    if patience_counter >= 3:\n        print(f'Early stopping at epoch {epoch}')\n        break",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "The anti-pattern wastes parameters on early transformer layers that already capture general features; the best practice concentrates low-rank updates in final layers (domain-specific reasoning) while maintaining validation hygiene to prevent overfitting on small fine-tuning datasets."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Mismatch between LoRA rank and task complexity is the #1 fine-tuning failure.** Too-low rank (r=4) on complex domain adaptation tasks causes severe underfitting where validation loss plateaus 15-20% above target; too-high rank (r=128) on simple classification causes 3-5x parameter explosion and overfitting on datasets <10k examples. **Fix:** Start with r=8 for classification/summarization tasks and r=16-32 for complex reasoning/domain transfer. Use this diagnostic: if training loss decreases but validation loss increases after 2-3 epochs, your rank is too high—reduce it and increase lora_dropout from 0.05 to 0.15. Always compute the actual parameter ratio: (2 × r × hidden_dim × num_layers) ÷ (total_model_params) should stay below 1-2% for efficient fine-tuning.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "LoRA excels for multi-task scenarios where model reuse is critical; adapters win when task knowledge must compose sequentially",
+        "QAT + LoRA hybrid is mandatory for edge inference; standalone LoRA sufficient for cloud serving with adequate GPU memory",
+        "Layer-wise rank allocation (higher in middle/final layers) outperforms uniform rank by 8-12% efficiency on benchmark tasks",
+        "Validation monitoring with early stopping prevents rank-induced overfitting; checkpoint the best LoRA weights, not the full model",
+        "Parameter budget allocation should match layer importance: compute gradients through frozen layers to identify which ones actually need updates"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're fine-tuning a 70B model for cricket commentary generation on a single A100 (40GB). After 3 epochs with r=32 LoRA, validation loss plateaus while training loss drops. What's the most likely issue and fix?",
+      "items": [
+        "Increase learning rate; the model is underfitting",
+        "Reduce rank to r=16 and increase lora_dropout to 0.15; the rank is too high causing overfitting",
+        "Switch to full fine-tuning; LoRA is insufficient for creative tasks",
+        "Add more training data; validation loss plateau always means data insufficiency"
+      ],
+      "answer": 1,
+      "explanation": "Divergence between training and validation loss is the classic overfitting signature. With r=32 on a 70B model, you're allocating ~1.2% of parameters to task-specific learning—excessive for commentary generation (relatively constrained task). Reducing rank decreases capacity while increasing dropout adds regularization. Full fine-tuning would consume 40GB entirely just for gradients (not feasible on A100). More data helps but doesn't fix the core issue: you've given the model too much capacity to memorize training patterns rather than generalize."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Parameter-efficient fine-tuning is now critical infrastructure at scale. Google uses LoRA variants across Gemini deployments to customize models for different regions and use cases without retraining from scratch. Meta leverages adapter modules in production LLaMA fine-tuning pipelines serving millions of requests daily. OpenAI employs quantization-aware fine-tuning for domain-specific GPT variants across enterprise customers—reducing storage by 75% while maintaining quality. Netflix uses prefix tuning for personalized recommendation explanations across their 250M subscriber base. Uber fine-tunes routing and ETA models using parameter-efficient methods, updating models weekly without GPU farm expansion. At scale, naive full fine-tuning breaks: memory explodes, training time stretches to weeks, model serving clusters need 10x more capacity. Companies discovered that 0.1% trainable parameters often match 100% fine-tuning performance—transforming economics from millions to thousands in training costs per iteration.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A batsman (your LLM) has a core technique developed over years (pre-training). When facing a new bowler's style (domain-specific task), they don't rebuild their entire stance—they adjust their footwork, bat angle, and grip (LoRA adjustments). The 95% of their trained muscle memory stays frozen; only key positioning parameters adapt. A team playing on a bouncy wicket (quantized low-rank space) still wins matches using the same core batting principles. Scale matters: a cricket academy training 1,000 players uses specialized coaches per position (adapters) rather than hiring entirely new trainers—efficient allocation of expertise.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Choosing the wrong rank or adapter configuration for your cricket_domain_model can waste weeks of training. Always run LoRA rank sweeps (8→64) on 10% of data first. Mixing quantization with prefix tuning requires careful initialization—misalignment causes 15-30% performance drop. Monitor actual inference latency in your serving infrastructure; theoretical speedups rarely match production reality when accounting for batching overhead.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "LoRA reduces trainable parameters by 99%+ while matching full fine-tuning—enables per-user/task customization economically.",
+        "Adapters and prefix tuning add minimal inference latency (<5ms) compared to full model serving, critical for real-time cricket_prediction_systems.",
+        "Quantization-aware fine-tuning cuts memory by 75% and storage by 80%, making edge deployment and multi-model serving feasible.",
+        "Production systems fail when rank/adapter size chosen without validation; always benchmark on held-out domain data before scaling.",
+        "Combining methods (LoRA + quantization + adapters) requires careful tuning; stacking without testing causes compounding degradation.",
+        "Parameter-efficient methods enable weekly model updates for production systems without infrastructure expansion—critical for fast-moving domains.",
+        "Enterprise adoption hinges on reproducibility and monitoring; version control your LoRA weights and track domain-specific performance separately."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket_sentiment_analyzer processes 100M tweets daily. Full fine-tuning takes 2 weeks and requires 8×A100 GPUs. Using LoRA with rank=32, you complete training in 3 days on 1×A100. What is the primary risk of this approach in production?",
+      "items": [
+        "LoRA parameters will degrade over time as new cricket terms emerge",
+        "The rank might be insufficient for your domain—sentiment accuracy could drop 5-15% without validation on held-out cricket data",
+        "Inference latency will double compared to quantized models",
+        "LoRA is incompatible with batch processing at scale"
+      ],
+      "answer": 1,
+      "explanation": "While LoRA provides massive efficiency gains, choosing rank without validation is the #1 production failure mode. A rank=32 might capture only 70% of domain variance for cricket-specific language nuances. You must benchmark different ranks (8, 16, 32, 64) on 5-10% of cricket domain data before deployment. Full fine-tuning doesn't degrade over time, inference latency is actually reduced, and LoRA batches efficiently—but insufficient expressiveness directly causes accuracy loss in production."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of parameter-efficient fine-tuning with these two knowledge checks. The first quiz focuses on conceptual understanding of the core mechanisms we've covered. The second quiz presents a real-world scenario where you'll apply what you've learned to make practical decisions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In Low-Rank Adaptation (LoRA), why do we decompose weight updates into two smaller matrices (A and B) with rank r, rather than directly fine-tuning the full weight matrix W?",
+      "items": [
+        "Because it reduces trainable parameters dramatically while maintaining model expressivity through the low-rank factorization, allowing efficient adaptation with minimal memory overhead and faster training",
+        "Because low-rank matrices are mathematically guaranteed to always produce better results than full-rank updates",
+        "Because GPUs can only process matrices with rank less than 10",
+        "Because it eliminates the need for any gradient computations during fine-tuning"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer explains the core principle: LoRA reduces computational and memory costs by limiting updates to a low-rank subspace. For a weight matrix W of shape (d_out × d_in), updating all parameters costs O(d_out × d_in). With LoRA, we only train A (d_out × r) and B (r × d_in), costing O(r(d_out + d_in)), where r << min(d_out, d_in). This factorization works because fine-tuning adaptations often lie in a lower-dimensional subspace. Option B is false—low-rank isn't guaranteed better; it's a trade-off. Option C misunderstands GPU capabilities. Option D is incorrect because LoRA still requires gradients; it just reduces their dimensionality."
+    },
+    {
+      "type": "quiz",
+      "content": "You're fine-tuning a large language model for cricket match commentary generation. Your base model has 7 billion parameters, but you have limited GPU memory (16GB). You've tried LoRA with rank 8, which trains well but produces generic commentary lacking sport-specific nuance. Which combination of techniques would you apply to improve performance while respecting memory constraints?",
+      "items": [
+        "Increase LoRA rank to 32, add adapter modules in every transformer layer, and apply Quantization-Aware Fine-Tuning to the base model",
+        "Switch to full fine-tuning of all 7B parameters since LoRA isn't capturing cricket terminology well enough",
+        "Keep LoRA rank at 8 but apply prefix tuning with 100 learnable tokens to inject task-specific knowledge, combine with 8-bit quantization of frozen weights",
+        "Use only adapter modules without LoRA, as they're more memory-efficient and better for domain adaptation"
+      ],
+      "answer": 2,
+      "explanation": "The correct answer combines multiple complementary techniques strategically. Increasing LoRA rank (option A) helps but risks exceeding 16GB memory with adapters in every layer. Full fine-tuning (option B) would blow memory and isn't necessary when efficient methods work. The correct approach: LoRA rank 8 handles general adaptation efficiently; prefix tuning adds 100 learned tokens (~1-2MB) that steer the model toward cricket-specific patterns (like player names, match terminology, commentary style); 8-bit quantization compresses frozen base model weights from 28GB to ~7GB, freeing memory. This layered approach addresses the core issue—generic output—by introducing domain knowledge through prefix tuning's learned prompts while maintaining efficiency. Option D underutilizes available techniques; combining LoRA with prefix tuning is more powerful for this nuanced task."
     }
   ]
 }

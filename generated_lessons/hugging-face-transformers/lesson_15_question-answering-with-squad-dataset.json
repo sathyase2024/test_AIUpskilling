@@ -195,6 +195,191 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production QA systems demand careful architectural decisions. Three dominant patterns emerge: (1) **Fine-tuning on domain-specific data** — optimal when you have 500+ labeled examples and need highest accuracy, but requires GPU resources and maintenance of separate model checkpoints; (2) **Few-shot prompting with large models** — fastest to deploy with minimal labeled data (10-50 examples), trading off inference latency and API costs for development speed; (3) **Retrieval-augmented generation (RAG) with frozen encoders** — balances scalability and cost when your passage corpus changes frequently, avoiding retraining but requiring efficient vector databases. Fine-tuning dominates when accuracy is paramount and data exists. Few-shot works for rapid prototyping with budget constraints. RAG excels for dynamic knowledge bases where retraining becomes prohibitive. Token classification overhead grows quadratically with passage length—passages exceeding 512 tokens require sliding window strategies that increase compute 3-5x. Batch inference efficiency peaks at 32-64 examples per batch on consumer GPUs; smaller batches waste parallelization, larger batches cause memory overflow. Always profile your specific hardware before deployment decisions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Fine-tuning your model is like selecting your XI and training them extensively on your home pitch—expensive preparation that pays off when you know the exact ground conditions. Few-shot prompting resembles a T20 XI picking flexible all-rounders who adapt quickly without match-specific practice—ready immediately but potentially less polished. RAG is your DRS strategy: instead of memorizing every umpire's decision pattern, you retrieve the exact rulebook moment-by-moment when disputes arise. Fine-tuning = aggressive field placements (high risk, high reward on familiar grounds); few-shot = defensive formations (safe, adaptable to unknown venues); RAG = DRS usage (surgical precision, consulting external authority only when needed). Your bowling rotation (inference strategy) must match your ground size (passage length) and opposition strength (question complexity). Choosing the wrong pattern is like playing spin bowlers on a bouncy wicket—technically possible but fighting against your constraints.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Batch processing with sliding window for long passages\nfrom transformers import pipeline, AutoTokenizer\nimport numpy as np\n\ndef qa_batched_sliding_window(contexts_batsman, questions_bowling, model_name='distilbert-base-uncased-distilled-squad'):\n    \"\"\"Process long passages with sliding window to respect token limits.\"\"\"\n    qa_pipeline = pipeline('question-answering', model=model_name, device=0)\n    tokenizer = AutoTokenizer.from_pretrained(model_name)\n    max_length = 512\n    stride = 128\n    \n    all_answers_scorecard = []\n    \n    for context_batsman, question_bowling in zip(contexts_batsman, questions_bowling):\n        encoded = tokenizer.encode_plus(question_bowling, context_batsman, max_length=max_length, \n                                       truncation='only_second', return_overflowing_tokens=True,\n                                       stride=stride)\n        \n        # Process each window (innings)\n        best_answer_innings = {'score': 0, 'answer': ''}\n        for window_idx in range(len(encoded['input_ids'])):\n            result = qa_pipeline(question=question_bowling, \n                               context=tokenizer.decode(encoded['input_ids'][window_idx]))\n            if result['score'] > best_answer_innings['score']:\n                best_answer_innings = result\n        \n        all_answers_scorecard.append(best_answer_innings)\n    \n    return all_answers_scorecard\n\n# ANTI-PATTERN: Processing entire passage at once (causes memory issues)\ndef qa_naive_no_batching(context_batsman, question_bowling):\n    \"\"\"AVOID: This fails on passages > 512 tokens.\"\"\"\n    qa = pipeline('question-answering')\n    # Will silently truncate or crash on long cricket match commentary\n    return qa(question=question_bowling, context=context_batsman)\n\n# Usage\nbatsman_passages = [\n    \"Virat Kohli scored 183 runs in the ODI series...\",\n    \"The Test match lasted five days with India batting twice...\"\n]\nbowling_questions = [\n    \"How many runs did Virat Kohli score?\",\n    \"How many days did the Test match last?\"\n]\n\nscorecard = qa_batched_sliding_window(batsman_passages, bowling_questions)\nfor answer in scorecard:\n    print(f\"Answer: {answer['answer']} (Confidence: {answer['score']:.2f})\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Passage Length Truncation Silent Failures** — The most common beginner mistake is passing passages longer than 512 tokens directly to SQuAD-trained models without implementing sliding window logic. The tokenizer silently truncates everything beyond token 512, meaning your model never sees the answer if it appears in lines 6-10 of a 50-line cricket match report. The answer extraction fails with low confidence scores that beginners misinterpret as 'the model is uncertain' rather than 'the model never saw the answer.' **Fix:** Always check passage length before inference: `tokens = len(tokenizer.tokenize(passage))`. If tokens > 480 (leaving buffer), implement sliding window decoding with 128-256 token stride, then aggregate scores across windows using max-score selection. Use `AutoTokenizer.encode_plus(..., return_overflowing_tokens=True, stride=128)` to handle windowing automatically. Test with at least 5 passages longer than your dataset's 90th percentile token length.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Fine-tuning on domain data yields best accuracy when 500+ labeled examples exist; few-shot excels for rapid prototyping with minimal data",
+        "Sliding window inference is mandatory for passages exceeding 512 tokens; stride size (128-256) trades latency against answer span fragmentation",
+        "Batch processing efficiency peaks at 32-64 examples per batch; profile your specific GPU before setting production batch sizes",
+        "Always validate token length before inference to prevent silent truncation failures that mask missing answers in long passages",
+        "Retrieval-augmented generation avoids retraining when passage corpus updates; optimal for dynamic knowledge bases despite vector DB overhead"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You have a cricket commentary passage of 2,500 tokens describing a Test match over 5 days. Your SQuAD model has a maximum context length of 512 tokens. What is the BEST approach?",
+      "items": [
+        "Split the passage manually into 512-token chunks and run inference on each independently, then return the highest-confidence answer",
+        "Use sliding window decoding with stride=128, aggregate answers across windows by confidence score, and validate the final answer spans a coherent match event",
+        "Submit the entire passage and let the tokenizer handle truncation automatically",
+        "Use a few-shot prompt with GPT-4 instead of fine-tuned SQuAD"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct. Sliding window with stride preserves context overlap that prevents answer spans from being fragmented across window boundaries. Option A risks missing answers that span multiple chunks or creating duplicate answers. Option C causes silent truncation where the model never sees answers beyond token 512. Option D abandons your trained model unnecessarily. The stride value (128 tokens) is critical—it must be large enough to catch answers spanning window boundaries but small enough to not quadruple inference latency."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Question answering systems power critical production systems at scale across major tech companies. Google uses BERT-based QA for Search and Assistant, processing millions of queries daily across their infrastructure. Netflix leverages transformer QA for content discovery and user support automation, handling thousands of concurrent requests. Meta's Blenderbot and OpenAI's ChatGPT integrate extractive QA with generative models, serving billions of conversations monthly. Uber uses similar architectures for FAQ automation and documentation retrieval. When deployed incorrectly—without proper passage ranking, low-confidence thresholding, or context truncation—systems hallucinate answers or return irrelevant passages. Production systems typically batch process with TensorRT or ONNX optimizations, maintain separate passage indexers (Elasticsearch, FAISS), and implement confidence scoring pipelines. Scaling requires handling variable-length documents, managing latency under 100ms, and gracefully degrading when models are uncertain.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A batsman (question) faces the bowler (passage context). The batsman must identify exactly which ball (token range) to strike—not too early, not too late. Just as a cricket commentator might replay the exact moment a batsman made contact, the attention mechanism replays question-passage interactions to pinpoint the precise word boundaries where the answer begins and ends.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Extractive QA identifies answer spans by classifying start/end token positions using transformer embeddings and attention mechanisms.",
+        "SQuAD dataset provides 100K+ context-question-answer triples enabling supervised training of span-selection models at scale.",
+        "Self-attention layers compute interactive representations between questions and passages, essential for precise answer localization.",
+        "Production systems require confidence thresholding, passage ranking, and latency optimization—raw model outputs insufficient for deployment.",
+        "Token classification approach scales efficiently compared to generative QA but limited to extracting existing passage text.",
+        "Common failure modes include unanswerable questions, multi-sentence answers, and null answer handling without explicit negative sampling.",
+        "Modern pipelines combine dense retrieval, ranking, and reading comprehension—single models rarely optimal for enterprise question-answering systems."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of question answering with Hugging Face Transformers through these two comprehensive quizzes. The first quiz focuses on conceptual mechanisms, while the second presents a real-world scenario where you'll apply your knowledge to solve practical problems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In extractive question answering with BERT, the model learns to identify answer spans by classifying tokens into answer and non-answer categories. Which of the following best explains why self-attention is crucial for this task?",
+      "items": [
+        "Self-attention allows the model to compute contextual relationships between tokens in the question and passage, enabling it to identify which passage tokens are relevant to answering the specific question asked",
+        "Self-attention reduces the model's computational complexity, making it faster to process long passages and questions simultaneously",
+        "Self-attention automatically extracts named entities from the passage, which are always the correct answers in SQuAD-style datasets",
+        "Self-attention converts token embeddings into probability distributions, which directly determine the start and end positions of the answer span"
+      ],
+      "answer": 0,
+      "explanation": "Self-attention mechanisms compute weighted relationships between all token pairs, allowing the model to understand how question tokens interact with passage tokens. This contextual understanding is essential for identifying which passage regions contain information relevant to the specific question. Option B is incorrect because self-attention actually increases computational complexity (quadratic in sequence length). Option C misunderstands self-attention's role—it doesn't extract entities; models can learn entity extraction patterns but that's not attention's primary function. Option D confuses attention with the output layer; attention computes relevance weights, not final probabilities directly.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket match analysis system using a fine-tuned SQuAD model. Users ask questions like 'Who hit the winning six?' and 'What was the final score?' Your model performs well on cricket commentary passages but fails when the answer spans multiple sentences (e.g., 'The batsman played defensively and then attacked aggressively'). What is the most likely cause and how would you address it?",
+      "items": [
+        "The SQuAD dataset contains mostly single-token and short-span answers, so the model's token position classifiers haven't learned to handle multi-sentence answer spans; you should either annotate cricket data with longer spans, use a span-ranking approach, or implement post-processing to merge adjacent predictions",
+        "The cricket terminology is unfamiliar to the model's tokenizer; you need to retrain the tokenizer on cricket-specific vocabulary to solve this problem",
+        "Multi-sentence answers require a different model architecture (like sequence-to-sequence) entirely; extractive QA is fundamentally incapable of handling them regardless of training data",
+        "The self-attention mechanism has a maximum range limit that prevents it from attending across sentence boundaries; you must split the passage into smaller chunks and run multiple inference passes"
+      ],
+      "answer": 0,
+      "explanation": "SQuAD's original dataset consists predominantly of single-token to short-span answers (typically under 10 tokens), so models fine-tuned on it learn token classifiers biased toward short predictions. When encountering longer answer spans, the model's start/end position predictions may not align to capture the full span. Solutions include: (1) annotating cricket-specific QA data with longer answers to fine-tune further, (2) using span-ranking models that score candidate spans by length, or (3) implementing heuristics to extend predictions. Option B is incorrect; while domain-specific tokenization helps, vocabulary isn't the core issue here. Option C is false; extractive QA can handle longer spans with appropriate training—it's just that SQuAD's training distribution doesn't naturally prepare models for it. Option D misunderstands attention; self-attention has no hard range limit and can attend across sentences in principle, though in practice the model may not have learned to predict long spans due to training data bias.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The batsman's decision-making process mirrors what happens during inference. Just as a batsman analyzes the bowler's angle, field placement, and match situation to decide whether to defend or attack, the attention mechanism analyzes question tokens and passage context to decide which passage tokens 'belong' to the answer. A batsman trained primarily on defensive scenarios will struggle when unexpectedly faced with an aggressive bowling attack—similarly, a model trained on short-span SQuAD examples struggles with longer answer spans.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "Summary of Key Takeaways",
+      "items": [
+        "Extractive QA models learn token classification biases based on their training data distribution; SQuAD's short-span bias affects real-world performance on longer answers",
+        "Self-attention is essential for computing question-passage relevance, not for automatically extracting entities or reducing complexity",
+        "Domain-specific data annotation and careful error analysis are more effective than architecture changes for handling distribution shifts",
+        "Span-ranking approaches and post-processing heuristics provide practical solutions when model predictions don't align with desired output characteristics"
+      ],
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
     }
   ]
 }

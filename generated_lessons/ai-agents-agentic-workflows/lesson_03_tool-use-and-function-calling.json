@@ -196,6 +196,188 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge when designing tool-use systems: Sequential Tool Chaining (execute tools in strict order with output feeding to input), Parallel Tool Execution (invoke multiple tools simultaneously when independent), and Conditional Branching with Fallbacks (route to different tools based on state verification). Sequential chaining maximizes reliability and constraint propagation but introduces latency—use when data dependencies are strict and correctness outweighs speed (regulatory workflows, financial transactions). Parallel execution minimizes wall-clock time and suits loosely-coupled subtasks, but requires careful state merging and conflict resolution—ideal for information gathering or multi-aspect analysis. Conditional branching with fallbacks provides resilience: if tool_A fails feasibility checks, automatically invoke tool_B as alternative. The trade-off is complexity: branching logic multiplies code paths and testing burden, while pure sequencing keeps the agent predictable but brittle. Most production systems hybrid these: sequence within stages, parallelize across stages, branch on high-uncertainty decision points. Cost considerations matter: parallel tool calls multiply API/compute spend; sequential adds latency; fallback branches increase total execution time but reduce failure rates. Choose based on your SLA requirements, error tolerance, and tool invocation costs.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Sequential tool chaining mirrors a carefully planned bowling attack—fast bowler → spinner → death overs—each phase depends on the previous bowler wearing down the batter, so you execute in strict order. Parallel tool execution resembles fielding placement decisions: you position slip, mid-wicket, and fine leg *simultaneously* because these choices are independent; they don't wait on each other. Conditional branching with fallbacks is like DRS strategy—if your fielder is uncertain about an LBW call, you review (invoke fallback review_tool); if the review confirms, you celebrate; if it overturns, you adjust your bowling plan. A team using *only* sequential patterns plays predictable but slow cricket; teams that parallelize decisions (field placement + batting strategy + bowling rotation concurrently) run faster operations but risk coordination chaos. The best captains hybrid: sequence the major phases (powerplay → middle → death), parallelize tactical decisions within each phase, and keep fallback options (change bowler if current one leaks runs) ready for when primary plans fail.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Rigid Sequential with No Fallback\nclass BattingOrderAgent:\n    def plan_innings(self, match_state):\n        # All tools executed in lockstep; one failure breaks entire chain\n        opener_strategy = self.call_tool('select_opener', match_state)\n        middle_order = self.call_tool('select_middle_order', opener_strategy)\n        tail_selection = self.call_tool('select_tail', middle_order)\n        return tail_selection\n        # Problem: if middle_order tool fails, no recovery—entire plan collapses\n\n# BEST PRACTICE: Conditional with Fallback & Parallel Where Safe\nclass AdaptiveMatchAgent:\n    def plan_innings(self, match_state):\n        # Phase 1: Parallel—independent decisions\n        opener_task = self.call_tool_async('select_opener', match_state)\n        pitch_analysis = self.call_tool_async('analyze_pitch', match_state)\n        (opener_strategy, pitch_condition) = self.await_all([opener_task, pitch_analysis])\n        \n        # Phase 2: Conditional with fallback\n        try:\n            middle_order = self.call_tool('select_middle_order', \n                                         (opener_strategy, pitch_condition))\n            if not self.verify_feasibility(middle_order, match_state):\n                raise ConstraintViolation(\"Middle order violates bench availability\")\n        except ToolFailure:\n            # Fallback: use conservative strategy if tool fails\n            middle_order = self.call_tool('select_middle_order_conservative', match_state)\n            self.log_fallback_used('select_middle_order')\n        \n        tail_selection = self.call_tool('select_tail', middle_order)\n        return {'opener': opener_strategy, 'middle': middle_order, 'tail': tail_selection}\n        # Benefits: Parallelizes independent calls, retries on failure, verifies feasibility",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is assuming all tool calls are independent and safe to parallelize. This causes 'state explosion' where multiple tools operate on stale or conflicting match_state, leading to infeasible plans (e.g., two tools both select the same batter for different roles). Fix: Always serialize tool calls that depend on the same resource (players, budget, time slots). Use constraint_propagation() to verify that outputs from parallel tools don't violate shared constraints before merging results. Explicitly track which tools read/write which state variables—if overlap exists, sequence them or use locking/versioning. Test your feasibility checker thoroughly: it should reject impossible plans *before* execution.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Sequential chaining maximizes correctness but adds latency; use for high-risk decisions.",
+        "Parallel execution minimizes latency but requires careful state merging and conflict detection.",
+        "Conditional branching with fallbacks provides resilience—essential for production robustness.",
+        "Always verify tool outputs against constraints before proceeding; don't trust tool results blindly.",
+        "Hybrid patterns (sequence phases, parallelize within phases) balance speed and safety.",
+        "Common failure: treating independent tools as if they are—always check for shared resource conflicts.",
+        "Cost trade-off: sequential = slower, parallel = more API calls, hybrid = best ROI in production."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're designing an agent for a cricket team that must select players, set field placement, and choose bowling rotation. Player selection and field placement have no data dependencies, but bowling rotation depends on which players were selected. Which pattern is most appropriate?",
+      "items": [
+        "Execute all three sequentially in any order",
+        "Parallelize player selection and field placement; sequence bowling rotation after",
+        "Parallelize all three simultaneously with a final merge step",
+        "Execute player selection first, then parallelize field placement and bowling rotation"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct. Player selection and field placement are independent (no shared constraints between them), so they can be parallelized for speed. Bowling rotation depends on the player selection outcome, so it must be sequenced *after* player selection completes. This hybrid approach (parallelize independent tasks, sequence dependent ones) is the pattern taught in the lesson. Option A wastes time by serializing independent tasks. Option C violates causality by running bowling rotation before player selection completes. Option D unnecessarily delays field placement."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Tool use and function calling power production systems at scale across major tech companies. Google's Vertex AI agents orchestrate multi-step customer service workflows handling millions of queries daily. Netflix uses agentic systems to coordinate recommendation pipelines, content delivery optimization, and user support across 250+ million accounts. Uber deploys agents for real-time ride matching, pricing adjustments, and dynamic route planning across 70+ countries. OpenAI's assistants API enables developers to build function-calling agents that integrate with thousands of third-party APIs. Meta uses agentic workflows for content moderation, ad targeting optimization, and infrastructure management at planetary scale. Airbnb coordinates booking workflows, payment processing, and host-guest communication through multi-agent systems handling 10M+ concurrent users. When implemented poorly—missing constraint validation, inadequate error recovery, or poor state management—production systems face cascading failures: unverified function calls cause data corruption, unbounded replanning loops consume resources explosively, and unchecked agent delegation creates security vulnerabilities and compliance violations.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A cricket captain uses tool functions (bowler selection, field placement, batting order) to execute a match strategy. Just as a captain cannot call invalid bowlers or place fielders outside the ground, agents must only invoke valid functions with correct parameters. When a batsman gets out, the captain dynamically replans the strategy—similarly, agents must verify outcomes and adjust next steps. Different bowlers for different conditions (spinners vs. pacers) match how agents select appropriate tools based on constraints and context.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production-grade function calling with robust error handling\nimport json\nfrom typing import Any, Callable, Dict, List\nfrom enum import Enum\n\nclass BowlingType(Enum):\n    FAST = \"pace_bowler\"\n    SPIN = \"spin_bowler\"\n    MEDIUM = \"medium_bowler\"\n\nclass CricketMatchAgent:\n    def __init__(self):\n        self.tools: Dict[str, Callable] = {\n            \"select_bowler\": self.select_bowler,\n            \"place_fielders\": self.place_fielders,\n            \"call_timeout\": self.call_timeout,\n            \"check_weather\": self.check_weather\n        }\n        self.constraint_rules = {\n            \"max_bowler_overs\": 10,\n            \"valid_fielder_positions\": 11,\n            \"rain_threshold\": 0.7\n        }\n    \n    def select_bowler(self, bowler_name: str, match_conditions: Dict[str, Any]) -> Dict[str, Any]:\n        \"\"\"Verify bowler validity before function execution\"\"\"\n        # Constraint check: bowler exists and hasn't exceeded overs\n        if not self._validate_bowler(bowler_name):\n            return {\"success\": False, \"error\": f\"Invalid bowler: {bowler_name}\"}\n        \n        overs_bowled = self._get_bowler_overs(bowler_name)\n        if overs_bowled >= self.constraint_rules[\"max_bowler_overs\"]:\n            return {\"success\": False, \"error\": \"Bowler overs limit exceeded\"}\n        \n        # Select bowler type based on constraints\n        bowling_type = self._determine_bowling_type(match_conditions)\n        return {\n            \"success\": True,\n            \"bowler\": bowler_name,\n            \"type\": bowling_type.value,\n            \"conditions\": match_conditions\n        }\n    \n    def place_fielders(self, formation: List[str]) -> Dict[str, Any]:\n        \"\"\"Validate fielder placement before execution\"\"\"\n        if len(formation) != self.constraint_rules[\"valid_fielder_positions\"]:\n            return {\"success\": False, \"error\": \"Invalid fielder count\"}\n        \n        valid_positions = {\"slip\", \"cover\", \"mid_wicket\", \"square_leg\", \"deep_fine_leg\"}\n        if not all(pos in valid_positions for pos in formation):\n            return {\"success\": False, \"error\": \"Invalid fielding positions\"}\n        \n        return {\"success\": True, \"formation\": formation}\n    \n    def call_timeout(self, duration: int) -> Dict[str, Any]:\n        \"\"\"Resource-bounded timeout function\"\"\"\n        if not (1 <= duration <= 2):\n            return {\"success\": False, \"error\": \"Timeout must be 1-2 minutes\"}\n        return {\"success\": True, \"timeout_minutes\": duration}\n    \n    def check_weather(self) -> Dict[str, Any]:\n        \"\"\"External tool call with fallback handling\"\"\"\n        try:\n            rain_probability = self._fetch_rain_probability()\n            if rain_probability > self.constraint_rules[\"rain_threshold\"]:\n                return {\"success\": True, \"action\": \"halt_play\", \"probability\": rain_probability}\n            return {\"success\": True, \"action\": \"continue\", \"probability\": rain_probability}\n        except Exception as e:\n            return {\"success\": False, \"error\": f\"Weather service unavailable: {str(e)}\"}\n    \n    def execute_plan(self, plan: List[Dict[str, Any]]) -> Dict[str, Any]:\n        \"\"\"Execute plan with outcome verification and dynamic replanning\"\"\"\n        results = []\n        for step in plan:\n            tool_name = step.get(\"tool\")\n            args = step.get(\"args\", {})\n            \n            # Feasibility check before execution\n            if not self._check_feasibility(tool_name, args):\n                return {\"success\": False, \"failed_step\": step, \"message\": \"Feasibility check failed\"}\n            \n            # Execute tool\n            if tool_name not in self.tools:\n                return {\"success\": False, \"error\": f\"Unknown tool: {tool_name}\"}\n            \n            result = self.tools[tool_name](**args)\n            results.append(result)\n            \n            # Outcome verification\n            if not result.get(\"success\"):\n                # Dynamic replanning: adjust strategy based on failure\n                new_plan = self._replan(results, plan[len(results):])\n                return self.execute_plan(new_plan)\n        \n        return {\"success\": True, \"execution_log\": results}\n    \n    def _validate_bowler(self, bowler_name: str) -> bool:\n        # Implementation: check against player registry\n        return bowler_name in [\"Jasprit\", \"Ravichandran\", \"Mohammed\"]\n    \n    def _get_bowler_overs(self, bowler_name: str) -> int:\n        # Implementation: fetch from match state\n        return 5\n    \n    def _determine_bowling_type(self, conditions: Dict[str, Any]) -> BowlingType:\n        if conditions.get(\"pitch_type\") == \"slow\":\n            return BowlingType.SPIN\n        return BowlingType.FAST\n    \n    def _check_feasibility(self, tool_name: str, args: Dict[str, Any]) -> bool:\n        # Implementation: constraint satisfaction check\n        return True\n    \n    def _fetch_rain_probability(self) -> float:\n        # Implementation: external API call\n        return 0.3\n    \n    def _replan(self, results: List[Dict], remaining_steps: List[Dict]) -> List[Dict]:\n        # Implementation: dynamic replanning logic\n        return remaining_steps\n\n# Usage example\nagent = CricketMatchAgent()\nplan = [\n    {\"tool\": \"check_weather\", \"args\": {}},\n    {\"tool\": \"select_bowler\", \"args\": {\"bowler_name\": \"Jasprit\", \"match_conditions\": {\"pitch_type\": \"fast\"}}},\n    {\"tool\": \"place_fielders\", \"args\": {\"formation\": [\"slip\", \"cover\", \"mid_wicket\", \"square_leg\", \"deep_fine_leg\", \"cover_point\", \"mid_off\", \"short_fine_leg\", \"backward_square_leg\", \"long_on\", \"long_off\"]}}\n]\n\nexecution_result = agent.execute_plan(plan)\nprint(json.dumps(execution_result, indent=2))",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Production-grade agent showing constraint validation, feasibility checking, outcome verification, dynamic replanning, and error recovery—critical for handling real-world complexity at scale."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: In production systems, unchecked function calling leads to catastrophic failures. Always implement: (1) Parameter validation before execution, (2) Return value verification after execution, (3) Resource limits on replanning loops (max iterations), (4) Explicit error handling for external tool failures, (5) Audit logging of all function calls for compliance, (6) Rate limiting on tool invocations, (7) Fallback strategies when tools become unavailable. Skipping any of these causes cascading failures, data corruption, security breaches, or compliance violations affecting millions of users.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Tool functions must be validated for existence, parameter types, and constraint satisfaction before execution—prevent invalid operations.",
+        "Outcome verification ensures agents detect failures immediately and trigger dynamic replanning rather than cascading broken states downstream.",
+        "Hierarchical task decomposition breaks complex goals into verifiable subtasks; each subtask constraint propagates upward to guide parent decisions.",
+        "Plan execution with outcome verification loops: execute → verify → replan if needed, enabling resilience to failures at any step.",
+        "Multi-agent coordination requires explicit task delegation, responsibility handoff protocols, and inter-agent communication for consistency.",
+        "Constraint satisfaction and feasibility checking prevent impossible plans before execution—save resources and improve user experience.",
+        "Production systems at scale (Google, Netflix, Uber, OpenAI, Meta, Airbnb) handle millions of concurrent agent invocations; robust error handling and monitoring are non-negotiable."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of tool use and function calling in agentic workflows with these two quizzes. The first focuses on core conceptual mechanisms, while the second applies these concepts to a realistic scenario.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A batting_analyzer agent needs to decide whether to call a tool for real-time pitch classification or use cached historical data. The agent has already classified 500 similar pitches this session. What is the PRIMARY advantage of implementing dynamic replanning with outcome verification in this scenario?",
+      "items": [
+        "The agent can verify if the cached classification matches the live pitch speed, and if accuracy drops below 85%, it automatically triggers a new tool call to re-classify with updated sensor data",
+        "The agent will always call the pitch classification tool regardless of cache availability to ensure maximum accuracy",
+        "The agent stores all previous classifications permanently and never needs to call tools again",
+        "The agent uses majority voting across all 500 cached decisions to make the current prediction"
+      ],
+      "answer": 0,
+      "explanation": "Dynamic replanning with outcome verification works by setting performance thresholds and monitoring actual results against expected outcomes. In this case, the agent can compare cached predictions against live verification metrics (pitch speed, actual outcome). If the verification reveals that cached data is underperforming (accuracy < 85%), the system replans by invoking the pitch classification tool with fresh sensor inputs. This is superior to the other options because: Option B ignores efficiency gains from caching; Option C assumes perfect data persistence which isn't realistic in cricket (conditions change); Option D uses statistical aggregation that doesn't account for changing match conditions, batsman form, or environmental factors like lighting and pitch wear that affect pitch behavior.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket_match_strategist agent that coordinates three sub-agents: batting_coach, bowling_coach, and field_optimizer. After 20 overs, the batting_coach requests a field adjustment that contradicts the field_optimizer's current configuration. The bowling_coach is neutral. How should the agent handle this constraint conflict during multi-agent coordination?",
+      "items": [
+        "Reject the batting_coach's request immediately since the field_optimizer already made a decision",
+        "Run constraint satisfaction checking to verify if both constraints can coexist (e.g., aggressive field for pace bowling vs. defensive field for spinners); if feasible, merge them; if not, escalate to a priority-weighted arbitration where match situation urgency overrides precedence",
+        "Ask the bowling_coach to cast a deciding vote between the two positions",
+        "Implement both field configurations sequentially, alternating every over"
+      ],
+      "answer": 1,
+      "explanation": "Multi-agent coordination requires constraint satisfaction and feasibility checking before conflict resolution. The correct approach first analyzes whether both constraints can technically coexist (they often can—a dynamic field can support aggressive pace bowling setup AND defensive spin positioning by rotating fielders). If feasible, merge the constraints. If truly conflicting (e.g., both need the same fielder in incompatible positions), use weighted arbitration based on match context: if a batter is attacking aggressively, batting_coach's constraint carries higher weight; if bowling is dominant, field_optimizer's constraint wins. Option A ignores the batting_coach's valid insight about batter psychology. Option C introduces unnecessary voting that delays decision-making and creates democratic deadlock. Option D wastes overs during critical transitions. This matches real-world cricket strategy where coaches continuously negotiate field placement based on evolving threats.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

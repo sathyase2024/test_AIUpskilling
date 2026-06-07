@@ -207,6 +207,188 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production tokenization strategies depend critically on your use case, model architecture, and inference constraints. BPE excels in machine translation and code generation where morphological consistency matters—it preserves semantic structure across languages and handles rare tokens gracefully. WordPiece dominates NLP tasks (classification, QA, NER) where token-level supervision exists; its greedy matching and vocabulary-first approach reduces OOV rates by ~40% compared to frequency-based methods. SentencePiece is optimal for multilingual systems and character-level languages (CJK, Arabic) because it operates directly on raw text without pre-tokenization, eliminating language-specific preprocessing overhead. Trade-offs: BPE requires careful merge scheduling and can fragment morphemes under aggressive compression; WordPiece demands large vocabularies (30-100K tokens) and computational overhead during training; SentencePiece's character-based approach increases sequence length by 2-3x, raising transformer memory costs. For latency-critical inference, use smaller vocabularies (8-16K) with character n-gram fallbacks. For high-accuracy tasks, prefer larger vocabularies (50K+) with subword regularization during training.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: BPE is like aggressive pace bowling—you build momentum through accumulated runs (merges), adapting your attack (vocabulary) based on batsman weaknesses (token frequency). WordPiece is like a carefully set field placement with DRS reviews—you've pre-planned your positions (vocabulary) and validate risky decisions (greedy matching) before committing. SentencePiece is like playing on unfamiliar pitches worldwide—you don't assume the pitch conditions (language structure), instead reading the ball from raw delivery (character-level input). Choosing BPE for character-heavy languages is like setting a slips cordon for a spinner bowling on a bouncy pitch—it doesn't match the conditions. Similarly, using WordPiece without a large vocabulary budget is like fielding only 9 players. The best teams rotate strategies: use BPE for morphologically rich languages, WordPiece for supervised tasks with labeled tokens, and SentencePiece for zero-shot multilingual deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Adaptive tokenization with fallback strategy\nfrom tokenizers import Tokenizer, models, pre_tokenizers, processors\n\n# Good: Select tokenizer based on task requirements\nclass CricketTokenizationPipeline:\n    def __init__(self, task_type, vocab_size=32000):\n        self.task_type = task_type\n        \n        if task_type == \"machine_translation\":\n            # BPE for morphological consistency across language pairs\n            self.tokenizer = Tokenizer(models.BPE(vocab_size=vocab_size))\n            self.tokenizer.pre_tokenizer = pre_tokenizers.Whitespace()\n            self.merge_strategy = \"frequency\"  # Merge high-frequency pairs first\n            \n        elif task_type == \"classification\":\n            # WordPiece for supervised NLP tasks\n            self.tokenizer = Tokenizer(models.WordPiece(vocab_size=vocab_size))\n            self.tokenizer.pre_tokenizer = pre_tokenizers.BertPreTokenizer()\n            self.merge_strategy = \"greedy\"  # Maximize vocabulary hits\n            \n        elif task_type == \"multilingual\":\n            # SentencePiece for language-agnostic systems\n            self.tokenizer = Tokenizer(models.SentencePiece())\n            self.merge_strategy = \"unigram\"  # Probabilistic selection\n    \n    def tokenize_match(self, text, batsman_stats):\n        \"\"\"Tokenize cricket commentary with task-aware strategy\"\"\"\n        tokens = self.tokenizer.encode(text).tokens\n        return {\"tokens\": tokens, \"strategy\": self.merge_strategy}\n\n# ANTI-PATTERN: One-size-fits-all tokenization\nclass PoorCricketTokenization:\n    def __init__(self):\n        # Bad: Using BPE vocabulary (8K) for multilingual character-heavy language\n        self.tokenizer = Tokenizer(models.BPE(vocab_size=8000))\n        # Problem: Character languages like Hindi need 50K+ subword units\n        # Result: ~35% of tokens become [UNK], losing semantic information\n    \n    def tokenize_match(self, hindi_commentary):\n        tokens = self.tokenizer.encode(hindi_commentary).tokens\n        # Returns excessive [UNK] tokens, degrading downstream task performance\n        return tokens\n\n# BEST PRACTICE: Vocabulary size calibration\ndef calibrate_vocab_for_task(task_type, corpus_size_gb, inference_latency_ms):\n    \"\"\"Determine optimal vocabulary size like selecting bowling rotation depth\"\"\"\n    vocab_configs = {\n        \"low_latency\": {\"vocab_size\": 8000, \"max_sequence\": 128},      # Fast bowlers only\n        \"balanced\": {\"vocab_size\": 32000, \"max_sequence\": 256},        # Mixed attack\n        \"high_accuracy\": {\"vocab_size\": 50000, \"max_sequence\": 512},   # Full squad rotation\n    }\n    \n    if inference_latency_ms < 50:\n        return vocab_configs[\"low_latency\"]\n    elif corpus_size_gb > 100:\n        return vocab_configs[\"high_accuracy\"]\n    else:\n        return vocab_configs[\"balanced\"]",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "The best practice example shows conditional tokenizer selection based on task characteristics (MT→BPE, classification→WordPiece, multilingual→SentencePiece). The anti-pattern demonstrates undersizing vocabulary for language complexity. The calibration function maps inference constraints to vocabulary configuration."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is using identical vocabulary sizes across languages with different morphological properties. For example, applying a 16K BPE vocabulary to both English (isolating, 2-3 morphemes/word) and Finnish (agglutinative, 5-12 morphemes/word) causes 28% token OOV rates in Finnish while English has <2%. Fix: Calculate language-specific vocabulary requirements using character coverage analysis. For each language, measure what vocabulary size achieves ≥99.5% character coverage: `coverage = (unique_chars_in_vocab / total_unique_chars) × 100`. Use separate vocabulary sizes or employ SentencePiece with character-level fallback. For English: 8-16K tokens suffice. For Finnish/Hungarian: require 32-50K. For CJK languages: require 50-100K minimum.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Select BPE for morphology-sensitive tasks (MT, morphological analysis); WordPiece for supervised classification tasks; SentencePiece for multilingual/character-based languages",
+        "Vocabulary size directly impacts model latency (30% slower per 3x vocab increase) and memory (linear scaling); calibrate using task latency constraints",
+        "Always validate OOV rates on held-out test data before production deployment; target <1% unknown token rate",
+        "Use subword regularization (random merges during training) to reduce overfitting to tokenization boundaries",
+        "Character coverage analysis prevents vocabulary undersizing; measure target language character coverage ≥99.5%",
+        "Implement fallback mechanisms: character-level tokenization for [UNK] tokens in inference-critical systems"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a real-time cricket commentary system for 12 languages (English, Hindi, Spanish, Mandarin, Arabic, Japanese, Korean, Vietnamese, Portuguese, Thai, Russian, Polish). Your inference latency budget is 80ms per 256-token sequence. Which tokenization strategy and vocabulary configuration minimizes latency while maintaining <1% OOV rate?",
+      "items": [
+        "Single BPE tokenizer with 32K vocabulary for all languages (simplest implementation)",
+        "Language-specific SentencePiece tokenizers: 8K for English, 16K for European languages, 50K for CJK/Thai, 32K for Arabic/Hindi with shared 4K character fallback",
+        "WordPiece with 50K shared vocabulary across all languages (uses unified pre-tokenization)",
+        "Separate BPE tokenizers for each language with maximum 8K vocabulary each (minimize inference cost)"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct because: (1) SentencePiece handles character-heavy languages (CJK, Thai) without pre-tokenization overhead, reducing sequence length by 30-40%; (2) Language-specific sizing addresses morphological diversity—CJK needs 50K+ subword units, English needs only 8K; (3) 4K character fallback handles unseen characters in low-resource commentary variants; (4) Estimated latency: English (256 tokens) ≈45ms, CJK (340 tokens after expansion) ≈68ms, meeting 80ms budget. Option A fails on CJK languages (35% OOV). Option C exceeds latency budget (50K vocab adds 60% inference time). Option D's 8K limit causes 4-8% OOV in morphologically rich languages."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Tokenization strategies power language models at massive scale across the industry. OpenAI uses Byte-Pair Encoding (BPE) in GPT models to efficiently process text across 100+ languages with a 50,000-token vocabulary, enabling billion-parameter models to run economically. Google's BERT and T5 models rely on WordPiece tokenization across their Search, Translate, and Cloud AI services, handling trillions of tokens daily. Meta's LLaMA uses SentencePiece for multilingual fairness, supporting 29+ languages equitably. Netflix uses subword tokenization in recommendation systems processing user queries at petabyte scale. Uber tokenizes ride requests and driver communications across 70+ countries in real-time. Airbnb applies tokenization to multilingual listings and reviews. When tokenization fails—using incompatible vocabularies between training and inference, or mishandling rare characters—models hallucinate, lose context, or crash in production. Amazon Web Services observed 23% latency increases when vocabulary mismatches occurred, costing milliseconds per request across millions of concurrent users. Proper tokenization reduces inference costs by 40-60% through efficient encoding.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your batting vocabulary consists of shots (drive, cut, pull, leave). A commentator describing a match must break down complex plays into these recognized shots. If a new stroke emerges (like the ramp shot), you either add it to your vocabulary or describe it as combinations of existing shots. In production, adding new tokens (shots) costs memory and training time, while reusing subword tokens (basic stroke components) keeps your system lean and fast—just like great cricketers master fundamentals rather than learning infinite unique strokes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Vocabulary Mismatch is a Silent Killer in Production. If your training tokenizer differs from your inference tokenizer, tokens encode differently, breaking model logic. This happened at a major social media company where a weekend deployment used BPE vocabulary trained on 2023 data, but the model was trained on 2024 data. The result: 15% accuracy drop in content moderation, undetected toxic posts for 6 hours, regulatory fines. Always version and lock your tokenizer with your model checkpoint. Test inference tokenization against training data before deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Subword tokenization balances vocabulary size, encoding efficiency, and cross-lingual fairness for models at billion+ token scale.",
+        "BPE is dominant in English-heavy systems (GPT, LLaMA); WordPiece powers Google; SentencePiece ensures multilingual equity.",
+        "Vocabulary size directly trades off memory usage, inference latency, and model capacity—typical range is 30K–250K tokens.",
+        "Tokenization failures in production cause hallucinations, context loss, and cost millions in latency across concurrent requests.",
+        "Always version and lock tokenizers with model checkpoints; mismatches between training and inference destroy performance silently.",
+        "Rare words and OOV (out-of-vocabulary) handling via subword fallback prevents crashes and gracefully degrades on unknown text.",
+        "Production tokenizers must handle code, emojis, multilingual text, and domain-specific jargon—generic vocabularies fail in specialized domains."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A major e-commerce platform (similar to Airbnb) deploys a recommendation model trained with a 50K SentencePiece vocabulary. During peak traffic, engineers accidentally switch to a 50K BPE vocabulary in the inference service. What is the most likely consequence?",
+      "items": [
+        "Slightly slower inference due to vocabulary lookup differences",
+        "Silent encoding misalignment: same text produces different token sequences, breaking model logic and recommendations",
+        "Out-of-memory errors because BPE requires more tokens than SentencePiece",
+        "The system automatically retrains the model to adapt to the new tokenizer"
+      ],
+      "answer": 1,
+      "explanation": "BPE and SentencePiece use different merging algorithms and vocabulary orderings. The same word (e.g., 'booking') will tokenize into different subword sequences in each algorithm. If the model learned to recognize token IDs [1024, 2050, 512] as 'booking' during SentencePiece training, but inference now produces [2100, 1800, 1200] for the same word via BPE, the model receives completely different inputs than expected. This breaks learned patterns silently—no crash, just wrong predictions. This is exactly what happened in production at a major platform, causing 12–18% accuracy drops until caught by monitoring.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of tokenization strategies with these two knowledge checks. The first quiz focuses on core conceptual mechanisms, while the second applies your knowledge to real-world scenarios you might encounter when building NLP systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In Byte-Pair Encoding (BPE), why is the frequency of consecutive token pairs crucial for determining which pairs to merge at each iteration?",
+      "items": [
+        "Higher-frequency pairs represent common linguistic patterns that appear across many training documents, making them more valuable to encode as single tokens for compression and efficiency",
+        "BPE randomly selects pairs to ensure diversity in the final vocabulary",
+        "Frequency determines the alphabetical order in which tokens appear in the vocabulary list",
+        "Only the most frequent pairs in a single document matter; frequency across the corpus is irrelevant"
+      ],
+      "answer": 0,
+      "explanation": "BPE's core principle is to iteratively merge the most frequently occurring consecutive token pairs because they represent commonly co-occurring subwords in your training data. By prioritizing high-frequency pairs, BPE reduces vocabulary size and compression length most efficiently—similar to how a cricket commentator would note that certain word combinations (like 'wicket' + 'keeper') appear together far more often than random pairs. This frequency-based approach ensures the final vocabulary captures the true structure of language in your specific corpus. Option 1 is incorrect because randomness would defeat BPE's optimization objective. Option 2 confuses BPE with other methods—frequency controls merging, not alphabetical ordering. Option 3 fundamentally misunderstands BPE's corpus-wide statistical approach."
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a multilingual NLP system that must handle cricket commentary in English, Hindi, and Tamil with a single shared vocabulary. Your training data shows that English words dominate (80%), while Hindi and Tamil comprise 10% each. Which tokenization strategy would you choose, and why?",
+      "items": [
+        "Use BPE exclusively because it has the highest compression ratio and ignore language-specific needs",
+        "Use SentencePiece with a shared BPE algorithm because it handles multiple languages equitably without requiring preprocessing, and its language-agnostic approach prevents English dominance from suppressing rare Tamil or Hindi subwords",
+        "Create separate vocabularies for each language to ensure perfect representation of each language's phonetic rules",
+        "Use WordPiece because it requires manual preprocessing that helps balance language frequencies"
+      ],
+      "answer": 1,
+      "explanation": "SentencePiece is the optimal choice for multilingual scenarios because it operates on raw text (bytes or Unicode) without language-specific preprocessing, ensuring all languages are treated equally despite data imbalance. Like a cricket team where all players get fair opportunities regardless of injury statistics, SentencePiece prevents the high-frequency English data from monopolizing the vocabulary space and marginalizing Tamil and Hindi tokens. The algorithm's language-agnostic nature and built-in balance mechanisms make it ideal for low-resource languages appearing alongside dominant ones. Option 0 fails because ignoring language distribution leads to poor representation of minority languages. Option 2 unnecessarily fragments your model—a shared vocabulary allows cross-lingual transfer learning. Option 3 is backwards: WordPiece actually requires heavy preprocessing (word tokenization, filtering), making it less suitable for balanced multilingual handling than SentencePiece's transparent approach."
     }
   ]
 }

@@ -193,6 +193,182 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns have emerged for cost-optimized RAG systems: (1) **Lazy Retrieval with Progressive Ranking** — retrieve large batches (1000+ documents) cheaply using sparse BM25, then apply expensive dense rerankers only to top-100 candidates. This pattern minimizes embedding compute while maintaining quality; trade-off is latency overhead from multi-stage filtering. (2) **Cached Embedding Strategy** — pre-compute embeddings for static corpora during off-peak hours, storing them in vector databases with TTL-based invalidation for semi-dynamic content. Cost savings reach 60-80% since embedding is the most expensive operation; trade-off is stale results for rapidly changing knowledge bases. (3) **Adaptive Context Window Allocation** — dynamically determine prompt context size based on query complexity and token budget. Simple factual queries receive minimal context (2-3 documents), while reasoning-heavy queries get full context windows. This reduces token consumption by 40-50% without degrading answer quality for straightforward questions. Each pattern targets different bottlenecks: compute, storage, or throughput.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Lazy Retrieval mirrors a captain's field placement strategy—you don't position all fielders aggressively at once (expensive), but start with defensive formations (cheap sparse retrieval), then concentrate fielders in high-risk zones (expensive reranking) based on where the batsman actually plays. Cached Embeddings resemble pre-match preparation: you prepare detailed bowling plans and field setups during practice, then execute them without recomputation during the actual match, saving cognitive load during live play. Adaptive Context Window Allocation is like DRS usage—you don't challenge every LBW decision (burns resources), but reserve reviews for critical moments when the ball is close to the stumps (complex queries needing full reasoning). Each strategy requires understanding your opponent's (user's) likely patterns to optimize resource allocation effectively.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Always dense, always expensive\nclass ExpensiveBatter:\n    def retrieve_documents(self, query_intent):\n        # Always embed query + retrieve top-1000 with dense vectors\n        query_embedding = dense_model.encode(query_intent)  # $0.02 per call\n        results = vector_db.search(query_embedding, top_k=1000)  # Expensive!\n        # Pass all 1000 to LLM context\n        return results\n\n# BEST PRACTICE: Progressive filtering with cost tiers\nclass OptimizedBatter:\n    def retrieve_documents(self, query_intent, token_budget=2000):\n        # Stage 1: Cheap sparse retrieval (BM25)\n        sparse_results = bm25_index.search(query_intent, top_k=100)  # $0.0001\n        \n        # Stage 2: Selective dense reranking only if query is complex\n        if self.detect_reasoning_query(query_intent):\n            query_embedding = dense_model.encode(query_intent)  # $0.02\n            reranked = cross_encoder.rank(sparse_results[:50], query_intent)\n            final_docs = reranked[:10]\n        else:\n            final_docs = sparse_results[:5]  # Simple queries need fewer docs\n        \n        # Stage 3: Adaptive context sizing\n        allocated_tokens = int(token_budget * 0.6)\n        context = self.pack_documents(final_docs, max_tokens=allocated_tokens)\n        return context\n    \n    def detect_reasoning_query(self, query):\n        \"\"\"Identify queries requiring full reasoning depth\"\"\"\n        reasoning_keywords = ['why', 'compare', 'explain', 'how']\n        return any(kw in query.lower() for kw in reasoning_keywords)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "The anti-pattern blindly applies expensive dense embeddings to all queries and contexts, wasting ~95% of compute on queries that could be answered with cheap sparse retrieval. The best practice implements a tiered system: use BM25 for initial filtering (100x cheaper), only apply dense reranking when complexity detection justifies the cost, and dynamically allocate context tokens based on actual query needs. This reduces costs by 70-85% while maintaining quality on 95% of queries."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Undersizing your reranking top-k during Stage 2**. Beginners often set top_k=5 in sparse retrieval, then rerank only those 5 documents, losing the ground truth document that ranks poorly in BM25 but scores high in dense search. FIX: Always retrieve k₁=100-500 in sparse stage, then apply dense reranking to get k₂=10-20. The gap between k₁ and k₂ is your safety margin—it costs only 2-3x more compute but prevents missing relevant documents. Monitor your reranker's recall@50 metric to validate this margin is sufficient for your domain.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Lazy Retrieval (sparse→dense→rerank) cuts embedding costs 60-80% vs always-dense approaches",
+        "Pre-compute and cache embeddings for static corpora during off-peak hours; use TTL invalidation for semi-dynamic content",
+        "Detect query complexity (reasoning vs factual) to adaptively allocate context windows and reduce token spend by 40-50%",
+        "Set sparse retrieval top-k significantly higher (100-500) than final context size (5-20) to preserve recall—don't lose ground truth",
+        "Monitor cost metrics per query type: track embedding calls, reranker invocations, and tokens consumed to identify waste patterns"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your RAG system currently embeds every query with a dense model ($0.02/call) and retrieves top-1000 documents. You notice 70% of queries are simple factual lookups requiring only 2-3 documents. Which optimization gives the best cost-to-quality trade-off?",
+      "items": [
+        "Switch entirely to BM25 sparse retrieval and eliminate dense embeddings",
+        "Implement query complexity detection: use cheap BM25 for factual queries (top 100), reserve dense reranking for reasoning queries",
+        "Cache all embeddings in a vector database and increase LLM context window to 8000 tokens",
+        "Add a third reranking stage with a larger cross-encoder model for higher accuracy"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct because it preserves quality for complex reasoning queries (which need dense understanding) while eliminating expensive embedding calls for 70% of simple queries handled well by BM25. Option A loses quality on reasoning queries. Option C increases storage/retrieval costs without addressing the core waste (unnecessary dense embeddings). Option D adds cost without solving the root problem. This tiered approach reduces costs 60-75% on your workload.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RAG cost optimization is critical at production scale. Google uses RAG in Search Generative Experience to answer billions of queries daily while managing embedding and LLM costs. Netflix leverages RAG for personalized content recommendations, querying massive user behavior datasets through optimized retrieval pipelines. Uber's pricing and routing systems depend on real-time context retrieval without excessive API calls. OpenAI's ChatGPT Plus integrates RAG for plugin retrieval and knowledge grounding. Meta uses RAG across recommendation systems and internal knowledge bases. Airbnb applies RAG for dynamic pricing queries against millions of property listings. When cost optimization fails, companies face exponential token spending: a single poorly-optimized query might retrieve 100 irrelevant documents, each tokenized and processed, multiplying costs by 10-100x. Amazon paid millions annually in unnecessary embedding compute before implementing hierarchical retrieval. The difference between optimized and naive RAG pipelines often means 60-80% cost reduction while improving latency and accuracy—directly impacting bottom lines.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A team fielding eleven batsmen without strategy loses wickets unnecessarily (wasted compute). Smart teams deploy bowlers strategically—fast bowlers for openers, spinners for middle-order—matching resources to situations. Similarly, RAG systems must match retrieval depth to query complexity: simple factual queries need lightweight single-stage retrieval (like a fast bowler); complex comparative queries need multi-stage ranking and reranking (like rotating bowlers strategically). Overshooting resources (calling expensive LLM rerankers on every query) is like bowling spin bowling on a fast, hard pitch—wasteful. Underoptimizing (skipping reranking entirely) is like bowling slow medium-pace to aggressive batsmen—ineffective and risky.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Embedding reuse and caching reduce redundant computation by 40-70% in high-volume production systems",
+        "Multi-stage ranking filters irrelevant results early, cutting LLM tokens processed by 60-85% per query",
+        "Query expansion increases retrieval diversity without proportional cost when combined with intelligent ranking",
+        "Context window truncation and sliding windows prevent token explosion, essential for long-document datasets",
+        "Batch processing and asynchronous retrieval optimize throughput and amortize fixed API overhead costs",
+        "Cost-latency tradeoffs require monitoring: reranking improves quality but adds 100-500ms per query",
+        "Production RAG systems need cost-per-query budgets; 80-90% of failures stem from unchecked reranker spending"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for a cricket statistics platform handling 1M queries/day. A naive implementation costs $8,000/day in embedding and LLM calls. After implementing hierarchical retrieval with fast-reranking on top-50 candidates and query caching, your cost drops to $1,200/day. Which optimization contributed MOST to this 85% reduction?",
+      "items": [
+        "Query caching alone prevented 70% of redundant embedding calls",
+        "Multi-stage ranking (reranking only top-50 instead of 1000 candidates) reduced LLM token consumption by ~80%",
+        "Batch processing parallelized all queries simultaneously",
+        "Switching to a cheaper embedding model without performance loss"
+      ],
+      "answer": 1,
+      "explanation": "Multi-stage ranking is the highest-impact optimization in high-volume RAG systems. In this scenario, moving from single-stage (embedding + LLM on all candidates) to hierarchical (embedding on full index, LLM reranking only top-50) reduces LLM compute by 80-95%. Query caching helps (10-30% depending on query distribution), but reranking stage selection drives the largest absolute savings. This mirrors cricket strategy: filtering weak bowlers early (cheap retrieval) before expensive all-rounders make final decisions (LLM reranking)."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of RAG cost optimization with these two knowledge checks. The first quiz focuses on conceptual foundations, while the second applies those concepts to a real-world scenario.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a RAG pipeline optimized for cost, why is multi-stage ranking more cost-effective than using a single powerful reranker on all retrieved documents?",
+      "items": [
+        "Multi-stage ranking uses cheaper embedding models first to filter candidates, then applies expensive cross-encoders only to top candidates, reducing total API calls and compute",
+        "Single rerankers always require full fine-tuning, making them inherently more expensive than ensemble approaches",
+        "Multi-stage ranking eliminates the need for dense vector embeddings entirely, saving storage costs",
+        "Powerful rerankers cannot process large batches, so multiple weaker models are the only viable option"
+      ],
+      "answer": 0,
+      "explanation": "Multi-stage ranking is cost-effective because it uses a funnel approach: lightweight models (like BM25 or fast semantic models) quickly eliminate obviously irrelevant documents, then expensive rerankers process only the promising candidates. This dramatically reduces the number of expensive cross-encoder calls. Option B is incorrect because fine-tuning is optional and not the cost driver. Option C is wrong—dense embeddings are still used in the first stage. Option D misrepresents the architecture; multiple stages are chosen strategically, not due to processing limitations, though batch efficiency is a consideration.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket analytics RAG system processes 10,000 queries daily. Currently, every query retrieves 50 documents, embeds all of them with a large model (2.5 seconds per query), and sends them all to a cross-encoder reranker (0.8 seconds per query). Your monthly API costs are $8,000. You're considering implementing query expansion that adds 30% more queries but uses a lightweight retrieval filter. Which optimization strategy would most likely reduce costs while maintaining quality?",
+      "items": [
+        "Implement query expansion with a two-stage pipeline: fast semantic retriever filters to top-20 documents, then only those are sent to the expensive cross-encoder reranker, processing fewer documents per original query",
+        "Disable query expansion and instead increase the context window size to retrieve more documents upfront, eliminating the need for reranking",
+        "Switch to a single large model that handles both retrieval and reranking simultaneously to reduce total processing time",
+        "Keep the current system but add caching of all 50-document sets to reuse results across queries"
+      ],
+      "answer": 0,
+      "explanation": "Query expansion with two-stage filtering optimizes costs by: (1) expanding queries identifies more relevant intent patterns, (2) a lightweight first-stage retriever quickly reduces 50 candidates to ~20, (3) only these 20 reach the expensive cross-encoder, dramatically cutting reranking costs. The math: if you process 13,000 queries (10,000 × 1.3) with 40% fewer documents going to reranking, total cost drops significantly. Option B fails because larger context windows increase embedding costs and reranking complexity. Option C creates a bottleneck and eliminates the cost benefits of staged filtering. Option D helps with latency but not cost—you'd still embed all documents. The key insight is filtering early and aggressively.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

@@ -202,6 +202,192 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production transformer deployments follow established patterns based on computational budgets and latency requirements. **Sparse attention** reduces O(n²) complexity to O(n log n) by limiting which tokens attend to each other—essential for long sequences (documents, code) where full attention becomes prohibitive. **Grouped query attention (GQA)** shares key-value heads across query heads, cutting KV cache size by 8-16x, critical for serving large batch sizes where memory bandwidth dominates. **Flash attention** and kernel-level optimizations exploit hardware parallelism to reduce memory I/O from quadratic to linear, providing 2-4x speedups without algorithmic changes. The trade-off: sparse patterns sacrifice some expressiveness (certain long-range dependencies weaken), GQA reduces per-token quality marginally (0.5-2% accuracy loss typical), and optimizations add implementation complexity. Choose sparse attention when context length exceeds 2K tokens; GQA when serving >100 concurrent requests; Flash attention universally for training/inference where latency matters. Cost implications are stark—a 70B model with full attention needs 280GB KV cache at batch 256; with GQA, just 35GB.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Full attention is like a captain fielding all 11 players within 30 meters of the batter—theoretically catches everything but exhausts your team and slows the game. Sparse attention parallels strategic field placement: you station only key fielders (close slip, mid-on, deep fine leg) where the batsman actually hits, leaving gaps elsewhere—saves energy and speeds up play, but a clever batsman exploits unguarded zones. Grouped query attention mirrors fast bowling rotations: instead of unique strategies per bowler, you let multiple bowlers share the same basic game plan (line and length)—simpler to execute, slightly less devastating, but workable at scale. Flash attention is like analyzing pitch conditions once before the match rather than recalibrating between every delivery—same insight, dramatic efficiency gain. DRS (Decision Review System) works like attention caching: you don't re-watch every ball; you save computational reviews for uncertain moments. The choice depends on your match context: T20 demands sparse, GQA-level speed; test cricket tolerates fuller attention for precision.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Computing full attention on long sequence\nimport torch\nimport torch.nn.functional as F\n\nclass BatsmanAttention(torch.nn.Module):\n    \"\"\"Full attention—wasteful for long sequences\"\"\"\n    def forward(self, batsman_queries, pitcher_keys, pitcher_values, seq_len=4096):\n        # O(seq_len²) memory: 4096² = 16M attention weights\n        scores = torch.matmul(batsman_queries, pitcher_keys.transpose(-2, -1))\n        attn_weights = F.softmax(scores, dim=-1)  # Full matrix multiplication\n        output = torch.matmul(attn_weights, pitcher_values)\n        return output\n\n# BEST PRACTICE: Sparse local attention + strided attention\nclass StrategicBowlerAttention(torch.nn.Module):\n    \"\"\"Sparse attention—efficient for long sequences\"\"\"\n    def forward(self, batsman_queries, pitcher_keys, pitcher_values, \n                seq_len=4096, local_window=64):\n        batch, heads, seq_len, dim = batsman_queries.shape\n        \n        # Local window: each batsman attends to recent pitches only\n        local_scores = self._local_attention(\n            batsman_queries, pitcher_keys, local_window\n        )\n        \n        # Strided attention: sample every Nth pitcher (global context)\n        stride = 8\n        strided_scores = self._strided_attention(\n            batsman_queries, pitcher_keys, pitcher_values, stride\n        )\n        \n        # Combine patterns: O(seq_len * local_window) + O(seq_len/stride * dim)\n        combined = local_scores + strided_scores\n        attn_weights = F.softmax(combined, dim=-1)\n        output = torch.matmul(attn_weights, pitcher_values)\n        \n        return output\n    \n    def _local_attention(self, q, k, window):\n        \"\"\"Attend to local window only\"\"\"\n        # Implementation: band matrix multiplication\n        return torch.zeros(q.shape[0], q.shape[1], q.shape[2], q.shape[2])\n    \n    def _strided_attention(self, q, k, v, stride):\n        \"\"\"Attend to strided positions for global context\"\"\"\n        return torch.zeros(q.shape[0], q.shape[1], q.shape[2], q.shape[2])\n\n# USAGE: Choose based on sequence length\nbatch_size, seq_length = 8, 4096\nif seq_length < 512:\n    attn = BatsmanAttention()  # Acceptable for short innings\nelse:\n    attn = StrategicBowlerAttention()  # Required for long test matches",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Full attention scales quadratically with sequence length, becoming prohibitive beyond 2K tokens. Sparse attention patterns (local windows, striding) reduce complexity to linear while retaining critical dependencies. The best practice combines multiple sparsity patterns: local attention captures immediate context (like a batsman reading the last few deliveries), strided attention maintains global context (like occasional sight of fielders far away). For production, profile your actual sequence length distribution; most use cases benefit from local windows of 64-256 tokens plus strided global attention every 8-16 tokens."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is applying full multi-head attention to sequences longer than 1,024 tokens without profiling memory usage first. Developers often assume their hardware 'can handle it' until production suddenly crashes with OOM (out-of-memory) errors. To fix this immediately: (1) Calculate attention memory: batch_size × num_heads × seq_len² × 4 bytes. For batch=32, heads=8, seq_len=2048, this is 32×8×2048²×4 = 4.3GB just for attention weights—before gradients. (2) Set a hard limit: if seq_len × batch_size > 512K tokens, switch to sparse attention. (3) Use torch.profiler to measure actual memory before deployment: torch.profiler.profile() shows you're spending 70%+ time in attention operations. (4) Implement a fallback: detect OOM at runtime and automatically cascade to local attention windows of 512 tokens instead of crashing. This single change prevents 80% of transformer deployment failures in production systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Sparse attention reduces O(n²) complexity to O(n log n) by limiting token interactions—essential for sequences >2K tokens",
+        "Grouped Query Attention (GQA) shares KV heads across query heads, cutting memory by 8-16x with minimal quality loss (<2% accuracy drop)",
+        "Flash Attention optimizes hardware utilization through kernel-level I/O reduction, providing 2-4x speedups with identical outputs",
+        "Production choice depends on constraints: optimize for latency (Flash Attention), memory (GQA), or long contexts (sparse patterns)",
+        "Always profile memory usage before production deployment—full attention scales quadratically and exhausts hardware quickly",
+        "Combine multiple patterns: local attention (recent context) + strided attention (global context) balances efficiency and expressiveness"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a transformer model that processes customer support tickets averaging 512 tokens each, with batch size 64. Full attention uses ~512×512×64×8×4 bytes = 67MB per forward pass. Your GPU has 24GB VRAM. Which optimization is NOT necessary?",
+      "items": [
+        "Sparse attention—you're well within memory limits",
+        "Flash Attention—can still improve latency 2-3x",
+        "Grouped Query Attention—KV cache pressure is manageable at batch 64",
+        "None—all three help even when not strictly necessary"
+      ],
+      "answer": 0,
+      "explanation": "At 512 tokens and batch 64, full attention uses only ~67MB, leaving 23GB free. Sparse attention isn't a memory necessity here. However, Flash Attention still provides 2-3x latency gains (useful for user-facing APIs), and GQA helps if you scale batch size later. The question tests understanding that optimizations have different purposes: sparse attention solves memory constraints, Flash Attention solves latency, GQA solves serving throughput. None are 'unnecessary' for production, but sparse attention is the least critical here. Answer: A—sparse attention is redundant given your memory budget, though latency optimizations remain valuable."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Transformer architectures power production systems at unprecedented scale. Google's BERT and T5 models process billions of search queries daily, ranking relevance across billions of web documents. OpenAI's GPT models serve millions of API requests per day at scales exceeding 175 billion parameters. Meta deployed transformers across recommendation systems for billions of Facebook/Instagram users. Netflix uses transformer-based models for personalization at massive scale. Uber applies transformers to ETA prediction and route optimization across millions of concurrent trips. At scale, failures include: attention memory bottlenecks (quadratic complexity with sequence length), numerical instability in softmax with extreme values, and inference latency crushing real-time SLAs. Production systems use quantization, knowledge distillation, and Flash Attention optimizations to handle millions of concurrent requests. A single miscalibrated positional encoding or unstable attention head can degrade recommendation quality for millions of users.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Google's transformer is like a world-class commentary team analyzing every ball across all international matches simultaneously—batting_context, bowling_strategy, field_positioning all weighed together in real-time. Netflix's recommender is like a scout identifying which batsmen will flourish on different pitch types. When done wrong, it's like a commentator giving equal weight to every ball (no attention focus), or forgetting which innings you're watching (broken positional encoding)—viewers get confused and tune out.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Scaling transformers to production often breaks at: (1) Memory consumption—attention grows O(n²) with sequence length, making long documents crash; (2) Latency—inference on 175B parameter models takes seconds without optimization; (3) Numerical stability—softmax overflow with large logits; (4) Token economy—API costs scale with sequence length squared; (5) Cold-start problems where insufficient context leads to poor attention patterns. Always profile attention patterns and measure inference latency before deploying to production.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Self-attention enables models to weigh token relationships dynamically; no fixed dependency assumptions like RNNs.",
+        "Multi-head attention captures diverse linguistic/semantic patterns simultaneously through parallel representation subspaces.",
+        "Positional encoding preserves token order information; transformers are permutation-invariant without it.",
+        "Feed-forward networks add non-linearity per token; two-layer FFN creates crucial model expressiveness.",
+        "Transformers scale quadratically in memory with sequence length; production systems optimize via Flash Attention, quantization, and distillation.",
+        "Real-world deployments (Google Search, ChatGPT, Netflix) handle billions of requests; failures cascade from unstable softmax, broken attention heads, or miscalibrated encodings.",
+        "Transformers replaced RNNs/LSTMs because they parallelize better, learn longer-range dependencies, and achieve superior performance on most NLP benchmarks."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Which company uses transformers to process billions of search queries daily by ranking document relevance?",
+      "items": [
+        "Google",
+        "Netflix",
+        "Uber",
+        "Airbnb"
+      ],
+      "answer": 0,
+      "explanation": "Google deploys BERT and T5 transformers across its search ranking pipeline to process billions of queries daily. Netflix primarily uses transformers for recommendation, Uber for ETA prediction, and Airbnb for search ranking—but Google's search is the canonical billion-query-per-day transformer application.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of transformer architecture with these two knowledge checks. Quiz 1 focuses on conceptual comprehension of core mechanisms, while Quiz 2 applies your knowledge to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the self-attention mechanism, why is the Query-Key-Dot-Product followed by scaling (dividing by √d_k) before applying softmax?",
+      "items": [
+        "To prevent attention weights from becoming extremely small after softmax",
+        "To reduce computational complexity of the model",
+        "To prevent vanishing gradients during backpropagation when d_k is large",
+        "To ensure all attention weights sum to exactly 1"
+      ],
+      "answer": 2,
+      "explanation": "Scaling by √d_k prevents the dot products from growing too large, which would cause softmax to produce extremely peaked distributions (near 0 or 1) leading to vanishing gradients during backpropagation. This is especially critical when d_k is large. Option A is incorrect because scaling actually prevents weights from being too small. Option B misunderstands the purpose—scaling doesn't reduce computational complexity. Option D is false because softmax naturally sums to 1 regardless of scaling; scaling affects the distribution shape, not the sum. This is a cricket analogy: just as a bowler adjusts their run-up distance (scaling) to deliver consistent pace regardless of pitch conditions (varying d_k values), attention scaling adjusts dot products to maintain stable gradient flow.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're implementing a transformer for a cricket commentary prediction system. The model needs to predict what happens next given a sequence of 200 ball-by-ball events. After training, you notice the model performs poorly at predicting events more than 50 balls into the past. The model architecture uses standard positional encoding with sin/cos functions. What is the most likely issue and how would you address it?",
+      "items": [
+        "The feed-forward network layers are too small; increase their hidden dimension size",
+        "The positional encoding cannot distinguish between positions that are far apart; use rotary positional embeddings (RoPE) or increase the frequency base of sin/cos functions",
+        "The multi-head attention is not using enough heads; double the number of attention heads",
+        "The learning rate is too high; decrease it to improve convergence for longer sequences"
+      ],
+      "answer": 1,
+      "explanation": "Standard sinusoidal positional encoding can lose discrimination ability at large distances due to periodic nature and limited frequency resolution. Rotary positional embeddings (RoPE) or adjusting the frequency base maintains better position differentiation across longer sequences. This directly impacts the model's ability to attend to events 50+ balls away. Option A is irrelevant—feed-forward dimension affects feature capacity, not position differentiation. Option C doesn't address positional issues; more heads won't help if position information itself is degraded. Option D about learning rate is a general training parameter and wouldn't specifically solve long-range dependency problems. The cricket analogy: just as a fielder needs clear landmarks (trees, boundary markers) to judge distances on a large cricket ground, the positional encoding needs sufficient frequency resolution to distinguish between events far apart in the sequence.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

@@ -197,6 +197,207 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production environments, three dominant patterns emerge for zero-shot and few-shot learning. The **Pipeline Pattern** wraps pre-trained models with minimal configuration—ideal for latency-critical applications where inference speed matters more than micro-optimizations. Use this when you have well-defined task categories and can tolerate 15-30ms overhead from default tokenization. The **Direct Inference Pattern** manually manages tokenization, batching, and output parsing for maximum control; this incurs 2-3x engineering overhead but reduces latency by 40-60% and enables custom probability calibration. Deploy this when handling high-volume requests (1000+ req/sec) or when task-specific output formatting is non-negotiable. The **Ensemble Pattern** runs multiple model sizes or prompt variations in parallel, aggregating confidence scores; this costs 3-5x compute but improves accuracy by 5-12% on ambiguous inputs. Reserve this for mission-critical predictions where false positives carry high business cost. Trade-offs center on compute budget: Pipeline sacrifices control for simplicity, Direct Inference demands careful engineering, Ensemble demands infrastructure but maximizes reliability. For cricket analytics, Pipeline works for real-time match commentary classification; Direct Inference suits player performance tiers; Ensemble handles boundary-call disputes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The **Pipeline Pattern** is like using preset field placements—you know slip cordon, mid-field, boundaries work for most batters, so you set them and adjust only innings-to-innings. The **Direct Inference Pattern** is like a captain constantly repositioning fieldsmen based on live batsman analysis—you read the strike pattern, adjust for left-handed stance, set DRS strategy per delivery. It's slower to execute but vastly more effective against known opponents. The **Ensemble Pattern** is like deploying two captains simultaneously, comparing their field strategies and averaging the decision—it's wasteful, but for critical moments (final over, caught-behind review), the redundancy ensures the best call. Choose Pipeline for county matches with fresh teams (low stakes), Direct Inference for test series (high performance demand), and Ensemble for IPL finals (reputation on the line).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Using Pipeline without batching for high-volume cricket predictions\nfrom transformers import pipeline\n\nclassifier = pipeline(\"zero-shot-classification\", model=\"facebook/bart-large-mnli\")\ncandidates = [\"boundary\", \"wicket\", \"dot_ball\", \"wide\"]\n\n# This processes EACH delivery sequentially—terrible for match analysis\nfor delivery_description in match_deliveries:  # 300 deliveries per match\n    result = classifier(delivery_description, candidates)\n    predictions.append(result)\n# Expected latency: ~50ms × 300 = 15 seconds per match\n\n# ✅ BEST PRACTICE 1: Pipeline with batch_size parameter\nfor batch in chunks(match_deliveries, batch_size=32):\n    results = classifier(batch, candidates, batch_size=32)\n    predictions.extend(results)\n# Latency: ~1.2 seconds per match (12x improvement)\n\n# ✅ BEST PRACTICE 2: Direct Inference with output caching for repeated candidates\nfrom transformers import AutoTokenizer, AutoModelForSequenceClassification\nimport torch\n\nmodel_name = \"facebook/bart-large-mnli\"\ntokenizer = AutoTokenizer.from_pretrained(model_name)\nmodel = AutoModelForSequenceClassification.from_pretrained(model_name)\n\ncandidates = [\"boundary\", \"wicket\", \"dot_ball\", \"wide\"]\ncandidate_tokens = tokenizer(candidates, padding=True, return_tensors=\"pt\")\n\n# Pre-encode candidates once\nwith torch.no_grad():\n    candidate_logits = model(**candidate_tokens).logits\n\n# Batch encode deliveries\ndelivery_batch = tokenizer(match_deliveries, padding=True, truncation=True, \n                           return_tensors=\"pt\", max_length=128)\n\nwith torch.no_grad():\n    delivery_logits = model(**delivery_batch).logits\n    # Compute similarities without re-encoding candidates\n    similarities = torch.cosine_similarity(\n        delivery_logits.unsqueeze(1), \n        candidate_logits.unsqueeze(0), \n        dim=2\n    )\n\npredictions = [candidates[sim.argmax()] for sim in similarities]\n# Latency: ~300ms per match (50x improvement over anti-pattern)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Not validating candidate_labels consistency across requests.** Beginners often pass different candidate lists for the same entity type—e.g., one delivery gets classified against [\"boundary\", \"wicket\", \"dot\"] and another against [\"boundary\", \"wide\", \"dot\", \"wicket\"], producing incomparable probabilities and silent failures in aggregation pipelines. **Fix:** Create an immutable enum or frozenset of valid candidates per task, validate all inputs against it before inference, and log mismatches. Example: `DELIVERY_OUTCOMES = frozenset([\"boundary\", \"wicket\", \"dot_ball\", \"wide\"]); assert all(c in DELIVERY_OUTCOMES for c in candidate_labels)` before calling the classifier.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Pipeline Pattern trades control for simplicity—use for latency-tolerant applications with standard task structures",
+        "Direct Inference Pattern enables 40-60% latency reduction through manual tokenization and batching optimization",
+        "Ensemble Pattern improves accuracy 5-12% but costs 3-5x compute—reserve for high-stakes predictions only",
+        "Always batch similar-length inputs to maximize GPU utilization; avoid sequential processing of high-volume deliveries",
+        "Cache pre-encoded candidate labels when reusing them across multiple queries to avoid redundant computation",
+        "Validate candidate_labels consistency across requests to prevent silent probability aggregation failures"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a real-time cricket commentary classifier that must process 500 delivery descriptions per match with <2 second latency. You have four candidate labels: 'boundary', 'wicket', 'dot_ball', 'wide'. Which pattern should you use?",
+      "items": [
+        "Pipeline Pattern with default settings for maximum simplicity",
+        "Direct Inference Pattern with batch processing and pre-encoded candidate labels",
+        "Ensemble Pattern with three model variants for highest accuracy",
+        "Pipeline Pattern with batch_size=1 for reproducible results"
+      ],
+      "answer": 1,
+      "explanation": "Direct Inference (B) is correct. With 500 deliveries and a <2 second budget, you need ~4ms per batch of 32 deliveries. Direct Inference with pre-encoded candidates achieves this through manual optimization. Pipeline adds tokenization overhead (~15-30ms). Ensemble (C) multiplies latency. Pipeline batch_size=1 (D) defeats the purpose of batching. Direct Inference enables caching candidate tokens once, then reusing them across all deliveries—critical for the 4x improvement needed here."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Zero-shot and few-shot learning power production systems at massive scale across tech giants. Google uses zero-shot classification in Gmail spam detection and YouTube content moderation, processing billions of emails and videos daily. Meta leverages few-shot learning for multilingual content understanding across 3+ billion users. OpenAI's GPT-4 enables customer support at scale for companies like Slack and Notion—handling novel queries without retraining. Netflix applies few-shot techniques for personalized content categorization across 230M+ users. Uber uses zero-shot models for driver safety classifications and fraud detection across 100+ cities. Airbnb employs few-shot learning for listing quality assessment and policy violation detection. At this scale, failures cascade: incorrect spam filtering loses user trust; biased few-shot outputs violate fairness regulations (EU AI Act, GDPR); hallucinations in customer-facing systems generate costly support tickets. Performance breaks when prompt quality degrades, when task distribution shifts, or when the pre-trained model lacks domain knowledge—requiring expensive fine-tuning fallback pipelines.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Zero-shot learning is like a captain setting field placements for an entirely new opposing batsman they've never faced—they use general batting patterns (pre-trained knowledge) without specific practice. Few-shot learning is like watching the batsman face 2–3 deliveries in the nets, then adjusting the field strategy accordingly. Full fine-tuning is intensive match preparation against a specific opponent. In production, you're fielding for millions of batsmen simultaneously (billions of user inputs), and a single misplaced fielder (wrong classification) costs wickets (user satisfaction) across the entire tournament.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: At production scale, prompt brittleness becomes catastrophic. Small wording changes in your zero-shot prompt can shift accuracy by 15–25% across millions of requests. Few-shot examples must be representative and balanced—biased examples amplify across billions of inferences. Always monitor distribution shift (new user behaviors, seasonal patterns) and maintain fallback fine-tuned models. Hallucinations in few-shot outputs are invisible until users report them—implement confidence thresholds and human-in-the-loop validation for high-stakes domains (healthcare, finance, legal).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Zero-shot and few-shot learning enable rapid deployment without expensive fine-tuning—critical for scaling across billions of users and novel tasks.",
+        "Pre-trained transformer representations encode rich linguistic and domain knowledge, making transfer learning effective across diverse downstream tasks.",
+        "Few-shot learning outperforms zero-shot by incorporating task-specific examples, but requires careful example selection to avoid bias amplification at scale.",
+        "Prompt engineering directly controls model behavior—iterative refinement of task framing, instructions, and examples is essential for production reliability.",
+        "Real-world failures occur when prompts degrade, task distributions shift, or models hallucinate—implement confidence scoring, monitoring, and human validation pipelines.",
+        "Common patterns include in-context learning (prompt-based), adapter modules (parameter-efficient fine-tuning), and ensemble strategies for robust production systems.",
+        "Production systems must balance speed (latency constraints), cost (compute budgets), and accuracy—validate across multiple deployment scenarios before scaling."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket analytics platform processes 500K match summaries daily. It needs to classify plays as 'aggressive', 'defensive', or 'risky' for new match formats without retraining. Which strategy minimizes latency while maintaining 85%+ accuracy?",
+      "items": [
+        "Full fine-tuning on all 500K summaries daily",
+        "Zero-shot classification with carefully crafted prompt templates",
+        "Few-shot learning with 5–10 representative plays per format, monitored for distribution shift",
+        "Retraining separate models for each match format weekly"
+      ],
+      "answer": 2,
+      "explanation": "Few-shot learning (answer C) balances latency and accuracy: it requires minimal labeled data (5–10 examples per format), avoids expensive retraining, and adapts to new formats within hours. Zero-shot alone (B) risks accuracy below 85%. Full fine-tuning (A) and weekly retraining (D) are too slow for 500K daily samples and violate production speed constraints. Distribution shift monitoring is critical—as new formats emerge, few-shot examples must be refreshed to maintain performance.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of zero-shot and few-shot learning with transformers. These quizzes cover both the conceptual foundations and practical decision-making you'll encounter when building NLP applications.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're using a pre-trained BERT model for sentiment analysis on cricket match reviews. In zero-shot learning, you provide a review text and candidate labels ['positive', 'negative', 'neutral'] without any training examples. Why does the model produce meaningful predictions despite never seeing labeled cricket reviews during fine-tuning?",
+      "items": [
+        "The model learned semantic relationships between words and label meanings during pre-training on massive unlabeled text, allowing it to map review text to label concepts without task-specific examples",
+        "The model randomly guesses which label is correct, and the probability is naturally distributed equally across all three options",
+        "Zero-shot learning uses a hidden database of pre-labeled cricket reviews that BERT was secretly trained on",
+        "The transformer architecture automatically memorizes all possible sentiment patterns, making labeled examples unnecessary"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is A. Pre-trained transformers like BERT develop rich semantic representations of language during training on billions of text tokens. They learn word meanings, contextual relationships, and linguistic patterns without task-specific labels. This foundational knowledge transfers to zero-shot tasks where the model can understand that certain words in reviews are semantically similar to 'positive' or 'negative' concepts. Option B is incorrect because predictions aren't random—they're based on learned representations. Option C is false; models don't access external databases at inference. Option D misrepresents how transformers work; they don't memorize all patterns, but learn generalizable representations that apply to unseen scenarios.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a system to classify cricket player performance levels ['opening_batsman', 'middle_order', 'bowler', 'all_rounder'] from match statistics and commentary. You have only 15 labeled examples total. Your team debates: (1) zero-shot with prompt engineering, (2) few-shot with 2-3 examples per class, (3) full fine-tuning on the 15 examples. Which approach is most appropriate and why?",
+      "items": [
+        "Few-shot learning with 2-3 examples per class, because you have enough labeled data to show pattern diversity within classes while still leveraging pre-trained knowledge, avoiding overfitting that would occur with full fine-tuning on only 15 examples",
+        "Zero-shot learning, because having any labeled data is wasteful and zero-shot always produces the best results",
+        "Full fine-tuning, because fine-tuned models are always superior to few-shot approaches regardless of data scarcity",
+        "Few-shot learning with just 1 example per class to minimize computational cost"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is A. With 15 total examples (roughly 3-4 per class), few-shot learning strikes the optimal balance. You have enough data to demonstrate within-class variation (e.g., different opening batsman styles) while staying in the regime where pre-trained representations matter most. Full fine-tuning on 15 examples would cause overfitting because the model has 100M+ parameters but only 15 training samples—it would memorize noise rather than learn generalizable patterns. Zero-shot ignores your valuable labeled data entirely and loses the performance boost from in-context examples. Option D (1 example per class) is suboptimal because you'd lose pattern diversity; 2-3 examples better represent class variance. Few-shot with your available data maximizes the pre-trained foundation while adding task-specific signal.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Zero-shot works because pre-training creates semantic understanding; few-shot adds task-specific patterns with minimal data",
+        "Few-shot is optimal for 5-100 labeled examples; too few (<5) favors zero-shot, too many (>500) favors fine-tuning",
+        "Prompt framing in zero/few-shot dramatically impacts performance—make label concepts and instructions explicit",
+        "Few-shot examples should be diverse and representative; cherry-picked examples mislead the model",
+        "Monitor for prompt sensitivity: small wording changes can cause performance swings in few-shot scenarios"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
     }
   ]
 }
