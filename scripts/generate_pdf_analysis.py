@@ -254,7 +254,7 @@ def build():
     summary_rows = [
         ['Metric', 'Value'],
         ['Total career paths',     '10'],
-        ['Total unique courses',   '45'],
+        ['Total unique courses',   '36'],
         ['Shared courses (2+ paths)', '5'],
         ['Patch 1 paths (launch-ready)', '5 — AI Engineer, DevOps, Cloud, Data Engineer, Full Stack Java'],
         ['Patch 2 paths', '5 — Frontend, MERN, Data Scientist, Security, Mobile'],
@@ -375,81 +375,57 @@ def build():
 
     # ── Full Catalogue ────────────────────────────────────────────────────────
     story.append(PageBreak())
-    story.append(Paragraph('Full Course Catalogue — 61 Courses', h2))
+    story.append(Paragraph('Full Course Catalogue — 36 Courses', h2))
     story.append(Paragraph(
-        'Complete list of all courses in the platform catalogue, organised by category.',
+        'Complete list of all courses in the platform catalogue, organised by career path coverage only.',
         body))
 
     catalogue = [
-        # AI & Machine Learning
+        # AI & Machine Learning (index 0-6)
         ('Python for AI/ML',               'AI & ML', 'Beginner'),
         ('Large Language Models',           'AI & ML', 'Intermediate'),
         ('AI Agents & Agentic Workflows',   'AI & ML', 'Advanced'),
         ('Retrieval-Augmented Generation',  'AI & ML', 'Intermediate'),
-        ('PyTorch Deep Learning',           'AI & ML', 'Intermediate'),
-        ('TensorFlow & Keras',              'AI & ML', 'Intermediate'),
-        ('Hugging Face Transformers',       'AI & ML', 'Intermediate'),
         ('MLOps & Model Deployment',        'AI & ML', 'Advanced'),
         ('Data Science with Python',        'AI & ML', 'Beginner'),
         ('Machine Learning Fundamentals',   'AI & ML', 'Beginner'),
-        ('Generative AI for Developers',    'AI & ML', 'Intermediate'),
-        ('Vector Databases & Embeddings',   'AI & ML', 'Intermediate'),
-        # Cloud
+        # Cloud (index 7-10)
         ('AWS Core Services',               'Cloud', 'Beginner'),
         ('AWS Solutions Architect',         'Cloud', 'Intermediate'),
-        ('AWS Data & Analytics',            'Cloud', 'Intermediate'),
-        ('Google Cloud Platform',           'Cloud', 'Beginner'),
-        ('Google Cloud AI/ML',              'Cloud', 'Intermediate'),
-        ('Microsoft Azure Fundamentals',    'Cloud', 'Beginner'),
-        ('Azure AI Services',               'Cloud', 'Intermediate'),
         ('Cloud Security',                  'Cloud', 'Intermediate'),
         ('Serverless Architecture',         'Cloud', 'Intermediate'),
-        # DevOps
+        # DevOps (index 11-16)
         ('Docker & Containers',             'DevOps', 'Beginner'),
         ('Kubernetes',                      'DevOps', 'Intermediate'),
-        ('Terraform & Infrastructure as Code','DevOps', 'Intermediate'),
+        ('Terraform & Infrastructure as Code', 'DevOps', 'Intermediate'),
         ('CI/CD with GitHub Actions',       'DevOps', 'Beginner'),
         ('Linux & Shell Scripting',         'DevOps', 'Beginner'),
-        ('Monitoring & Observability',      'DevOps', 'Intermediate'),
-        ('Site Reliability Engineering',    'DevOps', 'Advanced'),
         ('DevSecOps',                       'DevOps', 'Intermediate'),
-        # Backend
-        ('Python FastAPI/Django',           'Backend', 'Beginner'),
+        # Backend (index 17-20, 35)
         ('Node.js & Express',               'Backend', 'Beginner'),
         ('Java Spring Boot',                'Backend', 'Intermediate'),
-        ('Go Golang',                       'Backend', 'Intermediate'),
-        ('Rust Programming',                'Backend', 'Advanced'),
-        ('GraphQL APIs',                    'Backend', 'Intermediate'),
-        ('Microservices Architecture',      'Backend', 'Advanced'),
         ('Apache Kafka & Messaging',        'Backend', 'Intermediate'),
         ('PostgreSQL Mastery',              'Backend', 'Intermediate'),
-        ('MongoDB',                         'Backend', 'Beginner'),
-        # Data Engineering
+        # Data Engineering (index 21-24)
         ('SQL Mastery',                     'Data Engineering', 'Beginner'),
         ('Apache Spark',                    'Data Engineering', 'Intermediate'),
         ('dbt & Analytics Engineering',     'Data Engineering', 'Intermediate'),
         ('Apache Airflow & Orchestration',  'Data Engineering', 'Intermediate'),
-        ('Snowflake BigQuery',              'Data Engineering', 'Intermediate'),
-        ('Real-time Data Streaming',        'Data Engineering', 'Advanced'),
-        ('Data Warehouse Design',           'Data Engineering', 'Intermediate'),
-        # Frontend
+        # Frontend (index 25-30)
         ('React.js',                        'Frontend', 'Beginner'),
         ('Next.js',                         'Frontend', 'Intermediate'),
         ('TypeScript',                      'Frontend', 'Beginner'),
-        ('Vue.js Nuxt.js',                  'Frontend', 'Intermediate'),
         ('Tailwind CSS & Modern CSS',       'Frontend', 'Beginner'),
         ('React Native',                    'Frontend', 'Intermediate'),
         ('Flutter',                         'Frontend', 'Intermediate'),
-        # System Design
-        ('System Design Interview Prep',    'System Design', 'Advanced'),
-        ('Distributed Systems',             'System Design', 'Advanced'),
+        # System Design (index 31)
         ('API Design & Best Practices',     'System Design', 'Intermediate'),
-        ('Redis & Caching Strategies',      'System Design', 'Intermediate'),
-        ('Database Scaling & Sharding',     'System Design', 'Advanced'),
-        # Security
+        # Security (index 32-34)
         ('Web App Security OWASP',          'Security', 'Intermediate'),
         ('API Security',                    'Security', 'Intermediate'),
         ('Cloud Security Fundamentals',     'Security', 'Beginner'),
+        # Backend cont. (index 35)
+        ('MongoDB',                         'Backend', 'Beginner'),
     ]
 
     # Group by category
