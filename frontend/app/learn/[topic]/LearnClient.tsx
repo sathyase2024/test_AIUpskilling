@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import LessonRenderer from "@/components/LessonRenderer";
 import { apiGet, apiPost, isAuthenticated, getStoredUser, setStoredUser } from "@/lib/api";
+import { matchFAQ } from "@/lib/course-faq";
 
 // ─── Types (shape returned by the backend) ───────────────────────────────────
 
@@ -160,14 +161,24 @@ export default function LearnClient({ topic }: { topic: string }) {
     if (nextLesson) selectLesson(nextLesson.id);
   }, [currentLesson, completedLessons, nextLesson]);
 
-  // ── AI tutor chat (public /ai/chat endpoint) ─────────────────────────────────
+  // ── AI tutor chat ─────────────────────────────────────────────────────────────
+  // FAQ answers are served instantly without any API call. Only questions that
+  // don't match a pre-defined intent are forwarded to the Claude API.
   const sendChat = async () => {
     const trimmed = chatInput.trim();
     if (!trimmed || chatLoading) return;
     setChatMessages((prev) => [...prev, { role: "user", text: trimmed }]);
     setChatInput("");
-    setChatLoading(true);
 
+    // Check pre-defined FAQ first (zero tokens)
+    const faqAnswer = matchFAQ(topic, trimmed);
+    if (faqAnswer) {
+      setChatMessages((prev) => [...prev, { role: "ai", text: faqAnswer }]);
+      return;
+    }
+
+    // Fall through to Claude API for course-specific technical questions
+    setChatLoading(true);
     const context = currentLesson
       ? `Lesson: ${currentLesson.title}. Topic: ${topicData?.name ?? decodedTopic}.`
       : `Topic: ${topicData?.name ?? decodedTopic}.`;
