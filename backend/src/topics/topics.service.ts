@@ -211,20 +211,7 @@ export class TopicsService implements OnApplicationBootstrap {
 
     let seeded = 0;
     for (const [slug, meta] of Object.entries(GENERATED_TOPIC_META)) {
-      // Check DB first — if topic exists and already has lessons with content, skip entirely.
-      // No file reads needed on subsequent boots.
-      const topic = await this.topicRepo.findOne({ where: { slug } });
-      if (topic) {
-        const populatedCount = await this.lessonRepo.count({
-          where: { topicId: topic.id, isGenerated: true },
-        });
-        if (populatedCount > 0) {
-          this.logger.log(`Topic "${slug}" already seeded (${populatedCount} lessons) — skipping`);
-          continue;
-        }
-      }
-
-      // First boot only: read files and write to DB
+      // Directory listing is cheap — just filenames, no file reads yet
       const dir = path.join(baseDir, slug);
       if (!fs.existsSync(dir)) {
         this.logger.warn(`Generated content for "${slug}" not found at ${dir} — skipping`);
@@ -240,6 +227,19 @@ export class TopicsService implements OnApplicationBootstrap {
         continue;
       }
 
+      // Compare file count vs DB count — skip only when fully in sync
+      const topic = await this.topicRepo.findOne({ where: { slug } });
+      const existingCount = topic
+        ? await this.lessonRepo.count({ where: { topicId: topic.id, isGenerated: true } })
+        : 0;
+
+      if (existingCount >= lessonFiles.length) {
+        this.logger.log(`Topic "${slug}" up to date (${existingCount}/${lessonFiles.length} lessons) — skipping`);
+        continue;
+      }
+
+      this.logger.log(`Topic "${slug}": ${existingCount} in DB, ${lessonFiles.length} files — seeding ${lessonFiles.length - existingCount} new lesson(s)`);
+
       const savedTopic = topic ?? (await this.topicRepo.save(
         this.topicRepo.create({
           ...meta,
@@ -249,8 +249,15 @@ export class TopicsService implements OnApplicationBootstrap {
         } as Topic),
       )) as Topic;
 
+      // Only process files that don't have a DB row yet (by orderIndex)
+      const existingOrders = new Set(
+        (await this.lessonRepo.find({ where: { topicId: savedTopic.id }, select: ['orderIndex'] }))
+          .map((l) => l.orderIndex),
+      );
+
       let order = 1;
       for (const file of lessonFiles) {
+        if (existingOrders.has(order)) { order++; continue; } // already written
         let contentJson: Record<string, any>;
         try {
           contentJson = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8'));
@@ -281,7 +288,7 @@ export class TopicsService implements OnApplicationBootstrap {
       }
 
       seeded++;
-      this.logger.log(`Seeded generated topic "${slug}" with ${order - 1} lessons`);
+      this.logger.log(`✅ "${slug}" — wrote ${lessonFiles.length - existingCount} new lesson(s)`);
     }
 
     if (seeded > 0) this.logger.log(`✅ Seeded ${seeded} pre-generated topic(s) for the first time`);
