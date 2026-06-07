@@ -1,65 +1,102 @@
-import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { exec } from 'child_process';
-import { writeFile, unlink } from 'fs/promises';
+import { writeFile, unlink, mkdir, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
-interface ExecResult {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
+const EXEC_OPTS = {
+  timeout: 15_000,
+  maxBuffer: 512 * 1024,
+  env: { PATH: process.env.PATH },
+};
+
+interface ExecResult { stdout: string; stderr: string; exitCode: number }
+
+function tag() {
+  return `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
-// Language → temp file extension + shell command
-const RUNNERS: Record<string, { ext: string; cmd: (f: string) => string }> = {
-  python:     { ext: 'py',  cmd: (f) => `python3 ${f}` },
-  javascript: { ext: 'js',  cmd: (f) => `node ${f}` },
-  typescript: { ext: 'ts',  cmd: (f) => `node --input-type=module < ${f}` },
-};
+function handleError(err: any): ExecResult {
+  if (err.killed || err.signal === 'SIGTERM') {
+    return { stdout: '', stderr: 'Execution timed out (15s limit).', exitCode: 124 };
+  }
+  return { stdout: err.stdout ?? '', stderr: err.stderr ?? err.message, exitCode: err.code ?? 1 };
+}
 
 @Injectable()
 export class CodeService {
   private readonly logger = new Logger(CodeService.name);
 
   async execute(language: string, code: string): Promise<ExecResult> {
-    const runner = RUNNERS[language];
-
-    if (!runner) {
-      // Java, Go, C++ not installed on the server — return a clear message
-      return {
-        stdout: '',
-        stderr: `${language.toUpperCase()} server-side execution is not available in this environment. Switch to Python or JavaScript to run code here.`,
-        exitCode: 1,
-      };
+    switch (language) {
+      case 'python':     return this.runPython(code);
+      case 'java':       return this.runJava(code);
+      case 'javascript':
+      case 'typescript': return this.runNode(code);
+      default:
+        return {
+          stdout: '',
+          stderr: `${language} execution is not yet available. Use Python, JavaScript, or Java.`,
+          exitCode: 1,
+        };
     }
+  }
 
-    const tmpFile = join(tmpdir(), `exec_${Date.now()}_${Math.random().toString(36).slice(2)}.${runner.ext}`);
-
+  // ── Python ────────────────────────────────────────────────────────────────────
+  private async runPython(code: string): Promise<ExecResult> {
+    const file = join(tmpdir(), `py_${tag()}.py`);
     try {
-      await writeFile(tmpFile, code, 'utf8');
-
-      const { stdout, stderr } = await execAsync(runner.cmd(tmpFile), {
-        timeout: 10_000,   // 10 s hard limit
-        maxBuffer: 512 * 1024,  // 512 KB output cap
-        env: { PATH: process.env.PATH },  // minimal env — no secrets leaked
-      });
-
+      await writeFile(file, code, 'utf8');
+      const { stdout, stderr } = await execAsync(`python3 ${file}`, EXEC_OPTS);
       return { stdout, stderr, exitCode: 0 };
     } catch (err: any) {
-      if (err.killed || err.signal === 'SIGTERM') {
-        return { stdout: '', stderr: 'Execution timed out (10s limit).', exitCode: 124 };
-      }
-      // child_process throws when exit code != 0; stdout/stderr are still available
-      return {
-        stdout: err.stdout ?? '',
-        stderr: err.stderr ?? err.message,
-        exitCode: err.code ?? 1,
-      };
+      return handleError(err);
     } finally {
-      unlink(tmpFile).catch(() => {}); // clean up temp file
+      unlink(file).catch(() => {});
+    }
+  }
+
+  // ── Java — compile then run ───────────────────────────────────────────────────
+  private async runJava(code: string): Promise<ExecResult> {
+    const dir = join(tmpdir(), `java_${tag()}`);
+    const file = join(dir, 'Main.java');
+    try {
+      await mkdir(dir, { recursive: true });
+      await writeFile(file, code, 'utf8');
+
+      // Step 1: compile
+      try {
+        await execAsync(`javac ${file}`, { ...EXEC_OPTS, timeout: 20_000 });
+      } catch (err: any) {
+        return { stdout: '', stderr: err.stderr ?? err.message, exitCode: 1 };
+      }
+
+      // Step 2: run
+      try {
+        const { stdout, stderr } = await execAsync(`java -cp ${dir} Main`, EXEC_OPTS);
+        return { stdout, stderr, exitCode: 0 };
+      } catch (err: any) {
+        return handleError(err);
+      }
+    } finally {
+      rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+
+  // ── JavaScript / TypeScript (Node.js) ────────────────────────────────────────
+  private async runNode(code: string): Promise<ExecResult> {
+    const file = join(tmpdir(), `js_${tag()}.mjs`);
+    try {
+      await writeFile(file, code, 'utf8');
+      const { stdout, stderr } = await execAsync(`node ${file}`, EXEC_OPTS);
+      return { stdout, stderr, exitCode: 0 };
+    } catch (err: any) {
+      return handleError(err);
+    } finally {
+      unlink(file).catch(() => {});
     }
   }
 }

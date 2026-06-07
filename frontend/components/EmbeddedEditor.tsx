@@ -60,7 +60,8 @@ console.log("Sum:", nums.reduce((a, b) => a + b, 0));
   },
   java: {
     id: 'java', version: '*', monacoId: 'java', label: 'Java',
-    starter: `public class Main {
+    starter: `// Note: keep the class name as Main
+public class Main {
     public static void main(String[] args) {
         System.out.println("Hello, World!");
 
@@ -210,7 +211,7 @@ export default function EmbeddedEditor({ topicSlug }: Props) {
         // Run instantly in the browser — no server round-trip
         result = runInBrowser(code)
       } else {
-        // Python and others run via backend subprocess
+        // Python, Java → backend subprocess
         result = await runOnBackend(lang, code)
       }
       setOutput(result)
