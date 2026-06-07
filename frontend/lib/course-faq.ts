@@ -149,7 +149,7 @@ const COURSE_FAQ: Record<string, Record<IntentKey, string>> = {
 
 /**
  * Checks if a user message matches a pre-defined FAQ for the given course slug.
- * Returns the answer string if matched, null if the question should go to the AI API.
+ * Returns the answer string if matched, null if no intent was detected.
  */
 export function matchFAQ(slug: string, message: string): string | null {
   const answers = COURSE_FAQ[slug]
@@ -160,3 +160,22 @@ export function matchFAQ(slug: string, message: string): string | null {
 
   return answers[intent] ?? null
 }
+
+// ─── Chat UI helpers ──────────────────────────────────────────────────────────
+
+export interface QuickReply {
+  label: string
+  question: string
+}
+
+export const QUICK_REPLIES: QuickReply[] = [
+  { label: '🎯 Why Learn?',      question: 'Why should I learn this skill?' },
+  { label: '📊 Scope & Demand',  question: 'What is the job scope and market demand?' },
+  { label: '💰 Salary',          question: 'What salary can I earn with this skill?' },
+  { label: '🔮 Future Outlook',  question: 'What is the future of this skill?' },
+  { label: '📚 How Hard?',       question: 'How hard is it to learn and how long does it take?' },
+  { label: '🚀 Career Paths',    question: 'What career paths and job roles does this open up?' },
+]
+
+export const DEFLECTION_REPLY =
+  "I'm your course advisor and can only answer specific questions about this skill — scope, salary, future outlook, difficulty, and career paths. Please choose a topic below or rephrase your question around those areas."
