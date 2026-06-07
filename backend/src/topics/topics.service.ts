@@ -127,10 +127,19 @@ export class TopicsService implements OnApplicationBootstrap {
     @InjectRepository(Lesson) private lessonRepo: Repository<Lesson>,
   ) {}
 
-  async onApplicationBootstrap() {
+  onApplicationBootstrap() {
+    // Defer all seeding so the HTTP server is already accepting requests
+    // (and health checks are passing) before any heavy DB/file work starts.
+    setTimeout(() => {
+      this.runSeeders().catch((err) =>
+        this.logger.error(`Seeder failed: ${err.message}`),
+      );
+    }, 8_000);
+  }
+
+  private async runSeeders() {
     const count = await this.topicRepo.count();
     if (count === 0) await this.seedMissing();
-    // Idempotent — only inserts slugs that don't already exist.
     await this.seedGeneratedLessons();
   }
 
@@ -226,11 +235,13 @@ export class TopicsService implements OnApplicationBootstrap {
         )) as Topic;
       }
 
-      // Always sync lesson content from JSON files so updates are picked up on redeploy
+      // Only write lessons that are missing or have no content yet.
+      // Skipping already-populated lessons avoids 196+ DB writes on every restart.
       const existingLessons = await this.lessonRepo.find({ where: { topicId: topic.id }, order: { orderIndex: 'ASC' } });
       const existingByOrder = new Map(existingLessons.map((l) => [l.orderIndex, l]));
 
       let order = 1;
+      let written = 0;
       for (const file of lessonFiles) {
         let contentJson: Record<string, any>;
         try {
@@ -246,14 +257,18 @@ export class TopicsService implements OnApplicationBootstrap {
         const existing = existingByOrder.get(order);
 
         if (existing) {
-          await this.lessonRepo.update(existing.id, {
-            title,
-            type: type as Lesson['type'],
-            durationMinutes: Number(contentJson.estimatedMinutes) || 30,
-            xpReward: Number(contentJson.xpReward) || 50,
-            content: JSON.stringify(contentJson),
-            contentJson,
-          });
+          // Only update if content is missing — avoids rewriting 196 rows every boot
+          if (!existing.contentJson) {
+            await this.lessonRepo.update(existing.id, {
+              title,
+              type: type as Lesson['type'],
+              durationMinutes: Number(contentJson.estimatedMinutes) || 30,
+              xpReward: Number(contentJson.xpReward) || 50,
+              content: JSON.stringify(contentJson),
+              contentJson,
+            });
+            written++;
+          }
         } else {
           await this.lessonRepo.save(
             this.lessonRepo.create({
@@ -269,6 +284,7 @@ export class TopicsService implements OnApplicationBootstrap {
               isGenerated: true,
             }),
           );
+          written++;
         }
         order++;
       }
@@ -276,9 +292,11 @@ export class TopicsService implements OnApplicationBootstrap {
       if (isNew) {
         seeded++;
         this.logger.log(`Seeded generated topic "${slug}" with ${order - 1} lessons`);
-      } else {
+      } else if (written > 0) {
         updated++;
-        this.logger.log(`Synced generated topic "${slug}" — ${order - 1} lessons updated`);
+        this.logger.log(`Synced generated topic "${slug}" — ${written} lessons written`);
+      } else {
+        this.logger.log(`Generated topic "${slug}" already up to date — skipped`);
       }
     }
 
