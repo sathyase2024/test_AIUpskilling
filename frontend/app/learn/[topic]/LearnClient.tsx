@@ -16,10 +16,11 @@ import {
   User,
   Brain,
   AlertCircle,
+  Menu,
 } from "lucide-react";
 import Link from "next/link";
 import LessonRenderer from "@/components/LessonRenderer";
-import { apiGet, apiPost, isAuthenticated } from "@/lib/api";
+import { apiGet, apiPost, isAuthenticated, getStoredUser, setStoredUser } from "@/lib/api";
 
 // ─── Types (shape returned by the backend) ───────────────────────────────────
 
@@ -58,6 +59,7 @@ export default function LearnClient({ topic }: { topic: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showXpWidget, setShowXpWidget] = useState(false);
@@ -139,8 +141,12 @@ export default function LearnClient({ topic }: { topic: string }) {
   const markComplete = useCallback(async () => {
     if (!currentLesson) return;
     const id = currentLesson.id;
+    const xpReward = currentLesson.xpReward ?? 50;
     if (!completedLessons.includes(id)) {
       setCompletedLessons((prev) => [...prev, id]);
+      // Optimistically update stored user XP so Navbar reflects new total
+      const user = getStoredUser();
+      if (user) setStoredUser({ ...user, xp: (user.xp ?? 0) + xpReward });
     }
     if (isAuthenticated()) {
       try {
@@ -220,11 +226,20 @@ export default function LearnClient({ topic }: { topic: string }) {
         <div className="max-w-7xl mx-auto flex items-center gap-4">
           <Link
             href="/topics"
-            className="flex items-center gap-1.5 text-white/50 hover:text-white transition-colors text-sm"
+            className="flex items-center gap-1.5 text-white/50 hover:text-white transition-colors text-sm shrink-0"
           >
             <ArrowLeft size={16} />
-            Back
+            <span className="hidden sm:inline">Back</span>
           </Link>
+
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="lg:hidden flex items-center gap-1.5 text-white/50 hover:text-white transition-colors text-sm shrink-0"
+            aria-label="Open lesson list"
+          >
+            <Menu size={16} />
+            <span className="text-xs">Lessons</span>
+          </button>
 
           <div className="h-4 w-px bg-white/10" />
 
@@ -375,6 +390,65 @@ export default function LearnClient({ topic }: { topic: string }) {
           </div>
         </main>
       </div>
+
+      {/* ── Mobile Lesson Drawer ── */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <div className="absolute left-0 top-0 h-full w-72 bg-[#0d0d18] border-r border-white/10 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <h2 className="font-bold text-sm truncate pr-2">{topicData.name}</h2>
+              <button
+                onClick={() => setMobileNavOpen(false)}
+                className="text-white/40 hover:text-white transition-colors shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-4 py-3 border-b border-white/10">
+              <p className="text-xs text-white/40 mb-2">{courseProgress}% complete</p>
+              <div className="h-1.5 rounded-full bg-white/5">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all duration-500"
+                  style={{ width: `${courseProgress}%` }}
+                />
+              </div>
+            </div>
+            <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
+              {lessons.map((lesson, i) => {
+                const isDone = completedLessons.includes(lesson.id);
+                const isCurrent = selectedLessonId === lesson.id;
+                return (
+                  <button
+                    key={lesson.id}
+                    onClick={() => { selectLesson(lesson.id); setMobileNavOpen(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all text-xs ${
+                      isCurrent
+                        ? "bg-purple-600/20 border border-purple-500/40 text-white"
+                        : isDone
+                        ? "text-white/50 hover:bg-white/5"
+                        : "text-white/60 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    {isDone ? (
+                      <CheckCircle2 size={13} className="text-green-400 shrink-0" />
+                    ) : isCurrent ? (
+                      <Play size={13} className="text-purple-400 shrink-0 fill-purple-400" />
+                    ) : (
+                      <span className="w-[13px] text-center text-white/30 shrink-0 font-mono">{i + 1}</span>
+                    )}
+                    <span className="flex-1 leading-tight">{lesson.title}</span>
+                    {isCurrent && <span className="text-purple-400 text-[10px] shrink-0">Now</span>}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+      )}
 
       {/* ── Floating XP Widget ── */}
       {showXpWidget && (

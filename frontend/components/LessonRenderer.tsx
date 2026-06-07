@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Lightbulb, AlertTriangle, CheckCircle, Code2, BookOpen, HelpCircle, Sparkles } from 'lucide-react'
+import { Lightbulb, AlertTriangle, CheckCircle, Code2, BookOpen, HelpCircle, Sparkles, Copy, Check } from 'lucide-react'
 
 interface LessonSection {
   type: 'heading' | 'paragraph' | 'code' | 'info_box' | 'warning_box' | 'quiz' | 'exercise' | 'key_points' | 'analogy'
@@ -33,6 +33,165 @@ interface SectionProps {
   onQuizAnswer: (sectionIndex: number, optionIndex: number) => void
 }
 
+// ─── Syntax Highlighter ───────────────────────────────────────────────────────
+
+const PY_KW = new Set([
+  'def', 'class', 'return', 'if', 'elif', 'else', 'for', 'while', 'in', 'not', 'and', 'or',
+  'True', 'False', 'None', 'import', 'from', 'with', 'as', 'try', 'except', 'finally',
+  'raise', 'pass', 'break', 'continue', 'yield', 'lambda', 'self', 'cls', 'global',
+  'nonlocal', 'del', 'is', 'assert', 'async', 'await',
+])
+
+const JS_KW = new Set([
+  'const', 'let', 'var', 'function', 'class', 'return', 'if', 'else', 'for', 'while',
+  'do', 'switch', 'case', 'break', 'continue', 'import', 'export', 'default', 'from',
+  'new', 'this', 'typeof', 'instanceof', 'null', 'undefined', 'true', 'false', 'throw',
+  'try', 'catch', 'finally', 'async', 'await', 'interface', 'type', 'enum', 'extends',
+  'implements', 'of', 'in', 'delete', 'void', 'static', 'public', 'private', 'protected',
+  'readonly', 'abstract', 'override',
+])
+
+const BUILTINS = new Set([
+  'print', 'len', 'range', 'list', 'dict', 'set', 'tuple', 'str', 'int', 'float', 'bool',
+  'type', 'isinstance', 'hasattr', 'getattr', 'setattr', 'super', 'object', 'property',
+  'classmethod', 'staticmethod', 'enumerate', 'zip', 'map', 'filter', 'sorted', 'reversed',
+  'open', 'input', 'any', 'all', 'max', 'min', 'sum', 'abs', 'round', 'next', 'iter',
+  'callable', 'repr', 'id', 'dir', 'vars', 'help', 'hash', 'hex', 'oct', 'bin',
+  'console', 'Math', 'Array', 'Object', 'Promise', 'JSON', 'Number', 'String', 'Boolean',
+  'Error', 'TypeError', 'ValueError', 'KeyError', 'IndexError', 'Exception', 'RuntimeError',
+])
+
+type Token = { text: string; color: string }
+
+function tokenizeLine(line: string, kw: Set<string>): Token[] {
+  const tokens: Token[] = []
+  let pos = 0
+
+  while (pos < line.length) {
+    const rest = line.slice(pos)
+
+    // Single-line comment
+    if (rest.startsWith('#') || rest.startsWith('//')) {
+      tokens.push({ text: rest, color: '#6b7280' })
+      break
+    }
+
+    // Triple-quoted string (simplified — single-line only for safety)
+    const tripleMatch = rest.match(/^(""".*?"""|'''.*?''')/)
+    if (tripleMatch) {
+      tokens.push({ text: tripleMatch[0], color: '#34d399' })
+      pos += tripleMatch[0].length
+      continue
+    }
+
+    // Regular string
+    const strMatch = rest.match(/^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/)
+    if (strMatch) {
+      tokens.push({ text: strMatch[0], color: '#34d399' })
+      pos += strMatch[0].length
+      continue
+    }
+
+    // Decorator (@name)
+    const decorMatch = rest.match(/^@[a-zA-Z_]\w*/)
+    if (decorMatch) {
+      tokens.push({ text: decorMatch[0], color: '#fb923c' })
+      pos += decorMatch[0].length
+      continue
+    }
+
+    // Number
+    const numMatch = rest.match(/^\d+\.?\d*(?:e[+-]?\d+)?/)
+    if (numMatch) {
+      tokens.push({ text: numMatch[0], color: '#f59e0b' })
+      pos += numMatch[0].length
+      continue
+    }
+
+    // Identifier or keyword
+    const wordMatch = rest.match(/^[a-zA-Z_]\w*/)
+    if (wordMatch) {
+      const word = wordMatch[0]
+      let color: string
+      if (kw.has(word)) {
+        color = '#c084fc'   // keyword: purple-400
+      } else if (BUILTINS.has(word)) {
+        color = '#fcd34d'   // builtin: amber-300
+      } else if (/^[A-Z]/.test(word)) {
+        color = '#67e8f9'   // class/type: cyan-300
+      } else {
+        const after = line.slice(pos + word.length).trimStart()
+        color = after.startsWith('(') ? '#93c5fd' : '#e2e8f0'  // fn: blue-300, ident: slate-200
+      }
+      tokens.push({ text: word, color })
+      pos += word.length
+      continue
+    }
+
+    // Operator/punctuation
+    tokens.push({ text: rest[0], color: '#94a3b8' })
+    pos++
+  }
+
+  return tokens
+}
+
+function SyntaxCode({ code, language }: { code: string; language?: string }) {
+  const [copied, setCopied] = useState(false)
+  const lang = (language ?? '').toLowerCase()
+  const kw = lang === 'python' || lang === 'py' ? PY_KW : JS_KW
+  const lines = code.split('\n')
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div className="my-6 rounded-xl overflow-hidden border border-white/10 shadow-lg">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2 bg-[#161622] border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5">
+            <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+            <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+            <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
+          </div>
+          <div className="w-px h-3.5 bg-white/10 mx-1" />
+          <Code2 size={12} className="text-purple-400" />
+          <span className="text-xs text-white/40 font-mono">{language || 'code'}</span>
+        </div>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded-md hover:bg-white/5"
+          title="Copy code"
+        >
+          {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+          <span>{copied ? 'Copied!' : 'Copy'}</span>
+        </button>
+      </div>
+
+      {/* Code */}
+      <pre className="p-4 bg-[#0d0d14] text-sm font-mono leading-relaxed overflow-x-auto">
+        <code>
+          {lines.map((line, lineIdx) => (
+            <span key={lineIdx}>
+              {tokenizeLine(line, kw).map((token, i) => (
+                <span key={i} style={{ color: token.color }}>{token.text}</span>
+              ))}
+              {lineIdx < lines.length - 1 && '\n'}
+            </span>
+          ))}
+        </code>
+      </pre>
+    </div>
+  )
+}
+
+// ─── Section Renderer ─────────────────────────────────────────────────────────
+
 function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionProps) {
   switch (section.type) {
     case 'heading': {
@@ -45,7 +204,7 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
         )
       }
       return (
-        <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 mt-8 mb-4">
+        <h3 className="text-lg font-bold text-white/90 mt-6 mb-3">
           {section.content}
         </h3>
       )
@@ -59,17 +218,7 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
       )
 
     case 'code':
-      return (
-        <div className="my-6 rounded-xl overflow-hidden border border-white/10">
-          <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border-b border-white/10">
-            <Code2 size={14} className="text-purple-400" />
-            <span className="text-xs text-white/40 font-mono">{section.language || 'code'}</span>
-          </div>
-          <pre className="p-4 bg-[#0d0d14] text-sm font-mono leading-relaxed overflow-x-auto text-green-300">
-            <code>{section.content}</code>
-          </pre>
-        </div>
-      )
+      return <SyntaxCode code={section.content} language={section.language} />
 
     case 'info_box':
       return (
@@ -128,22 +277,22 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
             {(options.length > 0 ? options : ['Option A', 'Option B', 'Option C', 'Option D']).map((option, i) => {
               const isSelected = selectedAnswer === i
               const isCorrect = i === correctAnswer
-              let buttonClass = 'w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-all '
+              let cls = 'w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-all '
               if (!hasAnswered) {
-                buttonClass += 'border-white/10 bg-white/5 text-white/60 hover:bg-white/8 hover:border-white/20 cursor-pointer'
+                cls += 'border-white/10 bg-white/5 text-white/60 hover:bg-white/8 hover:border-white/20 cursor-pointer'
               } else if (isCorrect) {
-                buttonClass += 'border-green-500/40 bg-green-500/10 text-green-300 cursor-default'
+                cls += 'border-green-500/40 bg-green-500/10 text-green-300 cursor-default'
               } else if (isSelected && !isCorrect) {
-                buttonClass += 'border-red-500/40 bg-red-500/10 text-red-300 cursor-default'
+                cls += 'border-red-500/40 bg-red-500/10 text-red-300 cursor-default'
               } else {
-                buttonClass += 'border-white/5 bg-white/3 text-white/30 cursor-default'
+                cls += 'border-white/5 bg-white/[0.02] text-white/30 cursor-default'
               }
               return (
                 <button
                   key={i}
                   onClick={() => !hasAnswered && onQuizAnswer(index, i)}
                   disabled={hasAnswered}
-                  className={buttonClass}
+                  className={cls}
                 >
                   <span className="font-mono text-white/30 mr-2">{String.fromCharCode(65 + i)}.</span>
                   {option}
@@ -151,11 +300,13 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
               )
             })}
           </div>
-          {hasAnswered && section.explanation && (
+          {hasAnswered && (
             <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
               <p className="text-xs text-white/60 leading-relaxed">
-                <span className="font-semibold text-white/80">Explanation: </span>
-                {section.explanation}
+                {selectedAnswer === correctAnswer
+                  ? <span className="text-green-400 font-semibold">Correct! </span>
+                  : <span className="text-red-400 font-semibold">Incorrect. </span>}
+                {section.explanation && section.explanation}
               </p>
             </div>
           )}
