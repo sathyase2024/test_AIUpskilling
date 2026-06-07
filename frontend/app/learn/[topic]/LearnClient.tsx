@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import LessonRenderer from "@/components/LessonRenderer";
 import { apiGet, apiPost, isAuthenticated, getStoredUser, setStoredUser } from "@/lib/api";
+import { matchFAQ, QUICK_REPLIES, DEFLECTION_REPLY, type QuickReply } from "@/lib/course-faq";
 
 // ─── Types (shape returned by the backend) ───────────────────────────────────
 
@@ -47,6 +48,7 @@ interface ApiTopic {
 interface ChatMessage {
   role: "user" | "ai";
   text: string;
+  chips?: QuickReply[];
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -160,31 +162,33 @@ export default function LearnClient({ topic }: { topic: string }) {
     if (nextLesson) selectLesson(nextLesson.id);
   }, [currentLesson, completedLessons, nextLesson]);
 
-  // ── AI tutor chat (public /ai/chat endpoint) ─────────────────────────────────
-  const sendChat = async () => {
-    const trimmed = chatInput.trim();
-    if (!trimmed || chatLoading) return;
-    setChatMessages((prev) => [...prev, { role: "user", text: trimmed }]);
-    setChatInput("");
+  // ── Course Advisor — FAQ-only bot ────────────────────────────────────────────
+  // All answers come from the pre-defined knowledge base. No API calls are made.
+  const processMessage = useCallback(async (message: string) => {
+    if (!message.trim() || chatLoading) return;
+    setChatMessages((prev) => [...prev, { role: "user", text: message }]);
     setChatLoading(true);
 
-    const context = currentLesson
-      ? `Lesson: ${currentLesson.title}. Topic: ${topicData?.name ?? decodedTopic}.`
-      : `Topic: ${topicData?.name ?? decodedTopic}.`;
+    // Brief typing simulation for natural feel
+    await new Promise((r) => setTimeout(r, 480));
 
-    try {
-      const res = await apiPost<{ reply: string }>("/ai/chat", { message: trimmed, context });
-      setChatMessages((prev) => [...prev, { role: "ai", text: res.reply }]);
-    } catch (err) {
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "ai", text: "Sorry, the AI tutor is unavailable right now. Please try again shortly." },
-      ]);
-      // eslint-disable-next-line no-console
-      console.error("Chat failed", err);
-    } finally {
-      setChatLoading(false);
-    }
+    const answer = matchFAQ(topic, message);
+    setChatMessages((prev) => [
+      ...prev,
+      { role: "ai", text: answer ?? DEFLECTION_REPLY, chips: QUICK_REPLIES },
+    ]);
+    setChatLoading(false);
+  }, [chatLoading, topic]);
+
+  const sendChat = async () => {
+    const trimmed = chatInput.trim();
+    if (!trimmed) return;
+    setChatInput("");
+    await processMessage(trimmed);
+  };
+
+  const handleChipClick = (question: string) => {
+    processMessage(question);
   };
 
   // ── Loading / error states ───────────────────────────────────────────────────
@@ -460,55 +464,82 @@ export default function LearnClient({ topic }: { topic: string }) {
         </div>
       )}
 
-      {/* ── AI Tutor Chat Button ── */}
+      {/* ── Course Advisor FAB ── */}
       <button
         onClick={() => setAiChatOpen(true)}
         className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-semibold shadow-xl shadow-purple-500/30 hover:opacity-90 hover:scale-105 transition-all"
       >
         <MessageSquare size={18} />
-        Ask AI
+        Course Advisor
       </button>
 
-      {/* ── AI Chat Panel ── */}
+      {/* ── Course Advisor Panel ── */}
       {aiChatOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-end pointer-events-none">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
             onClick={() => setAiChatOpen(false)}
           />
-          <div className="relative pointer-events-auto w-full sm:w-[420px] h-[70vh] sm:h-[500px] sm:mr-6 sm:mb-6 rounded-t-2xl sm:rounded-2xl bg-[#12121f] border border-white/10 shadow-2xl flex flex-col overflow-hidden">
-            {/* Chat Header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-gradient-to-r from-purple-900/40 to-cyan-900/20">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center">
-                <Bot size={16} className="text-white" />
+          <div className="relative pointer-events-auto w-full sm:w-[420px] h-[76vh] sm:h-[560px] sm:mr-6 sm:mb-6 rounded-t-2xl sm:rounded-2xl bg-[#12121f] border border-white/10 shadow-2xl flex flex-col overflow-hidden">
+
+            {/* ── Header ── */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-gradient-to-r from-purple-900/50 to-cyan-900/20 shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center shadow-lg">
+                <Bot size={17} className="text-white" />
               </div>
-              <div>
-                <p className="text-sm font-semibold">AI Tutor</p>
-                <p className="text-xs text-green-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
-                  Online
-                </p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold leading-tight">Course Advisor</p>
+                <p className="text-[11px] text-white/50 truncate">{topicData.name}</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-green-400 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+                Online
               </div>
               <button
                 onClick={() => setAiChatOpen(false)}
-                className="ml-auto text-white/40 hover:text-white transition-colors"
+                className="ml-2 text-white/40 hover:text-white transition-colors shrink-0"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* ── Scope badge ── */}
+            <div className="px-4 py-2 bg-purple-500/5 border-b border-white/5 shrink-0">
+              <p className="text-[11px] text-white/40 text-center">
+                Answers questions about <span className="text-white/60 font-medium">scope · salary · career · future · difficulty</span>
+              </p>
+            </div>
+
+            {/* ── Messages ── */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+              {/* Welcome message with quick replies */}
               <div className="flex gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center shrink-0 mt-0.5">
                   <Bot size={13} className="text-white" />
                 </div>
-                <div className="flex-1 bg-white/5 border border-white/8 rounded-xl rounded-tl-sm px-3.5 py-2.5 text-sm text-white/80 leading-relaxed">
-                  Hi! I&apos;m your AI tutor for{" "}
-                  <span className="text-white">{currentLesson?.title ?? topicData.name}</span>. Ask me anything!
+                <div className="flex-1">
+                  <div className="bg-white/5 border border-white/8 rounded-xl rounded-tl-none px-3.5 py-3 text-sm text-white/80 leading-relaxed">
+                    Hi! I&apos;m your advisor for{" "}
+                    <span className="text-white font-semibold">{topicData.name}</span>.
+                    {" "}I can answer specific questions about this skill&apos;s scope, salary, career opportunities, future outlook, and learning difficulty.
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    {QUICK_REPLIES.map((chip) => (
+                      <button
+                        key={chip.label}
+                        onClick={() => handleChipClick(chip.question)}
+                        disabled={chatLoading}
+                        className="px-2.5 py-1 rounded-full border border-purple-500/35 bg-purple-500/10 text-purple-300 text-[11px] font-medium hover:bg-purple-500/25 hover:border-purple-400/50 transition-all disabled:opacity-50"
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
+              {/* Conversation messages */}
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                   <div
@@ -524,50 +555,74 @@ export default function LearnClient({ topic }: { topic: string }) {
                       <Bot size={13} className="text-white" />
                     )}
                   </div>
-                  <div
-                    className={`flex-1 rounded-xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
-                      msg.role === "user"
-                        ? "bg-purple-600/20 border border-purple-500/30 text-white rounded-tr-sm"
-                        : "bg-white/5 border border-white/8 text-white/80 rounded-tl-sm"
-                    }`}
-                  >
-                    {msg.text}
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className={`rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
+                        msg.role === "user"
+                          ? "bg-purple-600/20 border border-purple-500/30 text-white rounded-tr-none"
+                          : "bg-white/5 border border-white/8 text-white/85 rounded-tl-none"
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                    {/* Quick-reply chips after every bot response */}
+                    {msg.role === "ai" && msg.chips && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {msg.chips.map((chip) => (
+                          <button
+                            key={chip.label}
+                            onClick={() => handleChipClick(chip.question)}
+                            disabled={chatLoading}
+                            className="px-2.5 py-1 rounded-full border border-white/15 bg-white/5 text-white/50 text-[11px] font-medium hover:bg-purple-500/15 hover:border-purple-500/35 hover:text-purple-300 transition-all disabled:opacity-40"
+                          >
+                            {chip.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
 
+              {/* Typing indicator */}
               {chatLoading && (
                 <div className="flex gap-2.5">
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center shrink-0 mt-0.5">
                     <Bot size={13} className="text-white" />
                   </div>
-                  <div className="bg-white/5 border border-white/8 rounded-xl rounded-tl-sm px-3.5 py-2.5 text-sm text-white/50">
-                    Thinking…
+                  <div className="bg-white/5 border border-white/8 rounded-xl rounded-tl-none px-4 py-3 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               )}
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input */}
-            <div className="p-3 border-t border-white/10">
+            {/* ── Input ── */}
+            <div className="p-3 border-t border-white/10 shrink-0 bg-[#12121f]">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && sendChat()}
-                  placeholder="Ask about this lesson…"
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-purple-500/50 focus:bg-white/8 transition-all"
+                  onKeyDown={(e) => e.key === "Enter" && !chatLoading && sendChat()}
+                  placeholder="Ask about scope, salary, career, future…"
+                  disabled={chatLoading}
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-purple-500/50 focus:bg-white/8 transition-all disabled:opacity-50"
                 />
                 <button
                   onClick={sendChat}
-                  disabled={chatLoading}
-                  className="w-10 h-10 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 flex items-center justify-center hover:opacity-90 transition-all shrink-0 disabled:opacity-50"
+                  disabled={chatLoading || !chatInput.trim()}
+                  className="w-10 h-10 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 flex items-center justify-center hover:opacity-90 transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Send size={15} className="text-white" />
                 </button>
               </div>
+              <p className="text-center text-[10px] text-white/20 mt-2">
+                Answers are based on industry research · Not personalised advice
+              </p>
             </div>
           </div>
         </div>
