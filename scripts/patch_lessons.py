@@ -21,9 +21,9 @@ REPO_ROOT     = SCRIPT_DIR.parent
 GENERATED_DIR = REPO_ROOT / "generated_lessons"
 
 MODEL       = "claude-haiku-4-5-20251001"
-MAX_TOKENS  = 3000
+MAX_TOKENS  = 4500   # ~2 full sections fit safely; we call twice when >2 missing
 HOBBY       = "cricket"
-CONCURRENCY = 4
+CONCURRENCY = 3
 
 INPUT_COST  = 0.80 / 1_000_000
 OUTPUT_COST = 4.00 / 1_000_000
@@ -189,6 +189,23 @@ def filter_sections(sections: list) -> list:
 
 # ─── Per-lesson worker ────────────────────────────────────────────────────────
 
+async def call_api(
+    client: anthropic.AsyncAnthropic,
+    d: dict,
+    batch: list,
+) -> tuple[list, int, int]:
+    """Call the API for a subset of missing sections; return (valid_sections, in_tok, out_tok)."""
+    prompt = build_prompt(d, batch)
+    resp = await client.messages.create(
+        model=MODEL,
+        max_tokens=MAX_TOKENS,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw  = parse_response(resp.content[0].text)
+    valid = filter_sections(raw)
+    return valid, resp.usage.input_tokens, resp.usage.output_tokens
+
+
 async def patch_one(
     client: anthropic.AsyncAnthropic,
     sem: asyncio.Semaphore,
@@ -204,34 +221,32 @@ async def patch_one(
         if not missing:
             return {"skipped": True}
 
-        prompt = build_prompt(d, missing)
+        # Split into batches of ≤2 so JSON always fits within MAX_TOKENS
+        batches = [missing[i:i+2] for i in range(0, len(missing), 2)]
+
+        total_added  = 0
+        total_in     = 0
+        total_out    = 0
 
         try:
-            resp = await client.messages.create(
-                model=MODEL,
-                max_tokens=MAX_TOKENS,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            for batch in batches:
+                valid, in_tok, out_tok = await call_api(client, d, batch)
+                total_in  += in_tok
+                total_out += out_tok
+                if valid:
+                    d["sections"] = d["sections"] + valid
+                    total_added  += len(valid)
+                    with open(path, "w") as f:
+                        json.dump(d, f, indent=2, ensure_ascii=False)
 
-            in_tok  = resp.usage.input_tokens
-            out_tok = resp.usage.output_tokens
-            cost    = in_tok * INPUT_COST + out_tok * OUTPUT_COST
-
-            raw_sections = parse_response(resp.content[0].text)
-            valid        = filter_sections(raw_sections)
-
-            if valid:
-                d["sections"] = sections + valid
-                with open(path, "w") as f:
-                    json.dump(d, f, indent=2, ensure_ascii=False)
-
+            cost = total_in * INPUT_COST + total_out * OUTPUT_COST
             return {
                 "ok":      True,
                 "name":    f"{path.parent.name}/{path.name}",
                 "missing": missing,
-                "added":   len(valid),
-                "in_tok":  in_tok,
-                "out_tok": out_tok,
+                "added":   total_added,
+                "in_tok":  total_in,
+                "out_tok": total_out,
                 "cost":    cost,
             }
 
