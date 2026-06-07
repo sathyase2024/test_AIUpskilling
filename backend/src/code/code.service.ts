@@ -62,6 +62,15 @@ export class CodeService {
       if (status === 400) {
         throw new HttpException('Invalid code or language submitted', HttpStatus.BAD_REQUEST);
       }
+      // Connection refused = Piston not deployed yet; return helpful message instead of 503
+      const isConnRefused = err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND';
+      if (isConnRefused) {
+        return {
+          stdout: '',
+          stderr: 'Code execution service is not configured yet. Set PISTON_URL in your backend environment variables.',
+          exitCode: 1,
+        };
+      }
       throw new HttpException(
         'Code execution service is temporarily unavailable. Please try again.',
         HttpStatus.SERVICE_UNAVAILABLE,
