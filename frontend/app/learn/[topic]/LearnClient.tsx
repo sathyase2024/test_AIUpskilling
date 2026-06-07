@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import LessonRenderer from "@/components/LessonRenderer";
+import EmbeddedEditor from "@/components/EmbeddedEditor";
 import { apiGet, apiPost, isAuthenticated, getStoredUser, setStoredUser } from "@/lib/api";
 import { matchFAQ, QUICK_REPLIES, DEFLECTION_REPLY, type QuickReply } from "@/lib/course-faq";
 
@@ -356,6 +357,9 @@ export default function LearnClient({ topic }: { topic: string }) {
                 </div>
               </div>
             )}
+
+            {/* ── Embedded Code Playground ── */}
+            <EmbeddedEditor topicSlug={topic} />
 
             {/* Mark complete */}
             {currentLesson && (

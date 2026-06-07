@@ -30,14 +30,20 @@ import { CodingSubmission } from './entities/coding-submission.entity';
       imports: [ConfigModule],
       useFactory: (cfg: ConfigService) => ({
         type: 'postgres',
-        host: cfg.get('DB_HOST', 'localhost'),
+        url: cfg.get('DATABASE_URL'),           // preferred: single connection string
+        host: cfg.get('DB_HOST', 'localhost'),  // fallback: individual vars
         port: cfg.get<number>('DB_PORT', 5432),
         username: cfg.get('DB_USERNAME', 'postgres'),
         password: cfg.get('DB_PASSWORD', 'postgres'),
         database: cfg.get('DB_NAME', 'skillforge'),
+        ssl: cfg.get('DATABASE_URL')
+          ? { rejectUnauthorized: false }       // managed DBs (Railway, Render, Supabase)
+          : false,
         entities: [User, Topic, Lesson, LearningPath, UserProgress, CodingSubmission],
         synchronize: cfg.get('NODE_ENV') !== 'production' || cfg.get('DB_SYNC') === 'true',
         logging: cfg.get('NODE_ENV') === 'development' ? ['error'] : false,
+        retryAttempts: 10,   // retry DB connection up to 10 times on startup
+        retryDelay: 3000,    // 3 s between retries
       }),
       inject: [ConfigService],
     }),

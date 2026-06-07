@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import Navbar from '@/components/Navbar'
 import {
@@ -270,6 +270,18 @@ const INITIAL_TEST_CASES: TestCase[] = [
   { id: 3, input: 'nums=[3,3], target=6',          expected: '[0,1]', actual: '', status: 'pending' },
 ]
 
+// ─── API base ─────────────────────────────────────────────────────────────────
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
+
+interface AIReviewResult {
+  review: string
+  suggestions: string[]
+  score: number
+}
+
 // ─── Page Component ───────────────────────────────────────────────────────────
 
 export default function CodeLabPage() {
@@ -283,6 +295,9 @@ export default function CodeLabPage() {
   const [testCases, setTestCases] = useState<TestCase[]>(INITIAL_TEST_CASES)
   const [showTestCases, setShowTestCases] = useState(true)
   const [langDropdownOpen, setLangDropdownOpen] = useState(false)
+  const [aiReview, setAiReview] = useState<AIReviewResult | null>(null)
+  const [reviewLoading, setReviewLoading] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
 
   // Derived editor stats
   const lineCount = code.split('\n').length
@@ -295,6 +310,8 @@ export default function CodeLabPage() {
     setOutput(null)
     setTestCases(INITIAL_TEST_CASES)
     setLangDropdownOpen(false)
+    setAiReview(null)
+    setReviewError(null)
   }
 
   // Mock run behavior
@@ -318,6 +335,27 @@ export default function CodeLabPage() {
       ])
     }, 1500)
   }
+
+  // Call backend AI review endpoint
+  const handleAIReview = useCallback(async () => {
+    setReviewLoading(true)
+    setReviewError(null)
+    setActiveTab('review')
+    try {
+      const res = await fetch(`${API_URL}/ai/code/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language: selectedLanguage }),
+      })
+      if (!res.ok) throw new Error(`Server error ${res.status}`)
+      const data: AIReviewResult = await res.json()
+      setAiReview(data)
+    } catch {
+      setReviewError('Could not reach the review service. Check your connection and try again.')
+    } finally {
+      setReviewLoading(false)
+    }
+  }, [code, selectedLanguage])
 
   // Close lang dropdown on outside click
   useEffect(() => {
@@ -384,7 +422,8 @@ export default function CodeLabPage() {
 
         {/* AI Review */}
         <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-sm"
-          onClick={() => setActiveTab('review')}
+          onClick={handleAIReview}
+          disabled={reviewLoading}
         >
           <Sparkles className="w-3.5 h-3.5 text-purple-400" />
           <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent font-medium hidden sm:block">AI Review</span>
@@ -679,81 +718,82 @@ export default function CodeLabPage() {
                   </span>
                 </div>
 
-                {/* Code Quality */}
-                <div className="rounded-xl bg-green-500/10 border border-green-500/20 p-3 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    <span className="text-xs font-semibold text-green-400">Code Quality</span>
+                {/* Loading */}
+                {reviewLoading && (
+                  <div className="flex flex-col items-center justify-center gap-3 py-12 text-white/50">
+                    <div className="w-8 h-8 border-2 border-purple-500/40 border-t-purple-500 rounded-full animate-spin" />
+                    <span className="text-xs">Analysing your code…</span>
                   </div>
-                  <p className="text-xs text-white/70 pl-6">Good structure and naming conventions. Clean, readable code.</p>
-                </div>
+                )}
 
-                {/* Time Complexity */}
-                <div className="rounded-xl bg-cyan-500/10 border border-cyan-500/20 p-3 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-cyan-400" />
-                    <span className="text-xs font-semibold text-cyan-400">Time Complexity</span>
+                {/* Error */}
+                {!reviewLoading && reviewError && (
+                  <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-300">
+                    {reviewError}
                   </div>
-                  <p className="text-xs text-white/70 pl-6">
-                    <span className="font-mono bg-cyan-400/10 text-cyan-300 px-1.5 py-0.5 rounded">O(n)</span>
-                    {' '} — Optimal hash map approach. Excellent!
-                  </p>
-                </div>
+                )}
 
-                {/* Space Complexity */}
-                <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-3 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <MemoryStick className="w-4 h-4 text-purple-400" />
-                    <span className="text-xs font-semibold text-purple-400">Space Complexity</span>
+                {/* Prompt to get review */}
+                {!reviewLoading && !reviewError && !aiReview && (
+                  <div className="flex flex-col items-center gap-3 py-10 text-center">
+                    <Sparkles className="w-8 h-8 text-purple-400/50" />
+                    <p className="text-xs text-white/40">Click <strong className="text-white/60">AI Review</strong> in the toolbar to analyse your code.</p>
+                    <button
+                      onClick={handleAIReview}
+                      className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-medium transition-all"
+                    >
+                      Get AI Review
+                    </button>
                   </div>
-                  <p className="text-xs text-white/70 pl-6">
-                    <span className="font-mono bg-purple-400/10 text-purple-300 px-1.5 py-0.5 rounded">O(n)</span>
-                    {' '} — Hash map grows linearly with input size.
-                  </p>
-                </div>
+                )}
 
-                {/* Suggestion */}
-                <div className="rounded-xl bg-yellow-500/10 border border-yellow-500/20 p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Lightbulb className="w-4 h-4 text-yellow-400" />
-                    <span className="text-xs font-semibold text-yellow-400">Suggestion</span>
-                  </div>
-                  <p className="text-xs text-white/70 pl-6">
-                    Consider adding an early exit or input validation for empty arrays.
-                  </p>
-                  <div className="rounded-lg bg-black/40 border border-white/10 p-2.5 ml-2 font-mono text-[11px] text-green-300 leading-relaxed">
-                    {`if not nums:\n    return []\n# ... rest of logic`}
-                  </div>
-                </div>
+                {/* Real review result */}
+                {!reviewLoading && aiReview && (
+                  <>
+                    {/* Review text */}
+                    <div className="rounded-xl bg-green-500/10 border border-green-500/20 p-3 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                        <span className="text-xs font-semibold text-green-400">Review</span>
+                      </div>
+                      <p className="text-xs text-white/70 pl-6 leading-relaxed">{aiReview.review}</p>
+                    </div>
 
-                {/* Detailed Analysis */}
-                <div className="rounded-xl bg-white/5 border border-white/10 p-3 space-y-2">
-                  <h4 className="text-xs font-semibold text-white/80">Detailed Analysis</h4>
-                  <ul className="space-y-1.5 text-xs text-white/60">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
-                      Single-pass solution — avoids nested loops entirely.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
-                      Hash map lookup is O(1) average case.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="w-3.5 h-3.5 text-green-400 mt-0.5 flex-shrink-0" />
-                      Handles duplicate values correctly via index tracking.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <AlertCircle className="w-3.5 h-3.5 text-yellow-400 mt-0.5 flex-shrink-0" />
-                      No input validation for edge cases (empty array, null).
-                    </li>
-                  </ul>
-                </div>
+                    {/* Suggestions */}
+                    {aiReview.suggestions.length > 0 && (
+                      <div className="rounded-xl bg-yellow-500/10 border border-yellow-500/20 p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Lightbulb className="w-4 h-4 text-yellow-400" />
+                          <span className="text-xs font-semibold text-yellow-400">Suggestions</span>
+                        </div>
+                        <ul className="space-y-1.5 pl-6">
+                          {aiReview.suggestions.map((s, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-white/70">
+                              <AlertCircle className="w-3.5 h-3.5 text-yellow-400 mt-0.5 flex-shrink-0" />
+                              {s}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
-                {/* Score */}
-                <div className="rounded-xl bg-gradient-to-br from-purple-600/20 to-cyan-600/10 border border-purple-500/20 p-3 text-center">
-                  <div className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">92/100</div>
-                  <div className="text-xs text-white/50 mt-0.5">AI Score</div>
-                </div>
+                    {/* Score */}
+                    <div className="rounded-xl bg-gradient-to-br from-purple-600/20 to-cyan-600/10 border border-purple-500/20 p-3 text-center">
+                      <div className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                        {aiReview.score}/100
+                      </div>
+                      <div className="text-xs text-white/50 mt-0.5">AI Score</div>
+                    </div>
+
+                    {/* Re-review */}
+                    <button
+                      onClick={handleAIReview}
+                      className="w-full py-2 rounded-lg border border-white/10 hover:border-purple-500/40 text-xs text-white/50 hover:text-white/80 transition-colors"
+                    >
+                      Re-analyse
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
