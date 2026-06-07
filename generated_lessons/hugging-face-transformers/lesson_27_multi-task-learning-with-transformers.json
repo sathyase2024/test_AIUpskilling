@@ -215,6 +215,180 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production multi-task learning deployments follow three dominant patterns: Hard Parameter Sharing (shared encoder with independent task heads), Soft Parameter Sharing (task-specific encoders with regularization constraints), and Progressive Auxiliary Tasks (sequential task addition based on primary task performance). Hard parameter sharing minimizes computational overhead and prevents overfitting on small datasets—optimal when tasks are semantically related with sufficient training data. Soft parameter sharing provides task isolation and flexibility for heterogeneous tasks, accepting 2-3x memory costs for better performance variance control. Progressive auxiliary tasks reduce training instability by gradual task introduction, requiring careful monitoring of task divergence metrics and validation loss ratios. The trade-off matrix: hard sharing favors speed and data efficiency; soft sharing favors task independence and robustness; progressive patterns favor convergence stability. Most practitioners start with hard sharing, migrate to soft sharing only when task interference emerges (detected via ablation studies removing individual tasks), and employ progressive patterns exclusively in high-stakes domains where training reproducibility is critical.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Hard parameter sharing is like selecting a core batting lineup that handles all match situations—wicketkeeper, opener, middle-order—where all players strengthen the same fundamentals. Soft parameter sharing resembles having specialist batsmen for different formats: T20 aggressive openers differ from Test anchors, but both benefit from shared batting principles. Progressive auxiliary tasks mirror introducing DRS (Decision Review System) gradually into a tournament: you don't deploy all challenge mechanisms simultaneously, but introduce them strategically as confidence builds. Just as a captain wouldn't rotate the entire bowling attack mid-powerplay without understanding current match conditions, you shouldn't switch multi-task patterns mid-training. Field placement decisions (aggressive vs defensive) represent loss weight tuning—same underlying strategy, different operational emphasis. A batsman might practice cover drives (primary task) while simultaneously working on leg-side play (auxiliary task), but if the auxiliary work disrupts primary technique, the coaching team must rebalance effort allocation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Equal task weighting without validation monitoring\nclass PoorMultiTaskBatsman:\n    def __init__(self, shared_encoder):\n        self.shared_encoder = shared_encoder\n        self.batting_head = TaskHead(hidden_dim=768)  # Runs scored\n        self.bowling_head = TaskHead(hidden_dim=768)  # Wickets taken\n        self.fielding_head = TaskHead(hidden_dim=768)  # Catches held\n        \n    def train_step(self, batch):\n        encoded = self.shared_encoder(batch['cricket_input'])\n        batting_loss = self.batting_head(encoded, batch['runs'])\n        bowling_loss = self.bowling_head(encoded, batch['wickets'])\n        fielding_loss = self.fielding_head(encoded, batch['catches'])\n        # PROBLEM: No task scaling, no gradient monitoring\n        total_loss = batting_loss + bowling_loss + fielding_loss\n        return total_loss\n\n# BEST PRACTICE: Dynamic loss weighting with per-task validation tracking\nclass OptimalMultiTaskBatsman:\n    def __init__(self, shared_encoder, task_names=['batting', 'bowling', 'fielding']):\n        self.shared_encoder = shared_encoder\n        self.task_heads = {task: TaskHead(768) for task in task_names}\n        self.task_losses = {task: [] for task in task_names}\n        self.loss_weights = {task: 1.0 for task in task_names}\n        self.validation_metrics = {task: [] for task in task_names}\n        \n    def train_step(self, batch):\n        encoded = self.shared_encoder(batch['cricket_input'])\n        losses = {}\n        for task, head in self.task_heads.items():\n            losses[task] = head(encoded, batch[task]) * self.loss_weights[task]\n            self.task_losses[task].append(losses[task].detach())\n        \n        total_loss = sum(losses.values())\n        return total_loss\n    \n    def update_loss_weights(self, validation_scores):\n        \"\"\"Rebalance weights based on task performance drift\"\"\"\n        base_weights = {task: 1.0 for task in self.task_heads.keys()}\n        for task, score in validation_scores.items():\n            # Increase weight if task performance is degrading\n            if score < np.mean(self.validation_metrics[task][-10:]):\n                base_weights[task] *= 1.2\n            self.validation_metrics[task].append(score)\n        \n        # Normalize to prevent unbounded growth\n        total_weight = sum(base_weights.values())\n        self.loss_weights = {task: w/total_weight for task, w in base_weights.items()}\n        return self.loss_weights",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Ignoring Task Imbalance in Gradient Flow — The most common beginner mistake is assuming equal loss weighting works across all task combinations. When tasks have different loss scales (e.g., classification loss ~0.5 vs. regression loss ~50), gradients from high-magnitude tasks dominate backpropagation, causing the encoder to optimize primarily for that task while others stagnate. Fix: (1) Normalize all losses to [0,1] range before weighting: `normalized_loss = (raw_loss - min_loss) / (max_loss - min_loss)`, (2) Log per-task loss magnitudes at epoch boundaries to detect scale drift, (3) Implement gradient clipping per task head: `torch.nn.utils.clip_grad_norm_(head.parameters(), max_norm=1.0)` before backprop, (4) Use validation F1/accuracy per task (not training loss) to detect task interference. A single epoch of monitoring will reveal if one task's loss is 100x larger—this is your signal to normalize immediately.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Hard parameter sharing minimizes overfitting on small datasets; soft sharing provides task isolation at 2-3x memory cost",
+        "Loss weighting must be validated per-epoch using task-specific metrics, not training loss alone, to detect gradient imbalance",
+        "Progressive auxiliary task introduction reduces training instability when tasks conflict; monitor task divergence via ablation studies",
+        "Gradient clipping and loss normalization prevent high-magnitude tasks from dominating encoder optimization",
+        "Always establish baseline single-task performance before combining tasks—multi-task learning should improve, not degrade, primary metrics"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your multi-task cricket model trains on batting (regression: runs scored), bowling (classification: wicket types), and fielding (classification: catch success). After 5 epochs, batting loss is 0.03, bowling loss is 2.4, and fielding loss is 1.8. What is the first diagnostic action you should take?",
+      "items": [
+        "Increase the batting task weight to 100 to balance the losses",
+        "Log the gradient norms of each task head during backpropagation to check which task dominates gradient flow",
+        "Remove the batting task—its low loss indicates it's not learning useful shared representations",
+        "Switch from hard parameter sharing to soft parameter sharing immediately"
+      ],
+      "answer": 1,
+      "explanation": "The bowling and fielding tasks have 40-80x larger loss magnitudes than batting, which means their gradients will dominate backpropagation despite potentially being independent classification problems. The immediate diagnostic step is gradient norm logging—if bowling/fielding gradients are 10-100x larger, you've confirmed the imbalance. This happens because regression and multi-class classification losses have different scales. Only after confirming gradient imbalance should you normalize losses (divide by their initial magnitude) or use task-specific learning rates. Simply increasing batting weight to 100 would overcorrect and cause batting to dominate. Loss magnitude alone doesn't indicate task importance—gradient flow does."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Multi-task learning with transformers powers production systems at scale across major tech companies. Google uses multi-task BERT variants in search ranking and Gmail Smart Compose to simultaneously predict relevance, intent classification, and response generation. Meta deploys multi-task transformers across recommendation systems handling user engagement prediction, content moderation, and ad relevance scoring on billions of daily interactions. OpenAI's GPT models benefit from multi-task pretraining combining language modeling with code generation and reasoning. Netflix uses multi-task architectures for simultaneous prediction of watch completion, genre preference, and temporal engagement patterns across 230+ million subscribers. Uber's routing systems employ multi-task transformers for ETA prediction, driver matching, and surge pricing—where failure cascades affect real-time logistics. Scale breaks when: task interference degrades shared representations (negative transfer), imbalanced gradients cause dominant tasks to suppress minority ones, memory constraints explode with independent heads, and inference latency multiplies per-task computation. Production failures occur when loss weighting isn't adaptive across training phases, causing early training collapse on high-variance tasks or late-stage oscillation when balancing shifts.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A world-class batsman trains simultaneously on fast bowling technique (Task 1: handle pace), spin bowling strategy (Task 2: read deception), and fitness conditioning (shared foundation). The shared encoder is their core batting stance and footwork—common across all conditions. Task-specific heads are specialized shots: the drive against pace, the sweep against spin. Loss weighting determines practice allocation: spend 40% time on pace, 30% on spin, 30% on conditioning. If you weight pace training too heavily, the batsman develops unbalanced technique vulnerable to spin. If conditioning is neglected, both specialized skills collapse under match pressure. World-class cricket academies (Google, Meta) optimize all three simultaneously with adaptive weighting—increasing spin practice mid-training when that weakness emerges, reducing pace work when performance plateaus.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Multi-task transformers enable shared semantic understanding reducing model size 30-50% vs single-task ensembles while improving performance through positive transfer learning.",
+        "Adaptive loss weighting (gradient normalization, uncertainty weighting) prevents dominant tasks from suppressing minority tasks, maintaining balanced gradient flow during training.",
+        "Task interference manifests as negative transfer when unrelated tasks share encoders; detect via task-specific validation curves diverging while shared loss decreases.",
+        "Production systems at Google, Meta, Netflix deploy multi-task transformers at billion-scale handling simultaneous predictions; failures cascade when loss balancing becomes task-order dependent.",
+        "Memory efficiency gains from parameter sharing vanish if task-specific heads become too large; optimal design keeps shared encoder 60-80% of total parameters.",
+        "Inference optimization requires careful head selection; batching different tasks together reduces per-token latency compared to sequential single-task model inference.",
+        "Curriculum learning with multi-task transformers outperforms fixed weighting: prioritize easy tasks early (warm-up shared encoder), shift weight toward hard tasks in later epochs."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket academy trains batsmen on fast bowling, spin bowling, and fitness conditioning with fixed 40%-30%-30% time allocation. After 6 weeks, batsmen excel against pace but struggle with spin. What production failure does this mirror?",
+      "items": [
+        "Task weighting is too static; adaptive reallocation based on task-specific validation performance is needed",
+        "The shared encoder (core technique) is properly trained but task-specific heads aren't independent enough",
+        "Loss balancing is correct; this is normal negative transfer that resolves with more training",
+        "Fast bowling is a dominant task causing gradient starvation in the spin bowling head"
+      ],
+      "answer": 0,
+      "explanation": "This mirrors Google's production experience where static loss weights cause performance collapse on underweighted tasks. Adaptive weighting (answer A) detects when validation curves diverge and reallocates computational effort. Answer D (gradient starvation) is partial but answer A is the production pattern: early training requires balanced weighting, but as shared encoder matures, late-stage curriculum learning improves minority task performance. This is why Meta adjusts loss weights every epoch based on task-specific validation metrics."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of multi-task learning with transformers through these conceptual and applied quizzes. The first quiz focuses on core mechanisms, while the second presents a real-world scenario where you must apply your knowledge to make implementation decisions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a multi-task learning setup with a shared encoder, why is task-specific loss weighting essential when tasks have significantly different error scales?",
+      "items": [
+        "Tasks with larger error scales (e.g., regression with unbounded values) would dominate gradient updates, causing the shared encoder to optimize primarily for that task while neglecting others with smaller error scales, leading to poor overall performance.",
+        "Loss weighting allows the model to train faster by focusing computational resources on the most important task only.",
+        "It prevents the model from using too much memory when storing multiple task losses simultaneously.",
+        "Task-specific loss weighting is only necessary when using different batch sizes for each task during training."
+      ],
+      "answer": 0,
+      "explanation": "Loss weighting is crucial because gradients are proportional to loss magnitudes. If one task has losses in the range of 1000 while another ranges from 0.01 to 0.1, the high-magnitude task's gradients will overwhelm the shared encoder's parameter updates, effectively ignoring the lower-scale task. Weighting allows you to balance gradient contributions (e.g., upweighting the low-scale task) so each task meaningfully influences the shared representation. Option 1 is incorrect—training speed is independent of weighting strategy. Option 2 is false—multi-task doesn't inherently use more memory than single-task. Option 3 misunderstands the mechanism; different batch sizes are orthogonal to loss weighting.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You are building a multi-task cricket analytics model that predicts: (1) batsman strike rate (regression, typical range 50–150), (2) probability of dismissal next ball (binary classification, outputs 0–1), and (3) team win probability (binary classification, outputs 0–1). Initial training shows strike rate predictions dominating updates while dismissal and win probabilities barely improve. What is the best first action?",
+      "items": [
+        "Immediately add a third task-specific head to balance computational load equally across all three outputs.",
+        "Apply loss scaling by dividing the strike rate loss by a factor (e.g., 100–1000) so its gradient magnitude aligns with the smaller losses from binary tasks, allowing the shared encoder to learn from all three signals equally.",
+        "Remove the strike rate prediction task entirely and focus only on the two classification tasks, which are more stable.",
+        "Increase the batch size for the dismissal and win probability tasks to artificially inflate their loss values."
+      ],
+      "answer": 1,
+      "explanation": "Strike rate loss (typically in range 100+) produces gradients far larger than binary cross-entropy losses (typically 0.1–1.0), causing the shared encoder to over-optimize for strike rate prediction. Scaling the strike rate loss down by 100–1000× brings its gradient magnitude into the same ballpark as classification losses, enabling balanced multi-task learning. All three tasks provide complementary cricket insights: strike rate reveals batsman aggression, dismissal probability captures immediate risk, and win probability integrates team-level factors. Option 0 adds redundancy without solving the core imbalance. Option 2 discards valuable information. Option 3 doesn't address the root cause (loss magnitude) and artificially inflates loss without proper calibration.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

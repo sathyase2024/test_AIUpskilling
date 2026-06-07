@@ -196,6 +196,201 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production deployment of quantized and pruned models follows distinct patterns based on inference constraints and accuracy requirements. The **post-training quantization (PTQ)** pattern applies INT8 quantization directly to pretrained weights without retraining—ideal for rapid deployment when latency is critical and you tolerate 1-3% accuracy drop. Conversely, **quantization-aware training (QAT)** introduces fake quantization during training, preserving 0.5-1% accuracy at the cost of 2-4x longer training time; use this when accuracy margins are tight or models serve safety-critical tasks like medical diagnosis. The **progressive pruning** pattern combines structured pruning (remove entire channels) early with unstructured pruning (remove individual weights) late, achieving 70-90% sparsity while maintaining accuracy within 0.5%; this suits edge deployment on mobile hardware with sparse tensor support. **Layer-wise quantization heterogeneity** quantizes early transformer layers to INT8 and later layers to FP16, balancing the observation that attention heads in early layers are more robust to quantization noise. Finally, **distillation + pruning pipelines** first distill a large teacher into a compact student, then prune the student—this two-stage approach often outperforms pruning alone by 2-4% accuracy, but requires careful hyperparameter tuning across both stages. Trade-offs: PTQ is fastest but least accurate; QAT is slowest but most accurate; distillation+pruning is flexible but computationally expensive upfront.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Post-training quantization (PTQ) is like setting your field after the batsman walks in—quick and practical, but you might miss optimal placement. Quantization-aware training (QAT) is like planning your field during practice sessions based on the batsman's known weaknesses, requiring more preparation but guaranteeing better strategy. Progressive pruning mirrors a bowling rotation strategy: start with structured changes (removing an entire bowler type, like all spinners) when fresh, then make fine unstructured adjustments (rotating individual bowlers) as the match progresses and conditions shift. Layer-wise quantization heterogeneity is analogous to protecting your best fielders in high-pressure areas while loosening grip in low-risk zones—early transformer layers (slip cordon) demand precision, but later layers (deep fielding) tolerate more noise. Finally, distillation + pruning is like a captain studying opposition footage (distillation) before team selection (pruning), ensuring every player removed had a weaker profile than the team average. Each pattern trades off setup time against in-match adaptability, just as production choices trade training cost against deployment flexibility.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Progressive quantization with validation\nfrom transformers import AutoModelForSequenceClassification\nfrom torch.quantization import quantize_dynamic\nimport torch\n\n# Cricket-themed variable names\nbatsman_model = AutoModelForSequenceClassification.from_pretrained('bert-base-cased')\nwickets_dataset = load_validation_data()  # Hold-out validation set\n\n# Pattern 1: QAT (Quantization-Aware Training)\n# Prepare model for QAT\nbatsman_model.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')\ntorch.quantization.prepare_qat(batsman_model, inplace=True)\n\n# Train with fake quantization\nfor epoch in range(num_epochs):\n    for ball_batch, runs_labels in training_loader:\n        outputs = batsman_model(ball_batch)\n        loss = criterion(outputs.logits, runs_labels)\n        loss.backward()\n        optimizer.step()\n\n# Calibrate and convert\ntorch.quantization.convert(batsman_model, inplace=True)\nqat_accuracy = evaluate(batsman_model, wickets_dataset)\nprint(f\"QAT Accuracy: {qat_accuracy:.4f}\")\n\n# ANTI-PATTERN: Direct post-training quantization without validation\n# ❌ DON'T: Skip accuracy measurement\nquick_model = quantize_dynamic(batsman_model, {torch.nn.Linear}, dtype=torch.qint8)\n# Deploy immediately without testing—may fail on production data!\n\n# ✅ DO: Validate after quantization\nptq_accuracy = evaluate(quick_model, wickets_dataset)\nif ptq_accuracy < baseline_accuracy - 0.03:  # Allow 3% drop\n    print(\"Accuracy unacceptable—use QAT instead\")\nelse:\n    print(f\"PTQ acceptable with {ptq_accuracy:.4f} accuracy\")\n    deploy_model(quick_model)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Comparing quantized and original models on the same metrics without accounting for calibration distribution mismatch. **The fix:** Always calibrate INT8 models on a representative subset of your actual inference distribution (not training data). If training data differs from production data—e.g., you trained on formal English but deploy on social media text—quantization noise becomes amplified. Use `torch.quantization.prepare` with a separate calibration DataLoader: `prepare(model, inplace=True); calibrate(model, calib_loader)`. Then measure accuracy on your held-out **validation** set, not test set. If accuracy drops >2%, your calibration distribution was unrepresentative—collect more diverse calibration examples or switch to QAT.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "PTQ trades training time for accuracy loss; choose when latency deadline is immovable and 1-3% drop is tolerable",
+        "QAT preserves accuracy by introducing fake quantization during training; essential for safety-critical or competitive-margin tasks",
+        "Progressive pruning (structured→unstructured) achieves 70-90% sparsity while maintaining near-baseline accuracy",
+        "Layer-wise heterogeneity (early INT8, late FP16) exploits differential quantization robustness across transformer depth",
+        "Distillation + pruning pipeline outperforms pruning alone by 2-4% but requires careful joint hyperparameter tuning",
+        "Always validate quantized models on representative held-out data; calibration distribution mismatch is the #1 production failure"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a BERT model for real-time cricket commentary classification on edge devices. Latency must be <50ms, but accuracy cannot drop below 89% (baseline 91%). Which pattern should you choose?",
+      "items": [
+        "Post-training quantization (PTQ) to INT8—fastest, accept the 2% drop",
+        "Quantization-aware training (QAT)—preserve accuracy within 0.5%, slightly slower",
+        "Progressive pruning alone—remove 70% weights first, then quantize",
+        "Distillation + pruning—train a student, prune it, then quantize"
+      ],
+      "answer": 1,
+      "explanation": "QAT is the correct choice because your accuracy floor (89%) is only 2 percentage points below baseline (91%), making PTQ's typical 2-3% drop risky. QAT keeps accuracy loss to 0.5-1%, easily within your margin. Progressive pruning or distillation+pruning would add latency overhead and complexity you don't need given a tight (but achievable) 2% accuracy budget. QAT requires training time but guarantees both latency and accuracy targets.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Quantization and pruning are critical in production ML systems serving millions of users. Google deploys quantized BERT models in search ranking at planetary scale, reducing latency from 150ms to 45ms per query. Meta uses structured pruning on their recommendation transformers to serve billions of daily active users within strict inference budgets. OpenAI combines mixed-precision quantization with knowledge distillation for their API endpoints, cutting costs by 60% while maintaining sub-100ms response times. Netflix uses pruned transformers for real-time personalization recommendations, processing 200 million events daily. Uber applies quantized models on edge devices in driver apps, reducing model size from 800MB to 120MB for faster downloads and offline inference. These companies optimize for three dimensions simultaneously: latency (user experience), throughput (cost efficiency), and accuracy (business metrics). When quantization goes wrong—using int8 for attention mechanisms without proper calibration—models lose ranking quality, hallucinate recommendations, or fail on domain-specific tasks, directly impacting revenue and user retention.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A full-strength squad with 15 players and detailed training logs is your original transformer model. Quantization is like condensing each player's statistics from decimal precision into simplified metrics (int8)—you lose granular detail but make scorecards lighter and easier to distribute. Pruning is removing bench players and underperforming bowlers who rarely bat—your 11-player squad plays just as well but travels lighter and practices faster. Knowledge distillation is having a legendary captain coach younger players to absorb winning strategies in less time. In production, you're running a T20 tournament across 50 stadiums simultaneously; every MB of model size and millisecond of latency translates to operational costs. You can't afford to carry the full Test squad everywhere.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Real-world production example: Quantized cricket batting performance classifier\nfrom transformers import AutoTokenizer, AutoModelForSequenceClassification\nfrom transformers.quantization_config import BitsAndBytesConfig\nimport torch\n\n# Load quantized model for production inference\nquant_config = BitsAndBytesConfig(\n    load_in_4bit=True,\n    bnb_4bit_compute_dtype=torch.float16,\n    bnb_4bit_quant_type=\"nf4\",\n    bnb_4bit_use_double_quant=True,\n)\n\nmodel = AutoModelForSequenceClassification.from_pretrained(\n    \"bert-base-uncased\",\n    quantization_config=quant_config,\n    device_map=\"auto\"  # Distribute across GPUs if available\n)\n\ntokenizer = AutoTokenizer.from_pretrained(\"bert-base-uncased\")\n\n# Inference pipeline for cricket commentary classification\ndef classify_batting_performance(commentary):\n    \"\"\"Classify batting performance from live commentary.\"\"\"\n    inputs = tokenizer(\n        commentary,\n        return_tensors=\"pt\",\n        max_length=128,\n        truncation=True\n    )\n    \n    with torch.no_grad():\n        outputs = model(**inputs)\n    \n    # Returns: aggressive (0), defensive (1), cautious (2)\n    predictions = torch.argmax(outputs.logits, dim=-1)\n    return predictions.item()\n\n# Production batch inference with optimizations\ndef batch_classify_innings(commentary_list, batch_size=32):\n    \"\"\"Process multiple innings commentary efficiently.\"\"\"\n    results = []\n    \n    for i in range(0, len(commentary_list), batch_size):\n        batch = commentary_list[i:i+batch_size]\n        inputs = tokenizer(\n            batch,\n            return_tensors=\"pt\",\n            padding=True,\n            truncation=True,\n            max_length=128\n        )\n        \n        with torch.no_grad():\n            outputs = model(**inputs)\n        \n        predictions = torch.argmax(outputs.logits, dim=-1)\n        results.extend(predictions.cpu().numpy().tolist())\n    \n    return results\n\n# Performance metrics\nprint(f\"Model size: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M parameters\")\nprint(f\"Memory footprint: ~2GB (vs 350GB for fp32)\")\nprint(f\"Expected inference latency: 15-25ms per example\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Quantization affects different model components differently. Attention mechanisms (query/key/value projections) are sensitive to int8 quantization and may require calibration on domain-specific data. Linear layers (feed-forward networks) tolerate quantization much better. Never quantize embedding layers without careful validation—poor embeddings corrupt all downstream computations. Always benchmark on your actual production queries before deploying; accuracy loss on synthetic benchmarks may hide domain-specific degradation (e.g., cricket-specific terminology gets misclassified). Test pruning incrementally: removing 30% of attention heads often hurts more than 60% of feed-forward neurons. Mixed-precision strategies (keeping certain layers in float16) can cost 2-3% accuracy recovery for 10-15% latency improvement—measure your ROI.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Quantization reduces model size 4-8x and latency 2-4x; production systems use int8 or int4 for cost-efficiency at scale.",
+        "Structured pruning removes entire heads/layers (hardware-friendly); unstructured pruning removes individual weights (requires sparsity-aware inference libraries).",
+        "Knowledge distillation enables smaller student models to match teacher accuracy; synergizes powerfully with quantization for deployment.",
+        "Mixed-precision keeps sensitive layers (attention) at float16, quantizes others to int8; balances accuracy and performance optimally.",
+        "Calibration data must represent production distribution; off-distribution quantization causes significant accuracy loss on domain-specific tasks.",
+        "Real-world bottlenecks are often memory bandwidth (not compute); quantization helps more than sparsity unless using specialized hardware (Nvidia Ampere, TPUv4).",
+        "Always measure end-to-end metrics (latency, throughput, power consumption) on your inference hardware; micro-benchmarks mislead optimization decisions."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Google reduced BERT search ranking latency from 150ms to 45ms using quantization. What is the approximate throughput improvement (queries/second) if a server can handle 100 queries in parallel?",
+      "items": [
+        "Approximately 2.2x more queries per second (from 667 to 1,467 QPS)",
+        "Exactly 3x more queries per second due to 3:1 latency ratio",
+        "Cannot calculate without knowing batch size and network I/O overhead",
+        "Approximately 1.5x more queries per second (diminishing returns from parallelization)"
+      ],
+      "answer": 0,
+      "explanation": "Latency improvement (3.33x: 150/45) directly translates to throughput improvement under constant parallelism. With 100 parallel queries: original TPS = 100,000/150 ≈ 667 QPS; optimized TPS = 100,000/45 ≈ 2,222 QPS (2.2x improvement). Answer C is incorrect because we have sufficient information (parallelism and latency reduction). Real systems also benefit from reduced memory pressure, enabling higher batch sizes—actual improvement often exceeds latency-only calculations."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of model quantization and pruning techniques with these two knowledge checks. The first quiz focuses on conceptual understanding of core mechanisms, while the second applies these concepts to real-world scenarios you might encounter when optimizing Hugging Face Transformer models for production deployments.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In mixed-precision quantization, why do we typically keep the gradient computation in float32 while quantizing model weights to int8 during training?",
+      "items": [
+        "Because gradients accumulate small numerical changes that require higher precision to maintain training stability and prevent convergence loss",
+        "Because float32 gradients reduce the overall model size more effectively",
+        "Because int8 gradients are not supported by any hardware accelerators",
+        "Because quantizing gradients would eliminate the need for knowledge distillation"
+      ],
+      "answer": 0,
+      "explanation": "Keeping gradients in float32 during mixed-precision training is crucial because gradient computations involve cumulative operations where small numerical errors compound. Low-precision gradients (int8) would lose critical information during backpropagation, leading to degraded convergence and final model accuracy. The weights can be safely quantized to int8 because they're updated less frequently and can tolerate lower precision, but gradients need the numerical headroom of float32 to maintain training dynamics. Option 1 is correct. Option 2 is false—float32 gradients actually increase memory usage. Option 3 is incorrect; modern hardware supports int8 gradients, but we avoid them for numerical reasons. Option 4 confuses the relationship between mixed-precision training and knowledge distillation; they serve different purposes.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a fine-tuned DistilBERT model for real-time cricket commentary classification on edge devices. The model achieves 92% accuracy unoptimized but consumes 500MB. Your hardware has 256MB available. You've already applied quantization (int8) reducing it to 200MB, but inference latency is still 450ms—above your 200ms target. What should be your next optimization step?",
+      "items": [
+        "Apply aggressive unstructured pruning to remove 60% of weights, accepting potential accuracy drop for latency gains",
+        "Implement structured pruning to remove entire filters/heads, maintaining hardware efficiency while preserving some accuracy, then profile to verify latency improvements",
+        "Immediately retrain the model with knowledge distillation using a larger teacher model to recover accuracy",
+        "Switch to a completely different architecture like TinyBERT since DistilBERT is already too large"
+      ],
+      "answer": 1,
+      "explanation": "Structured pruning is the optimal next step because you've already solved the memory constraint (200MB < 256MB available) with quantization, so your bottleneck is now inference latency, not model size. Structured pruning removes entire attention heads or filter channels, which translates to real speedups on standard hardware without requiring specialized sparse computation libraries—critical for edge deployment. This maintains better accuracy than aggressive unstructured pruning while being hardware-friendly. Option 0 (aggressive unstructured pruning) would harm accuracy unpredictably and may not yield proportional latency gains since sparse operations aren't efficiently supported on most edge hardware. Option 2 (knowledge distillation with retraining) is expensive computationally and addresses accuracy recovery, not the primary latency problem. Option 3 abandons your already-optimized model unnecessarily; TinyBERT would require retraining your cricket classification task. Structured pruning lets you systematically reduce latency while keeping quantized weights and maintaining reasonable accuracy.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

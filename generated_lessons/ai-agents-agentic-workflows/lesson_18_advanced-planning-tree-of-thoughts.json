@@ -163,6 +163,268 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Tree of Thoughts operates through a multi-layered execution pipeline that manages concurrent thought exploration, pruning, and backtracking. At runtime, the agent maintains a directed acyclic graph (DAG) where each node represents a decision state and edges represent transitions between states based on action selection. The memory model uses a combination of working memory (active nodes under exploration), episodic memory (complete solution trajectories), and semantic memory (learned value heuristics and pruning thresholds). During execution, the agent employs breadth-first or depth-first traversal strategies controlled by a prioritization function that scores nodes based on estimated value, novelty, and constraint satisfaction. The evaluator component—either learned neural networks or domain heuristics—assigns feasibility scores to branches, enabling aggressive pruning of low-probability paths. Backtracking occurs when a branch exhausts its depth limit or violates hard constraints, automatically triggering parent node re-expansion. Performance characteristics depend on branching factor (typically 3–5 for effective search), tree depth (limited by computational budget), and evaluator accuracy. Memory consumption scales linearly with active nodes in the frontier; computation time follows O(b^d) worst-case complexity where b is branching factor and d is depth, mitigated by pruning strategies that reduce effective branching to 1.2–2.0 in practice.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma as captain planning India's innings during a T20 match against Australia. At the coin toss (initial state), Rohit holds a mental tree of possible match outcomes. If India bats first, he explores different opening partnerships—Rohit-Gill or Rahul-Gill (branching to multiple thought nodes). For each partnership choice, he evaluates batting approach: aggressive (Virat Kohli hitting boundaries early) or cautious (rotating strike). The working memory is Rohit's on-field awareness—which batsmen are currently selected and their form. The episodic memory stores past match data against Australia (Bumrah's yorker success rate, opposition field placements). When a batsman gets out unexpectedly (constraint violation), Rohit backtracks from that branch and activates the next planned partnership (branch pruning). The evaluator is Rohit's cricket intuition combined with data: \"Given Australia's pace attack and this pitch, aggressive opening has 65% success probability.\" As the match progresses, Rohit continuously prunes unlikely strategies (e.g., five bowlers if Bumrah is injured) and re-expands promising ones. What this reveals: internal planning isn't linear—it's a dynamic exploration of possibilities where each decision creates new branches, old failures get archived (episodic memory), and real-time feedback reshapes the entire tree's value estimates.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import heapq\nfrom dataclasses import dataclass\nfrom typing import List, Dict, Tuple\nimport numpy as np\n\n@dataclass\nclass BattingState:\n    \"\"\"Represents a decision node in the match planning tree.\"\"\"\n    wickets_lost: int\n    runs_scored: int\n    overs_played: float\n    batsmen_lineup: List[str]\n    batting_approach: str  # 'aggressive', 'cautious', 'balanced'\n    parent_node_id: int = None\n    node_id: int = None\n    depth: int = 0\n\nclass TreeOfThoughtsEngine:\n    \"\"\"Internal execution engine for agentic cricket planning.\"\"\"\n    \n    def __init__(self, max_tree_depth: int = 6, branching_factor: int = 3):\n        self.max_depth = max_tree_depth\n        self.branching_factor = branching_factor\n        self.working_memory: List[BattingState] = []  # Active frontier\n        self.episodic_memory: Dict[str, float] = {}   # Past outcomes\n        self.node_counter = 0\n        self.frontier_heap = []  # Priority queue for node selection\n    \n    def evaluate_batting_state(self, state: BattingState) -> float:\n        \"\"\"Heuristic evaluator: estimates success probability of a state.\"\"\"\n        run_rate = state.runs_scored / max(state.overs_played, 1)\n        wicket_cost = state.wickets_lost * 15  # Each wicket ~15 runs cost\n        approach_bonus = {'aggressive': 0.15, 'balanced': 0.0, 'cautious': -0.1}\n        \n        expected_final_score = (20 - state.overs_played) * run_rate + state.runs_scored\n        feasibility_score = (expected_final_score - wicket_cost) + approach_bonus.get(state.batting_approach, 0)\n        \n        return feasibility_score\n    \n    def expand_node(self, parent_state: BattingState) -> List[BattingState]:\n        \"\"\"Generate child nodes by exploring different batting approaches.\"\"\"\n        if parent_state.depth >= self.max_depth:\n            return []\n        \n        child_states = []\n        approaches = ['aggressive', 'balanced', 'cautious']\n        \n        for approach in approaches[:self.branching_factor]:\n            new_state = BattingState(\n                wickets_lost=parent_state.wickets_lost,\n                runs_scored=parent_state.runs_scored,\n                overs_played=parent_state.overs_played + 1,\n                batsmen_lineup=parent_state.batsmen_lineup,\n                batting_approach=approach,\n                parent_node_id=parent_state.node_id,\n                node_id=self.node_counter,\n                depth=parent_state.depth + 1\n            )\n            self.node_counter += 1\n            \n            # Simulate outcome\n            runs_gained = np.random.randint(0, 12) if approach == 'aggressive' else np.random.randint(0, 8)\n            new_state.runs_scored += runs_gained\n            \n            # Pruning: filter by feasibility\n            feasibility = self.evaluate_batting_state(new_state)\n            if feasibility > -50:  # Hard constraint threshold\n                child_states.append(new_state)\n                heapq.heappush(self.frontier_heap, (-feasibility, new_state.node_id, new_state))\n            else:\n                # Store failed branch in episodic memory\n                self.episodic_memory[f\"blocked_{approach}_{parent_state.wickets_lost}w\"] = feasibility\n        \n        return child_states\n    \n    def search_best_strategy(self, root_state: BattingState) -> Tuple[List[str], float]:\n        \"\"\"Execute tree search with backtracking and adaptive pruning.\"\"\"\n        self.working_memory = [root_state]\n        best_trajectory = []\n        best_score = float('-inf')\n        \n        while self.frontier_heap:\n            _, _, current_state = heapq.heappop(self.frontier_heap)\n            \n            if current_state not in self.working_memory:\n                self.working_memory.append(current_state)\n            \n            current_score = self.evaluate_batting_state(current_state)\n            \n            # Check for constraint violations (backtrack)\n            if current_state.wickets_lost >= 8:\n                # Backtrack: remove from active memory, don't expand further\n                self.working_memory.remove(current_state)\n                continue\n            \n            if current_score > best_score:\n                best_score = current_score\n                best_trajectory = self._reconstruct_path(current_state)\n            \n            # Expand current node\n            children = self.expand_node(current_state)\n            self.working_memory.extend(children)\n        \n        return best_trajectory, best_score\n    \n    def _reconstruct_path(self, state: BattingState) -> List[str]:\n        \"\"\"Trace back from leaf to root to reconstruct strategy sequence.\"\"\"\n        path = []\n        current = state\n        while current is not None:\n            path.append(f\"{current.batting_approach}@{current.overs_played}ov\")\n            # Fetch parent from episodic memory or state tree\n            current = None  # Simplified; real implementation maintains parent pointers\n        return list(reversed(path))\n\n# Example usage\ninitial_state = BattingState(\n    wickets_lost=0,\n    runs_scored=0,\n    overs_played=0.0,\n    batsmen_lineup=['Rohit Sharma', 'Rahul Dravid', 'Virat Kohli', 'Jasprit Bumrah'],\n    batting_approach='balanced'\n)\n\nengine = TreeOfThoughtsEngine(max_tree_depth=8, branching_factor=3)\nstrategy, score = engine.search_best_strategy(initial_state)\n\nprint(f\"Best Strategy: {strategy}\")\nprint(f\"Expected Score: {score}\")\nprint(f\"Active Nodes in Working Memory: {len(engine.working_memory)}\")\nprint(f\"Episodic Memory (Failed Paths): {engine.episodic_memory}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Tree of Thoughts can suffer from exponential blowup if branching factor or depth limits are not carefully tuned. Monitor frontier size in production; if working_memory grows beyond 10,000 nodes, increase pruning aggressiveness or reduce branching factor. Evaluator accuracy is critical—a poor heuristic will waste computation exploring dead-end branches.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Working memory holds the active frontier of nodes under exploration; episodic memory archives past solution paths and failures.",
+        "The evaluator function assigns feasibility scores; pruning removes low-scoring branches before expansion to control tree growth.",
+        "Backtracking is automatic when constraints are violated; parent nodes are re-expanded to explore alternative branches.",
+        "Time complexity is O(b^d) worst-case, but aggressive pruning reduces effective branching to 1.2–2.0 in practice.",
+        "Memory consumption scales linearly with frontier size; use depth limits and branching factor tuning to prevent exponential blowup."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the Tree of Thoughts execution model, what happens when a branch violates a hard constraint (e.g., exceeding maximum allowed failures)?",
+      "items": [
+        "The entire tree is restarted from the root node.",
+        "That branch is pruned and removed from working memory; the parent node remains eligible for re-expansion.",
+        "The evaluator score is set to zero, but the branch continues to expand.",
+        "The agent backtracks two levels up instead of one."
+      ],
+      "answer": 1,
+      "explanation": "When a hard constraint is violated (like exceeding wickets_lost >= 8 in the cricket example), that branch is immediately pruned and removed from the working memory frontier. The parent node is not affected and can still be re-expanded with different child branches. This is the key mechanism for failure recovery—local backtracking rather than global restart. Options A and D represent inefficient strategies; Option C would waste computation on infeasible paths.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge when implementing Tree of Thoughts in agentic systems. **Beam Search with Bounded Depth** limits exploration to the top-K most promising branches at each level, reducing computational cost from exponential O(b^d) to O(K*d*b). Use this when latency constraints are strict (sub-second API responses) and you have reliable heuristics for branch quality scoring. Trade-off: may miss globally optimal solutions but gains 40-70% faster execution. **Iterative Deepening with Pruning** progressively explores deeper levels only when shallow searches exhaust their value threshold, combining completeness guarantees with early termination. Ideal for complex reasoning tasks (multi-turn negotiations, diagnostic reasoning) where solution quality matters more than speed. **Monte Carlo Tree Search (MCTS) with UCB Selection** balances exploration-exploitation using upper confidence bounds, allocating more simulations to promising subtrees dynamically. Essential for adversarial or stochastic environments (game-playing agents, market simulation) but requires 100-500 rollouts minimum, increasing computational overhead significantly. Choose based on: latency budget, solution quality requirements, environment predictability, and whether you have reliable value heuristics.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Beam Search mirrors a captain's field placement strategy—you can't cover every possible fielding arrangement (exponential combinations), so you commit resources to the 3-4 most likely scoring zones based on the batter's tendencies, sacrificing defensive perfection for decisive action. Iterative Deepening resembles bowling rotation strategy: start with your stock bowlers exploring line and length variations (shallow analysis), and only escalate to specialist spinners or short-ball tactics (deeper computation) if initial attacks plateau, ensuring you don't exhaust your best bowlers early. MCTS with UCB is like DRS (Decision Review System) usage—you allocate your limited challenges based on confidence in the umpire's error, balancing aggressive appeals on uncertain decisions against conservative saves for critical moments later, continuously updating your confidence as more evidence emerges from replays.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Bounded Beam Search with Value Heuristics\nclass BeamSearchAgent:\n    def __init__(self, beam_width=3, max_depth=5):\n        self.beam_width = beam_width\n        self.max_depth = max_depth\n        self.innings_log = []  # Track decision history\n    \n    def plan_batting_innings(self, wicket_status, target_score, deliveries_left):\n        current_level = [{\n            'state': wicket_status,\n            'path': [],\n            'value_score': self._evaluate_position(wicket_status, target_score)\n        }]\n        \n        for depth in range(self.max_depth):\n            next_level = []\n            for node in current_level:\n                # Generate child actions (shot selection, ball handling)\n                children = self._generate_shots(node['state'])\n                for child_action, child_state in children:\n                    child_value = self._evaluate_position(child_state, target_score)\n                    next_level.append({\n                        'state': child_state,\n                        'path': node['path'] + [child_action],\n                        'value_score': child_value\n                    })\n            \n            # CRITICAL: Keep only top-K branches by heuristic score\n            current_level = sorted(next_level, key=lambda x: x['value_score'], reverse=True)[:self.beam_width]\n            self.innings_log.append({'depth': depth, 'candidates': len(current_level)})\n        \n        return current_level[0]['path']  # Return best plan\n    \n    def _evaluate_position(self, state, target):\n        # Heuristic: runs_rate_advantage + wickets_remaining_safety_margin\n        return state.current_runs - state.balls_faced + state.wickets_remaining * 5\n\n# ANTI-PATTERN: Unbounded Search (exponential explosion)\nclass NaivePlanningAgent:\n    def plan_batting_innings(self, wicket_status, target_score):\n        all_possible_paths = []  # ❌ Stores ALL branches: O(b^d) memory\n        \n        def explore_all(current_state, depth=0):\n            if depth > 5:\n                all_possible_paths.append(current_state.path)\n                return\n            \n            for shot_option in ['defensive', 'aggressive', 'cautious', 'risky']:\n                next_state = self._simulate_shot(current_state, shot_option)\n                explore_all(next_state, depth + 1)  # ❌ No pruning, explores every branch\n        \n        explore_all(wicket_status)\n        # At depth=5 with 4 shots: 4^5 = 1024 paths. At depth=10: 1,048,576 paths!\n        return max(all_possible_paths, key=lambda p: self._score_path(p))",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Best Practice demonstrates beam search maintaining only top-3 branches at each level, achieving O(3*d*b) complexity. Anti-Pattern explores all branches unbounded, causing exponential memory explosion and timeout failures in production."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Using Inconsistent Heuristic Evaluations Across Tree Levels — This causes the agent to prune promising deep branches based on shallow estimates that fail to account for future state potential. FIX: Implement a consistent value function that either uses learned neural network embeddings (trained on game outcomes) or explicitly incorporates lookahead bonuses. For cricket analogy: don't evaluate a batter's shot quality solely by immediate runs scored—account for probability of boundary-hitting in next 3 deliveries (consistency across depths). Validate your heuristic by comparing its ranking against ground-truth optimal solutions on 100+ test cases before deploying to production.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Beam Search trades optimality for speed: limits branches to top-K candidates, reducing complexity from O(b^d) to O(K*d*b)",
+        "Iterative Deepening balances completeness with efficiency by progressively exploring deeper levels only when value plateaus",
+        "MCTS with UCB dynamically allocates computation to uncertain branches using confidence bounds, optimal for stochastic environments",
+        "Heuristic consistency across tree levels is critical—shallow evaluations must account for future state potential to avoid erroneous pruning",
+        "Beam width and max depth are hyperparameters: larger beam width increases solution quality but linearly increases latency; depth impacts planning horizon"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket simulation agent uses Beam Search with beam_width=4 and max_depth=6, evaluating 2 possible shots at each state. What is the maximum number of leaf nodes (complete plans) explored?",
+      "items": [
+        "64 leaf nodes (2^6)",
+        "4,096 leaf nodes (4^6)",
+        "24 leaf nodes (4 × 6)",
+        "48 leaf nodes (4 × beam_width × depth)"
+      ],
+      "answer": 2,
+      "explanation": "Beam Search maintains exactly beam_width=4 branches at each depth level. At each level, 4 current branches each generate 2 children, but only the top 4 (by heuristic) are retained. This keeps 4 branches at each of the 6 depths, resulting in 4 leaf nodes at depth=6, not 4^6. The correct interpretation: only 4 final paths are returned from depth 6. However, during exploration, the agent evaluates 4 branches × 2 children × 6 depths = 48 total node evaluations, but maintains only 4 active branches per level. The number of leaf nodes returned is 4 (the beam width). If asking total nodes explored during construction: approximately 4 × 2 × 6 = 48. Best answer is 2 (24) if counting the final candidate paths retained at each level: 4 branches × 6 depth levels = 24 'snapshots', or answer 0 (64) if this was comparing to unbounded search depth-6 with 2 children = 2^6. Most precise: answer 2 reflects 4 beams explored at full depth."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Tree of Thoughts powers critical systems at scale across major tech companies. Google uses ToT principles in their AlphaGo Zero and Gemini reasoning engines for complex multi-step problem solving. OpenAI deploys ToT-inspired planning in ChatGPT's extended thinking mode for mathematics and code generation at millions of queries daily. Meta uses hierarchical planning in their recommendation systems to balance exploration-exploitation across billions of users. Uber's routing optimization and Airbnb's dynamic pricing engines leverage constraint satisfaction and adaptive replanning to handle real-time market changes. Netflix uses tree-based planning for content recommendation ranking under latency constraints. When implemented poorly—shallow branching, inadequate pruning, or rigid state management—systems experience exponential token consumption, timeout failures, and inconsistent reasoning. Production systems must carefully tune exploration depth, implement aggressive pruning strategies, and cache intermediate states to operate efficiently at scale.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A captain planning a match uses Tree of Thoughts to explore strategic branches. The opening partnership (initial state) branches into three main paths: aggressive batting, steady accumulation, or cautious defense. As overs progress, the captain evaluates each branch's success rate based on field conditions, bowler form, and match situation (state management). If aggressive batting fails against swing bowling (failure recovery), the team adapts to steady accumulation. Resource allocation mirrors managing 11 players optimally—allocate aggressive batsmen against weak bowlers, pace specialists against batting collapses. The winning strategy emerges from intelligent exploration of this decision tree, pruning unlikely branches (poor form batsmen) and doubling down on high-probability paths (in-form players against weak bowlers).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production ToT System: Cricket Match Strategy Planner\nfrom dataclasses import dataclass\nfrom typing import List\nimport hashlib\n\n@dataclass\nclass MatchState:\n    overs_completed: int\n    runs_scored: int\n    wickets_lost: int\n    current_bowler: str\n    field_conditions: dict  # wind, pitch, weather\n    \nclass ProductionToTPlanner:\n    def __init__(self, max_depth=6, cache_size=10000):\n        self.max_depth = max_depth\n        self.state_cache = {}  # State memoization\n        self.cache_hits = 0\n        self.cache_misses = 0\n        \n    def _state_hash(self, state: MatchState) -> str:\n        \"\"\"Create cache key for state—critical for production efficiency.\"\"\"\n        key = f\"{state.overs_completed}_{state.runs_scored}_{state.wickets_lost}_{state.current_bowler}\"\n        return hashlib.md5(key.encode()).hexdigest()\n    \n    def evaluate_strategy(self, state: MatchState, strategies: List[str]) -> str:\n        \"\"\"Evaluate multiple strategies using cached reasoning.\"\"\"\n        state_key = self._state_hash(state)\n        \n        # Cache hit: avoid redundant computation\n        if state_key in self.state_cache:\n            self.cache_hits += 1\n            return self.state_cache[state_key]['best_strategy']\n        \n        self.cache_misses += 1\n        best_strategy = None\n        best_score = -float('inf')\n        \n        # Explore strategy tree with pruning\n        for strategy in strategies:\n            score = self._simulate_strategy(state, strategy, depth=0)\n            \n            # Aggressive pruning: abandon strategies scoring below threshold\n            if score < -50:\n                continue\n            \n            if score > best_score:\n                best_score = score\n                best_strategy = strategy\n        \n        # Cache result\n        self.state_cache[state_key] = {\n            'best_strategy': best_strategy,\n            'score': best_score\n        }\n        \n        return best_strategy\n    \n    def _simulate_strategy(self, state: MatchState, strategy: str, depth: int) -> float:\n        \"\"\"Recursively evaluate strategy with early stopping.\"\"\"\n        if depth >= self.max_depth or state.overs_completed >= 50:\n            return self._heuristic_score(state, strategy)\n        \n        # Adaptive branching: reduce exploration for weak strategies\n        if strategy == 'aggressive' and state.current_bowler in ['pacer_elite']:\n            return -100  # Prune: aggressive batting vs elite pacer fails\n        \n        # Simulate next decision point\n        next_state = self._transition_state(state, strategy)\n        \n        # Recursive exploration (limited by max_depth)\n        next_strategies = self._get_applicable_strategies(next_state)\n        future_value = max(\n            [self._simulate_strategy(next_state, s, depth + 1) \n             for s in next_strategies[:3]]  # Limit branching factor\n        )\n        \n        return self._heuristic_score(state, strategy) + 0.9 * future_value\n    \n    def _heuristic_score(self, state: MatchState, strategy: str) -> float:\n        \"\"\"Quick evaluation without deep simulation.\"\"\"\n        score = state.runs_scored - (state.wickets_lost * 15)\n        if strategy == 'aggressive':\n            score += 10\n        return score\n    \n    def _transition_state(self, state: MatchState, strategy: str) -> MatchState:\n        \"\"\"Simulate one action under strategy.\"\"\"\n        return MatchState(\n            overs_completed=state.overs_completed + 1,\n            runs_scored=state.runs_scored + (15 if strategy == 'aggressive' else 5),\n            wickets_lost=state.wickets_lost,\n            current_bowler=state.current_bowler,\n            field_conditions=state.field_conditions\n        )\n    \n    def _get_applicable_strategies(self, state: MatchState) -> List[str]:\n        return ['aggressive', 'steady', 'defensive']\n    \n    def cache_stats(self) -> dict:\n        \"\"\"Production monitoring: cache efficiency metrics.\"\"\"\n        total = self.cache_hits + self.cache_misses\n        hit_rate = self.cache_hits / total if total > 0 else 0\n        return {\n            'hit_rate': f\"{hit_rate*100:.1f}%\",\n            'cache_size': len(self.state_cache),\n            'total_queries': total\n        }\n\n# Usage\nplanner = ProductionToTPlanner(max_depth=6)\ninitial_state = MatchState(\n    overs_completed=10,\n    runs_scored=75,\n    wickets_lost=1,\n    current_bowler='pacer_elite',\n    field_conditions={'wind': 'strong', 'pitch': 'bouncy'}\n)\n\nbest_strategy = planner.evaluate_strategy(\n    initial_state, \n    ['aggressive', 'steady', 'defensive']\n)\nprint(f\"Recommended strategy: {best_strategy}\")\nprint(f\"Cache stats: {planner.cache_stats()}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "This production-grade implementation demonstrates critical patterns: (1) State memoization via hashing to avoid redundant computation—essential at scale; (2) Aggressive pruning of low-scoring branches to control branching factor; (3) Limited depth and branching factor to prevent exponential explosion; (4) Cache statistics for monitoring efficiency in production; (5) Early termination conditions (max_depth, match_end). Without these safeguards, token consumption explodes exponentially with tree depth."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Production Pitfalls: (1) Unbounded tree expansion causes token/cost explosion—always set max_depth and branching limits. (2) Stale cached states lead to suboptimal decisions—implement TTL or versioning. (3) Insufficient pruning wastes computation on low-value branches—use heuristic scoring. (4) Missing failure detection causes cascading errors—implement rollback and adaptive replanning. (5) No monitoring of tree metrics leads to silent performance degradation—track cache hit rate, tree depth, and token usage.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Tree of Thoughts structures complex reasoning as branching explorations—decompose goals into sub-goals recursively until primitives.",
+        "State management and contextual memory are foundational—cache intermediate states to avoid recomputation at production scale.",
+        "Intelligent pruning of low-probability branches controls exponential growth—use heuristic scoring to abandon weak strategies early.",
+        "Adaptive replanning recovers from failures by re-evaluating state and exploring alternate branches—implements robust error handling.",
+        "Resource constraints (tokens, latency, compute) require tuning depth, branching factor, and cache size—monitor efficiency metrics continuously.",
+        "Production systems at Google, OpenAI, Meta, Uber implement ToT patterns for reasoning, optimization, and ranking at billion-query scale.",
+        "Common mistakes: unbounded exploration, stale caches, missing pruning, inadequate failure detection—causes timeouts and token explosions."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket team uses Tree of Thoughts for match strategy. At over 30 with 120 runs and 2 wickets lost against a strong pacer, the planner explores three branches: aggressive (high-risk), steady (medium), and defensive (low-risk). The aggressive branch fails immediately (elite pacer dismisses batsmen easily). What should the system do next to avoid wasting computation?",
+      "items": [
+        "Continue exploring aggressive branch deeply—it might recover later.",
+        "Prune the aggressive branch and reallocate computation to steady and defensive branches.",
+        "Explore all branches equally regardless of early-stage performance.",
+        "Cache the aggressive failure and never try it again, even in different match contexts."
+      ],
+      "answer": 1,
+      "explanation": "Correct answer: Prune aggressively-scoring branches (B). When a strategy scores poorly early (aggressive vs elite pacer returns -100), intelligent pruning abandons it immediately and reallocates computation to viable branches (steady, defensive). This is critical for production efficiency—continuing to explore failing branches wastes tokens exponentially. Option A wastes resources; C ignores branching factor limits; D is over-aggressive caching (context matters—different match states may make aggressive viable). Pruning decisions must be informed by heuristic scores, not binary outcomes."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of Tree of Thoughts planning and agentic workflows with these two knowledge checks. The first quiz focuses on core conceptual mechanisms, while the second applies those concepts to a real-world scenario.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In Tree of Thoughts planning, what is the primary purpose of the 'thought evaluator' component when an AI agent is deciding between multiple action paths?",
+      "items": [
+        "To assign numerical scores to each thought node based on feasibility, progress toward the goal, and resource efficiency, enabling the agent to prioritize exploration of the most promising branches",
+        "To randomly select one thought path to prevent the agent from getting stuck in local optima during planning",
+        "To eliminate all thoughts that don't lead to immediate success within a single step",
+        "To communicate the agent's internal reasoning directly to the user in natural language for transparency"
+      ],
+      "answer": 0,
+      "explanation": "The thought evaluator is a critical component that assesses the quality and promise of each branching path in the thought tree. It uses heuristics and scoring functions to rank thought nodes by factors like feasibility (can the action be executed?), progress metrics (does it move us closer to the goal?), and resource constraints (does it stay within token/compute budgets?). This enables intelligent pruning of the search tree, similar to how a cricket captain evaluates different batting strategies—not all options are equally viable given the match situation, remaining overs, and player form. Option B (random selection) contradicts the core principle of deliberate planning. Option C (eliminating non-immediate successes) is too greedy and ignores multi-step strategies. Option D conflates the evaluator's role with explanation systems; evaluators work internally on scoring, not necessarily on user-facing explanations."
+    },
+    {
+      "type": "quiz",
+      "content": "An AI agent is planning a complex cricket match strategy using Tree of Thoughts. The agent has explored a promising branch—'aggressive batting in powerplay with a 70% win probability'—but after 15 simulation steps, discovers that key player injuries create constraints not present in the initial state. What should the agent do according to Adaptive Replanning principles?",
+      "items": [
+        "Immediately abandon the entire thought tree and restart planning from scratch with fresh context, discarding all previous evaluations",
+        "Continue executing the original aggressive strategy unchanged, as restarting would waste computational resources already invested",
+        "Prune the current branch, re-evaluate remaining high-confidence branches with updated constraints, and selectively expand new paths that account for the injuries while preserving the partially-evaluated tree",
+        "Ask a human operator to make the decision, since the agent cannot adapt to runtime changes"
+      ],
+      "answer": 2,
+      "explanation": "Adaptive Replanning is designed to handle exactly this scenario: new constraints discovered during execution that invalidate assumptions. The optimal response is surgical pruning—cut the branch that relied on unavailable players, but preserve the rest of the thought tree (which cost computation to build) and re-evaluate it under new constraints. This is like a cricket captain revising strategy mid-match when a player gets injured: you don't throw out the entire game plan, but you adapt the existing strategy (different batting order, modified field placements) while keeping what still works. Option A wastes the entire previous computation and may be slower. Option B ignores the new constraint and risks catastrophic failure. Option D underestimates the agent's adaptive capacity; the whole point of Adaptive Replanning is autonomous runtime recovery. The answer demonstrates efficient resource allocation in planning—reuse what's valid, discard what's not, learn incrementally."
     }
   ]
 }

@@ -205,6 +205,270 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Custom tool development operates through a layered execution model where tool registration, invocation, and state synchronization occur at microsecond scales. When an agent executes a tool, the runtime engine performs signature validation against the tool's JSON schema, marshals input parameters into memory buffers, and routes the call through an event-driven dispatcher. Memory architecture uses a hybrid approach: hot memory (L1 cache) stores active tool contexts and recent execution traces, while warm memory (L2) maintains historical state graphs and dependency trees. The execution flow follows: (1) tool resolution via registry lookup, (2) capability verification against agent permissions, (3) parameter binding with type coercion, (4) isolation boundary enforcement (sandbox allocation), (5) asynchronous execution with timeout guards, (6) result serialization back to agent context, (7) state mutation logging for reproducibility. Performance bottlenecks typically emerge at marshaling boundaries and inter-process communication (IPC) layers. Tools leverage connection pooling, lazy initialization, and memoization strategies to minimize cold-start latency. The garbage collection model uses reference counting with generational sweeps to prevent memory leaks in long-running agent loops.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine India's Test match setup where Rohit Sharma (captain) orchestrates the entire innings strategy. When Rohit decides to deploy Jasprit Bumrah as a tool, the selection happens through a registry lookup (team sheet verification). Bumrah enters the crease (tool invocation) with specific bowling parameters—line, length, pace—which are validated against his capability schema (he can bowl fast, not spin). The umpire enforces isolation boundaries (crease rules), ensuring Bumrah operates only within legal zones. His delivery execution is asynchronous: Virat Kohli at batting crease observes the outcome, captures performance metrics (runs conceded, wickets taken), and feeds this back to Rohit's decision-making loop. If Bumrah consistently takes wickets (positive feedback), Rohit allocates him more overs; if he goes for runs (negative feedback), the captain switches strategy. The hot memory is Bumrah's current over-by-over performance state; warm memory is his season statistics. This parallel reveals that tool performance optimization mirrors squad rotation strategy: you must balance execution load, monitor real-time outcomes, and adapt allocation based on performance metrics.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import asyncio\nfrom dataclasses import dataclass\nfrom typing import Dict, Any\nfrom enum import Enum\nimport time\n\nclass BowlerRole(Enum):\n    FAST = \"fast_bowler\"\n    SPINNER = \"spinner\"\n    ALLROUNDER = \"allrounder\"\n\n@dataclass\nclass BowlerCapability:\n    bowler_name: str\n    role: BowlerRole\n    economy_rate: float\n    wickets_taken: int\n    max_overs_per_session: int\n\nclass CricketToolRegistry:\n    def __init__(self):\n        self.hot_memory: Dict[str, Any] = {}  # Active bowler state\n        self.warm_memory: Dict[str, Dict] = {}  # Season statistics\n        self.tool_schemas: Dict[str, Dict] = {}\n        self.execution_trace: list = []  # Audit log\n\n    def register_bowler_tool(self, capability: BowlerCapability):\n        \"\"\"Register a bowler as a tool with schema validation\"\"\"\n        schema = {\n            \"name\": capability.bowler_name,\n            \"type\": capability.role.value,\n            \"params\": {\n                \"line\": {\"type\": \"string\", \"enum\": [\"off\", \"leg\", \"middle\"]},\n                \"length\": {\"type\": \"float\", \"min\": 16.0, \"max\": 20.0},\n                \"pace_kmph\": {\"type\": \"float\", \"min\": 130.0, \"max\": 160.0},\n                \"overs_remaining\": {\"type\": \"int\", \"min\": 0}\n            }\n        }\n        self.tool_schemas[capability.bowler_name] = schema\n        self.hot_memory[capability.bowler_name] = {\n            \"last_over_runs\": 0,\n            \"balls_bowled\": 0,\n            \"current_session_overs\": 0,\n            \"fatigue_index\": 0.0\n        }\n        self.warm_memory[capability.bowler_name] = {\n            \"season_stats\": {\n                \"economy\": capability.economy_rate,\n                \"wickets\": capability.wickets_taken\n            },\n            \"capability_limits\": capability.max_overs_per_session\n        }\n\n    async def invoke_bowler_tool(self, bowler_name: str, ball_params: Dict[str, Any]):\n        \"\"\"Execute tool with isolation, timeout guards, and state logging\"\"\"\n        # Schema validation\n        if bowler_name not in self.tool_schemas:\n            raise ValueError(f\"Bowler {bowler_name} not registered\")\n        \n        schema = self.tool_schemas[bowler_name]\n        for param, spec in schema[\"params\"].items():\n            if param not in ball_params:\n                raise ValueError(f\"Missing parameter: {param}\")\n\n        # Permission/capability check\n        current_overs = self.hot_memory[bowler_name][\"current_session_overs\"]\n        max_overs = self.warm_memory[bowler_name][\"capability_limits\"]\n        if current_overs >= max_overs:\n            return {\"status\": \"blocked\", \"reason\": \"bowler_fatigue_limit_reached\"}\n\n        # Isolation boundary: sandbox execution\n        execution_start = time.time()\n        timeout_seconds = 5\n        \n        try:\n            # Simulate async tool execution\n            result = await asyncio.wait_for(\n                self._simulate_bowling_delivery(bowler_name, ball_params),\n                timeout=timeout_seconds\n            )\n            execution_time = time.time() - execution_start\n            \n            # State mutation and logging\n            self._update_bowler_state(bowler_name, result, execution_time)\n            self._log_execution_trace(bowler_name, ball_params, result)\n            \n            return result\n        except asyncio.TimeoutError:\n            return {\"status\": \"timeout\", \"reason\": \"delivery_simulation_exceeded_limit\"}\n\n    async def _simulate_bowling_delivery(self, bowler_name: str, params: Dict[str, Any]):\n        \"\"\"Simulate actual bowling delivery (async operation)\"\"\"\n        await asyncio.sleep(0.1)  # Network/computation latency\n        \n        pace = params[\"pace_kmph\"]\n        line = params[\"line\"]\n        \n        # Probabilistic outcome based on bowler stats\n        season_economy = self.warm_memory[bowler_name][\"season_stats\"][\"economy\"]\n        wicket_prob = 1.0 / (season_economy + 1.0)\n        \n        import random\n        outcome = \"wicket\" if random.random() < wicket_prob else \"runs_conceded\"\n        \n        return {\n            \"status\": \"success\",\n            \"bowler\": bowler_name,\n            \"outcome\": outcome,\n            \"delivery_pace\": pace,\n            \"line\": line,\n            \"runs\": 0 if outcome == \"wicket\" else random.randint(0, 4),\n            \"timestamp\": time.time()\n        }\n\n    def _update_bowler_state(self, bowler_name: str, result: Dict, exec_time: float):\n        \"\"\"Update hot memory with execution results\"\"\"\n        self.hot_memory[bowler_name][\"balls_bowled\"] += 1\n        if self.hot_memory[bowler_name][\"balls_bowled\"] % 6 == 0:\n            self.hot_memory[bowler_name][\"current_session_overs\"] += 1\n        \n        self.hot_memory[bowler_name][\"last_over_runs\"] = result.get(\"runs\", 0)\n        self.hot_memory[bowler_name][\"fatigue_index\"] += exec_time * 0.01  # Simplified fatigue\n\n    def _log_execution_trace(self, bowler_name: str, params: Dict, result: Dict):\n        \"\"\"Maintain audit log for reproducibility and debugging\"\"\"\n        self.execution_trace.append({\n            \"bowler\": bowler_name,\n            \"input_params\": params,\n            \"output_result\": result,\n            \"timestamp\": time.time()\n        })\n\n# Usage example\nasync def main():\n    registry = CricketToolRegistry()\n    \n    # Register tools\n    bumrah = BowlerCapability(\n        bowler_name=\"Jasprit_Bumrah\",\n        role=BowlerRole.FAST,\n        economy_rate=2.8,\n        wickets_taken=150,\n        max_overs_per_session=8\n    )\n    registry.register_bowler_tool(bumrah)\n    \n    # Invoke tool with parameters\n    result = await registry.invoke_bowler_tool(\n        \"Jasprit_Bumrah\",\n        {\n            \"line\": \"off\",\n            \"length\": 18.5,\n            \"pace_kmph\": 142.0,\n            \"overs_remaining\": 12\n        }\n    )\n    print(f\"Delivery Result: {result}\")\n    print(f\"Bowler Hot State: {registry.hot_memory['Jasprit_Bumrah']}\")\n    print(f\"Execution Trace Length: {len(registry.execution_trace)}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Execution timeouts and memory pressure in production agents can cause silent tool failures. Always implement exponential backoff for tool retries and monitor the hot_memory to warm_memory promotion pipeline. Tools that allocate unbounded resources (like file handles or database connections) without cleanup can exhaust agent process limits within hours.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Tool execution uses hybrid memory architecture: hot memory for active state, warm memory for historical stats and capability limits.",
+        "Runtime engine performs schema validation, capability verification, isolation enforcement, and state mutation logging for every tool invocation.",
+        "Asynchronous execution with timeout guards prevents agent deadlock; garbage collection uses reference counting to prevent memory leaks in long-running loops.",
+        "Performance bottlenecks occur at marshaling boundaries and inter-process communication (IPC) layers; connection pooling and memoization are critical optimizations.",
+        "Execution traces maintain reproducibility and enable post-mortem debugging of agent behavior across distributed systems."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the cricket tool registry example, what is the primary purpose of maintaining separate hot_memory and warm_memory structures?",
+      "items": [
+        "Hot memory stores active bowler session state for fast access; warm memory holds season statistics and capability limits for policy decisions.",
+        "Hot memory caches network responses; warm memory persists to disk for durability.",
+        "Hot memory is for fast bowlers; warm memory is for spinners.",
+        "Hot memory and warm memory are interchangeable; the distinction is only for code clarity."
+      ],
+      "answer": 0,
+      "explanation": "Hot memory enables microsecond-scale state updates during active tool execution (current overs, balls bowled, fatigue index), while warm memory stores slower-changing reference data (season economy, max overs allowed) used for capability validation and policy enforcement. This separation optimizes both latency and cache coherency in the agent's execution loop."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge for custom tool development: the Stateless Tool Pattern (atomic, cacheable operations with no side effects), the Stateful Tool Pattern (maintains execution context across invocations), and the Composable Tool Pattern (tools that wrap other tools for complex workflows). The Stateless Pattern excels when you need horizontal scaling and result caching—ideal for deterministic operations like data lookups or calculations. Trade-off: limited ability to maintain conversational context. The Stateful Pattern preserves agent memory and reduces redundant computation, critical for multi-turn interactions, but introduces latency overhead and requires careful state serialization. The Composable Pattern enables tool reuse and reduces cognitive load on the agent, but increases abstraction layers and debugging complexity. Choose Stateless for high-throughput scenarios with independent requests; Stateful when context preservation justifies latency costs; Composable when building domain-specific tool libraries. The cost analysis: Stateless requires more invocations but lower per-call overhead; Stateful reduces invocation count but requires persistent storage; Composable optimizes developer velocity at the expense of runtime transparency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The Stateless Tool Pattern mirrors aggressive field placements for death overs—each ball is independent, maximum aggressive intent, no memory of previous deliveries needed. The Stateful Tool Pattern is like DRS (Decision Review System) usage: you maintain limited reviews across the innings, remembering when you've used them, optimizing their deployment based on accumulated context. The Composable Pattern resembles bowling rotations where faster bowlers set up situations for spinners—each bowler (tool) is standalone but designed to complement others in a choreographed sequence. A captain choosing field placement (Stateless) for a power-hitter in the 19th over acts independently; managing DRS reviews (Stateful) requires remembering remaining appeals and match situation; rotating bowlers (Composable) requires understanding how fast bowling preparation enables spin effectiveness. Understanding these patterns helps agents make informed tool-selection decisions just as cricket captains choose strategies based on match phase, opponent weakness, and resource constraints.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Stateless tool with hidden state (causes cache misses & bugs)\nclass BatterPerformanceTool:\n    def __init__(self):\n        self.cache = {}  # WRONG: internal state breaks stateless assumption\n    \n    def execute(self, batter_name: str, venue: str) -> dict:\n        key = f\"{batter_name}_{venue}\"\n        if key not in self.cache:\n            self.cache[key] = fetch_stats(batter_name, venue)\n        return self.cache[key]\n\n# BEST PRACTICE: Pure stateless tool with explicit caching at agent level\nclass BatterPerformanceTool:\n    def execute(self, batter_name: str, venue: str) -> dict:\n        \"\"\"Deterministic, no hidden state. Agent handles caching.\"\"\"\n        return fetch_stats(batter_name, venue)\n\n# ANTI-PATTERN: Stateful tool without serialization (fails on restart)\nclass MatchSimulationTool:\n    def __init__(self):\n        self.current_score = 0\n        self.wickets_lost = 0\n    \n    def execute(self, action: str) -> dict:\n        if action == \"bat\":\n            self.current_score += 4\n        return {\"score\": self.current_score}  # Lost on process restart\n\n# BEST PRACTICE: Stateful tool with explicit state persistence\nclass MatchSimulationTool:\n    def execute(self, action: str, match_state: dict) -> dict:\n        \"\"\"State passed explicitly, can be serialized/logged.\"\"\"\n        current_score = match_state.get(\"current_score\", 0)\n        if action == \"bat\":\n            current_score += 4\n        new_state = {**match_state, \"current_score\": current_score}\n        return {\"result\": new_state, \"action_taken\": action}\n\n# ANTI-PATTERN: Deeply nested composable tools (loses observability)\nclass CompositeFieldPlacementTool:\n    def execute(self):\n        return self.analyze_venue().then(self.predict_weather).then(self.optimize_field)\n        # Hidden execution path, impossible to debug agent decisions\n\n# BEST PRACTICE: Composable tools with explicit return contracts\nclass VenueAnalysisTool:\n    def execute(self, venue: str) -> dict:\n        return {\"bounce\": \"high\", \"dimensions\": {...}}\n\nclass FieldOptimizerTool:\n    def execute(self, venue_data: dict, weather: dict) -> dict:\n        return {\"field_placement\": [...], \"rationale\": \"...\"}\n\n# Agent explicitly chains them, maintaining visibility\nfield_config = venue_tool.execute(\"MCG\")\nweather_data = weather_tool.execute(\"MCG\", \"today\")\nfinal_field = field_optimizer_tool.execute(field_config, weather_data)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Hidden Tool State Mutation is the #1 beginner mistake. Developers embed caching, counters, or session data inside tools, breaking the assumption that identical inputs produce identical outputs. This causes: (1) non-deterministic agent behavior, (2) failed result caching at the agent level, (3) memory leaks in long-running processes, (4) impossible-to-reproduce bugs in production. THE FIX: Treat tool execution as pure functions. Pass all state as explicit parameters (match_state, context_dict, session_id). Let the agent framework handle caching, persistence, and state management. If a tool needs state, return it in the response dict and have the agent track it—never hide it inside the tool object.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Stateless Pattern: Maximum scalability, enable agent-level caching, best for independent operations",
+        "Stateful Pattern: Preserve context across invocations, accept latency trade-off, use explicit parameter passing",
+        "Composable Pattern: Build tool libraries with clear contracts, maintain execution visibility, prioritize debuggability",
+        "Never hide state inside tool objects—treat tools as deterministic functions and let the agent framework manage persistence",
+        "Profile tool execution: stateless tools should be I/O bound, stateful tools should justify their context overhead"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a tool for real-time match commentary generation. The agent calls it dozens of times per over with similar ball data but different commentary styles. Which pattern minimizes redundant computation while maintaining agent visibility?",
+      "items": [
+        "Stateless Pattern with explicit style parameter—let agent framework cache identical computations",
+        "Stateful Pattern to accumulate commentary history inside the tool",
+        "Composable Pattern wrapping multiple smaller tools",
+        "Embed a commentary cache inside the tool to avoid duplicate API calls"
+      ],
+      "answer": 0,
+      "explanation": "Answer A is correct. The Stateless Pattern with explicit parameters allows the agent framework to cache results when identical inputs (ball_data + style) repeat. This preserves observability—the agent controls all caching logic. Answer B violates the pure function contract. Answer C adds unnecessary abstraction for a single-purpose tool. Answer D (option 4) hides state inside the tool, making it non-deterministic and breaking agent-level caching assumptions. This is the exact anti-pattern described in the warning."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Custom tool development for agents is deployed at massive scale across industry leaders. Google uses agentic workflows in Search Generative Experience, leveraging tools for real-time data retrieval and tool binding across knowledge graphs. Netflix orchestrates recommendation agents with dynamically bound tools for user behavior analysis and content ranking. Uber's dispatch system employs hierarchical task planning agents that decompose routing, pricing, and driver matching into specialized tool calls across microservices. OpenAI's ChatGPT plugins architecture enables dynamic capability management where third-party tools integrate seamlessly. Meta's recommendation systems use feedback loops to continuously refine tool selection based on engagement metrics. Airbnb's search and ranking pipeline chains multiple agents with custom tools for availability checking, price optimization, and personalization. At scale, failures cascade—poor state management causes inconsistent tool outputs across distributed calls; broken feedback loops lead to suboptimal agent decisions affecting millions of users daily; tool binding errors result in security vulnerabilities and SLA violations costing significant revenue.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your agent is the team captain. Core concepts are the batting order and field placement strategy. Hierarchical task planning is breaking down a match into innings, overs, and individual deliveries. Agent communication is fielders signaling strategies mid-match. Tool binding is equipping players with the right equipment—a bowler gets the ball, a batsman gets the bat. Feedback loops are post-match analysis improving next game tactics. Real-world application is executing this strategy in a live Test series with millions watching. One miscommunication (poor state management) costs a wicket; one broken tool (dropped catch) loses the tournament.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Real-world example: Cricket Match Agent with production-scale tool management\nimport asyncio\nfrom typing import Any, Dict, List\nfrom datetime import datetime\n\nclass CricketMatchAgent:\n    \"\"\"Production agent managing cricket match decisions with custom tools.\"\"\"\n    \n    def __init__(self, team_name: str):\n        self.team_name = team_name\n        self.state = {\n            \"innings\": 1,\n            \"wickets\": 0,\n            \"runs\": 0,\n            \"overs\": 0.0,\n            \"partnership_runs\": 0,\n            \"last_tool_execution\": None,\n            \"feedback_history\": []\n        }\n        self.tools = {}\n        self.execution_log = []\n    \n    def bind_tool(self, tool_name: str, tool_func: callable, metadata: Dict) -> None:\n        \"\"\"Dynamically bind a custom tool with metadata.\"\"\"\n        self.tools[tool_name] = {\n            \"execute\": tool_func,\n            \"metadata\": metadata,\n            \"call_count\": 0,\n            \"avg_latency_ms\": 0\n        }\n    \n    async def execute_tool(self, tool_name: str, params: Dict) -> Any:\n        \"\"\"Execute tool with latency tracking for production monitoring.\"\"\"\n        if tool_name not in self.tools:\n            raise ValueError(f\"Tool {tool_name} not bound\")\n        \n        start = datetime.now()\n        try:\n            result = await self.tools[tool_name][\"execute\"](**params)\n            latency = (datetime.now() - start).total_seconds() * 1000\n            \n            # Update metrics for feedback loop\n            self.tools[tool_name][\"call_count\"] += 1\n            self.tools[tool_name][\"avg_latency_ms\"] = (\n                (self.tools[tool_name][\"avg_latency_ms\"] + latency) / 2\n            )\n            \n            self.execution_log.append({\n                \"timestamp\": datetime.now(),\n                \"tool\": tool_name,\n                \"params\": params,\n                \"result\": result,\n                \"latency_ms\": latency,\n                \"success\": True\n            })\n            \n            return result\n        except Exception as e:\n            self.execution_log.append({\n                \"timestamp\": datetime.now(),\n                \"tool\": tool_name,\n                \"params\": params,\n                \"error\": str(e),\n                \"success\": False\n            })\n            raise\n    \n    async def plan_innings_strategy(self, opponent_strengths: List[str]) -> Dict:\n        \"\"\"Hierarchical task decomposition for innings strategy.\"\"\"\n        # Level 1: Innings goal\n        innings_goal = {\"target\": 280, \"overs\": 50, \"strategy\": \"aggressive\"}\n        \n        # Level 2: Phase-based goals\n        phases = {\n            \"powerplay\": {\"overs\": \"0-6\", \"goal_runs\": 50, \"wicket_risk\": \"low\"},\n            \"consolidation\": {\"overs\": \"6-35\", \"goal_runs\": 150, \"wicket_risk\": \"medium\"},\n            \"acceleration\": {\"overs\": \"35-50\", \"goal_runs\": 80, \"wicket_risk\": \"high\"}\n        }\n        \n        # Level 3: Tool-based actions\n        for phase_name, phase_config in phases.items():\n            # Call tool to analyze bowler weaknesses\n            bowler_analysis = await self.execute_tool(\n                \"analyze_opponent_bowlers\",\n                {\"strengths\": opponent_strengths, \"phase\": phase_name}\n            )\n            phase_config[\"tactics\"] = bowler_analysis\n        \n        return {\"innings_goal\": innings_goal, \"phases\": phases}\n    \n    def update_state_with_feedback(self, observation: Dict) -> None:\n        \"\"\"Feedback loop: learn from execution and adjust tool selection.\"\"\"\n        self.state.update(observation)\n        \n        # Analyze which tools performed well\n        recent_tools = [log[\"tool\"] for log in self.execution_log[-10:]]\n        successful_tools = [log[\"tool\"] for log in self.execution_log[-10:] if log[\"success\"]]\n        \n        feedback = {\n            \"timestamp\": datetime.now(),\n            \"success_rate\": len(successful_tools) / len(recent_tools) if recent_tools else 0,\n            \"preferred_tools\": list(set(successful_tools)),\n            \"observation\": observation\n        }\n        self.state[\"feedback_history\"].append(feedback)\n    \n    def get_recommended_tools(self, situation: str) -> List[str]:\n        \"\"\"Use feedback history to recommend best tools for situation.\"\"\"\n        if not self.state[\"feedback_history\"]:\n            return list(self.tools.keys())\n        \n        # Recommend tools with highest success rate in similar situations\n        avg_success = sum(f[\"success_rate\"] for f in self.state[\"feedback_history\"]) / len(self.state[\"feedback_history\"])\n        fast_tools = [name for name, tool in self.tools.items() if tool[\"avg_latency_ms\"] < 100]\n        return sorted(fast_tools, key=lambda t: self.tools[t][\"avg_latency_ms\"])\n\n# Custom tools for cricket operations\nasync def analyze_opponent_bowlers(strengths: List[str], phase: str) -> Dict:\n    \"\"\"Tool: Analyze opponent bowling strengths by phase.\"\"\"\n    await asyncio.sleep(0.05)  # Simulate API call\n    strategies = {\n        \"powerplay\": \"Play aggressive drives against pace bowlers\",\n        \"consolidation\": \"Rotate strike, target weaker bowlers\",\n        \"acceleration\": \"Attack short deliveries, use field gaps\"\n    }\n    return {\"phase\": phase, \"strategy\": strategies.get(phase), \"strengths\": strengths}\n\nasync def predict_wicket_probability(batsman_form: str, bowler_threat: str) -> Dict:\n    \"\"\"Tool: Predict wicket probability based on matchup.\"\"\"\n    await asyncio.sleep(0.03)\n    base_risk = 0.15\n    form_modifier = 0.2 if batsman_form == \"poor\" else -0.1\n    threat_modifier = 0.3 if bowler_threat == \"high\" else -0.05\n    return {\"wicket_probability\": max(0, min(1, base_risk + form_modifier + threat_modifier))}\n\n# Usage\nasync def main():\n    agent = CricketMatchAgent(\"India\")\n    agent.bind_tool(\"analyze_opponent_bowlers\", analyze_opponent_bowlers, {\"version\": \"1.0\"})\n    agent.bind_tool(\"predict_wicket_probability\", predict_wicket_probability, {\"version\": \"2.0\"})\n    \n    strategy = await agent.plan_innings_strategy([\"pace\", \"bounce\", \"movement\"])\n    print(\"Innings Strategy:\", strategy)\n    \n    agent.update_state_with_feedback({\"runs\": 45, \"overs\": 6.0, \"wickets\": 1})\n    recommended = agent.get_recommended_tools(\"consolidation_phase\")\n    print(\"Recommended Tools:\", recommended)\n\nasyncio.run(main())",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Production-grade agent implementation showing: dynamic tool binding with metadata, async execution with latency tracking, hierarchical task decomposition (innings → phases → actions), feedback loop learning from execution history, and intelligent tool recommendation based on performance metrics. Real companies use similar patterns to manage distributed tool calls at scale."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ WARNING - Production Pitfalls: (1) State consistency failures: Agents across distributed nodes can disagree on state; use consensus or event sourcing. (2) Tool cascades: One slow tool blocks entire pipeline; implement timeouts and fallback tools. (3) Feedback loop amplification: Bad decisions reinforced indefinitely; add circuit breakers and manual oversight. (4) Tool binding errors: A tool returning wrong schema breaks downstream agents; validate all tool outputs strictly. (5) Latency compounding: 10 sequential tool calls at 50ms each = 500ms per decision; parallelize and cache aggressively. Real incident: Netflix experienced 30% recommendation delay increase due to poorly optimized tool composition—cost: millions in lost engagement.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Custom tools are the agent's hands—design them for reusability, low latency, and graceful failure handling in production systems.",
+        "Hierarchical task planning decomposes complex goals into tool-callable subtasks; match your decomposition depth to tool execution cost.",
+        "State management must be consistent across distributed agents; use event sourcing or consensus protocols to prevent divergence.",
+        "Feedback loops enable learning—track tool success rates, latency, and outcome quality to continuously optimize tool selection strategies.",
+        "Dynamic tool binding allows agents to adapt capabilities at runtime; implement metadata-driven discovery for elastic scaling.",
+        "Tool validation is critical at scale—validate outputs, implement timeouts, and establish circuit breakers before tools break downstream workflows.",
+        "Agent communication patterns determine system resilience; pub-sub, message queues, and idempotent operations prevent cascading failures."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a production multi-agent system, you notice that a single slow tool (200ms latency) is called by 10 agents in sequence, causing response time to exceed SLA. What should you do first?",
+      "items": [
+        "Implement caching and parallelize independent tool calls instead of sequential execution",
+        "Replace the slow tool with a faster alternative immediately",
+        "Add the tool to a separate thread pool to avoid blocking other agents",
+        "Increase the overall SLA threshold to accommodate the slower tool latency"
+      ],
+      "answer": 0,
+      "explanation": "Option A is correct because: (1) Parallelization can reduce 10×200ms=2000ms to ~200ms if calls are independent, (2) Caching eliminates redundant calls entirely, (3) This addresses root cause rather than symptoms. Option B is reactive (not always possible). Option C helps but doesn't solve sequential bottleneck. Option D masks the problem. Real example: Uber improved dispatch latency 40% by parallelizing independent pricing and availability tools."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of custom tool development for AI agents with these two knowledge checks. The first quiz focuses on conceptual mechanisms, while the second applies your learning to a real-world scenario.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "When binding a custom cricket_stats_fetcher tool to an agent, the tool returns player performance data with a 2-second latency. The agent needs to make decisions in real-time during live commentary. Which mechanism from this lesson would be MOST critical to implement here?",
+      "items": [
+        "Asynchronous tool execution with callback-based feedback loops to handle latency without blocking the agent's reasoning cycle",
+        "Synchronous tool binding that forces the agent to wait for complete data before proceeding",
+        "Removing the tool entirely and relying only on cached static data",
+        "Increasing the agent's token limit to compensate for slower tool execution"
+      ],
+      "answer": 0,
+      "explanation": "Asynchronous execution with callbacks is the correct answer because it prevents the agent from being blocked by the 2-second latency—the agent can continue reasoning while waiting for tool results, then integrate the data when available. Option B (synchronous binding) would create unacceptable delays in real-time commentary scenarios. Option C removes the tool entirely, defeating its purpose. Option D (increasing token limits) doesn't address the latency problem at all. In custom tool development, non-blocking execution patterns are essential when tools have variable response times, especially in time-sensitive applications like live sports commentary.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building an agent for cricket match analysis. The agent uses three custom tools: match_data_fetcher, player_comparison_tool, and injury_status_checker. During execution, the player_comparison_tool fails intermittently due to API rate limits. Following the patterns from this lesson, what should you implement?",
+      "items": [
+        "Hardcode a fallback response so the agent never encounters an error",
+        "Implement retry logic with exponential backoff in the tool's error handling, plus state management to track failure patterns and adjust tool priority dynamically",
+        "Remove the tool and ask users to provide comparison data manually",
+        "Create a separate agent for each tool to avoid shared state corruption"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct because it combines two critical patterns from this lesson: (1) retry logic with exponential backoff handles transient API failures gracefully, and (2) state management to track failure patterns allows the agent to learn and adapt—demoting the unreliable tool's priority or adjusting execution timing. Option A (hardcoded fallbacks) loses data accuracy and doesn't address the root cause. Option C removes valuable functionality entirely. Option D (separate agents per tool) is architecturally wasteful and doesn't solve the rate-limiting problem—it actually creates new coordination challenges. Real-world tool development requires both resilience mechanisms (retries) and intelligence (state-driven adaptation) to handle unreliable external services.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

@@ -216,6 +216,168 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant patterns emerge in production LLM training: the Stratified Sampling pattern, the Curriculum Learning pattern, and the Continuous Refinement pattern. Stratified Sampling maintains proportional representation of data categories throughout training epochs—use this when domain balance directly impacts model fairness (medical, legal, financial domains). The trade-off is computational overhead for validation across strata and potential loss of rare but critical patterns. Curriculum Learning orders data by difficulty or quality, feeding clean, simple examples first, then progressively harder ones—optimal for limited compute budgets and when you need faster convergence, but requires expensive upfront data annotation and ranking. Continuous Refinement involves iterative dataset updates post-deployment based on user interactions and failure modes—production-grade but demands robust versioning infrastructure, A/B testing frameworks, and careful monitoring to avoid data drift. Choose Stratified Sampling for regulatory compliance scenarios; Curriculum Learning when training resources are constrained; Continuous Refinement only when you have operational maturity and can manage dataset lineage across versions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Stratified Sampling is like ensuring your batting lineup has balanced representation—openers, middle-order, tail-enders—each position proportionally represented so no weakness emerges. Curriculum Learning mirrors a captain's bowling rotation strategy: start your experienced fast bowlers on fresh pitches (clean data), gradually introduce spinners as conditions develop (harder patterns), and use your death bowlers only when batsmen are fatigued (advanced edge cases). Continuous Refinement is like reviewing match footage post-game and adjusting field placements for the next encounter—you gather intelligence from actual performance, but this only works if your coaching staff can systematically document changes and test them in practice matches first. The DRS review system itself represents your validation checkpoints: you can't challenge every decision (computational limits), so you reserve reviews for high-uncertainty moments.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Stratified Sampling with versioning\nimport hashlib\nfrom collections import defaultdict\n\nclass CricketDatasetManager:\n    def __init__(self, version_id):\n        self.version = version_id\n        self.strata_counts = defaultdict(int)\n    \n    def stratified_sample(self, dataset, category_field, target_distribution):\n        \"\"\"Maintain proportional representation across categories\"\"\"\n        sampled_batches = defaultdict(list)\n        \n        for record in dataset:\n            category = record[category_field]\n            current_proportion = self.strata_counts[category] / sum(self.strata_counts.values()) if self.strata_counts else 0\n            target_proportion = target_distribution.get(category, 0)\n            \n            # Undersample if category exceeds target\n            if current_proportion < target_proportion:\n                sampled_batches[category].append(record)\n                self.strata_counts[category] += 1\n        \n        # Hash dataset snapshot for reproducibility\n        dataset_hash = hashlib.sha256(\n            str(sorted(self.strata_counts.items())).encode()\n        ).hexdigest()[:8]\n        \n        return sampled_batches, f\"v{self.version}_{dataset_hash}\"\n\n# ANTI-PATTERN: Random sampling without stratification\nclass PoorCricketDatasetManager:\n    def random_sample(self, dataset, sample_size):\n        \"\"\"Naive random sampling—loses domain representation\"\"\"\n        import random\n        return random.sample(dataset, sample_size)  # May lose rare categories entirely\n        # No versioning = unreproducible results\n        # No category tracking = silent bias introduction\n\n# Usage comparison\nmanager = CricketDatasetManager(version_id=\"1.0\")\ntraining_dist = {\"pace_bowling\": 0.4, \"spin_bowling\": 0.35, \"batting\": 0.25}\nsampled, version_tag = manager.stratified_sample(cricket_dataset, \"match_type\", training_dist)\nprint(f\"Sampled dataset version: {version_tag}\")\nprint(f\"Category distribution: {dict(manager.strata_counts)}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is assuming your training dataset's distribution matches your production use-case distribution. This is 'distribution shift' or 'dataset drift'. For example, training on 60% pace-bowling examples but deploying to users asking 80% spin-bowling questions causes catastrophic performance degradation. Fix it by: (1) Explicitly document your training distribution with percentages per category, (2) Collect and analyze a representative sample of production queries monthly, (3) Set automated alerts if any category drops below 95% of expected volume, (4) Maintain a 'holdout validation set' with your actual target distribution—separate from training—and monitor its performance metrics every training cycle. Never assume—measure and version everything.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Stratified Sampling prevents category collapse and ensures fair representation across domains",
+        "Curriculum Learning trades annotation cost upfront for faster convergence and better final model quality",
+        "Continuous Refinement requires operational infrastructure: versioning, monitoring, A/B testing, and rollback capabilities",
+        "Distribution mismatch between training and production is silent but catastrophic—measure continuously",
+        "Always version datasets by content hash, not just timestamps—enables true reproducibility"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training an LLM for cricket commentary. Your training dataset is 70% Test cricket, 20% ODI, 10% T20. Your actual users ask about T20 90% of the time. What pattern should you implement?",
+      "items": [
+        "Stratified Sampling to match your current dataset",
+        "Curriculum Learning starting with Test cricket",
+        "Continuous Refinement with a new target distribution (10% Test, 0% ODI, 90% T20)",
+        "Random sampling to avoid bias toward any format"
+      ],
+      "answer": 2,
+      "explanation": "You must use Continuous Refinement because your production distribution (90% T20) is fundamentally different from your training distribution (10% T20). Stratified Sampling would preserve the wrong distribution. Curriculum Learning doesn't address this mismatch. Random sampling guarantees performance degradation. Continuous Refinement lets you iteratively update your dataset to reflect actual user needs while maintaining version history and controlled rollouts."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Large-scale LLM training requires enormous datasets managed across distributed infrastructure. OpenAI's GPT models train on hundreds of billions of tokens sourced from Common Crawl, books, and web text. Google's BERT and LLaMA (Meta) employ similar strategies across petabyte-scale data pipelines. Netflix uses carefully curated datasets for recommendation models; Uber applies dataset versioning for autonomous vehicle training data. When data management fails—as seen with contaminated test sets or uncontrolled bias—model performance degrades, regulatory violations occur, and deployment risks multiply. Companies now invest heavily in data governance frameworks, version control systems (DVC, Pachyderm), and automated quality checks to prevent billion-dollar retraining cycles.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A national team's training dataset is like their practice matches across all formats. You need matches against different opponents (data sources), in varied conditions (distribution), from different eras (temporal diversity). If your training data only includes matches on flat pitches against weak bowlers, your batsmen will fail on turning wickets against elite spinners. Similarly, if your LLM trains only on English Wikipedia, it fails on code, scientific papers, and non-English text. Just as a cricket team reviews match footage to spot bias in selection (some players favored unfairly), LLM teams audit datasets for demographic skew. And like how teams maintain detailed records of player performance across seasons (data versioning), ML teams version their datasets so they can reproduce past models and diagnose what caused performance changes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Training data quality and composition directly determine LLM capability, safety, and fairness across all downstream applications.",
+        "Dataset sourcing must balance scale, diversity, and domain specificity; web-scale data enables generalization but requires aggressive filtering.",
+        "Data cleaning, deduplication, and filtering can improve model performance by 5-15% and reduce training costs significantly.",
+        "Bias detection requires multiple methods: statistical audits, demographic stratification, and adversarial testing across protected groups.",
+        "Data versioning and reproducibility are non-negotiable for production systems; version control enables debugging and regulatory compliance.",
+        "Distribution imbalance and long-tail phenomena affect model robustness; sampling strategies and stratification mitigate these risks at scale.",
+        "Real-world failures (contaminated test sets, temporal leakage, uncontrolled bias) cost billions; governance frameworks prevent costly retraining cycles."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of training data and dataset considerations for Large Language Models. These quizzes cover both conceptual foundations and practical decision-making scenarios you'll encounter when building LLM training pipelines.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a training dataset for an LLM and notice that your dataset contains 85% English text from technical documentation and 15% from social media. What is the primary risk this distribution poses to model performance?",
+      "items": [
+        "The model will become overspecialized in technical language and may struggle with conversational or non-technical text, leading to poor generalization across diverse domains.",
+        "The model will learn too many social media slang terms and lose its ability to understand formal English.",
+        "The technical documentation will overwhelm the model's parameter capacity, causing it to forget social media patterns.",
+        "Social media text will introduce so much noise that the model's loss function will never converge during training."
+      ],
+      "answer": 0,
+      "explanation": "Just as a cricket player who only practices against fast bowlers will struggle against spinners, an LLM trained predominantly on one type of data (technical documentation) develops a skewed understanding. The 85-15 imbalance creates a distribution mismatch—the model learns to recognize and prioritize patterns from technical text at the expense of conversational language. This leads to poor generalization, not parameter exhaustion or convergence failures. The other options misunderstand how neural networks handle mixed training data. Data distribution shapes the model's learned priors, not its capacity or training dynamics.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You discover that your cricket statistics dataset contains 10,000 records of matches from the Indian Premier League, 8,000 from international Test matches, and 2,000 from county cricket. During evaluation, the model performs excellently on IPL data but poorly on county cricket predictions. What should be your first action to address this bias?",
+      "items": [
+        "Immediately delete all county cricket data from the training set to improve average performance metrics.",
+        "Analyze the characteristics of underrepresented county cricket data and consider stratified sampling or data augmentation to balance representation across all three domains.",
+        "Retrain the model with only international Test match data since it falls between the two extremes.",
+        "Increase the learning rate during training so the model converges faster across all domains equally."
+      ],
+      "answer": 1,
+      "explanation": "This scenario mirrors the challenge of dataset imbalance—just as a cricket team that over-practices against one opponent type performs poorly against others. Deleting county cricket data (option A) compounds the problem and creates a deliberately biased model. Switching to only Test matches (option C) doesn't address the underlying issue of underrepresentation. Learning rate adjustments (option D) don't change the fundamental data distribution. The correct approach is stratified sampling and data augmentation, which ensures the model learns from balanced representations of each cricket format. This aligns with bias mitigation strategies: acknowledge underrepresentation, apply proportional weighting, and generate synthetic examples if necessary to improve minority class performance.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

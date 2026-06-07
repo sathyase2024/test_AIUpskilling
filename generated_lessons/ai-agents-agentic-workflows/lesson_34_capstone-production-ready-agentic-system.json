@@ -213,6 +213,265 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "The agentic system operates through a continuous loop of perception, reasoning, and action. At runtime, the agent maintains an internal state representation—a composite memory model containing short-term working memory (current task context), long-term semantic memory (domain knowledge, learned patterns), and episodic memory (historical interactions and outcomes). The execution flow begins with sensory input ingestion, which triggers feature extraction and embedding generation. The reasoning engine then processes these representations through a multi-layer transformer-based decision network, producing action probabilities and confidence scores. Action selection occurs via epsilon-greedy or softmax sampling, balancing exploration and exploitation. Each action modifies the environment state, generating reward signals and new observations that feed back into memory, creating a reinforcement loop. Performance characteristics depend on memory capacity (larger contexts enable better reasoning but increase latency), model depth (deeper networks improve decision quality at computational cost), and update frequency (more frequent learning reduces staleness but increases variance). Bottlenecks typically emerge in embedding computation, attention mechanisms, and memory retrieval operations. Profiling tools reveal that 60-70% of latency occurs in forward passes, 20-30% in memory access patterns, and 5-10% in action encoding. Optimization strategies include quantization, caching, batch processing, and asynchronous I/O to maintain sub-100ms decision latency in production environments.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma batting in a T20 match. His short-term working memory is the current over—he remembers the last three balls, the field placement, and the bowler's pattern. His long-term semantic memory is years of experience: knowledge that Jasprit Bumrah excels at yorkers, understanding fast-bowling techniques, recognizing when a batsman typically switches stance. His episodic memory stores past encounters—\"Last time Bumrah bowled to me, I got out to a slower ball at off-stump.\" When Bumrah runs in, Rohit perceives the ball's initial trajectory (sensory input), extracts features like seam position and arm angle (feature extraction), and his brain processes this through decision networks: \"Is this a yorker? A bouncer? Should I advance or stay back?\" (reasoning engine). He selects an action—play a drive, defend, or leave (action selection)—which generates immediate feedback: the ball either hits the bat sweetly or beats him. His brain updates its model based on the outcome (memory update loop). The agent's latency is the decision time between ball release and stroke initiation. Rohit's performance depends on his mental capacity to track information (memory), the depth of his cricket understanding (model depth), and how quickly he processes live data (update frequency). This parallel reveals that agentic systems, like elite batsmen, succeed through layered memory integration, real-time perception refinement, and rapid feedback incorporation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom collections import deque\nfrom dataclasses import dataclass\nimport time\n\n@dataclass\nclass BatsmanMemoryState:\n    \"\"\"Internal memory model for cricket agentic system\"\"\"\n    working_memory: deque  # Current over context\n    semantic_memory: dict  # Historical patterns\n    episodic_memory: list  # Past interactions\n    attention_weights: np.ndarray\n    last_decision_latency: float\n\nclass CricketAgent:\n    def __init__(self, model_depth=12, memory_capacity=512):\n        self.memory_state = BatsmanMemoryState(\n            working_memory=deque(maxlen=6),  # Last 6 balls\n            semantic_memory={},\n            episodic_memory=[],\n            attention_weights=np.zeros(6),\n            last_decision_latency=0.0\n        )\n        self.model_depth = model_depth\n        self.memory_capacity = memory_capacity\n        self.embedding_cache = {}\n    \n    def perceive_delivery(self, ball_features: dict) -> np.ndarray:\n        \"\"\"Extract features from bowler's delivery\"\"\"\n        start = time.time()\n        \n        # Feature extraction: seam, speed, line, length\n        seam_angle = ball_features['seam_orientation']\n        speed = ball_features['pace']\n        line_offset = ball_features['line'] - 0.5  # Normalized to [-0.5, 0.5]\n        length = ball_features['pitch_length']\n        \n        features = np.array([\n            seam_angle,\n            np.log(speed / 140),  # Normalize around 140 kmph baseline\n            line_offset,\n            length,\n            len(self.memory_state.working_memory) / 6.0  # Balls faced so far\n        ])\n        \n        self.memory_state.working_memory.append(features)\n        self.embedding_cache[hash(tuple(features[:3]))] = features\n        \n        return features\n    \n    def reason_action(self, current_features: np.ndarray) -> tuple[str, float]:\n        \"\"\"Multi-layer reasoning with memory integration\"\"\"\n        start = time.time()\n        \n        # Layer 1: Pattern matching against semantic memory (bowler history)\n        bowler_patterns = self.semantic_memory.get('bumrah', {})\n        if current_features[0] > 0.2:  # High seam angle\n            base_action_logits = np.array([0.1, 0.8, 0.1])  # [drive, defend, leave]\n        else:\n            base_action_logits = np.array([0.6, 0.3, 0.1])\n        \n        # Layer 2: Attention over working memory (last 6 balls)\n        working_mem_array = np.array(list(self.memory_state.working_memory))\n        if len(working_mem_array) > 0:\n            sequence_attention = np.exp(working_mem_array[:, 0]) / np.sum(\n                np.exp(working_mem_array[:, 0])\n            )\n            self.memory_state.attention_weights = sequence_attention\n        \n        # Layer 3: Episodic memory retrieval (similar past situations)\n        similar_episodes = self._retrieve_similar_episodes(current_features)\n        episode_boost = np.zeros(3)\n        for episode in similar_episodes:\n            episode_boost += episode['outcome_logits']\n        \n        # Combine all layers\n        final_logits = base_action_logits + 0.3 * episode_boost\n        action_probs = final_logits / np.sum(final_logits)\n        \n        # Action selection via softmax\n        action_idx = np.random.choice([0, 1, 2], p=action_probs)\n        action_map = ['drive', 'defend', 'leave']\n        action = action_map[action_idx]\n        confidence = float(action_probs[action_idx])\n        \n        latency = time.time() - start\n        self.memory_state.last_decision_latency = latency\n        \n        return action, confidence\n    \n    def _retrieve_similar_episodes(self, current_features: np.ndarray, top_k=3):\n        \"\"\"Episodic memory retrieval via similarity search\"\"\"\n        if not self.memory_state.episodic_memory:\n            return []\n        \n        similarities = []\n        for episode in self.memory_state.episodic_memory:\n            past_features = episode['features']\n            # Euclidean distance in feature space\n            dist = np.linalg.norm(current_features - past_features)\n            similarities.append((dist, episode))\n        \n        similarities.sort(key=lambda x: x[0])\n        return [ep for _, ep in similarities[:top_k]]\n    \n    def update_memory(self, action: str, outcome: dict):\n        \"\"\"Feedback loop: update all memory tiers\"\"\"\n        runs_scored = outcome['runs']\n        wicket_risk = outcome.get('dismissal_probability', 0.0)\n        \n        # Episodic memory: store this interaction\n        episode = {\n            'features': np.mean(\n                np.array(list(self.memory_state.working_memory)), axis=0\n            ),\n            'action': action,\n            'outcome_logits': np.array([runs_scored, -wicket_risk, 0.1]),\n            'timestamp': time.time()\n        }\n        self.memory_state.episodic_memory.append(episode)\n        \n        # Semantic memory: update bowler patterns\n        if 'bowler' in outcome:\n            bowler = outcome['bowler']\n            if bowler not in self.semantic_memory:\n                self.semantic_memory[bowler] = {'deliveries': [], 'success_rate': {}}\n            self.semantic_memory[bowler]['deliveries'].append(outcome)\n        \n        # Prune episodic memory if capacity exceeded\n        if len(self.memory_state.episodic_memory) > self.memory_capacity:\n            self.memory_state.episodic_memory = self.memory_state.episodic_memory[-self.memory_capacity:]\n\n# Usage\nagent = CricketAgent(model_depth=12, memory_capacity=512)\n\n# Simulate Bumrah bowling to Rohit\nbumrah_delivery = {\n    'seam_orientation': 0.35,\n    'pace': 145,\n    'line': 0.55,  # Slightly off-stump\n    'pitch_length': 0.65  # Good length\n}\n\nfeatures = agent.perceive_delivery(bumrah_delivery)\naction, confidence = agent.reason_action(features)\nprint(f\"Decision: {action} (confidence: {confidence:.2%})\")\nprint(f\"Latency: {agent.memory_state.last_decision_latency*1000:.2f}ms\")\n\n# Update with outcome\nagent.update_memory(action, {\n    'runs': 0,\n    'dismissal_probability': 0.02,\n    'bowler': 'bumrah'\n})",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Memory management is critical in production. Episodic memory grows linearly with interactions—unbounded storage will cause OOM errors. Implement sliding-window retention (keep last N interactions) or vector database indexing (e.g., Pinecone, Weaviate) for semantic similarity at scale. Also monitor attention bottlenecks: with working memory > 256 tokens, quadratic attention becomes prohibitively expensive. Use sliding-window or sparse attention patterns (local + strided) for long sequences.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Runtime execution flows through continuous perception-reasoning-action loops with three-tier memory: working (current context), semantic (learned patterns), and episodic (past interactions).",
+        "Performance bottlenecks occur in embedding computation (60-70% latency), memory retrieval (20-30%), and action encoding (5-10%)—profile these in your specific deployment.",
+        "Latency targets for reactive agents should be <100ms for interactive systems; use caching, quantization, and batch processing to achieve this.",
+        "Memory capacity directly trades off reasoning depth against computational cost—test your system's knee point empirically.",
+        "Attention mechanisms over memory are powerful but quadratic in complexity; switch to sparse or local attention for sequences >256 tokens.",
+        "Update frequency affects learning stability: too-frequent updates increase variance, infrequent updates cause staleness; typical sweet spot is 10-50ms.",
+        "Reward signal quality matters more than reasoning depth—a poorly-designed reward function trains bad behavior faster than a simple agent with clean signal."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the cricket agent example, which memory tier would Rohit Sharma rely on MOST when facing Jasprit Bumrah's yorker after already facing 5 balls in the over?",
+      "items": [
+        "Working memory—the last 6 balls provide the freshest data about Bumrah's current pattern in this over.",
+        "Semantic memory—Rohit's years of experience against Bumrah's yorker statistics and tendencies.",
+        "Episodic memory—recalling the exact outcome of a previous encounter with a similar delivery.",
+        "All three equally—elite performers integrate all memory tiers simultaneously."
+      ],
+      "answer": 3,
+      "explanation": "In high-stakes decisions, elite agentic systems (and cricket players) use hierarchical memory integration: semantic memory provides prior knowledge (Bumrah's typical yorker success rate), working memory captures current over context (he's bowled 3 slower balls already), and episodic memory fills gaps with similar-situation outcomes. The reasoning engine weights these based on confidence and recency. Relying on only one tier leads to myopia (working-only ignores expertise) or rigidity (semantic-only misses live cues). The code example demonstrates this: final_logits = base_action_logits (semantic) + episode_boost (episodic), with attention weights over working_memory providing recency bias. Real production agents achieve 5-15% better decision quality by multi-tier fusion than single-tier approaches."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production agentic systems rely on three core patterns: the Reflection Loop, State Machine Orchestration, and Circuit Breaker patterns. The Reflection Loop—where agents evaluate their own decisions and adjust strategy mid-execution—works best for complex reasoning tasks with high failure cost (LLM API calls, database mutations). Trade-off: adds 2-3x latency but prevents cascading errors. Use this when correctness > speed. State Machine Orchestration enforces rigid sequential workflows (authentication → validation → processing → logging), ideal for compliance-heavy domains where every step must be auditable and predictable. Cost: reduced flexibility, but gains observability and rollback capability. Circuit Breaker Pattern protects downstream services by failing gracefully when error rates exceed thresholds—essential for external API dependencies (payment gateways, third-party ML models). Trade-off: temporary service degradation vs. system-wide cascade failures. Choose Circuit Breaker when external dependencies are unreliable or rate-limited. Combining all three creates robust, maintainable systems that survive production chaos.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Reflection Loop is like DRS (Decision Review System)—the captain reviews a contentious LBW decision before accepting it, adding delay but preventing unjust dismissals. State Machine Orchestration mirrors a pre-planned field setting: slip → cover → mid-wicket formations deployed in exact sequence based on batter type and pitch conditions. Circuit Breaker is your fast bowler's fatigue management—if a pacer's economy rate explodes beyond 8 runs per over after 5 overs, you rotate him out immediately rather than letting him hemorrhage 20+ runs. Reflection Loop costs time but prevents errors; State Machine sacrifices creativity for predictability; Circuit Breaker trades continuity for system health. A championship team uses all three: they review critical calls, execute disciplined field placements, and rotate bowlers intelligently.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: No reflection, no state tracking, no error boundaries\nclass CricketAgent_BadProduction:\n    def process_innings(self, batter_stats):\n        decision = self.llm.call(f\"Predict runs for {batter_stats}\")\n        self.database.save(decision)  # Fire-and-forget\n        self.analytics.log(decision)   # Assumes all calls succeed\n        return decision\n\n# BEST PRACTICE: Reflection + State Machine + Circuit Breaker\nclass CricketAgent_Production:\n    def __init__(self):\n        self.state = InningsState.ANALYSIS_PENDING\n        self.circuit_breaker = CircuitBreaker(failure_threshold=0.5, timeout=30)\n    \n    def process_innings(self, batter_stats):\n        try:\n            # State: Validate inputs\n            self.state = InningsState.VALIDATING\n            assert batter_stats['avg_runs'] > 0, \"Invalid batter data\"\n            \n            # State: Analyze with reflection\n            self.state = InningsState.ANALYZING\n            initial_prediction = self.llm.call(f\"Predict runs for {batter_stats}\")\n            \n            # Reflection: Self-evaluate\n            is_confident = self.llm.call(f\"Confidence in prediction {initial_prediction}? Answer 0-100.\")\n            if is_confident < 60:\n                refined_prediction = self.llm.call(f\"Refine prediction with alternative reasoning\")\n            else:\n                refined_prediction = initial_prediction\n            \n            # Protected save with circuit breaker\n            self.state = InningsState.SAVING\n            self.circuit_breaker.call(self.database.save, refined_prediction)\n            self.state = InningsState.COMPLETED\n            return refined_prediction\n            \n        except CircuitBreakerOpen:\n            logger.error(\"Database circuit open. Returning cached prediction.\")\n            return self.get_cached_prediction(batter_stats)\n        except Exception as e:\n            self.state = InningsState.FAILED\n            logger.error(f\"Agent failed at state {self.state}: {e}\")\n            raise",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Assuming LLM outputs are always valid. Beginner agents chain LLM calls without output validation, leading to null values, JSON parsing errors, or logical contradictions cascading downstream. FIX: Wrap every LLM call in a validation layer. Example: After calling `llm.predict_runs()`, immediately assert the output is an integer between 0-200, and retry with a different prompt if validation fails. Use Pydantic models to enforce schema: `class RunsPrediction(BaseModel): runs: int; confidence: float` and parse LLM JSON output through this model. Add a max_retries=3 circuit to prevent infinite loops.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Reflection Loop adds latency but prevents cascading failures in high-stakes decisions",
+        "State Machine Orchestration trades flexibility for auditability and predictable error recovery",
+        "Circuit Breaker Pattern protects against external dependency failures with graceful degradation",
+        "Always validate LLM outputs before downstream processing—never trust untyped strings",
+        "Combine all three patterns for production-grade resilience: reflect → orchestrate → protect"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a match prediction agent that queries external cricket APIs (player injuries, pitch reports). If the API fails 30% of the time, which pattern should you prioritize?",
+      "items": [
+        "Reflection Loop—have the agent re-evaluate its predictions multiple times",
+        "Circuit Breaker—fail fast when error rate exceeds threshold, switch to cached data",
+        "State Machine Orchestration—enforce strict sequential API calls",
+        "None—unreliable APIs aren't worth protecting"
+      ],
+      "answer": 1,
+      "explanation": "Circuit Breaker is designed for exactly this scenario: unreliable external dependencies. At 30% failure rate, you should configure the breaker to trip after consecutive failures (e.g., 3 failures) and route requests to a fallback (cached predictions, default model). Reflection Loop adds latency without solving the dependency problem. State Machine doesn't handle failure gracefully. The API *must* be protected to keep the system online."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Agentic systems power production systems at scale across major tech companies. Google's Vertex AI Agents handle customer service routing for millions of daily interactions, while OpenAI's GPT-4-based agents power enterprise workflows at companies like Morgan Stanley and Deloitte. Netflix uses agent-based recommendation systems processing petabytes of viewing data, Uber's dispatch algorithms coordinate millions of rides using agent decision-making frameworks, and Meta deploys agentic systems for content moderation across billions of posts. When done incorrectly—without proper error handling, state management, or latency optimization—production systems fail catastrophically: hallucinations propagate, inconsistent state corrupts databases, and cascading failures can cost millions per hour. Real systems handle 100K+ concurrent agents, require sub-100ms decision latency, and must maintain consistency across distributed nodes using frameworks like LangGraph, AutoGPT Enterprise, and custom implementations built on ray or airflow.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A single batsman (agent) must make split-second decisions based on the bowler's action, field placement, and match situation. At international level, millions of people watch simultaneously (scale), each decision impacts team strategy (state consistency), and one misjudgment can lose the match (production failures). Just as coaches develop playbooks and train players for every scenario, production systems need predefined strategies, error recovery plans, and continuous monitoring to handle high-pressure situations without breaking.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Production agentic systems without robust monitoring, rate limiting, and circuit breakers will fail under load. Inadequate state management leads to duplicate actions and data corruption. Missing feedback loops prevent the system from learning from failures. Always implement comprehensive logging, metrics collection (latency, error rates, token usage), and automated rollback mechanisms before deploying to production.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Production agents require sub-100ms latency, distributed state management, and graceful error handling across millions of concurrent requests.",
+        "Major platforms (Google, OpenAI, Netflix, Uber) deploy agentic systems at petabyte scale with multi-tier fallback strategies and real-time monitoring.",
+        "Failures in production include hallucinations, state inconsistency, cascading failures, and propagating errors that cost millions per hour if uncontrolled.",
+        "Implement comprehensive observability: structured logging, metrics collection, distributed tracing, and automated alerting before production deployment.",
+        "Design for resilience using circuit breakers, exponential backoff, request timeout limits, and predefined fallback strategies for every critical decision point.",
+        "Validate agent outputs with confidence scoring, consistency checks, and human-in-the-loop reviews before taking irreversible actions on live data.",
+        "Continuously monitor token usage, cost per request, latency percentiles (p99), and error rates—optimize based on production telemetry, not assumptions."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "What is the primary risk when deploying an agentic system to production without proper state management?",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Slightly slower response times",
+        "Duplicate actions and data corruption across distributed nodes",
+        "Users seeing slightly inconsistent UI",
+        "Increased memory usage during peak hours"
+      ],
+      "answer": 1,
+      "explanation": "Without proper state management, concurrent agents can execute the same action multiple times, duplicate database writes, or apply conflicting updates. This leads to data corruption and system inconsistency—a critical failure mode. Response time degradation, UI inconsistency, and memory issues are secondary concerns compared to data integrity violations in production systems."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of production-ready agentic systems with these two knowledge checks. Quiz 1 focuses on conceptual mastery of core mechanisms, while Quiz 2 applies your knowledge to real-world decision-making scenarios you'll encounter when building and deploying agent systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a production agentic system, the agent needs to decide whether to retrieve additional context from a database before responding to a user query. What is the PRIMARY purpose of implementing a confidence threshold mechanism that gates this retrieval decision?",
+      "items": [
+        "To prevent the agent from making unnecessary API calls that increase latency and cost while maintaining response quality above a minimum acceptable threshold",
+        "To ensure the agent always retrieves data because more information always leads to better answers",
+        "To allow users to manually approve every database query before the agent executes it",
+        "To replace the agent's decision-making entirely with a deterministic rule-based system"
+      ],
+      "answer": 0,
+      "explanation": "A confidence threshold acts as an economic and performance gate in production systems. When the agent's internal confidence about its current knowledge is above the threshold, it responds immediately without additional retrieval, saving latency and API costs. Below the threshold, it retrieves context. This is analogous to a batsman deciding whether to leave a delivery (confidence in their assessment) or play a defensive stroke (needs more information/time). Option B is wrong because over-retrieval wastes resources. Option C contradicts the point of autonomous agents. Option D removes the agent's adaptive intelligence, making it inflexible for varying query types.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a cricket match analysis agent. During a live match, the agent successfully predicted the next 3 player decisions correctly. Now it's facing a new match situation it hasn't seen in training. The agent's uncertainty increased, but it still returned a prediction with high confidence. What is the CORRECT action to take?",
+      "items": [
+        "Deploy the system as-is; past performance guarantees future accuracy in this domain",
+        "Immediately flag this prediction for human review and implement a circuit breaker that routes unfamiliar patterns to a fallback handler or human expert",
+        "Reduce the model's confidence scores uniformly across all predictions to be safer",
+        "Disable the agent temporarily and retrain on the new match data before re-deploying"
+      ],
+      "answer": 1,
+      "explanation": "This scenario describes distribution shift—the agent encounters data outside its training distribution yet maintains overconfident predictions. The correct production response is defensive: implement a circuit breaker pattern that detects high-uncertainty-with-high-confidence mismatches and routes those cases to human experts or fallback systems rather than deploying potentially wrong predictions at scale. This is like a cricket team immediately calling for a video review when an umpire's call seems inconsistent with the evidence. Option A is dangerous over-confidence. Option C (uniform score reduction) doesn't address the root problem of out-of-distribution data. Option D is reactive and causes unnecessary downtime when strategic routing would preserve service.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

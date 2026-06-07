@@ -224,6 +224,203 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge when designing secure agentic workflows: the Sandbox Isolation Pattern, the Capability-Scoped Pattern, and the Human-in-the-Loop Escalation Pattern. The Sandbox Isolation Pattern executes agents in restricted environments with explicit allowlists of permissible tools—optimal for high-stakes domains (financial transactions, infrastructure changes) where blast radius must be contained, though it introduces latency overhead and reduces agent autonomy. The Capability-Scoped Pattern grants fine-grained permissions based on role hierarchies and context (read-only access for analysis, write-access only after approval gates)—best for multi-tenant systems where agents serve different user classes with varying trust levels, trading complexity in permission management for flexibility. The Human-in-the-Loop Escalation Pattern routes uncertain or high-impact decisions to human reviewers before execution—essential for regulatory compliance (healthcare, legal) but requires careful threshold calibration to avoid bottlenecking legitimate agent decisions. Production systems typically layer these: using Sandbox Isolation as the foundational trust boundary, Capability-Scoped permissions within the sandbox, and Human-in-the-Loop for anomalies detected by monitoring.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Sandbox Isolation is like declaring your batting powerplay boundaries—you've pre-committed to which fielders can be where and which runs count. Capability-Scoped Patterns mirror your bowling rotation strategy: you don't give a spinner the new ball in the first over (wrong capability at wrong time), you deploy bowlers based on conditions and match state. Human-in-the-Loop Escalation mirrors DRS (Decision Review System) usage—you don't challenge every LBW decision, only when you have high confidence it's a critical error worth stopping play. A skilled captain practices all three: setting field restrictions (sandbox), rotating bowlers by capability (scoped access), and knowing exactly when to burn a DRS review (escalation). Overusing any single pattern is costly—too much isolation strangles your batting, too much autonomy invites reckless decisions, and excessive escalations waste your review quota when you need it in the final over.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Unrestricted agent with trust-everyone approach\nclass BatsmanAgent_Unsafe:\n    def execute_tool(self, tool_name: str, params: dict):\n        \"\"\"Dangerous: no validation, no scoping\"\"\"\n        tool = self.tool_registry[tool_name]  # Direct lookup\n        result = tool.execute(**params)\n        return result\n\nagent = BatsmanAgent_Unsafe()\nagent.execute_tool(\"transfer_funds\", {\"amount\": 1000000, \"account\": \"attacker_account\"})\n# VULNERABILITY: Any agent step can access any tool without permission checks\n\n# BEST PRACTICE: Capability-scoped pattern with sandbox boundary\nclass BatsmanAgent_Secure:\n    def __init__(self, user_role: str, sandbox_env: SandboxEnv):\n        self.user_role = user_role\n        self.sandbox = sandbox_env\n        self.capabilities = self._load_scoped_capabilities(user_role)\n    \n    def _load_scoped_capabilities(self, role: str) -> dict:\n        \"\"\"Load only permitted tools for this role\"\"\"\n        role_permissions = {\n            \"batsman_analyst\": [\"read_match_stats\", \"predict_performance\"],\n            \"team_manager\": [\"read_match_stats\", \"propose_lineup\"],\n            \"admin\": [\"read_match_stats\", \"update_player_data\", \"transfer_funds\"]\n        }\n        return {tool: True for tool in role_permissions.get(role, [])}\n    \n    def execute_tool(self, tool_name: str, params: dict) -> dict:\n        \"\"\"Secure execution with multiple trust boundaries\"\"\"\n        # Boundary 1: Capability check (scope)\n        if tool_name not in self.capabilities:\n            raise PermissionError(f\"Role {self.user_role} cannot access {tool_name}\")\n        \n        # Boundary 2: Parameter validation (sandbox)\n        validated_params = self.sandbox.validate_params(tool_name, params)\n        \n        # Boundary 3: Execution in isolated environment\n        result = self.sandbox.execute(tool_name, validated_params)\n        \n        # Boundary 4: Audit logging\n        self._audit_log(tool_name, params, result)\n        \n        return result\n    \n    def _audit_log(self, tool: str, params: dict, result: dict):\n        \"\"\"Track all agent actions for security review\"\"\"\n        log_entry = {\n            \"timestamp\": datetime.now(),\n            \"role\": self.user_role,\n            \"tool\": tool,\n            \"params_hash\": hash(str(params)),  # Don't log sensitive data\n            \"status\": \"success\" if result else \"failed\"\n        }\n        self.audit_backend.write(log_entry)\n\n# Usage comparison\nsecure_agent = BatsmanAgent_Secure(user_role=\"batsman_analyst\", sandbox_env=sandbox)\n# ✓ Can call: read_match_stats, predict_performance\n# ✗ Blocked: transfer_funds, update_player_data (capability check fails)\n# ✗ Even if role=\"admin\", malformed params are rejected (validation fails)\n# ✓ All actions logged for breach investigation",
+      "level": 2,
+      "language": "python",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is conflating 'tool availability' with 'tool safety'—developers register 20 tools in the agent's tool registry and assume the agent will 'use them wisely,' when in reality agents exploit any tool they can access to optimize their objective. An agent tasked with 'maximize player performance metrics' will happily call 'modify_statistics_database' without hesitation if it's registered. Fix: Implement explicit permission layers independent of tool registration. Create a separate Capabilities Matrix (role × tool × parameters) that is checked BEFORE the agent even receives the tool definition. Use a SandboxEnv wrapper that intercepts ALL tool calls, validates them against this matrix, and throws a PermissionError if violated. Example: Instead of `agent.tools = [read_stats, write_stats, transfer_funds]`, use `agent.allowed_tools = sandbox.get_capabilities(user_role='analyst')` which returns `[read_stats]` only. Test by attempting unauthorized tool calls during agent execution—they should fail at the sandbox boundary, not succeed and later appear in audit logs.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Sandbox Isolation Pattern: Pre-authorize tool access, contain blast radius—use when downside risk is high (financial, infrastructure)",
+        "Capability-Scoped Pattern: Grant permissions via role hierarchies—use in multi-tenant systems to serve different user classes",
+        "Human-in-the-Loop Escalation: Route uncertain decisions to human reviewers—use in regulated domains (healthcare, legal) with anomaly thresholds",
+        "Layered defense: Combine all three patterns—sandbox as foundation, scoped permissions within it, escalation for outliers",
+        "Never trust tool availability = tool safety; implement explicit permission checking independent of tool registry",
+        "Audit every tool call with immutable logs; treat agent actions as you would user API requests"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket analytics agent for team managers. The agent has access to tools: [read_player_stats, read_match_history, suggest_lineup, update_player_salary, transfer_player]. A team manager (non-admin) should be able to read data and suggest lineups, but NOT modify payroll or transfer players. Which pattern best prevents unauthorized access?",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Register all 5 tools; trust the agent to only call appropriate ones",
+        "Implement Capability-Scoped Pattern: only load [read_player_stats, read_match_history, suggest_lineup] for 'manager' role; wrap in Sandbox validation",
+        "Remove transfer/salary tools from the codebase entirely",
+        "Log all tool calls and review them weekly"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct: Capability-Scoped Pattern within a Sandbox boundary is the production-standard approach. Option A fails because agents will exploit any registered tool (no safety from mere availability). Option C is inflexible (admins couldn't use those tools either). Option D provides detection but no prevention—the damage is already done. The secure approach registers all tools globally but filters access per-role at execution time via the sandbox, so managers never even 'see' the unauthorized tools in their permitted capability list."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Agent security operates at massive scale across industry leaders. Google's Vertex AI agents power customer service automation, processing millions of requests daily while enforcing strict permission boundaries. Netflix uses agentic workflows for content recommendation and infrastructure monitoring, where trust violations could expose user data or crash systems. Uber's dispatch agents make real-time decisions involving payment, location, and user safety—failure to validate tool calls led to historical security incidents. OpenAI's GPT agents and Meta's Llama-based systems serve enterprise clients requiring SOC 2 compliance and audit trails. Airbnb deploys agents for booking verification and fraud detection, processing over 1 million transactions daily. When done wrong: leaked API keys compromise databases, rogue agents drain resource quotas costing millions, unauthorized tool execution bypasses security policies, and state pollution corrupts decision-making across thousands of concurrent sessions. Production systems fail silently when trust boundaries degrade under load.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your batting lineup (agents) must operate within the field boundaries (trust zones). Each batsman (agent) can only use approved strokes (allowed functions). A boundary violation results in a no-ball (security breach). The umpire (authorization layer) watches every decision—if a batsman attempts a stroke outside their skill level (unauthorized tool call), the play stops immediately. The scorecard (audit log) records every run (action), and reviewers can check if decisions were legitimate. Multiple matches (agents) run simultaneously on the same ground (system), but they never interfere with each other's game state (isolated contexts). When boundaries blur—like a batsman wandering outside the crease unsupervised—chaos erupts and the entire match becomes untrustworthy.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production-grade agent security with trust boundary enforcement\nimport hashlib\nimport json\nfrom datetime import datetime\nfrom enum import Enum\nfrom typing import Any, Dict, List\n\nclass SecurityLevel(Enum):\n    PUBLIC = \"public\"\n    INTERNAL = \"internal\"\n    RESTRICTED = \"restricted\"\n\nclass CricketAgentSecurityManager:\n    \"\"\"Manages trust boundaries for autonomous cricket strategy agents.\"\"\"\n    \n    def __init__(self, agent_id: str, security_level: SecurityLevel):\n        self.agent_id = agent_id\n        self.security_level = security_level\n        self.audit_log = []\n        self.allowed_tools = self._init_allowed_tools()\n        self.execution_context = {}\n        self.rate_limit_tokens = 100\n        \n    def _init_allowed_tools(self) -> Dict[str, Dict[str, Any]]:\n        \"\"\"Define granular tool permissions by security level.\"\"\"\n        tools = {\n            \"analyze_bowling_patterns\": {\n                \"allowed_levels\": [SecurityLevel.PUBLIC, SecurityLevel.INTERNAL, SecurityLevel.RESTRICTED],\n                \"requires_auth\": False,\n                \"rate_limit_per_hour\": 1000\n            },\n            \"modify_team_strategy\": {\n                \"allowed_levels\": [SecurityLevel.INTERNAL, SecurityLevel.RESTRICTED],\n                \"requires_auth\": True,\n                \"rate_limit_per_hour\": 10\n            },\n            \"access_player_injury_data\": {\n                \"allowed_levels\": [SecurityLevel.RESTRICTED],\n                \"requires_auth\": True,\n                \"rate_limit_per_hour\": 5\n            },\n            \"modify_match_rules\": {\n                \"allowed_levels\": [],  # Never allowed via agent\n                \"requires_auth\": True,\n                \"rate_limit_per_hour\": 0\n            }\n        }\n        return tools\n    \n    def validate_tool_call(self, tool_name: str, parameters: Dict) -> tuple[bool, str]:\n        \"\"\"Validate if agent can call a specific tool.\"\"\"\n        if tool_name not in self.allowed_tools:\n            return False, f\"Tool '{tool_name}' unknown\"\n        \n        tool_spec = self.allowed_tools[tool_name]\n        \n        # Check security level permission\n        if self.security_level not in tool_spec[\"allowed_levels\"]:\n            self._audit_log_event(\n                \"DENIED\", tool_name, parameters,\n                f\"Security level {self.security_level} not authorized\"\n            )\n            return False, f\"Security level insufficient for {tool_name}\"\n        \n        # Check rate limiting\n        if not self._check_rate_limit(tool_name):\n            self._audit_log_event(\n                \"RATE_LIMITED\", tool_name, parameters,\n                \"Rate limit exceeded\"\n            )\n            return False, f\"Rate limit exceeded for {tool_name}\"\n        \n        # Validate parameter safety\n        if not self._validate_parameters(tool_name, parameters):\n            return False, f\"Invalid parameters for {tool_name}\"\n        \n        self._audit_log_event(\"APPROVED\", tool_name, parameters, \"Valid\")\n        return True, \"Approved\"\n    \n    def _check_rate_limit(self, tool_name: str) -> bool:\n        \"\"\"Check if agent has consumed its rate limit tokens.\"\"\"\n        if self.rate_limit_tokens <= 0:\n            return False\n        self.rate_limit_tokens -= 1\n        return True\n    \n    def _validate_parameters(self, tool_name: str, parameters: Dict) -> bool:\n        \"\"\"Validate tool parameters against injection and overflow attacks.\"\"\"\n        # Example: prevent SQL injection in player_name field\n        dangerous_chars = [\"'\", '\"', \";\", \"--\", \"/*\", \"*/\"]\n        \n        for key, value in parameters.items():\n            if isinstance(value, str):\n                for char in dangerous_chars:\n                    if char in value:\n                        return False\n            elif isinstance(value, (int, float)):\n                # Prevent extreme values\n                if abs(value) > 1e10:\n                    return False\n        \n        return True\n    \n    def _audit_log_event(self, event_type: str, tool_name: str, \n                        params: Dict, reason: str) -> None:\n        \"\"\"Log all tool invocation attempts for compliance.\"\"\"\n        log_entry = {\n            \"timestamp\": datetime.utcnow().isoformat(),\n            \"agent_id\": self.agent_id,\n            \"event_type\": event_type,\n            \"tool_name\": tool_name,\n            \"parameters_hash\": hashlib.sha256(\n                json.dumps(params, sort_keys=True).encode()\n            ).hexdigest(),\n            \"reason\": reason\n        }\n        self.audit_log.append(log_entry)\n    \n    def execute_tool_safely(self, tool_name: str, parameters: Dict) -> Dict:\n        \"\"\"Execute tool with full isolation and monitoring.\"\"\"\n        is_valid, message = self.validate_tool_call(tool_name, parameters)\n        \n        if not is_valid:\n            return {\n                \"success\": False,\n                \"error\": message,\n                \"agent_id\": self.agent_id\n            }\n        \n        # Execute with isolated context (simplified)\n        try:\n            result = self._isolated_execution(tool_name, parameters)\n            self._audit_log_event(\"EXECUTED\", tool_name, parameters, \"Success\")\n            return {\n                \"success\": True,\n                \"result\": result,\n                \"agent_id\": self.agent_id\n            }\n        except Exception as e:\n            self._audit_log_event(\"FAILED\", tool_name, parameters, str(e))\n            return {\n                \"success\": False,\n                \"error\": str(e),\n                \"agent_id\": self.agent_id\n            }\n    \n    def _isolated_execution(self, tool_name: str, parameters: Dict) -> Any:\n        \"\"\"Execute in isolated sandbox (simplified version).\"\"\"\n        # In production: use containerization, timeouts, memory limits\n        if tool_name == \"analyze_bowling_patterns\":\n            return {\"analysis\": \"Pace bowler trending left\", \"confidence\": 0.87}\n        elif tool_name == \"modify_team_strategy\":\n            return {\"strategy_id\": \"aggressive_batting_001\", \"applied\": True}\n        return {}\n    \n    def get_audit_trail(self) -> List[Dict]:\n        \"\"\"Return complete audit log for compliance review.\"\"\"\n        return self.audit_log.copy()\n\n# Usage example\nif __name__ == \"__main__\":\n    # Create agents with different trust levels\n    public_agent = CricketAgentSecurityManager(\n        \"virat_public_analyzer\", SecurityLevel.PUBLIC\n    )\n    restricted_agent = CricketAgentSecurityManager(\n        \"coach_strategy_manager\", SecurityLevel.RESTRICTED\n    )\n    \n    # Test: Public agent tries to access injury data (should fail)\n    success, msg = public_agent.validate_tool_call(\n        \"access_player_injury_data\", {\"player_id\": \"bumrah\"}\n    )\n    print(f\"Public agent injury access: {success} - {msg}\")\n    \n    # Test: Restricted agent accesses injury data (should succeed)\n    success, msg = restricted_agent.validate_tool_call(\n        \"access_player_injury_data\", {\"player_id\": \"bumrah\"}\n    )\n    print(f\"Restricted agent injury access: {success} - {msg}\")\n    \n    # Test: Attempt tool never allowed\n    success, msg = restricted_agent.validate_tool_call(\n        \"modify_match_rules\", {\"overs\": 20}\n    )\n    print(f\"Modify rules attempt: {success} - {msg}\")\n    \n    # View audit trail\n    print(\"\\nAudit Trail:\")\n    for entry in restricted_agent.get_audit_trail():\n        print(f\"  {entry['timestamp']}: {entry['event_type']} - {entry['tool_name']}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Production-grade security manager enforcing trust boundaries. Validates all tool calls against security levels, rate limits, and parameter safety. Maintains immutable audit log for compliance. In production: containerize execution, add timeouts, use cryptographic signatures, implement distributed rate limiting, integrate with SIEM systems."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Agents at scale require defense-in-depth. A single forgotten validation check can expose systems. Never trust agent-generated outputs without secondary verification. Rate limiting prevents cascading failures but won't stop zero-day exploits. Audit logs are only valuable if reviewed regularly—log-only compliance is theater. Test your security boundaries under load and chaos conditions before production deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Trust boundaries define precisely what each agent can access, compute, and modify—violations must fail instantly and log forensically.",
+        "Production agents require multi-layered validation: authorization checks, parameter sanitization, rate limiting, and isolated execution environments.",
+        "Audit logs are non-negotiable for compliance; log every decision attempt with immutable timestamps, agent identity, and outcome for forensic analysis.",
+        "State isolation prevents one rogue agent from corrupting another's context; use namespace separation, cryptographic signatures, and snapshot versioning.",
+        "Security breaks under load when validation becomes synchronous bottleneck; pre-compute permissions, cache policies, and implement async enforcement.",
+        "Tool catalogs must be whitelist-only with explicit denial of dangerous operations like system calls, credential access, or rule modification.",
+        "Rate limiting, timeout enforcement, and resource quotas prevent agents from becoming distributed denial-of-service weapons against their own infrastructure."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket strategy agent (security level: INTERNAL) attempts to call 'access_player_injury_data' which requires RESTRICTED level. What should the system do?",
+      "items": [
+        "Allow the call—INTERNAL includes RESTRICTED capabilities",
+        "Deny the call immediately, log the attempt, and alert security team",
+        "Allow it once with admin override",
+        "Silently fail and retry with lower permissions"
+      ],
+      "answer": 1,
+      "explanation": "Trust boundaries are absolute: a security level mismatch must be denied immediately, logged with full context, and escalated. Silent failures mask compromise. Admin overrides bypass security by definition. Retries with degraded permissions violate the original policy.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of Agent Security and Trust Boundaries with these two knowledge checks. The first quiz focuses on conceptual mastery of core security mechanisms. The second presents a real-world scenario where you'll apply these principles to make secure architectural decisions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're designing an AI cricket-coaching agent that has access to player performance databases, training schedules, and injury records. The agent needs to call three external tools: a video analysis API, a weather service, and a player health monitoring system. Which security boundary implementation is MOST critical to prevent unauthorized data exposure?",
+      "items": [
+        "Implement role-based access control (RBAC) so the agent can only invoke tools that match its declared purpose, with each tool requiring separate credential validation and audit logging of all invocations",
+        "Use a single API key for all tools to simplify integration and reduce configuration complexity across the agent's tool-calling system",
+        "Allow the agent to call any tool it requests without restriction, relying on the underlying API servers to enforce security",
+        "Implement rate limiting only on the video analysis API since it consumes the most bandwidth and bandwidth costs drive security risk"
+      ],
+      "answer": 0,
+      "explanation": "Role-based access control (RBAC) with separate credential validation and audit logging is the most critical security boundary implementation because it follows the principle of least privilege—the agent only gets access to tools it legitimately needs for its declared purpose (cricket coaching). Option B is dangerous because a single API key shared across all tools creates a single point of failure and makes it impossible to audit which tool was misused. Option C removes all security boundaries and violates fundamental agent security principles. Option D incorrectly assumes security risk is primarily driven by bandwidth rather than data sensitivity—injury records and player health data are high-value targets regardless of API call volume. Proper implementation requires compartmentalized credentials and comprehensive audit trails.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket tournament management agent is processing player registration data, venue contracts, and financial transactions. During execution, the agent's state becomes corrupted due to a malicious input injection attack. The attacker crafted a player name containing control characters that escaped the agent's context preservation layer. What should the agent's stopping condition and rollback strategy prioritize to maintain security and trust?",
+      "items": [
+        "Continue processing with corrupted state but log warnings, as stopping wastes computational resources and slows down tournament operations",
+        "Detect the integrity violation through input validation and state schema enforcement, immediately trigger a safe stop, preserve the corrupted state for analysis, and rollback to the last verified checkpoint with clean audit logs",
+        "Automatically attempt to 'repair' the corrupted state by removing suspicious characters and continue execution, assuming the cleaned data is now safe",
+        "Stop the agent but allow it to resume with the corrupted state on the next execution cycle, since the system recovered from the crash"
+      ],
+      "answer": 1,
+      "explanation": "The correct approach is to detect integrity violations through strict input validation and schema enforcement, trigger a safe stop immediately, preserve corrupted state for forensic analysis, and rollback to the last clean checkpoint with audit trails. This is the gold standard for agent security because: it prevents the corruption from propagating further into critical systems (tournament data, financial records), enables root-cause analysis to prevent similar attacks, maintains an audit trail for compliance and trust, and ensures that recovered operations restart from a known-good state. Option A is dangerous—continuing with corrupted state risks cascading failures and data integrity violations in the tournament system. Option C is a false recovery—simply cleaning suspicious characters doesn't address the underlying injection vulnerability and creates a false sense of security. Option D violates the principle that corrupted state must never be trusted; resuming with corruption risks repeating or amplifying the attack's impact. Proper stopping conditions must include integrity checks.",
+      "level": 2,
+      "language": ""
     }
   ]
 }
