@@ -189,6 +189,119 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production environments, three dominant tokenization patterns emerge based on use-case constraints. **Byte-Pair Encoding (BPE)** dominates transformer models (GPT, Claude) because it handles unknown words gracefully through character fallback, maintains compact vocabularies (50K tokens typical), and compresses frequent sequences efficiently—trade-off is slower encoding speed due to iterative merging. **WordPiece** (used by BERT, Google Search) prioritizes semantic coherence by merging subwords based on likelihood ratios; it's faster at inference but requires extensive corpus analysis upfront and struggles with code/multilingual content. **SentencePiece** (used by T5, multilingual models) operates on raw bytes without language assumptions, excelling at 100+ language coverage and emoji handling, but produces larger vocabularies (32K-256K tokens) and adds encoding overhead. Choose BPE for English-dominant, latency-sensitive applications; WordPiece for semantic-focused tasks with homogeneous training data; SentencePiece for multilingual, diverse-character systems. The hidden cost: vocabulary mismatch between training and inference can degrade performance by 15-40% depending on domain shift.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: BPE is your aggressive opening strategy—you pre-commit to high-frequency shots (yorkers, bouncers) based on opponent patterns, then improvise with singles when unexpected deliveries arrive (unknown tokens fall back to characters). WordPiece is like setting a balanced field before the match—you've analyzed the batsman's stats thoroughly and place fielders at optimal positions, but you're locked into that setup even if conditions change mid-innings. SentencePiece is your flexible rotation bowler—you don't assume the batsman speaks English, you adapt to any playing style, any format (T20, Test, ODI), handling spinners and seamers equally well. The trade-off: BPE needs less preparation but slower execution; WordPiece needs deep scouting but blazing-fast performance; SentencePiece handles everything but consumes more resources.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Adaptive tokenization with fallback strategy\nimport tiktoken\nfrom collections import defaultdict\n\nclass CricketTokenizer:\n    def __init__(self, model_name=\"gpt-3.5-turbo\"):\n        self.encoder = tiktoken.encoding_for_model(model_name)\n        self.token_cache = {}  # Cache for repeated sequences\n        self.unk_fallback_count = defaultdict(int)\n    \n    def tokenize_match_commentary(self, text: str) -> list:\n        \"\"\"Best practice: Cache + monitor unknowns\"\"\"\n        if text in self.token_cache:\n            return self.token_cache[text]\n        \n        tokens = self.encoder.encode(text)\n        self.token_cache[text] = tokens\n        return tokens\n    \n    def get_unk_stats(self) -> dict:\n        \"\"\"Track tokenization health\"\"\"\n        return dict(self.unk_fallback_count)\n\n# ANTI-PATTERN: No caching, no monitoring\nclass BadCricketTokenizer:\n    def __init__(self, model_name=\"gpt-3.5-turbo\"):\n        self.encoder = tiktoken.encoding_for_model(model_name)\n    \n    def tokenize_match_commentary(self, text: str) -> list:\n        \"\"\"Anti-pattern: Re-encodes identical text repeatedly\"\"\"\n        tokens = self.encoder.encode(text)  # Cache miss every time\n        return tokens\n\n# Performance comparison\nbest = CricketTokenizer()\nbad = BadCricketTokenizer()\n\ncommentary = \"Virat Kohli drives it through covers for four!\"\n\n# Best practice: 1st call = 0.5ms, 2nd call = 0.001ms (cached)\nbest.tokenize_match_commentary(commentary)\nbest.tokenize_match_commentary(commentary)  # Fast!\n\n# Anti-pattern: Both calls = 0.5ms (no caching)\nbad.tokenize_match_commentary(commentary)\nbad.tokenize_match_commentary(commentary)  # Slow!",
+      "level": 2,
+      "language": "python",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Forgetting to handle token limits at the sequence boundary. The most common beginner mistake is encoding text without checking total token count before passing to the model, causing silent truncation or runtime errors. At scale, a 10-token overage across 1M requests = 10M wasted tokens = unnecessary cost and degraded model outputs. FIX: Always implement a pre-flight check using `len(encoder.encode(text))` and establish a safety margin (e.g., reserve 50 tokens for model response). Use truncation strategies like 'sliding_window' (take first N tokens) or 'recursive_chunks' (split semantically) rather than naive cutoffs that break sentences mid-word.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At scale, tokenization is the invisible bottleneck. OpenAI tokenizes billions of tokens daily across GPT API calls; insufficient batching causes 30% latency overhead. Google's BERT powers Search ranking for 8.5 billion daily queries—a flawed tokenization choice (e.g., breaking proper nouns incorrectly) cascades into ranking errors affecting billions. Meta's multilingual systems (used by 3B+ Facebook/WhatsApp users) rely on SentencePiece to handle 111 languages; WordPiece would require separate vocabularies per language (memory explosion). Netflix uses tokenization in content recommendation pipelines—user reviews tokenized inconsistently lead to embedding misalignment, degrading personalization accuracy by 12-18%. Uber's real-time chat translation tokenizes 50M+ messages/day; over-tokenization (splitting aggressively) creates embedding sparsity, reducing semantic similarity scores by 25%. The breaking point: when vocabulary mismatches or truncation occur unexpectedly in production, model performance degrades gracefully but measurably. Companies typically invest in custom tokenizers for domain-specific tasks (medical, legal, code) where generic tokenizers perform 20-35% worse.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Tokenization directly impacts model latency, cost, and accuracy—choose algorithm based on your specific trade-off priorities (speed, vocabulary size, multilingual support).",
+        "BPE dominates production because it balances unknown word handling, compact vocabularies, and efficient compression of frequent sequences.",
+        "Always cache tokenization results for repeated sequences; re-encoding identical text wastes 99%+ of computational time and money.",
+        "Set token count safeguards before inference to prevent silent truncation and unexpected model behavior from sequence overflow.",
+        "Vocabulary mismatch between training and inference can degrade model performance by 15-40%; monitor unknown token rates in production.",
+        "Multilingual and code-heavy domains require custom tokenizers; generic approaches underperform by 20-35% on specialized content.",
+        "SentencePiece excels at handling 100+ languages and diverse character sets, while WordPiece demands extensive corpus analysis for optimal performance."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In Byte-Pair Encoding (BPE), why does the algorithm prioritize merging the most frequent byte pair at each iteration?",
+      "items": [
+        "Because it maximizes vocabulary compression and ensures rare/unknown words can still be represented through character-level fallback, maintaining model robustness.",
+        "Because it guarantees the resulting tokens will always match the original training data without any truncation.",
+        "Because merging the most frequent pairs first ensures alphabetical ordering of the final vocabulary.",
+        "Because it allows the model to process longer sequences without any token limit constraints."
+      ],
+      "answer": 0,
+      "explanation": "BPE's greedy approach of merging the most frequent byte pairs is optimal because it minimizes vocabulary size while ensuring graceful degradation—any unknown word can be represented by falling back to smaller subword units or even characters. This trade-off between vocabulary compactness and unknown-word handling is why BPE dominates production. Option B is incorrect because no tokenization can guarantee zero truncation; option C misunderstands the algorithm (alphabetical order is irrelevant); option D is false because token limits are a constraint in all systems."
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a real-time cricket commentary system for a global audience using 15 languages. Your model currently uses WordPiece tokenization trained on English-only data. What problem will you encounter, and which tokenization algorithm would you switch to?",
+      "items": [
+        "WordPiece will create separate vocabularies for each language, causing memory bloat and poor performance on non-English scripts like Devanagari and Arabic; switch to SentencePiece which operates on raw bytes without language assumptions.",
+        "WordPiece will merge all 15 languages into a single vocabulary, causing token count explosion; switch to BPE which handles multiple languages more efficiently.",
+        "WordPiece will refuse to tokenize non-English languages entirely; you must stay with WordPiece and add language detection preprocessing.",
+        "There is no problem—WordPiece automatically handles all languages equally well without modification."
+      ],
+      "answer": 0,
+      "explanation": "WordPiece is fundamentally English-centric; it was designed for single-language datasets and struggles with scripts outside Latin characters (Devanagari, Arabic, Chinese). While you *could* retrain WordPiece on multilingual data, SentencePiece is purpose-built for this scenario—it operates on raw Unicode bytes, treats all languages equally, and handles emoji/special characters seamlessly. This is exactly why Meta, Google, and Uber use SentencePiece for their global products. Option B misunderstands the trade-off (vocabulary size is the least important concern here); option C is false (WordPiece can tokenize other languages, just poorly); option D ignores real production constraints."
     }
   ]
 }

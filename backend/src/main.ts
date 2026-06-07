@@ -20,6 +20,13 @@ async function bootstrap() {
   // ── Global exception filter ───────────────────────────────────────────────────
   app.useGlobalFilters(new GlobalExceptionFilter());
 
+  // ── No-cache middleware — API responses must never be cached ─────────────────
+  app.use((_req: any, res: any, next: any) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    next();
+  });
+
   // ── Security headers ──────────────────────────────────────────────────────────
   app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled: Next.js handles it client-side
   app.use(cookieParser());

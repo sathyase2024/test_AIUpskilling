@@ -93,6 +93,7 @@ export async function register(payload: {
 
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
+    cache: 'no-store',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
   });

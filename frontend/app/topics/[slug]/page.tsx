@@ -93,6 +93,8 @@ function transformApiResponse(raw: any): TopicDetail {
     'pytorch-deep-learning': '🔥', 'retrieval-augmented-generation': '🔍',
     'ai-agents-agentic-workflows': '🤖', 'large-language-models': '🧠',
     'python-for-ai-ml': 'PY',
+    'tensorflow-keras': '🔷',
+    'hugging-face-transformers': '🤗',
   }
 
   return {

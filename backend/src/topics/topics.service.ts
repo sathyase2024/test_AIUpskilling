@@ -94,6 +94,18 @@ const GENERATED_TOPIC_META: Record<
     difficulty: 'beginner', durationHours: 45,
     tags: ['python', 'numpy', 'pandas', 'data', 'ai'], imageGradient: 'from-green-500 to-teal-600',
   },
+  'tensorflow-keras': {
+    name: 'TensorFlow & Keras', category: 'ai-ml',
+    description: 'Build, train and deploy neural networks with TensorFlow 2 and the Keras high-level API',
+    difficulty: 'intermediate', durationHours: 50,
+    tags: ['tensorflow', 'keras', 'deep-learning', 'neural-networks', 'ai'], imageGradient: 'from-amber-500 to-orange-600',
+  },
+  'hugging-face-transformers': {
+    name: 'Hugging Face Transformers', category: 'ai-ml',
+    description: 'Master the Hugging Face ecosystem — pretrained models, tokenizers, fine-tuning, and the Hub',
+    difficulty: 'intermediate', durationHours: 45,
+    tags: ['hugging-face', 'transformers', 'bert', 'nlp', 'ai'], imageGradient: 'from-yellow-400 to-amber-500',
+  },
 };
 
 const LESSON_TYPES = ['video', 'reading', 'exercise', 'quiz', 'project'] as const;
@@ -251,7 +263,11 @@ export class TopicsService implements OnApplicationBootstrap {
 
   async findAll(query: { category?: string; difficulty?: string; search?: string; page?: number; limit?: number }) {
     const { category, difficulty, search, page = 1, limit = 20 } = query;
-    const qb = this.topicRepo.createQueryBuilder('t').where('t.isActive = :a', { a: true });
+    // Only expose topics that have pre-generated lesson content
+    const generatedSlugs = Object.keys(GENERATED_TOPIC_META);
+    const qb = this.topicRepo.createQueryBuilder('t')
+      .where('t.isActive = :a', { a: true })
+      .andWhere('t.slug IN (:...slugs)', { slugs: generatedSlugs });
     if (category && category !== 'all') qb.andWhere('t.category = :c', { c: category });
     if (difficulty) qb.andWhere('t.difficulty = :d', { d: difficulty });
     if (search) qb.andWhere('(t.name ILIKE :s OR t.description ILIKE :s)', { s: `%${search}%` });

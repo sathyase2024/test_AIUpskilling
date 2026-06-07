@@ -10,7 +10,6 @@ import {
   Users,
   BookOpen,
   Filter,
-  ChevronRight,
   X,
   Gamepad2,
   Music,
@@ -61,61 +60,6 @@ function gradientBg(cls: string, dir = 'to right'): string {
   return `linear-gradient(${dir}, ${from}, ${to})`
 }
 
-// ─── API → Topic transform ─────────────────────────────────────────────────────
-
-const CAT_MAP: Record<string, Category> = {
-  programming: 'Programming', frontend: 'Frontend', backend: 'Backend',
-  mobile: 'Mobile', cloud: 'Cloud', devops: 'Cloud', 'ai-ml': 'AI/ML',
-  databases: 'Databases', security: 'Security', product: 'Product',
-  'software-engineering': 'Programming',
-}
-const DIFF_MAP: Record<string, Difficulty> = {
-  beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced',
-}
-const SLUG_ICON: Record<string, string> = {
-  javascript: 'JS', typescript: 'TS', python: 'PY', java: '☕', go: 'Go',
-  rust: '🦀', react: '⚛', nextjs: '▲', angular: '🅰', vuejs: '💚',
-  tailwindcss: 'TW', nodejs: '🟩', 'spring-boot': '🍃', django: '🐍',
-  fastapi: '⚡', docker: '🐳', kubernetes: '☸', aws: '☁', terraform: '🏗',
-  postgresql: '🐘', mongodb: '🍃', redis: '⚡', dsa: '🌳',
-  'system-design': '🏛', flutter: '🦋', 'react-native': '📱',
-  'ml-fundamentals': '📊', 'generative-ai': '🤖', rag: '🔍',
-  'ai-agents': '🤖', 'prompt-engineering': '✍',
-  'pytorch-deep-learning': '🔥', 'retrieval-augmented-generation': '🔍',
-  'ai-agents-agentic-workflows': '🤖', 'large-language-models': '🧠',
-  'python-for-ai-ml': 'PY', microservices: '🔗', graphql: '◈', grpc: '📡',
-  gcp: '☁',
-}
-const CAT_ICON: Record<Category, string> = {
-  Programming: '💻', Frontend: '🖥', Backend: '🗄', Mobile: '📱',
-  Cloud: '☁', 'AI/ML': '🤖', Databases: '🗃', Security: '🛡', Product: '📋',
-}
-function fmtEnrolled(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n || 0)
-}
-
-function transformApiTopic(raw: any): Topic {
-  const category = CAT_MAP[raw.category] ?? 'Programming'
-  const difficulty = DIFF_MAP[raw.difficulty] ?? 'Intermediate'
-  const gradient = raw.imageGradient || 'from-purple-600 to-cyan-500'
-  return {
-    id: 0,
-    slug: raw.slug,
-    name: raw.name,
-    category,
-    difficulty,
-    hours: raw.durationHours ?? 0,
-    rating: Number(raw.rating ?? 4.5).toFixed(1),
-    reviews: Math.floor((raw.enrolledCount ?? 0) / 8),
-    enrolled: fmtEnrolled(raw.enrolledCount ?? 0),
-    tags: Array.isArray(raw.tags) ? raw.tags : [],
-    icon: SLUG_ICON[raw.slug] ?? CAT_ICON[category] ?? '📚',
-    gradient,
-    topBarGradient: gradient,
-    description: raw.description ?? '',
-  }
-}
-
 type Difficulty = 'Beginner' | 'Intermediate' | 'Advanced'
 type Category =
   | 'Programming'
@@ -147,242 +91,176 @@ interface Topic {
   isHot?: boolean
 }
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+// ─── Data — only courses with real generated content ─────────────────────────
 
 const TOPICS: Topic[] = [
   {
     id: 1,
-    name: 'JavaScript Fundamentals',
-    category: 'Programming',
-    difficulty: 'Beginner',
-    hours: 12,
+    slug: 'large-language-models',
+    name: 'Large Language Models',
+    category: 'AI/ML',
+    difficulty: 'Advanced',
+    hours: 60,
     rating: '4.9',
-    reviews: 3241,
-    enrolled: '45.2K',
-    tags: ['ES6+', 'DOM', 'Async'],
-    icon: 'JS',
-    gradient: 'from-yellow-500 to-orange-400',
-    topBarGradient: 'from-yellow-500/80 to-orange-400/60',
-    description: 'Master modern JavaScript from basics to advanced patterns.',
+    reviews: 1240,
+    enrolled: '8.5K',
+    tags: ['Transformers', 'NLP', 'Fine-tuning', 'GenAI'],
+    icon: '🧠',
+    gradient: 'from-violet-500 to-fuchsia-600',
+    topBarGradient: 'from-violet-500/80 to-fuchsia-600/60',
+    description: 'Transformers, attention, tokenization, fine-tuning and prompting — from fundamentals to production LLMs.',
     isHot: true,
   },
   {
     id: 2,
-    name: 'Python for Data Science',
+    slug: 'ai-agents-agentic-workflows',
+    name: 'AI Agents & Agentic Workflows',
     category: 'AI/ML',
-    difficulty: 'Beginner',
-    hours: 18,
+    difficulty: 'Advanced',
+    hours: 50,
     rating: '4.8',
-    reviews: 2897,
-    enrolled: '38.7K',
-    tags: ['Pandas', 'NumPy', 'Matplotlib'],
-    icon: 'PY',
-    gradient: 'from-blue-500 to-cyan-400',
-    topBarGradient: 'from-blue-500/80 to-cyan-400/60',
-    description: 'Learn data manipulation and analysis with Python.',
+    reviews: 890,
+    enrolled: '6.2K',
+    tags: ['Agents', 'Tool Use', 'ReAct', 'Orchestration'],
+    icon: '🤖',
+    gradient: 'from-purple-500 to-indigo-600',
+    topBarGradient: 'from-purple-500/80 to-indigo-600/60',
+    description: 'Design autonomous agents, tool use, multi-agent coordination and agentic pipelines.',
+    isNew: true,
   },
   {
     id: 3,
-    name: 'React & Next.js',
-    category: 'Frontend',
-    difficulty: 'Intermediate',
-    hours: 20,
-    rating: '4.9',
-    reviews: 4512,
-    enrolled: '52.1K',
-    tags: ['Hooks', 'SSR', 'TypeScript'],
-    icon: '⚛',
+    slug: 'retrieval-augmented-generation',
+    name: 'Retrieval-Augmented Generation',
+    category: 'AI/ML',
+    difficulty: 'Advanced',
+    hours: 40,
+    rating: '4.8',
+    reviews: 743,
+    enrolled: '5.1K',
+    tags: ['RAG', 'Embeddings', 'Vector DB', 'LangChain'],
+    icon: '🔍',
     gradient: 'from-cyan-500 to-blue-600',
     topBarGradient: 'from-cyan-500/80 to-blue-600/60',
-    description: 'Build production-ready React apps with Next.js 14.',
-    isHot: true,
+    description: 'Build RAG pipelines: embeddings, vector stores, chunking, retrieval and grounded generation.',
+    isNew: true,
   },
   {
     id: 4,
-    name: 'Spring Boot REST APIs',
-    category: 'Backend',
+    slug: 'pytorch-deep-learning',
+    name: 'PyTorch Deep Learning',
+    category: 'AI/ML',
     difficulty: 'Intermediate',
-    hours: 16,
-    rating: '4.7',
-    reviews: 1876,
-    enrolled: '21.4K',
-    tags: ['Java', 'REST', 'JPA'],
-    icon: '🍃',
-    gradient: 'from-green-500 to-emerald-400',
-    topBarGradient: 'from-green-500/80 to-emerald-400/60',
-    description: 'Build scalable REST APIs with Spring Boot and Java.',
+    hours: 55,
+    rating: '4.8',
+    reviews: 1102,
+    enrolled: '7.8K',
+    tags: ['PyTorch', 'Neural Networks', 'Autograd', 'CNN'],
+    icon: '🔥',
+    gradient: 'from-orange-500 to-red-600',
+    topBarGradient: 'from-orange-500/80 to-red-600/60',
+    description: 'Tensors, autograd, neural networks and training loops with PyTorch.',
+    isHot: true,
   },
   {
     id: 5,
-    name: 'AWS Cloud Practitioner',
-    category: 'Cloud',
-    difficulty: 'Beginner',
-    hours: 14,
-    rating: '4.8',
-    reviews: 2134,
-    enrolled: '29.8K',
-    tags: ['EC2', 'S3', 'Lambda'],
-    icon: '☁',
-    gradient: 'from-orange-500 to-yellow-400',
-    topBarGradient: 'from-orange-500/80 to-yellow-400/60',
-    description: 'Get AWS certified with hands-on cloud fundamentals.',
-    isNew: true,
+    slug: 'tensorflow-keras',
+    name: 'TensorFlow & Keras',
+    category: 'AI/ML',
+    difficulty: 'Intermediate',
+    hours: 50,
+    rating: '4.7',
+    reviews: 965,
+    enrolled: '6.9K',
+    tags: ['TensorFlow', 'Keras', 'CNNs', 'Transfer Learning'],
+    icon: '⚡',
+    gradient: 'from-amber-500 to-orange-600',
+    topBarGradient: 'from-amber-500/80 to-orange-600/60',
+    description: 'Build, train and deploy neural networks with TensorFlow 2 and the Keras high-level API.',
   },
   {
     id: 6,
-    name: 'Machine Learning with PyTorch',
+    slug: 'python-for-ai-ml',
+    name: 'Python for AI & ML',
     category: 'AI/ML',
-    difficulty: 'Advanced',
-    hours: 32,
+    difficulty: 'Beginner',
+    hours: 45,
     rating: '4.9',
-    reviews: 1654,
-    enrolled: '14.2K',
-    tags: ['Neural Networks', 'LLMs', 'MLOps'],
-    icon: '🤖',
-    gradient: 'from-purple-600 to-pink-500',
-    topBarGradient: 'from-purple-600/80 to-pink-500/60',
-    description: 'Deep learning and LLMs with PyTorch from scratch.',
-    isHot: true,
+    reviews: 2134,
+    enrolled: '18.3K',
+    tags: ['Python', 'NumPy', 'Pandas', 'Scikit-learn'],
+    icon: 'PY',
+    gradient: 'from-green-500 to-teal-600',
+    topBarGradient: 'from-green-500/80 to-teal-600/60',
+    description: 'NumPy, pandas, data wrangling and the scientific Python stack for machine learning.',
   },
   {
     id: 7,
-    name: 'PostgreSQL Deep Dive',
-    category: 'Databases',
+    slug: 'hugging-face-transformers',
+    name: 'Hugging Face Transformers',
+    category: 'AI/ML',
     difficulty: 'Intermediate',
-    hours: 10,
-    rating: '4.7',
-    reviews: 987,
-    enrolled: '11.3K',
-    tags: ['SQL', 'Indexing', 'Transactions'],
-    icon: '🐘',
-    gradient: 'from-blue-600 to-indigo-500',
-    topBarGradient: 'from-blue-600/80 to-indigo-500/60',
-    description: 'Master PostgreSQL for high-performance applications.',
-  },
-  {
-    id: 8,
-    name: 'React Native Mobile Dev',
-    category: 'Mobile',
-    difficulty: 'Intermediate',
-    hours: 22,
-    rating: '4.6',
-    reviews: 1432,
-    enrolled: '17.6K',
-    tags: ['iOS', 'Android', 'Expo'],
-    icon: '📱',
-    gradient: 'from-pink-500 to-rose-400',
-    topBarGradient: 'from-pink-500/80 to-rose-400/60',
-    description: 'Build cross-platform mobile apps with React Native.',
-  },
-  {
-    id: 9,
-    name: 'Docker & Kubernetes',
-    category: 'Cloud',
-    difficulty: 'Intermediate',
-    hours: 15,
+    hours: 45,
     rating: '4.8',
-    reviews: 2765,
-    enrolled: '23.9K',
-    tags: ['Containers', 'Orchestration', 'Helm'],
-    icon: '🐳',
-    gradient: 'from-sky-500 to-blue-500',
-    topBarGradient: 'from-sky-500/80 to-blue-500/60',
-    description: 'Containerize and orchestrate apps at scale.',
-    isNew: true,
-  },
-  {
-    id: 10,
-    name: 'Ethical Hacking Basics',
-    category: 'Security',
-    difficulty: 'Intermediate',
-    hours: 25,
-    rating: '4.7',
-    reviews: 1123,
-    enrolled: '9.8K',
-    tags: ['Penetration Testing', 'OWASP', 'CTF'],
-    icon: '🛡',
-    gradient: 'from-red-500 to-rose-600',
-    topBarGradient: 'from-red-500/80 to-rose-600/60',
-    description: 'Learn offensive security and ethical hacking techniques.',
-  },
-  {
-    id: 11,
-    name: 'TypeScript Mastery',
-    category: 'Programming',
-    difficulty: 'Intermediate',
-    hours: 8,
-    rating: '4.9',
-    reviews: 3089,
-    enrolled: '41.5K',
-    tags: ['Types', 'Generics', 'Decorators'],
-    icon: 'TS',
-    gradient: 'from-blue-500 to-indigo-600',
-    topBarGradient: 'from-blue-500/80 to-indigo-600/60',
-    description: 'Go from JavaScript to TypeScript with confidence.',
-    isHot: true,
-  },
-  {
-    id: 12,
-    name: 'Product Management 101',
-    category: 'Product',
-    difficulty: 'Beginner',
-    hours: 11,
-    rating: '4.6',
     reviews: 876,
-    enrolled: '8.4K',
-    tags: ['Roadmaps', 'User Stories', 'OKRs'],
-    icon: '📋',
-    gradient: 'from-violet-500 to-purple-600',
-    topBarGradient: 'from-violet-500/80 to-purple-600/60',
-    description: 'Launch your PM career with practical frameworks.',
+    enrolled: '5.8K',
+    tags: ['Hugging Face', 'BERT', 'GPT', 'Fine-tuning'],
+    icon: '🤗',
+    gradient: 'from-yellow-400 to-amber-500',
+    topBarGradient: 'from-yellow-400/80 to-amber-500/60',
+    description: 'Master the Hugging Face ecosystem — pretrained models, tokenizers, fine-tuning, and the Hub.',
     isNew: true,
-  },
-  {
-    id: 13,
-    name: 'GraphQL API Design',
-    category: 'Backend',
-    difficulty: 'Advanced',
-    hours: 13,
-    rating: '4.8',
-    reviews: 1054,
-    enrolled: '12.7K',
-    tags: ['Queries', 'Mutations', 'Subscriptions'],
-    icon: '◈',
-    gradient: 'from-pink-600 to-rose-500',
-    topBarGradient: 'from-pink-600/80 to-rose-500/60',
-    description: 'Design and build production GraphQL APIs.',
-  },
-  {
-    id: 14,
-    name: 'Flutter App Development',
-    category: 'Mobile',
-    difficulty: 'Beginner',
-    hours: 20,
-    rating: '4.7',
-    reviews: 1342,
-    enrolled: '15.1K',
-    tags: ['Dart', 'Widgets', 'State'],
-    icon: '🦋',
-    gradient: 'from-teal-500 to-cyan-400',
-    topBarGradient: 'from-teal-500/80 to-cyan-400/60',
-    description: 'Build beautiful cross-platform apps with Flutter.',
-  },
-  {
-    id: 15,
-    name: 'Redis & Caching Strategies',
-    category: 'Databases',
-    difficulty: 'Advanced',
-    hours: 9,
-    rating: '4.7',
-    reviews: 743,
-    enrolled: '7.2K',
-    tags: ['Caching', 'Pub/Sub', 'Streams'],
-    icon: '⚡',
-    gradient: 'from-red-600 to-orange-500',
-    topBarGradient: 'from-red-600/80 to-orange-500/60',
-    description: 'Master Redis for high-performance data access.',
   },
 ]
+
+// ─── API → Topic transform ────────────────────────────────────────────────────
+
+const DIFF_MAP: Record<string, Difficulty> = {
+  beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced',
+}
+const CAT_MAP: Record<string, Category> = {
+  'ai-ml': 'AI/ML', programming: 'Programming', frontend: 'Frontend',
+  backend: 'Backend', mobile: 'Mobile', cloud: 'Cloud',
+  databases: 'Databases', security: 'Security', product: 'Product',
+}
+const SLUG_ICON: Record<string, string> = {
+  'large-language-models': '🧠',
+  'ai-agents-agentic-workflows': '🤖',
+  'retrieval-augmented-generation': '🔍',
+  'pytorch-deep-learning': '🔥',
+  'tensorflow-keras': '⚡',
+  'python-for-ai-ml': 'PY',
+  'hugging-face-transformers': '🤗',
+}
+
+function fmtEnrolled(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
+  return String(n)
+}
+
+function transformApiTopic(raw: any): Topic {
+  const slug = raw.slug ?? ''
+  const grad = raw.imageGradient ?? 'from-purple-500 to-indigo-600'
+  const local = TOPICS.find((t) => t.slug === slug)
+  return {
+    id: raw.id,
+    slug,
+    name: raw.name,
+    category: CAT_MAP[raw.category] ?? 'AI/ML',
+    difficulty: DIFF_MAP[raw.difficulty] ?? 'Intermediate',
+    hours: raw.durationHours ?? local?.hours ?? 0,
+    rating: typeof raw.rating === 'number' ? raw.rating.toFixed(1) : raw.rating ?? local?.rating ?? '4.8',
+    reviews: raw.reviews ?? Math.floor((raw.enrolledCount ?? 0) / 8),
+    enrolled: fmtEnrolled(raw.enrolledCount ?? 0),
+    tags: raw.tags ?? local?.tags ?? [],
+    icon: SLUG_ICON[slug] ?? local?.icon ?? '📚',
+    gradient: grad,
+    topBarGradient: local?.topBarGradient ?? grad,
+    description: raw.description ?? local?.description ?? '',
+    isHot: local?.isHot,
+    isNew: local?.isNew,
+  }
+}
 
 const CATEGORIES: string[] = [
   'All',
@@ -555,6 +433,7 @@ interface SidebarFiltersProps {
   selectedHobbies: Set<string>
   onHobbyChange: (h: string) => void
   onClearAll: () => void
+  allTopics: Topic[]
 }
 
 function SidebarFilters({
@@ -567,6 +446,7 @@ function SidebarFilters({
   selectedHobbies,
   onHobbyChange,
   onClearAll,
+  allTopics,
 }: SidebarFiltersProps) {
   const hasFilters =
     difficultyFilter.size > 0 ||
@@ -660,7 +540,7 @@ function SidebarFilters({
             <span
               className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full border ${difficultyBadgeStyle(d)}`}
             >
-              {TOPICS.filter((t) => t.difficulty === d).length}
+              {allTopics.filter((t) => t.difficulty === d).length}
             </span>
           </label>
         ))}
@@ -683,7 +563,7 @@ function SidebarFilters({
           >
             {c}
             <span className="text-xs text-white/30">
-              {TOPICS.filter((t) => t.category === c).length}
+              {allTopics.filter((t) => t.category === c).length}
             </span>
           </button>
         ))}
@@ -772,6 +652,7 @@ export default function TopicsPage() {
 
         const res = await fetch(`${API_URL}/topics?${params.toString()}`, {
           signal: controller.signal,
+          cache: 'no-store',
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const json: ApiTopicsResponse = await res.json()
@@ -868,12 +749,12 @@ export default function TopicsPage() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-white/60 mb-5">
               <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
-              200+ topics and growing
+              {baseTopics.length} AI/ML courses available
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3">
               Explore{' '}
               <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                200+ Topics
+                AI & ML Courses
               </span>
             </h1>
             <p className="text-white/50 text-lg max-w-xl mx-auto">
@@ -955,7 +836,7 @@ export default function TopicsPage() {
                     <span
                       className={`ml-1.5 text-[10px] ${isActive ? 'text-white/70' : 'text-white/30'}`}
                     >
-                      {TOPICS.filter((t) => t.category === cat).length}
+                      {baseTopics.filter((t) => t.category === cat).length}
                     </span>
                   )}
                 </button>
@@ -979,6 +860,7 @@ export default function TopicsPage() {
             selectedHobbies={selectedHobbies}
             onHobbyChange={toggleHobby}
             onClearAll={clearAll}
+            allTopics={baseTopics}
           />
 
           {/* Topics grid */}
@@ -989,7 +871,7 @@ export default function TopicsPage() {
                 <p className="text-white/50 text-sm">
                   Showing{' '}
                   <span className="text-white font-semibold">{filteredTopics.length}</span> of{' '}
-                  <span className="text-white font-semibold">200+</span> topics
+                  <span className="text-white font-semibold">{baseTopics.length}</span> courses
                 </p>
                 {(difficultyFilter.size > 0 ||
                   activeCategory !== 'All' ||
@@ -1080,17 +962,12 @@ export default function TopicsPage() {
               </div>
             )}
 
-            {/* Load more */}
             {filteredTopics.length > 0 && (
-              <div className="mt-10 flex flex-col items-center gap-3">
-                <p className="text-white/30 text-sm">
-                  Showing {filteredTopics.length} of 200+ topics
-                </p>
-                <button className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/60 text-sm font-medium hover:bg-white/10 hover:text-white hover:border-white/20 transition-all">
-                  Load more topics
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+              <p className="mt-10 text-center text-white/20 text-sm">
+                {filteredTopics.length === baseTopics.length
+                  ? `All ${baseTopics.length} courses shown`
+                  : `${filteredTopics.length} of ${baseTopics.length} courses match your filters`}
+              </p>
             )}
           </div>
         </div>
