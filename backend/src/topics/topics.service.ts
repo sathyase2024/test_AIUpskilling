@@ -144,6 +144,12 @@ export class TopicsService implements OnApplicationBootstrap {
   }
 
   async seedMissing() {
+    // One count check — if all topics are already there, skip all per-slug queries
+    const count = await this.topicRepo.count();
+    if (count >= SEED_TOPICS.length) {
+      this.logger.log(`All ${SEED_TOPICS.length} base topics present — skipping seedMissing`);
+      return;
+    }
     for (const t of SEED_TOPICS) {
       const existing = await this.topicRepo.findOne({ where: { slug: t.slug } });
       if (existing) continue;
@@ -204,8 +210,21 @@ export class TopicsService implements OnApplicationBootstrap {
     }
 
     let seeded = 0;
-    let updated = 0;
     for (const [slug, meta] of Object.entries(GENERATED_TOPIC_META)) {
+      // Check DB first — if topic exists and already has lessons with content, skip entirely.
+      // No file reads needed on subsequent boots.
+      const topic = await this.topicRepo.findOne({ where: { slug } });
+      if (topic) {
+        const populatedCount = await this.lessonRepo.count({
+          where: { topicId: topic.id, isGenerated: true },
+        });
+        if (populatedCount > 0) {
+          this.logger.log(`Topic "${slug}" already seeded (${populatedCount} lessons) — skipping`);
+          continue;
+        }
+      }
+
+      // First boot only: read files and write to DB
       const dir = path.join(baseDir, slug);
       if (!fs.existsSync(dir)) {
         this.logger.warn(`Generated content for "${slug}" not found at ${dir} — skipping`);
@@ -221,27 +240,16 @@ export class TopicsService implements OnApplicationBootstrap {
         continue;
       }
 
-      let topic = await this.topicRepo.findOne({ where: { slug } });
-      const isNew = !topic;
-
-      if (!topic) {
-        topic = (await this.topicRepo.save(
-          this.topicRepo.create({
-            ...meta,
-            slug,
-            rating: 4.7 + Math.random() * 0.3,
-            enrolledCount: Math.floor(Math.random() * 5000) + 500,
-          } as Topic),
-        )) as Topic;
-      }
-
-      // Only write lessons that are missing or have no content yet.
-      // Skipping already-populated lessons avoids 196+ DB writes on every restart.
-      const existingLessons = await this.lessonRepo.find({ where: { topicId: topic.id }, order: { orderIndex: 'ASC' } });
-      const existingByOrder = new Map(existingLessons.map((l) => [l.orderIndex, l]));
+      const savedTopic = topic ?? (await this.topicRepo.save(
+        this.topicRepo.create({
+          ...meta,
+          slug,
+          rating: 4.7 + Math.random() * 0.3,
+          enrolledCount: Math.floor(Math.random() * 5000) + 500,
+        } as Topic),
+      )) as Topic;
 
       let order = 1;
-      let written = 0;
       for (const file of lessonFiles) {
         let contentJson: Record<string, any>;
         try {
@@ -254,54 +262,29 @@ export class TopicsService implements OnApplicationBootstrap {
         const rawType = String(contentJson.type ?? 'reading');
         const type = (LESSON_TYPES as readonly string[]).includes(rawType) ? rawType : 'reading';
         const title = String(contentJson.title ?? `Lesson ${order}`);
-        const existing = existingByOrder.get(order);
 
-        if (existing) {
-          // Only update if content is missing — avoids rewriting 196 rows every boot
-          if (!existing.contentJson) {
-            await this.lessonRepo.update(existing.id, {
-              title,
-              type: type as Lesson['type'],
-              durationMinutes: Number(contentJson.estimatedMinutes) || 30,
-              xpReward: Number(contentJson.xpReward) || 50,
-              content: JSON.stringify(contentJson),
-              contentJson,
-            });
-            written++;
-          }
-        } else {
-          await this.lessonRepo.save(
-            this.lessonRepo.create({
-              topicId: topic.id,
-              title,
-              slug: `${slug}-lesson-${order}`,
-              orderIndex: order,
-              type: type as Lesson['type'],
-              durationMinutes: Number(contentJson.estimatedMinutes) || 30,
-              xpReward: Number(contentJson.xpReward) || 50,
-              content: JSON.stringify(contentJson),
-              contentJson,
-              isGenerated: true,
-            }),
-          );
-          written++;
-        }
+        await this.lessonRepo.save(
+          this.lessonRepo.create({
+            topicId: savedTopic.id,
+            title,
+            slug: `${slug}-lesson-${order}`,
+            orderIndex: order,
+            type: type as Lesson['type'],
+            durationMinutes: Number(contentJson.estimatedMinutes) || 30,
+            xpReward: Number(contentJson.xpReward) || 50,
+            content: JSON.stringify(contentJson),
+            contentJson,
+            isGenerated: true,
+          }),
+        );
         order++;
       }
 
-      if (isNew) {
-        seeded++;
-        this.logger.log(`Seeded generated topic "${slug}" with ${order - 1} lessons`);
-      } else if (written > 0) {
-        updated++;
-        this.logger.log(`Synced generated topic "${slug}" — ${written} lessons written`);
-      } else {
-        this.logger.log(`Generated topic "${slug}" already up to date — skipped`);
-      }
+      seeded++;
+      this.logger.log(`Seeded generated topic "${slug}" with ${order - 1} lessons`);
     }
 
-    if (seeded > 0) this.logger.log(`✅ Seeded ${seeded} pre-generated topic(s)`);
-    if (updated > 0) this.logger.log(`✅ Synced ${updated} pre-generated topic(s)`);
+    if (seeded > 0) this.logger.log(`✅ Seeded ${seeded} pre-generated topic(s) for the first time`);
   }
 
   async findAll(query: { category?: string; difficulty?: string; search?: string; page?: number; limit?: number }) {
