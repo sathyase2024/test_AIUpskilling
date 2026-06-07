@@ -100,6 +100,12 @@ const GENERATED_TOPIC_META: Record<
     difficulty: 'intermediate', durationHours: 50,
     tags: ['tensorflow', 'keras', 'deep-learning', 'neural-networks', 'ai'], imageGradient: 'from-amber-500 to-orange-600',
   },
+  'hugging-face-transformers': {
+    name: 'Hugging Face Transformers', category: 'ai-ml',
+    description: 'Master the Hugging Face ecosystem — pretrained models, tokenizers, fine-tuning, and the Hub',
+    difficulty: 'intermediate', durationHours: 45,
+    tags: ['hugging-face', 'transformers', 'bert', 'nlp', 'ai'], imageGradient: 'from-yellow-400 to-amber-500',
+  },
 };
 
 const LESSON_TYPES = ['video', 'reading', 'exercise', 'quiz', 'project'] as const;

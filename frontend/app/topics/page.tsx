@@ -162,6 +162,23 @@ const TOPICS: Topic[] = [
     topBarGradient: 'from-green-500/80 to-teal-600/60',
     description: 'NumPy, pandas, data wrangling and the scientific Python stack for machine learning.',
   },
+  {
+    id: 7,
+    slug: 'hugging-face-transformers',
+    name: 'Hugging Face Transformers',
+    category: 'AI/ML',
+    difficulty: 'Intermediate',
+    hours: 45,
+    rating: '4.8',
+    reviews: 876,
+    enrolled: '5.8K',
+    tags: ['Hugging Face', 'BERT', 'GPT', 'Fine-tuning'],
+    icon: '🤗',
+    gradient: 'from-yellow-400 to-amber-500',
+    topBarGradient: 'from-yellow-400/80 to-amber-500/60',
+    description: 'Master the Hugging Face ecosystem — pretrained models, tokenizers, fine-tuning, and the Hub.',
+    isNew: true,
+  },
 ]
 
 // ─── API → Topic transform ────────────────────────────────────────────────────
@@ -181,6 +198,7 @@ const SLUG_ICON: Record<string, string> = {
   'pytorch-deep-learning': '🔥',
   'tensorflow-keras': '⚡',
   'python-for-ai-ml': 'PY',
+  'hugging-face-transformers': '🤗',
 }
 
 function fmtEnrolled(n: number): string {
