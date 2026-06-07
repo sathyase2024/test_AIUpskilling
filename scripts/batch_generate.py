@@ -5,7 +5,7 @@ SkillForge — Async batch lesson generation script.
 Usage:
   python scripts/batch_generate.py --batch 1               # generate courses 0-9
   python scripts/batch_generate.py --batch 3 --concurrency 8
-  python scripts/batch_generate.py --all                   # all 60 courses
+  python scripts/batch_generate.py --all                   # all 36 courses
   python scripts/batch_generate.py --all --output-dir /tmp/lessons
 """
 
@@ -985,16 +985,16 @@ def main() -> None:
         description="SkillForge async batch lesson generator"
     )
     parser.add_argument(
-        "--batch", type=int, choices=range(1, 7), default=1, metavar="N",
-        help="Batch number 1-6 (generates 10 courses). Default: 1"
+        "--batch", type=int, choices=range(1, 5), default=1, metavar="N",
+        help="Batch number 1-4 (generates 10 courses, except batch 4 which has 6). Default: 1"
     )
     parser.add_argument(
         "--all", action="store_true",
-        help="Generate all 60 courses (overrides --batch)"
+        help="Generate all 36 courses (overrides --batch)"
     )
     parser.add_argument(
         "--course", type=int, metavar="N",
-        help="Single course index 0-59. Overrides --batch and --all."
+        help="Single course index 0-35. Overrides --batch and --all."
     )
     parser.add_argument(
         "--concurrency", type=int, default=3, metavar="N",
