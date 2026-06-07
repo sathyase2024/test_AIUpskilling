@@ -35,7 +35,7 @@ PROGRESS_PATH = REPO_ROOT / "generation_progress.json"
 AI_WORKER_PATH = REPO_ROOT / "ai-worker"
 
 MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 8192
+MAX_TOKENS = 16000
 HOBBY = "cricket"
 
 # Cost per million tokens (USD)
@@ -683,10 +683,12 @@ async def generate_single_lesson(
     json_reminder = "\n\nReturn ONLY valid JSON"
     # Prompt suffix used when the model hits the token limit (output truncated)
     brevity_suffix = (
-        "\n\nCRITICAL: Your previous response was cut off because it exceeded the token limit. "
-        "You MUST generate a SHORTER response this time. Use EXACTLY 4 sections. "
-        "Each section's 'content' field must be under 120 words. "
-        "No code blocks longer than 8 lines. Return ONLY valid JSON that fits within 3000 tokens."
+        "\n\nCRITICAL: Your previous response was cut off at the token limit. "
+        "You MUST include ALL sections (Overview, Core Concepts, How It Works Under the Hood, "
+        "Common Patterns & Best Practices, Real-World Application, and 2 quiz sections) — "
+        "do NOT drop any section. Instead, make each section MORE CONCISE: "
+        "paragraphs under 80 words, analogies under 60 words, code blocks under 10 lines, "
+        "key_points max 5 bullets. Return ONLY valid JSON."
     )
 
     last_exc = None
