@@ -195,6 +195,192 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production deep learning systems, three dominant patterns emerge for tensor management: batch processing with gradient accumulation, mixed-precision training with automatic casting, and distributed computation across devices. Batch processing trades memory efficiency against computational throughput—larger batches reduce per-sample overhead and improve GPU utilization but consume exponential memory and may degrade generalization. Mixed-precision (float16 activations, float32 weights) reduces memory by 50% and accelerates computation 2-3x on modern hardware, yet introduces numerical instability requiring loss scaling and careful operator selection. Distributed patterns (DataParallel vs DistributedDataParallel) scale across GPUs with different synchronization costs: DataParallel is simple but synchronous (GPU bottleneck), while DistributedDataParallel uses asynchronous all-reduce operations (20-40% faster at 8+ GPUs). Choose batch processing size based on your GPU's peak memory; select mixed-precision when training vision/NLP models on V100/A100 hardware; adopt DistributedDataParallel only when your batch size justifies multi-GPU overhead (typically batch ≥ 256 across 4+ devices).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Batch processing is like deciding your XI composition—a larger squad (batch) prepares you for varied match conditions but costs more resources; small squads are nimble but brittle. Mixed-precision training mirrors using DRS strategically: you sacrifice certainty (float16 precision) for tactical speed (faster computation), but miscalibration (loss scaling) causes you to lose crucial reviews (NaN gradients). Distributed training across multiple GPUs is field placement strategy—DataParallel is like having one captain make all decisions (synchronous bottleneck), while DistributedDataParallel delegates authority to fielders (asynchronous communication). In powerplay overs, you can't sustain full batting intensity forever (batch size limits); you must rotate bowlers (offload computation) to prevent collapse. The trade-off between aggressive batting (memory-intensive large batches) and defensive strategy (gradient accumulation over micro-batches) determines your match outcome (convergence speed and generalization).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Storing all gradients in memory (memory explosion)\nbatsman_scores = torch.randn(100000, 512, requires_grad=True)  # massive tensor\nfor epoch in range(100):\n    for batch_idx in range(1000):\n        logits = model(batsman_scores[batch_idx*100:(batch_idx+1)*100])\n        loss = criterion(logits, labels)\n        loss.backward()  # gradient stored on every iteration\n    optimizer.step()\n    optimizer.zero_grad()\n# Problem: GPU memory grows linearly; OOM on large datasets\n\n# BEST PRACTICE: Gradient accumulation with explicit zeroing\nbatsman_scores = torch.randn(100000, 512, requires_grad=True)\naccum_steps = 4\nfor epoch in range(100):\n    for batch_idx in range(1000):\n        micro_batch = batsman_scores[batch_idx*25:(batch_idx+1)*25]\n        logits = model(micro_batch)\n        loss = criterion(logits, labels) / accum_steps  # normalize loss\n        loss.backward()  # accumulate gradients\n        \n        if (batch_idx + 1) % accum_steps == 0:\n            optimizer.step()\n            optimizer.zero_grad()\n            print(f\"Batsman {batch_idx}: cumulative_runs = {loss.item()*accum_steps:.4f}\")\n# Benefit: Memory stable; effective batch size 100 with 4x micro-batches\n\n# ANTI-PATTERN: In-place operations breaking gradients\nwicket_count = torch.tensor([3, 5, 2], requires_grad=True)\nwicket_count += 1  # In-place operation\nloss = wicket_count.sum()\nloss.backward()  # RuntimeError: leaf variable was modified\n\n# BEST PRACTICE: Create new tensors for clarity\nwicket_count = torch.tensor([3, 5, 2], requires_grad=True)\nwicket_count = wicket_count + 1  # New tensor; graph preserved\nloss = wicket_count.sum()\nloss.backward()  # Works correctly\nprint(f\"Gradient flow: {wicket_count.grad}\")  # [1, 1, 1]",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is forgetting to call `optimizer.zero_grad()` before `loss.backward()`, causing gradients to accumulate across unintended iterations and corrupting parameter updates. This manifests as training loss oscillating wildly or diverging completely. Fix: Always structure your training loop as: (1) `optimizer.zero_grad()`, (2) forward pass, (3) `loss.backward()`, (4) `optimizer.step()`. If you intentionally want gradient accumulation (for larger effective batch sizes), explicitly normalize the loss by the accumulation steps before backward() and only call `zero_grad()` after completing N accumulation steps, as shown in the best practice code above.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Batch processing trades memory (fixed) against computation speed (scales with batch size)—choose based on GPU memory ceiling and generalization targets",
+        "Gradient accumulation enables large effective batches on limited hardware by computing multiple micro-batches before parameter updates",
+        "Mixed-precision training (float16 activations, float32 weights) requires loss scaling to prevent underflow; use torch.cuda.amp.autocast() and GradScaler for safety",
+        "DistributedDataParallel outperforms DataParallel beyond 4 GPUs due to asynchronous all-reduce; requires explicit rank/world_size setup",
+        "Never use in-place operations on tensors with requires_grad=True in the computational graph; always create new tensors to preserve gradient flow",
+        "Profile memory usage with torch.cuda.memory_allocated() and torch.cuda.max_memory_allocated() before deploying models to production"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket performance prediction model on 10 million samples with a GPU that has 16GB VRAM. A single forward-backward pass with batch_size=256 uses 14GB, leaving only 2GB free. Which approach best balances memory safety and training speed?",
+      "items": [
+        "Reduce batch_size to 128 to fit within 8GB (memory safety margin)",
+        "Use gradient accumulation with batch_size=256 over 2 micro-batches of 128 each, accumulating gradients before optimizer.step()",
+        "Switch to float16 mixed-precision training with batch_size=256 and torch.cuda.amp.autocast()",
+        "Use DistributedDataParallel across 2 GPUs with batch_size=256 per GPU"
+      ],
+      "answer": 1,
+      "explanation": "Gradient accumulation (Option B) is optimal here because: it maintains effective batch_size=256 (no generalization loss), keeps memory usage at ~14GB per micro-batch (manageable), and runs on a single GPU (no distribution overhead). Option A reduces batch size too aggressively, hurting convergence. Option C helps but still leaves memory tight—best combined with accumulation. Option D requires a second GPU and adds communication latency without necessity. Accumulation lets you simulate large batches while respecting hardware constraints: loop twice with batch_size=128, divide loss by 2 before backward(), then step once every 2 iterations."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "PyTorch tensors and GPU acceleration power production systems at companies like Meta (Facebook's recommendation engine processing billions of tensors daily), OpenAI (GPT model training on thousands of GPUs), Netflix (real-time personalization across millions of users), and Google (TPU-optimized tensor operations at planetary scale). At Netflix's scale, a single batch operation on CPU instead of GPU can delay recommendations by milliseconds—costing engagement metrics. When gradient accumulation breaks (due to in-place operations or device mismatches), entire training pipelines fail silently, producing models that converge to wrong solutions. Uber's real-time ETA predictions require sub-100ms tensor inference; GPU acceleration reduces this from seconds to milliseconds. Meta's recommendation systems process petabytes of tensor data monthly; inefficient memory management causes OOM errors affecting millions of users. The difference between correct and incorrect tensor operations isn't always obvious—wrong gradients train models that appear valid but fail in production.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A batsman's performance metrics (runs, average, strike rate) are like tensors—they need to be computed across millions of deliveries (data points). Just as analyzing 1 match manually takes hours but analyzing 1000 matches on a supercomputer takes seconds, CPU tensor operations on large datasets are painfully slow. GPU acceleration is like having 10,000 scoreboard analysts working in parallel—each GPU core processes a slice of your tensor simultaneously. An in-place operation mishap is like a scorekeeper accidentally overwriting yesterday's records while calculating today's average—your historical gradient data corrupts, and the entire statistical model becomes unreliable.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production tensor pipeline example (simplified Netflix-style recommendation)\nimport torch\nimport torch.nn as nn\nfrom torch.cuda import is_available\n\n# Device-agnostic production pattern\ndevice = torch.device('cuda' if is_available() else 'cpu')\n\n# Batch of user embeddings (millions in production)\nuser_embeddings = torch.randn(10000, 128, device=device, dtype=torch.float32)\nmovie_embeddings = torch.randn(50000, 128, device=device, dtype=torch.float32)\n\n# GPU-accelerated similarity computation\n# In production: processes 10M+ recommendations/second\nsimilarities = torch.mm(user_embeddings, movie_embeddings.t())  # Fast on GPU\n\n# Batched gradient computation (critical for training stability)\nclass RecommendationModel(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.embedding = nn.Embedding(100000, 128)\n    \n    def forward(self, user_ids):\n        return self.embedding(user_ids)\n\nmodel = RecommendationModel().to(device)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.001)\n\n# Gradient accumulation for large effective batch sizes\naccum_steps = 4\nloss_accumulated = 0\n\nfor step in range(100):\n    batch = torch.randint(0, 100000, (256,), device=device)\n    outputs = model(batch)\n    loss = outputs.mean()\n    \n    # Accumulate gradients without in-place operations\n    loss_accumulated = loss_accumulated + loss / accum_steps\n    loss.backward()\n    \n    if (step + 1) % accum_steps == 0:\n        optimizer.step()\n        optimizer.zero_grad()\n        loss_accumulated = 0  # Reset, don't use in-place\n\nprint(f'Model on {device}, Training complete')",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Production Pitfalls\n\n1. Device Mismatch (Silent Killer): A tensor on GPU + tensor on CPU = runtime error that doesn't crash until backward pass. Always check `.device` before operations.\n\n2. In-Place Operations in Gradients: `tensor.add_(x)` during backward pass causes incorrect gradient computation. Use `tensor = tensor + x` instead.\n\n3. Gradient Accumulation Bugs: Resetting accumulated loss with `loss = 0` instead of `loss = torch.tensor(0.0)` converts it to a Python float—gradient flow breaks silently.\n\n4. Memory Leaks: Keeping old computation graphs in memory (forgetting `.detach()`) causes OOM on long training loops. Netflix experienced this affecting real-time recommendations.\n\n5. Dtype Mismatches: Mixing float32 and float16 tensors without explicit casting causes numerical instability that only emerges after thousands of iterations.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Tensors are the fundamental data structure in PyTorch; understand their shape, dtype, and device for correct operations.",
+        "GPU acceleration via CUDA transforms deep learning from hours to minutes; always move tensors to the correct device explicitly.",
+        "Autograd (automatic differentiation) computes gradients automatically, but requires understanding computational graphs and backward passes.",
+        "In-place operations like .add_() corrupt gradients during backpropagation; avoid them in loss computation and gradient-dependent code.",
+        "Gradient accumulation enables training with larger effective batch sizes on limited GPU memory—critical for production systems.",
+        "Computational graphs are dynamically built in PyTorch; detach tensors to prevent memory leaks and break gradient flow when needed.",
+        "Production systems (Meta, OpenAI, Netflix) rely on tensor operations at massive scale; device mismatches and gradient bugs cause silent failures affecting millions of users."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a recommendation system for a cricket streaming platform. Your training loop accumulates gradients across 8 batches, but after 1000 iterations, GPU memory gradually increases. What's the most likely cause?",
+      "level": 2,
+      "language": "",
+      "items": [
+        "You forgot to move tensors to GPU with .to(device)",
+        "Old computation graphs are retained in memory; you need to .detach() intermediate tensors or disable gradients for non-learnable tensors",
+        "Your batch size is too large for the GPU",
+        "You're using float16 instead of float32 for embeddings"
+      ],
+      "answer": 1,
+      "explanation": "Memory leaks in training loops typically result from retaining computation graphs. When you accumulate gradients or store intermediate activations without detaching, PyTorch keeps the entire computational graph in memory. After 1000 iterations, these accumulate. Solution: use `with torch.no_grad()` for inference, `.detach()` for non-learnable tensors, or enable gradient checkpointing. The other options don't explain gradual memory increase—device mismatches crash immediately, and batch size issues cause OOM on first full batch."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket batting performance model where the loss function depends on multiple intermediate tensor operations. During backpropagation, you notice that gradients for certain weight parameters are accumulating across multiple batches instead of being reset. Which mechanism is most likely causing this issue, and what's the best way to prevent it?",
+      "items": [
+        "Use .detach() on all intermediate tensors to prevent gradient flow",
+        "Call optimizer.zero_grad() before each backward() pass to clear accumulated gradients",
+        "Set requires_grad=False on all input tensors before forward pass",
+        "Increase the batch size to dilute the effect of gradient accumulation"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is optimizer.zero_grad(). In PyTorch, gradients accumulate by default when you call .backward() multiple times. Each backward() adds to the existing .grad attribute rather than replacing it. To reset gradients before computing new ones, you must explicitly call optimizer.zero_grad() (or tensor.grad.zero_()) at the start of each training iteration. Option 0 is incorrect because .detach() disconnects from the computation graph but doesn't manage gradient accumulation. Option 2 is wrong because requires_grad=False prevents gradient computation entirely, not just accumulation. Option 3 is ineffective since batch size doesn't affect how gradients accumulate within the optimizer state.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a real-time cricket analytics system that processes video frames to predict ball trajectory. Your model trains perfectly on CPU but crashes with 'CUDA out of memory' when moved to GPU. You have a batch size of 128 and limited GPU VRAM. Which combination of strategies would be most effective?",
+      "items": [
+        "Reduce batch size to 32, use torch.cuda.empty_cache() periodically, and implement gradient checkpointing for memory-intensive layers",
+        "Switch to float16 precision and disable autograd completely with torch.no_grad()",
+        "Use larger batch sizes (256) to fully utilize GPU memory and reduce communication overhead",
+        "Move only the loss computation to GPU while keeping model weights on CPU"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is option 0. This approach addresses GPU memory constraints through three complementary methods: reducing batch size directly decreases memory footprint per iteration, torch.cuda.empty_cache() frees unused cached memory from previous operations, and gradient checkpointing trades computation for memory by recomputing intermediate activations during backward pass instead of storing them. Option 1 fails because disabling autograd prevents training entirely—you need gradients for backpropagation. Option 2 is counterproductive; increasing batch size worsens the memory problem. Option 3 is inefficient because host-device transfer becomes a bottleneck and contradicts the purpose of GPU acceleration. The winning strategy combines memory optimization with smart architectural choices, much like a cricket captain balancing aggressive batting with defensive solidity.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

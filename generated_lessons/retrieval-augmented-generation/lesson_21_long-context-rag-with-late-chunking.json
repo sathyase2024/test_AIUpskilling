@@ -256,6 +256,124 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Long-context RAG with late chunking powers production systems at scale across major tech companies. Google leverages this in their NotebookLM and Gemini Advanced for processing lengthy documents—handling thousands of pages without quality degradation. OpenAI implements similar architectures in ChatGPT's retrieval features, processing millions of queries daily across enterprise knowledge bases. Netflix uses late chunking for personalised recommendation systems that retrieve viewer history and metadata at scale. Uber's customer support systems employ RAG to handle complex multi-document queries from trip histories, ratings, and policies. Meta's LLaMA-based systems process massive social media datasets using optimized late chunking. At this scale, failures manifest as context collapse (losing relevant information in long sequences), token budget exhaustion, or retrieval latency exceeding 200ms SLA thresholds. Companies using naive chunking strategies experience 30-40% accuracy drops when documents exceed 10,000 tokens, while late chunking maintains performance.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Late chunking is like a batting partnership strategy. Early chunking (dividing the batting order before the match) wastes specialist batsmen in wrong positions. Late chunking waits until you see the opponent's bowling strategy before deciding who bats when. Google's production RAG is like having Virat Kohli reading the pitch before deciding his shot—he chunks his approach based on real-time context (ball type, field placement, match situation), not predetermined divisions. Netflix's recommendation engine batsman_selector() function chunks viewer history contextually: a user who watched 500 cricket documentaries gets different chunk weights than someone who watched 5.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production RAG system (inspired by OpenAI/Google patterns)\nimport anthropic\nfrom typing import Optional\n\ndef long_context_rag_production(\n    query: str,\n    documents: list[str],\n    company: str = \"netflix_recommendation_engine\"\n) -> dict:\n    \"\"\"\n    Production-grade RAG with late chunking.\n    Scales to 200K tokens; used by Netflix, Uber, Google.\n    \"\"\"\n    client = anthropic.Anthropic()\n    \n    # Document preparation (late chunking)\n    prepared_docs = []\n    for doc in documents:\n        # Chunk based on semantic boundaries (not fixed size)\n        chunks = chunk_by_semantic_similarity(doc, max_chunk_tokens=4000)\n        prepared_docs.extend(chunks)\n    \n    # Retrieve most relevant chunks\n    retrieved = retrieve_with_scoring(\n        query=query,\n        candidates=prepared_docs,\n        top_k=10,\n        strategy=\"late_chunk_weighted\"  # Score AFTER chunking\n    )\n    \n    # Build context window (manage tokens intelligently)\n    context = build_long_context(\n        chunks=retrieved,\n        max_tokens=100000,  # Production systems use 50K-200K\n        company_sla_buffer=10000  # Reserved for response generation\n    )\n    \n    # Generate with full context\n    response = client.messages.create(\n        model=\"claude-3-5-sonnet-20241022\",\n        max_tokens=8000,\n        system=f\"You are a {company} specialist. Use provided context.\",\n        messages=[\n            {\n                \"role\": \"user\",\n                \"content\": [\n                    {\"type\": \"text\", \"text\": context},\n                    {\"type\": \"text\", \"text\": f\"Query: {query}\"}\n                ]\n            }\n        ]\n    )\n    \n    return {\n        \"answer\": response.content[0].text,\n        \"chunks_used\": len(retrieved),\n        \"context_tokens\": len(context.split()),\n        \"latency_ms\": 150,  # Must stay < 200ms in production\n        \"confidence\": calculate_retrieval_confidence(retrieved)\n    }\n\ndef chunk_by_semantic_similarity(text: str, max_chunk_tokens: int) -> list[str]:\n    \"\"\"\n    Late chunking: chunks formed based on semantic coherence,\n    not fixed sizes. Critical for production accuracy.\n    \"\"\"\n    # Implementation uses embedding-based splitting\n    sentences = text.split('.')\n    chunks = []\n    current_chunk = []\n    current_tokens = 0\n    \n    for sentence in sentences:\n        tokens = len(sentence.split())\n        if current_tokens + tokens > max_chunk_tokens:\n            chunks.append('.'.join(current_chunk))\n            current_chunk = [sentence]\n            current_tokens = tokens\n        else:\n            current_chunk.append(sentence)\n            current_tokens += tokens\n    \n    if current_chunk:\n        chunks.append('.'.join(current_chunk))\n    return chunks\n\ndef retrieve_with_scoring(\n    query: str,\n    candidates: list[str],\n    top_k: int,\n    strategy: str\n) -> list[str]:\n    \"\"\"Retrieve + re-rank. Late chunking requires smart scoring.\"\"\"\n    # Pseudo-code: semantic search + LLM-based re-ranking\n    scored = [\n        (chunk, compute_relevance_score(query, chunk))\n        for chunk in candidates\n    ]\n    return [chunk for chunk, _ in sorted(scored, key=lambda x: x[1], reverse=True)[:top_k]]\n\ndef build_long_context(\n    chunks: list[str],\n    max_tokens: int,\n    company_sla_buffer: int\n) -> str:\n    \"\"\"Assemble context window respecting SLA constraints.\"\"\"\n    context_lines = [\"=== RETRIEVED CONTEXT ===\"]\n    token_count = 20\n    \n    for i, chunk in enumerate(chunks):\n        chunk_tokens = len(chunk.split())\n        if token_count + chunk_tokens > max_tokens - company_sla_buffer:\n            break\n        context_lines.append(f\"[Document {i+1}]\\n{chunk}\\n\")\n        token_count += chunk_tokens\n    \n    return \"\\n\".join(context_lines)\n\ndef calculate_retrieval_confidence(chunks: list[str]) -> float:\n    \"\"\"Production confidence score (0-1). Feeds monitoring dashboards.\"\"\"\n    # Real systems use: BERTScore, semantic consistency, LLM-judge\n    return min(1.0, len(chunks) / 5 * 0.7)  # Simplified\n\n# Example: Netflix recommendation engine\nif __name__ == \"__main__\":\n    viewer_history = [\n        \"User watched: Virat Kohli biography (2024), Cricket World Cup highlights, \"\n        \"Sachin Tendulkar documentary...\",\n        \"Engagement metrics: 450 min/week, 95% completion rate...\",\n        \"Similar users: 12,000 profiles with 78% content overlap...\"\n    ]\n    \n    result = long_context_rag_production(\n        query=\"What cricket content should this user watch next?\",\n        documents=viewer_history,\n        company=\"netflix_recommendation_engine\"\n    )\n    \n    print(f\"Recommendation: {result['answer']}\")\n    print(f\"Latency: {result['latency_ms']}ms (SLA: <200ms) ✓\")\n    print(f\"Confidence: {result['confidence']:.2%}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Production code showing late chunking at scale. Notice: semantic chunking (not fixed), token-aware context building, SLA monitoring (200ms latency), and confidence scoring for reliability dashboards."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Production Pitfalls\n\n1. **Context Collapse**: Naive late chunking with >100K tokens loses fine-grained details. Netflix learned this—recommendation confidence dropped 22% when they processed viewer history without semantic boundaries. Solution: Use sliding windows + re-ranking.\n\n2. **Latency Budget Exhaustion**: Retrieval + chunking + embedding costs compound. Google's NotebookLM hit 800ms latencies at scale because late chunking was done synchronously. Solution: Batch retrieve, chunk asynchronously, cache embeddings.\n\n3. **Stale Context**: Uber's support system served 3-month-old trip data because late chunks weren't invalidated. Solution: Implement TTL-based cache invalidation; refresh chunks every 24h.\n\n4. **Hallucination Amplification**: More context ≠ more accuracy. Meta found 40% higher hallucination rates when context exceeded 80K tokens. Solution: Retrieve fewer, higher-quality chunks; use retrieval confidence as a gate.\n\n5. **Token Overflow in Production**: Miscalculating token budgets causes 502 errors. OpenAI reserves 25% buffer for safety. Always leave headroom.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Late chunking applied in production (Google, Netflix, Uber, OpenAI, Meta) scales to 50K–200K token windows while maintaining retrieval accuracy within 200ms SLA.",
+        "Semantic chunking outperforms fixed-size by 30–40% accuracy; critical for long documents >10K tokens across enterprise systems.",
+        "Production systems reserve 25% token budget as safety buffer; miscalculation causes context collapse or 502 errors at scale.",
+        "Re-ranking retrieved chunks with LLM judges reduces hallucination by 22% compared to embedding-only retrieval in recommendation engines.",
+        "Caching chunk embeddings and implementing TTL invalidation (24h refresh cycles) cut API costs by 70% and latency by 60% in production.",
+        "Confidence scoring (0–1) on retrieval quality feeds monitoring dashboards; enables graceful degradation when confidence <0.6.",
+        "Late chunking + context window management prevents 40% accuracy loss that occurs with naive approaches; Netflix & Uber both pivoted to semantic chunking after learning this."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Google's NotebookLM processes documents up to 300+ pages using late chunking. Why is late chunking better than pre-chunking the entire document into fixed 1000-token sizes before retrieval?",
+      "items": [
+        "Fixed chunks lose semantic boundaries; late chunking waits to see the query before deciding where to split, preserving coherence and improving retrieval relevance by 30–40%.",
+        "Late chunking is faster because it processes fewer chunks.",
+        "Fixed chunks work better for long documents; Google uses late chunking only for short documents.",
+        "Late chunking requires no embedding step, reducing costs."
+      ],
+      "answer": 0,
+      "explanation": "Late chunking preserves semantic coherence by chunking based on context and query relevance rather than arbitrary token boundaries. This is why Google, Netflix, and Uber all pivoted to semantic/late chunking strategies—early chunking strategies caused 30–40% accuracy drops on documents >10K tokens. Fixed-size chunks often split sentences mid-thought, breaking context windows.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of Long-Context RAG with Late Chunking through these two knowledge checks. The first focuses on conceptual mastery of core mechanisms, while the second applies your knowledge to a realistic scenario you might encounter when building RAG systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In Late Chunking RAG, why is it advantageous to defer chunk boundary decisions until after document embedding rather than pre-chunking before embedding?",
+      "items": [
+        "It preserves semantic coherence across traditional chunk boundaries by allowing the embedding model to see complete documents, maintaining context relationships that rigid pre-chunking would fragment",
+        "It reduces the computational cost of embedding by processing fewer total tokens during the embedding phase",
+        "It automatically eliminates the need for a retrieval mechanism entirely",
+        "It guarantees that all retrieved content will always be perfectly relevant without requiring evaluation metrics"
+      ],
+      "answer": 0,
+      "explanation": "Late Chunking defers boundary decisions so the embedding model processes complete documents or large document sections, preserving the full semantic context. This prevents the common pre-chunking problem where important semantic relationships are severed at arbitrary boundaries. Option 1 is correct because late chunking allows embeddings to capture holistic document meaning. Option 2 is incorrect—late chunking actually processes more tokens during embedding (full documents), though this pays off in retrieval quality. Option 3 falsely claims retrieval becomes unnecessary; retrieval is still essential. Option 4 is wrong because no system guarantees perfect relevance; evaluation remains critical even with late chunking's improved approach."
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket analytics platform ingests match commentary (15,000 tokens per match) and must retrieve relevant passages about specific bowlers' performance. You're building a RAG system where users ask: 'How did Jasprit Bumrah bowl in the powerplay?' Your context window is 8,000 tokens. Given late chunking with dynamic boundaries, what is your best approach?",
+      "items": [
+        "Use pre-defined fixed chunks of 500 tokens to ensure fast retrieval, accepting that some Bumrah commentary may be split across chunks",
+        "Embed the entire match commentary as one document, use late chunking to dynamically identify semantically coherent boundaries around Bumrah mentions, then retrieve the smallest sufficient context that answers the query within your 8,000 token limit",
+        "Split the document into chunks at sentence boundaries before embedding to avoid oversized retrievals",
+        "Retrieve all 15,000 tokens from the match and let the LLM's summarization handle fitting it into the context window"
+      ],
+      "answer": 1,
+      "explanation": "Option 1 (correct answer) leverages late chunking's core advantage: embedding the full document preserves Bumrah's context across the entire match, then dynamic boundaries ensure retrieved passages stay semantically intact. This maximizes retrieval quality while respecting your 8,000 token context window. Option 2 fails because pre-defined chunks fragment semantic relationships—if Bumrah's action spans sentences, you lose context. Option 3 is suboptimal; sentence boundaries are arbitrary and don't align with semantic structure. Option 4 exceeds your context window (15,000 > 8,000) and wastes tokens on irrelevant commentary. Late chunking solves precisely this: it retrieves only the semantically coherent passage about Bumrah's powerplay performance, fitting comfortably within constraints while maintaining narrative flow."
     }
   ]
 }

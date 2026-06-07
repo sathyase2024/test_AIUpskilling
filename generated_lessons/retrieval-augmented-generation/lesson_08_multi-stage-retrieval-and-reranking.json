@@ -199,6 +199,195 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge in multi-stage retrieval systems, each optimizing for different constraints. The eager-rerank pattern retrieves a large candidate set (top-k=100) then applies expensive cross-encoder reranking on all documents before generation—maximizes recall but increases latency by 200-500ms and requires substantial compute budgeting. The cascade pattern applies lightweight BM25 filtering first, then expensive dense retrievers only on survivors, finally cross-encoders on the smallest set—reduces token consumption by 60-75% but introduces cascading failure modes where early stages cannot recover lost documents. The adaptive pattern dynamically adjusts retrieval depth and reranker invocation based on query confidence scores and answer uncertainty metrics—optimal for variable-cost environments but requires sophisticated calibration pipelines and monitoring infrastructure. Trade-offs center on latency budgets (eager-rerank unsuitable for <200ms SLAs), token economics (cascade minimizes costs but risks answer quality), and operational complexity (adaptive requires robust confidence estimation). Production systems typically hybrid these approaches: cascade for initial filtering, then conditional cross-encoder application based on answer consistency metrics from earlier pipeline stages.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The eager-rerank pattern mirrors preparing a 25-player squad for a match—you scout comprehensively (large retrieval), meticulously evaluate every candidate (expensive reranking), then select your best XI. It's thorough but requires stadium facilities and expert scouts. The cascade pattern resembles a county captain's progressive selection strategy: first cut to domestic performers (BM25), then assess recent form intensively (dense retrievers), finally verify against match conditions (cross-encoders). You save evaluation effort but risk rejecting a hidden gem early. The adaptive pattern is like DRS usage—you challenge only when uncertainty is high, conserving reviews for critical moments. Against a known bowling attack, you commit resources heavily; against unpredictable conditions, you preserve flexibility. Each strategy wins different scenarios: eager-rerank for high-stakes finals where budget isn't constrained, cascade for tournament formats with fixed evaluation time, adaptive for unpredictable series where conditions vary match-to-match.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Cascade Pattern with Adaptive Reranking\nclass CricketEvidenceRetriever:\n    def retrieve_and_rerank(self, query: str, match_context: dict) -> list:\n        # Stage 1: Fast filtering (batsman form check)\n        batter_candidates = self.bm25_retriever.retrieve(\n            query, top_k=50, field_weights={'recent_scores': 2.0}\n        )\n        \n        # Stage 2: Dense retrieval (seasonal statistics)\n        dense_candidates = self.dense_retriever.retrieve(\n            query, top_k=20, context=match_context\n        )\n        \n        # Merge and deduplicate\n        merged = self._merge_candidates(batter_candidates, dense_candidates)\n        \n        # Stage 3: Conditional cross-encoder (only if uncertainty high)\n        if self._query_uncertainty(query) > 0.6:\n            reranked = self.cross_encoder.rerank(\n                query, merged, top_k=10, batch_size=8\n            )\n        else:\n            reranked = merged[:10]  # Skip expensive reranking\n        \n        return reranked\n\n# ANTI-PATTERN: Eager Reranking Everything\nclass PoorRetriever:\n    def retrieve_and_rerank(self, query: str) -> list:\n        # Retrieves everything without filtering\n        all_documents = self.vector_db.retrieve(query, top_k=500)\n        \n        # Applies expensive cross-encoder to entire set\n        for doc in all_documents:  # ❌ Inefficient loop\n            doc['score'] = self.cross_encoder.score(query, doc['text'])\n        \n        # Result: 45 second latency, blown token budget\n        return sorted(all_documents, key=lambda x: x['score'])[:10]",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Applying reranking to all retrieved documents without measuring query uncertainty or answer stability first. This is the most common beginner mistake—engineers assume expensive rerankers always improve quality, but they don't justify costs when initial retrieval already provides high-confidence answers. Fix: Implement a consistency check after initial retrieval—if top-3 documents agree on the answer with >0.8 confidence, skip cross-encoder reranking entirely. Use metrics like mutual information between candidate documents' extracted facts or embedding cluster tightness to decide conditionally. Monitor your reranking invocation rate; if >80% of queries trigger reranking, your cascade thresholds are miscalibrated. Aim for 40-60% reranking invocation in production, keeping expensive stages rare and targeted.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Cascade pattern reduces token consumption 60-75% by filtering at each stage, ideal for cost-sensitive deployments",
+        "Eager-rerank maximizes answer quality at latency/cost expense, suitable for high-stakes applications with relaxed SLAs",
+        "Adaptive patterns save resources by conditioning reranking on query confidence and answer agreement metrics",
+        "Most common mistake: reranking all documents unconditionally; fix by implementing confidence-based conditional invocation",
+        "Monitor reranking rates (target 40-60%) and measure latency per stage to identify optimization opportunities",
+        "Hybrid approaches combine cascade filtering + selective cross-encoding for production robustness"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for cricket match analysis with a 300ms latency budget. Your eager-rerank pattern achieves 0.92 F1 but takes 520ms. Your cascade pattern takes 180ms with 0.84 F1. What's the best next step?",
+      "items": [
+        "Implement eager-rerank anyway; latency SLAs are suggestions",
+        "Use cascade pattern as baseline, add adaptive cross-encoder invocation based on answer confidence thresholds",
+        "Switch to dense-only retrieval to reduce latency further",
+        "Rerank on a separate service to parallelize execution"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct. You have a working cascade baseline (180ms, 0.84 F1) that meets latency constraints. The 8-point F1 gap to eager-rerank is significant but addressable through selective reranking only on low-confidence queries, keeping you under 300ms total while recovering quality. Option A violates SLA commitments. Option C trades away too much quality. Option D adds operational complexity without solving the fundamental latency issue—cross-encoder inference is the bottleneck, not orchestration. Adaptive invocation lets you maintain latency guarantees while improving quality for uncertain cases."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Multi-stage retrieval and reranking powers production systems at scale across major tech companies. Google uses this in Search Generative Experience to fetch and rank billions of web documents in milliseconds. OpenAI's ChatGPT+ integrates multi-stage retrieval for web browsing and document analysis. Meta deploys similar patterns in their Llama models for knowledge-grounded generation. Netflix uses reranking pipelines to personalize recommendation explanations at millions of concurrent requests. Uber applies dynamic context windowing for real-time routing queries with conflicting traffic data sources. Airbnb implements consistency verification across property listings and reviews. Systems fail catastrophically when reranking confidence scores are miscalibrated, retrieval latency exceeds 200ms SLA, or fusion logic doesn't handle contradictory sources. Production deployments typically require 50-200ms per multi-stage pipeline with 95th percentile tail latency monitoring.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your opening batsman (retriever) scouts for all possible ball deliveries across the pitch. The cricket captain (reranker) then evaluates each delivery's difficulty and relevance—filtering out wide balls and no-balls. Middle-order batsmen (fusion layer) combine insights from multiple fielders' positions (documents) to decide the best batting strategy. The match referee (consistency verifier) ensures the scorecard matches actual runs. Finally, the batting coach (iterative loop) reviews replays to fetch additional evidence if the score doesn't add up, sending the opener back for another over if needed.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production-grade multi-stage RAG pipeline with monitoring\nfrom typing import List, Dict\nimport time\nfrom dataclasses import dataclass\n\n@dataclass\nclass MatchContext:\n    query: str\n    retrieved_docs: List[Dict]\n    reranked_docs: List[Dict]\n    fusion_result: Dict\n    consistency_score: float\n    latency_ms: float\n\nclass CricketRAGPipeline:\n    def __init__(self, retriever, reranker, fusion_model, fact_checker):\n        self.retriever = retriever\n        self.reranker = reranker\n        self.fusion = fusion_model\n        self.fact_checker = fact_checker\n        self.latency_budget_ms = 150\n    \n    def execute_multi_stage(self, query: str, max_iterations: int = 3) -> MatchContext:\n        start_time = time.time()\n        iteration = 0\n        \n        # Stage 1: Initial retrieval\n        retrieved = self.retriever.fetch(query, top_k=50)\n        \n        while iteration < max_iterations:\n            iteration += 1\n            \n            # Stage 2: Reranking with confidence filtering\n            reranked = self.reranker.rank(\n                query=query,\n                candidates=retrieved,\n                confidence_threshold=0.6\n            )\n            \n            # Stage 3: Multi-document fusion\n            fused = self.fusion.merge(\n                documents=reranked[:10],\n                conflict_resolution='evidence_weighting'\n            )\n            \n            # Stage 4: Consistency verification\n            consistency = self.fact_checker.verify(\n                fused_result=fused,\n                original_docs=reranked\n            )\n            \n            elapsed = (time.time() - start_time) * 1000\n            \n            # Adaptive retrieval: fetch more evidence if inconsistent\n            if consistency['score'] < 0.75 and elapsed < self.latency_budget_ms:\n                retrieved = self.retriever.fetch(\n                    query=query,\n                    top_k=100,\n                    diversify=True  # Different sources for conflict resolution\n                )\n                continue\n            \n            return MatchContext(\n                query=query,\n                retrieved_docs=retrieved,\n                reranked_docs=reranked,\n                fusion_result=fused,\n                consistency_score=consistency['score'],\n                latency_ms=elapsed\n            )\n        \n        return MatchContext(\n            query=query,\n            retrieved_docs=retrieved,\n            reranked_docs=reranked,\n            fusion_result=fused,\n            consistency_score=consistency['score'],\n            latency_ms=(time.time() - start_time) * 1000\n        )\n\n# Usage in production\npipeline = CricketRAGPipeline(\n    retriever=ElasticsearchRetriever(),\n    reranker=ColBERT(),\n    fusion_model=FusionTransformer(),\n    fact_checker=FactChecker()\n)\n\nmatch_context = pipeline.execute_multi_stage(\n    \"What was Virat Kohli's performance in the 2023 Cricket World Cup?\"\n)\n\nprint(f\"Consistency Score: {match_context.consistency_score:.2f}\")\nprint(f\"Total Latency: {match_context.latency_ms:.1f}ms\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Tail Latency Kills Production\nMulti-stage RAG pipelines are only as fast as their slowest stage. A single slow document retrieval or reranking operation can push 95th percentile latency beyond SLA. Always set strict timeouts per stage (e.g., 50ms retrieval, 40ms reranking, 30ms fusion, 20ms verification). Monitor percentile latencies, not just averages. Use adaptive early-stopping: if consistency exceeds 0.85 by stage 2, skip stages 3-4. Reranking with heavy cross-encoders can introduce 200-500ms latency—use lightweight distilled models in production. Cache reranked results aggressively; 80% of queries in cricket platforms repeat within minutes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Multi-stage retrieval combines coarse retrieval + learned reranking to balance recall and latency at production scale.",
+        "Reranking layers (ColBERT, LLM-based) improve relevance by 15-40% but require strict latency budgets under 200ms.",
+        "Multi-document fusion resolves contradictions through evidence weighting and consistency scoring across source documents.",
+        "Iterative loops with on-demand fetching enable adaptive retrieval when confidence or consistency drops below thresholds.",
+        "Fact-checking loops catch hallucinations by verifying fused outputs against original source claims with NLI or semantic matching.",
+        "Production deployments require monitoring percentile latencies, caching strategies, and graceful degradation when SLA budgets are exceeded.",
+        "Dynamic context windows prioritize high-confidence, high-relevance evidence while discarding low-signal sources to reduce hallucination risk."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a production cricket analytics platform receiving 100K queries/second, you implement multi-stage retrieval with 50ms retrieval, 40ms reranking, and 30ms fusion stages. Your consistency checker takes 25ms but fails 10% of the time, triggering a costly re-retrieval loop (+100ms). What is the best optimization strategy?",
+      "items": [
+        "Increase all timeouts to 200ms to allow full re-retrieval loops whenever consistency fails.",
+        "Skip consistency verification entirely and rely on reranking scores to filter low-quality results.",
+        "Implement a lightweight pre-consistency filter (5ms) using embedding similarity; only run expensive verification on borderline cases (<15% of queries).",
+        "Cache all results for 24 hours to eliminate repeated retrievals entirely."
+      ],
+      "answer": 2,
+      "explanation": "Option C is correct. In high-throughput systems, probabilistic early-stopping and selective verification minimize latency spikes. A lightweight pre-filter catches obvious consistency issues in 5ms, reserving the expensive 25ms verifier for genuinely ambiguous cases. This reduces avg consistency verification latency to ~6-8ms (0.15 × 25ms + 0.85 × 5ms) while maintaining quality. Option A violates SLA budgets; Option B risks hallucinations; Option D is impractical for real-time sports data that updates constantly."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of multi-stage retrieval and reranking by completing the two quizzes below. The first quiz focuses on core conceptual mechanisms, while the second presents a real-world scenario requiring practical decision-making.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a multi-stage retrieval system for cricket match analysis, you retrieve 50 documents about recent matches. During the reranking stage, your relevance scorer identifies 8 documents as highly relevant to the query 'What factors led to India's loss in the 2023 World Cup final?' However, these documents contain conflicting claims: 4 say batting collapse was the primary cause, while 4 emphasize bowling performance failures. Which approach best handles this conflict before generating the final answer?",
+      "items": [
+        "Apply multi-document fusion with weighted voting where documents citing match statistics are weighted 0.7 and opinion-based analyses are weighted 0.3, then generate an answer acknowledging both factors with statistical evidence prioritized",
+        "Select only the 4 documents that mention batting collapse since they appeared first in the reranking results, and discard the bowling-focused documents to avoid confusion",
+        "Treat this as a consistency verification failure and immediately request new documents from the retrieval stage without attempting to resolve the conflict",
+        "Generate separate answers for each conflict cluster, then randomly choose one to present to the user"
+      ],
+      "answer": 0,
+      "explanation": "The correct approach is option 0 because multi-stage retrieval systems must handle genuine disagreement in source documents through weighted fusion strategies. By assigning higher weights to documents with empirical match statistics (batting averages, bowling figures), you create a principled hierarchy while acknowledging both perspectives in the final answer. Option 1 is incorrect because discarding conflicting viewpoints reduces evidence comprehensiveness and may miss important factors. Option 2 fails because consistency verification loops exist specifically to detect and resolve such conflicts, not avoid them—this is a use case for those mechanisms, not a reason to bypass generation. Option 3 is wrong because presenting multiple answers contradicts the system's goal of providing a coherent, synthesized response; instead, weighted fusion resolves the conflict within a single answer."
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for fantasy cricket league analysis. Your retrieval pipeline returns 100 documents, but your context window allows only 2,000 tokens. After reranking by relevance score, your top 12 documents would consume 3,500 tokens total. The query is 'Which all-rounders should I prioritize in my fantasy team for next month's tournament?' Your dynamic context window manager must decide what to include. What's the best strategy?",
+      "items": [
+        "Include only the top 5 reranked documents (1,800 tokens) and mark the remaining 7 as 'truncated' in your response to acknowledge information loss",
+        "Progressively add documents by relevance score until reaching 1,900 tokens, apply consistency verification to check if included documents contradict each other, then perform iterative on-demand retrieval if gaps are detected in player coverage or tournament context",
+        "Reduce token limits on each document equally to fit all 12 documents, accepting lower information density across all sources",
+        "Use only the single highest-ranked document to stay well within token limits, as it presumably contains the most relevant information"
+      ],
+      "answer": 1,
+      "explanation": "Option 1 is the correct answer because it combines several best practices from this lesson: it respects the hard context window constraint (1,900 < 2,000 tokens), uses relevance-based progressive addition (like a cricket batsman building an innings incrementally), applies consistency verification to detect contradictions among included documents, and crucially implements on-demand iterative retrieval to fill gaps. If the 7 included documents only mention top-order batsmen but miss all-rounder analysis, the system triggers another retrieval cycle specifically for all-rounders. Option 0 is suboptimal because truncation notification doesn't solve the information gap—it just admits defeat. Option 2 is dangerous because uniform token reduction degrades all sources equally, potentially losing critical context about player injury status or tournament format changes. Option 3 oversimplifies: the highest-ranked document may be about top-order batting only, missing all-rounder perspectives entirely, making on-demand retrieval necessary for completeness."
     }
   ]
 }

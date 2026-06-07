@@ -159,6 +159,264 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Model deployment at runtime involves sophisticated orchestration of memory allocation, request routing, and inference execution. When a deployed model receives input data, the inference server deserializes the request, allocates GPU/CPU resources from a resource pool, loads model weights from cache or disk into memory, executes forward passes through computational graphs, and streams results back to clients. The runtime maintains warm model replicas across multiple processes or containers to handle concurrent requests. Memory management becomes critical: models must fit within available VRAM, with careful attention to batch size, precision (float32 vs. float16), and quantization strategies. Execution flow involves request queues, load balancers distributing traffic across replicas, and graceful shutdown mechanisms. Performance characteristics depend on latency (time-to-first-token for LLMs, inference time for classifiers), throughput (requests per second), and tail latencies (p99, p95) under load. The runtime environment tracks resource utilization, manages model lifecycle transitions (loading, serving, unloading), and enforces Service Level Agreements (SLAs) through backpressure and circuit breakers.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider India's ODI strategy during a match. Virat Kohli (the model) is the core asset that must perform consistently. His preparation and warm-up (model serialization and caching) happen before play begins—the faster he's ready, the better. Jasprit Bumrah operates as a load balancer, strategically rotating between spells to manage workload distribution across overs (request batching and concurrent inference). Rohit Sharma, as opener, sets the pace for the innings (request routing and latency targets)—he faces fast bowlers efficiently without getting out (handling latency SLAs). The team's batting order represents resource allocation: players are prepared in sequence, not all at once, to manage energy (memory and CPU budgeting). The fielding captain monitors Bumrah's performance metrics—economy rate and strike rate (throughput and latency monitoring)—and pulls him from the attack if he tires (triggering model replica restarts). When Kohli retires hurt mid-match, his replacement must take over seamlessly (model versioning and zero-downtime rollover). This parallel reveals that production ML systems, like cricket teams, require careful resource orchestration, graceful degradation under pressure, and continuous performance monitoring to maintain peak execution.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import asyncio\nimport psutil\nfrom typing import List, Dict\nfrom dataclasses import dataclass\nfrom collections import deque\nimport time\n\n@dataclass\nclass InferenceRequest:\n    \"\"\"Cricket match performance prediction request\"\"\"\n    player_name: str\n    batting_avg: float\n    recent_form: List[int]  # recent scores\n    opposition_strength: float\n    request_id: str\n    timestamp: float\n\n@dataclass\nclass BatchInference:\n    \"\"\"Batched requests for efficient GPU utilization\"\"\"\n    requests: List[InferenceRequest]\n    batch_size: int\n    priority: int  # higher = urgent (like match-deciding moments)\n\nclass RuntimeExecutor:\n    \"\"\"Low-level inference runtime with memory and queue management\"\"\"\n    \n    def __init__(self, max_batch_size: int = 32, gpu_memory_gb: float = 8.0):\n        self.max_batch_size = max_batch_size\n        self.gpu_memory_gb = gpu_memory_gb\n        self.request_queue = deque()\n        self.active_batches: Dict[str, BatchInference] = {}\n        self.memory_pool = gpu_memory_gb\n        self.model_replicas = 3  # warm replicas like cricket batting order\n        self.tail_latencies = []  # track p99, p95\n        self.requests_processed = 0\n\n    def estimate_memory_footprint(self, batch: BatchInference) -> float:\n        \"\"\"Estimate GPU memory needed for batch inference\"\"\"\n        model_weights_gb = 2.5  # ResNet/BERT-sized model\n        activations_per_request_mb = 150  # intermediate tensors\n        batch_activations_gb = (activations_per_request_mb * len(batch.requests)) / 1024\n        return model_weights_gb + batch_activations_gb\n\n    async def enqueue_request(self, request: InferenceRequest) -> str:\n        \"\"\"Queue incoming inference request\"\"\"\n        self.request_queue.append(request)\n        return request.request_id\n\n    async def form_batch(self) -> BatchInference:\n        \"\"\"Form a batch respecting memory constraints and latency targets\"\"\"\n        batch_requests = []\n        estimated_memory = 0\n        \n        while self.request_queue and len(batch_requests) < self.max_batch_size:\n            req = self.request_queue[0]\n            temp_batch = BatchInference(batch_requests + [req], len(batch_requests) + 1, priority=1)\n            mem_needed = self.estimate_memory_footprint(temp_batch)\n            \n            if mem_needed <= self.memory_pool:\n                batch_requests.append(self.request_queue.popleft())\n                estimated_memory = mem_needed\n            else:\n                break  # memory pressure: execute current batch\n        \n        return BatchInference(\n            requests=batch_requests,\n            batch_size=len(batch_requests),\n            priority=max([r.timestamp for r in batch_requests], default=0)\n        )\n\n    async def execute_inference(self, batch: BatchInference) -> Dict[str, float]:\n        \"\"\"Execute batch inference on warm replica\"\"\"\n        start_time = time.time()\n        \n        # Select replica with lowest pending load (round-robin simplified)\n        replica_id = self.requests_processed % self.model_replicas\n        \n        # Simulate forward pass with memory tracking\n        inference_time = 0.05 + (batch.batch_size * 0.01)  # 50ms base + 10ms per request\n        await asyncio.sleep(inference_time)\n        \n        end_time = time.time()\n        latency_ms = (end_time - start_time) * 1000\n        \n        # Track tail latency\n        self.tail_latencies.append(latency_ms)\n        if len(self.tail_latencies) > 1000:\n            self.tail_latencies.pop(0)\n        \n        # Return predictions\n        results = {\n            req.player_name: 42.5 + (req.batting_avg * 0.3)  # mock prediction\n            for req in batch.requests\n        }\n        \n        self.requests_processed += batch.batch_size\n        return results\n\n    def get_runtime_stats(self) -> Dict:\n        \"\"\"Return runtime performance metrics for monitoring\"\"\"\n        sorted_latencies = sorted(self.tail_latencies)\n        return {\n            \"total_requests_processed\": self.requests_processed,\n            \"queue_depth\": len(self.request_queue),\n            \"memory_available_gb\": self.memory_pool,\n            \"p99_latency_ms\": sorted_latencies[int(len(sorted_latencies) * 0.99)] if sorted_latencies else None,\n            \"p95_latency_ms\": sorted_latencies[int(len(sorted_latencies) * 0.95)] if sorted_latencies else None,\n            \"avg_latency_ms\": sum(self.tail_latencies) / len(self.tail_latencies) if self.tail_latencies else None,\n        }\n\n# Usage\nasync def simulate_match_predictions():\n    executor = RuntimeExecutor(max_batch_size=16, gpu_memory_gb=8.0)\n    \n    # Simulate cricket prediction requests during match\n    requests = [\n        InferenceRequest(\"Rohit Sharma\", 48.5, [76, 89, 45], 0.72, \"req_001\", time.time()),\n        InferenceRequest(\"Virat Kohli\", 52.3, [102, 88, 67], 0.72, \"req_002\", time.time()),\n        InferenceRequest(\"Jasprit Bumrah\", 15.2, [12, 0, 8], 0.85, \"req_003\", time.time()),\n    ]\n    \n    for req in requests:\n        await executor.enqueue_request(req)\n    \n    batch = await executor.form_batch()\n    predictions = await executor.execute_inference(batch)\n    \n    print(\"Predicted scores:\", predictions)\n    print(\"Runtime stats:\", executor.get_runtime_stats())",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Underestimating memory footprint during batching can cause Out-of-Memory (OOM) errors, crashing inference replicas mid-request. Always include buffers for dynamic tensors and activation spikes. Monitor p99 latency vigilantly—long tail latencies often indicate resource contention or GC pauses that degrade user experience despite low average latency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Runtime inference involves request deserialization, resource allocation, forward pass execution, and result streaming—all must complete within latency budgets.",
+        "Memory management is critical: model weights, activations, and batch buffers compete for limited GPU/CPU space; quantization and batching strategies directly impact throughput.",
+        "Warm model replicas distributed across processes/containers enable concurrent request handling and graceful load balancing without cold starts.",
+        "Tail latency (p99, p95) is more important than average latency for production SLAs; long-tail requests indicate resource bottlenecks or scheduling delays.",
+        "Request queues and backpressure mechanisms prevent overwhelming the runtime; dynamic batch formation balances latency targets against throughput optimization.",
+        "Circuit breakers and graceful degradation ensure that replica failures or resource exhaustion don't crash the entire inference service."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the RuntimeExecutor example, why is tail latency (p99) tracked separately from average latency?",
+      "items": [
+        "Because it reveals the worst-case user experience; even if most requests are fast, a few slow outliers can violate SLAs and harm user perception.",
+        "Because p99 is always higher than average latency mathematically.",
+        "Because average latency is meaningless and should never be used.",
+        "Because tail latency helps determine the model batch size."
+      ],
+      "answer": 0,
+      "explanation": "Tail latency (p99, p95) captures the experience of users in the worst 1-5% of cases—e.g., requests that hit a full queue or trigger garbage collection. High tail latencies indicate resource bottlenecks even when average latency is acceptable. This is critical for SLAs: a service with 50ms average but 2000ms p99 violates user expectations far more than one with 100ms average and 150ms p99, even though the first has lower average. Monitoring tail latency ensures equitable performance across all users."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge based on inference latency requirements, scalability needs, and cost constraints. **Batch Processing** handles non-real-time predictions by accumulating requests and processing them together—ideal for overnight analytics, report generation, or periodic model updates where latency tolerance is hours or days. Trade-off: minimal infrastructure costs but unsuitable for interactive applications. **Real-time API Serving** processes individual requests synchronously with sub-second latency using frameworks like FastAPI or gRPC; essential for user-facing applications but requires load balancing, auto-scaling, and robust monitoring. Trade-off: higher operational complexity and compute costs. **Streaming/Event-Driven** consumes continuous data streams (Kafka, Pub/Sub) for low-latency predictions on unbounded data; used in fraud detection, anomaly detection, and live recommendations. Trade-off: requires distributed systems expertise and careful state management. Selection depends on your SLA: batch for flexible deadlines, real-time API for <1s requirements, streaming for continuous decision-making on high-volume events. Cost scales accordingly—batch inference uses spot instances effectively, while streaming demands reserved capacity.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Batch processing mirrors pre-match analysis—you analyze opponent statistics overnight and present a comprehensive strategy report before play begins, accepting that insights won't change during the match. Real-time API serving is like your slip fielder reading the batter's stance and adjusting position milliseconds before delivery—reactive, demanding constant alertness, but essential for live game dynamics. Streaming inference resembles a dynamic field placement adjustment after every ball: based on current run rate, wickets fallen, and bowler performance, your captain repositions fielders continuously. Batch suits scheduled reports; real-time API suits interactive features like instant player stats lookup; streaming suits live match prediction updates. Each pattern trades off decision freshness against operational overhead—choosing wrongly wastes budget or fails users.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Synchronous inference in batch job without pooling\nimport time\nfrom datetime import datetime\n\nclass CricketBattingPredictorAntiPattern:\n    def __init__(self, model):\n        self.model = model\n    \n    def predict_match_outcomes(self, batsman_stats_list):\n        \"\"\"Processes each prediction sequentially—SLOW for batch\"\"\"\n        results = []\n        for stats in batsman_stats_list:  # N predictions, N API calls\n            start = time.time()\n            prediction = self.model.predict(stats)  # Blocks until complete\n            latency = time.time() - start\n            results.append({\n                'batsman': stats['name'],\n                'predicted_score': prediction,\n                'latency_ms': latency * 1000\n            })\n            # Problem: 10,000 batsmen × 100ms = 1000 seconds!\n        return results\n\n# BEST PRACTICE: Batch inference with vectorization\nimport numpy as np\nfrom concurrent.futures import ThreadPoolExecutor\n\nclass CricketBattingPredictorBestPractice:\n    def __init__(self, model, batch_size=256):\n        self.model = model\n        self.batch_size = batch_size\n    \n    def predict_match_outcomes(self, batsman_stats_list):\n        \"\"\"Vectorized batch processing—FAST for production\"\"\"\n        results = []\n        start_time = time.time()\n        \n        # Convert to numpy array for vectorization\n        stats_array = np.array([s['features'] for s in batsman_stats_list])\n        batsman_names = [s['name'] for s in batsman_stats_list]\n        \n        # Process in batches to balance memory and speed\n        for i in range(0, len(stats_array), self.batch_size):\n            batch = stats_array[i:i + self.batch_size]\n            batch_names = batsman_names[i:i + self.batch_size]\n            \n            # Single GPU/batch call instead of N calls\n            predictions = self.model.predict_batch(batch)\n            \n            for name, pred in zip(batch_names, predictions):\n                results.append({\n                    'batsman': name,\n                    'predicted_score': float(pred),\n                    'timestamp': datetime.utcnow().isoformat()\n                })\n        \n        total_latency = time.time() - start_time\n        print(f\"Processed {len(batsman_stats_list)} predictions in {total_latency:.2f}s\")\n        # 10,000 batsmen × batch processing = ~10 seconds instead of 1000!\n        return results\n\n# Usage comparison\nmodel = CricketPredictionModel()\n\n# Anti-pattern: ~16 minutes for 10k predictions\n# anti = CricketBattingPredictorAntiPattern(model)\n# outcomes = anti.predict_match_outcomes(large_dataset)\n\n# Best practice: ~10 seconds for 10k predictions\nbest = CricketBattingPredictorBestPractice(model, batch_size=512)\noutcomes = best.predict_match_outcomes(large_dataset)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Deploying synchronous inference without batch optimization for high-volume predictions. Many teams deploy models expecting sub-100ms per-request latency and build applications around that assumption, only to discover that real traffic creates queue backlogs. **Exact fix:** (1) Profile your model's actual latency with production hardware using `time.perf_counter()` around inference calls. (2) Measure throughput: requests per second your instance can handle. (3) Calculate minimum instances needed: `ceil(peak_qps / measured_throughput)`. (4) For batch jobs, always vectorize inputs—use model.predict_batch() or stack requests into matrices instead of calling model.predict() in a loop. (5) Set aggressive timeouts (e.g., 30s max per batch) and implement circuit breakers to fail fast rather than queue indefinitely. Many outages stem from a single slow prediction cascading into timeout chains.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Batch processing minimizes infrastructure costs for non-urgent predictions (reports, analytics); real-time APIs serve interactive user requests but demand auto-scaling and monitoring",
+        "Streaming inference processes unbounded data with low latency; requires state management, Kafka/Pub-Sub infrastructure, and specialized deployment (Flink, Spark Streaming)",
+        "Always vectorize predictions—process 256+ samples per model call via batching, not 256 sequential single-sample calls, reducing latency 10-100× for identical compute",
+        "Profile actual latency and throughput on production hardware; SLA guarantees depend on measured, not theoretical, performance metrics",
+        "Pattern selection drives architecture: batch uses spot VMs + cron jobs, real-time uses load-balanced GPU clusters, streaming uses message queues + stateful processors"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket analytics platform must predict live batting averages for 50,000 historical batsmen once daily at 2 AM, with results published by 6 AM. Which pattern should you choose?",
+      "items": [
+        "Real-time API serving with load balancers",
+        "Batch processing with vectorized inference and spot instances",
+        "Streaming inference with Kafka topics",
+        "Synchronous request-response with auto-scaling"
+      ],
+      "answer": 1,
+      "explanation": "Batch processing is optimal: (1) 4-hour deadline is generous (no <1s SLA), (2) high volume (50k) benefits from vectorization cost savings, (3) scheduled job suits spot instances (90% cheaper), (4) 2 AM timing exploits off-peak compute. Real-time API or streaming would waste 10-50× more on always-on infrastructure for an overnight job. Synchronous without batching would require hours even with massive parallelism.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Model deployment at scale is mission-critical across tech giants. Google serves billions of inference requests daily through TensorFlow Serving and Vertex AI, handling real-time search ranking, translation, and recommendation systems. Netflix deploys thousands of personalization models in their recommendation engine, processing 200+ million user interactions per day. Uber runs thousands of ML models simultaneously across matching, pricing, and ETA prediction at microsecond latency requirements. OpenAI's API infrastructure serves millions of requests to GPT models through carefully orchestrated Kubernetes clusters with auto-scaling policies. Meta's FBLearner framework manages over 300,000 models in production for ranking, safety, and content delivery. Airbnb's ML platform deploys search ranking and pricing models handling peak loads of 50,000+ requests per second. When deployment fails—incorrect versioning, memory leaks, or stale model versions—companies lose revenue instantly: a 100ms latency increase costs Netflix millions annually; misranked search results at Google affect billions of users. Proper containerization, monitoring, and CI/CD pipelines prevent these catastrophic failures.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your trained model is like a star batsman in the nets—it performs excellently during practice (training). But match day (production) is different: thousands of spectators, pressure, variable pitch conditions, and real-time decision-making at scale. Containerization is like standardizing the batsman's equipment across all grounds. Versioning is like having backup batsmen ready if the primary performer underperforms. Monitoring is your team's analyst watching every ball—detecting if the batsman's technique degrades. API design is your coach's playbook—clear signals for when to attack or defend. Without these systems, even the best batsman (model) fails under match pressure.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Production failures cascade quickly. A model deployed without proper health checks can silently serve stale predictions, degrading user experience before you notice. Always implement canary deployments (route 5% traffic first), maintain rollback procedures, and set strict SLA thresholds. A single unmonitored model consuming 10GB RAM can crash your entire service cluster.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Containerize models with Docker to ensure consistency across dev, staging, and production environments.",
+        "Implement semantic versioning for models; track lineage from data → training → deployment pipeline.",
+        "Monitor inference latency, prediction distribution drift, and resource utilization continuously in real-time.",
+        "Design stateless, horizontally-scalable APIs using frameworks like FastAPI, TensorFlow Serving, or Triton Inference Server.",
+        "Use canary deployments and A/B testing to validate new model versions before full production rollout.",
+        "Set up automated alerting for data drift, model performance degradation, and infrastructure failures.",
+        "Maintain comprehensive audit logs of model versions, deployment timestamps, and rollback events for compliance."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Netflix's recommendation system processes 200M+ user interactions daily. Which deployment strategy would best handle a new model update without risking user experience?",
+      "items": [
+        "Deploy to all users immediately; monitor for issues afterward",
+        "Route 5-10% traffic to new model (canary), compare metrics, gradually increase if stable",
+        "Test model offline only; never update production",
+        "Deploy every hour to catch problems faster"
+      ],
+      "answer": 1,
+      "explanation": "Canary deployment (answer B) minimizes risk by testing new models on a small traffic percentage first. You can compare metrics between old and new model versions in real production conditions. This approach is used by Netflix, Google, and Meta because it catches issues early without impacting all users. Immediate full deployment (A) risks catastrophic failures. Offline-only testing (C) misses production edge cases. Frequent hourly deployments (D) increase instability."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of model deployment concepts with these two assessments. The first quiz focuses on core mechanisms and theoretical understanding, while the second presents a real-world scenario where you must apply deployment knowledge to solve a practical problem.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You have trained a cricket match outcome prediction model that performs exceptionally well in development (98% accuracy). After deploying it to production using Docker containers, you notice the model's accuracy drops to 72% within two weeks. The training data was collected from matches played between 2015-2020. What is the MOST LIKELY root cause of this performance degradation?",
+      "items": [
+        "Data drift: the distribution of features in production matches (player injuries, rule changes, new players) has shifted significantly from the training data",
+        "The Docker container is not allocating enough CPU resources to run inference at optimal speed",
+        "The model serialization process corrupted the weights when the model was saved to pickle format",
+        "API latency increased, causing timeout errors that artificially lowered the accuracy metric"
+      ],
+      "answer": 0,
+      "explanation": "Data drift is the correct answer because model performance degradation in production—especially with such a dramatic drop from 98% to 72%—typically indicates that the input data distribution has changed. Cricket evolves: new playing styles emerge, player fitness levels improve, rule modifications occur, and team compositions change. The model learned patterns from 2015-2020 data but now encounters fundamentally different match conditions. While resource allocation, serialization errors, and API latency could cause issues, they would typically result in different failure modes (slow inference, completely broken predictions, or timeouts) rather than consistent but degraded accuracy. Monitoring data drift through statistical tests on feature distributions and prediction confidence scores is essential for catching this problem early.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket player performance prediction model is served via a REST API that receives 500 requests per second during match days. You implement comprehensive monitoring and observe that: (1) p99 latency increased from 50ms to 800ms over the past hour, (2) model predictions show increasing confidence scores but lower calibration, (3) CPU usage is stable at 40%, (4) no recent code or model changes were deployed. What should you investigate FIRST?",
+      "items": [
+        "Increase the number of API server replicas immediately to handle the traffic spike",
+        "Roll back to the previous model version because predictions are becoming overconfident",
+        "Check if input data quality has degraded—missing features, null values, or out-of-range statistics that cause the model to process requests slower and produce miscalibrated predictions",
+        "Examine database query logs since the latency increase suggests the inference serving layer is waiting on external I/O operations"
+      ],
+      "answer": 2,
+      "explanation": "Input data quality degradation is the correct first investigation because the symptoms point directly to this issue: latency increased significantly while CPU remained stable (ruling out compute saturation), no deployment changes occurred (ruling out code issues), and increasing confidence with poor calibration is a classic sign of distributing data outside the model's training range. In cricket analytics, this could mean batsmen statistics being recorded differently, sensor data formatting changes in live match feeds, or new player metrics that weren't in training data. When the model encounters unfamiliar feature patterns, it may process them more slowly through the neural network layers and produce overconfident but incorrect predictions. While scaling could help (option A), it wouldn't solve the root cause. Rolling back (option B) is premature without diagnosis. Database I/O (option D) is possible but less likely given stable CPU—data quality issues are more probable given the specific pattern of overconfidence plus degradation.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

@@ -194,6 +194,189 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems employ several established patterns, each optimized for different retrieval scenarios. The **Dense Passage Retrieval (DPR)** pattern uses dual encoders for queries and documents, enabling real-time semantic matching with latency under 100ms—ideal when you need fast responses on smaller corpora (under 10M documents). The **Hybrid Search** pattern combines dense vector retrieval with sparse BM25 keyword matching, recovering 15-25% more relevant results by capturing both semantic and lexical relevance; it costs 30-40% more compute but handles out-of-domain queries better. The **Hierarchical Indexing** pattern organizes documents into metadata layers (source → section → chunk), reducing search scope by 80-90% before semantic matching—essential for multi-domain corpora. **Approximate Nearest Neighbor (ANN)** algorithms like HNSW or IVF compress 1B+ dimensional vectors into searchable graphs with 98% recall at 10x speed reduction, but require careful parameter tuning for your specific embedding dimension. Trade-offs include index refresh latency (dense indices take 2-4x longer to rebuild than sparse), memory overhead (vector indices use 2-8GB per million documents), and cold-start problems where new documents have no retrieval history.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Dense Passage Retrieval is like placing fielders based on detailed batting statistics—precise and responsive, but only works for known opponents. Hybrid Search mirrors a captain's dual strategy: aggressive slip cordon (sparse keyword catches) combined with mid-field positioning (dense semantic coverage), catching edges you didn't expect. Hierarchical Indexing resembles bowling rotations across grounds—you don't field every bowler everywhere, but rotate strategically by venue and match situation. ANN algorithms are like using DRS reviews efficiently: you can't check every marginal call (too slow), so you use smart heuristics to identify high-impact decisions. The trade-off between index refresh speed and search accuracy is like choosing between aggressive bowling (fast wickets, higher runs conceded) versus defensive bowling (slower but more economical).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Hybrid Search with ANN indexing\nfrom pinecone import Pinecone, ServerlessSpec\nfrom bm25s import BM25\nimport numpy as np\n\n# Initialize vector and sparse indices\npinecone_client = Pinecone(api_key=\"your-key\")\nindex_cricket = pinecone_client.Index(\"cricket-hybrid\")\nbm25_model = BM25()\n\ndef hybrid_retrieve_batsmen(query, top_k=10, alpha=0.7):\n    \"\"\"\n    Retrieve batting records using hybrid search.\n    alpha=0.7 weights dense (70%) vs sparse (30%)\n    \"\"\"\n    # Dense vector search (semantic)\n    query_embedding = embedding_model.encode(query)\n    dense_results = index_cricket.query(\n        vector=query_embedding,\n        top_k=top_k,\n        include_metadata=True\n    )\n    \n    # Sparse keyword search (BM25)\n    sparse_results = bm25_model.retrieve(\n        query,\n        corpus=batsmen_corpus,\n        k=top_k\n    )\n    \n    # Normalize and combine scores\n    dense_scores = {r['id']: r['score'] for r in dense_results['matches']}\n    sparse_scores = {r['id']: r['score'] for r in sparse_results}\n    \n    all_ids = set(dense_scores.keys()) | set(sparse_scores.keys())\n    hybrid_scores = {\n        bid: (alpha * dense_scores.get(bid, 0) + \n              (1-alpha) * sparse_scores.get(bid, 0))\n        for bid in all_ids\n    }\n    \n    return sorted(hybrid_scores.items(), key=lambda x: x[1], reverse=True)[:top_k]\n\n# ANTI-PATTERN: Dense-only search (fragile, missing lexical matches)\ndef poor_retrieve_batsmen(query, top_k=10):\n    \"\"\"Missing rare player names, acronyms, team codes\"\"\"\n    query_embedding = embedding_model.encode(query)\n    return index_cricket.query(vector=query_embedding, top_k=top_k)\n    # ❌ Fails when searching \"CSK opener\" (team code) or \"AB deVilliers\" (nickname)\n    # ✓ Hybrid search catches both semantic intent AND exact matches",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Vector Drift Without Reindexing** — Beginner mistake: Adding new cricket match documents to your corpus without recomputing embeddings for the entire index. This causes semantic drift where old embeddings use different encoder versions than new ones, degrading retrieval quality by 20-40% invisibly. FIX: Implement a versioning system where all documents in an index use the same embedding model version. When upgrading embeddings, either (1) perform full reindex before swapping (downtime approach), or (2) maintain dual indices during transition period and gradually migrate queries (blue-green deployment). Set up monitoring that tracks embedding staleness and auto-triggers reindexing when >5% of documents exceed 30 days old. Use index metadata to store embedding_model_version and timestamp; reject cross-version queries that would contaminate results.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Dense retrieval (DPR) excels at semantic matching but struggles with out-of-vocabulary terms; combine with sparse BM25 for production robustness",
+        "Hierarchical indexing reduces search latency by 80-90% on large corpora by filtering before semantic matching—essential for multi-domain datasets",
+        "ANN algorithms (HNSW, IVF) achieve 10x speedup with 98% recall by trading exact search for approximate nearest neighbors—tune parameters for your embedding dimension",
+        "Hybrid search requires score normalization (min-max scaling) before combining dense and sparse signals; unequal normalization causes one signal to dominate",
+        "Embedding staleness from model updates is invisible but degrades quality significantly; implement versioning and auto-reindexing triggers"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for cricket statistics across 50M historical matches and player records. Users sometimes query with acronyms ('MI', 'IPL'), exact player nicknames ('King Kohli'), and semantic phrases ('explosive opening batsmen'). Which pattern best solves this?",
+      "items": [
+        "Dense-only semantic search with high-quality embeddings",
+        "Sparse BM25 keyword search with exact matching",
+        "Hybrid search combining dense vectors (70%) and BM25 (30%) with ANN indexing",
+        "Hierarchical indexing with dense retrieval only at leaf nodes"
+      ],
+      "answer": 2,
+      "explanation": "Hybrid search (C) is optimal because: dense vectors handle semantic intent ('explosive opening batsmen'), BM25 catches acronyms/nicknames that embeddings miss ('MI', 'King Kohli'), and ANN indexing enables sub-100ms latency on 50M documents. A fails on acronyms, B misses semantic intent, D still requires hybrid matching at leaves. The 70/30 split balances both signals for cricket domain data."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RAG systems power production systems at massive scale across tech giants. Google integrates RAG into Search Generative Experience, processing billions of queries daily by retrieving and ranking relevant documents in milliseconds. OpenAI uses RAG patterns in ChatGPT plugins to fetch real-time data and proprietary knowledge bases. Netflix leverages semantic retrieval to recommend content by matching user preferences against their massive catalog. Uber's logistics systems retrieve historical trip patterns and route information to optimize driver-customer matching. Meta's recommendation systems index user-generated content to retrieve contextually relevant posts. Airbnb retrieves listing metadata and guest preferences to generate personalized property recommendations. These systems handle 10k-100k+ queries per second, requiring distributed vector databases (Pinecone, Weaviate, Milvus), optimized reranking with models like ColBERT, and careful latency management. Common failure points: stale embeddings causing outdated retrievals, vector database overload under peak traffic, reranking bottlenecks exceeding SLA budgets, and semantic drift where embeddings diverge from user intent over time.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Indexing the corpus is like creating a comprehensive scorecard of every player's career statistics. Document chunking is dividing that data into meaningful segments—runs per over, wickets per venue, averages against specific bowlers. Embedding is converting these segments into a numerical format (like a 'player profile vector'). Vector search is finding players with similar stats when you need a batter for a specific condition. Reranking is the captain's final decision—after finding statistically similar players, considering current form, opposition strengths, and pitch conditions. In production, you're managing thousands of live matches simultaneously, updating vectors in real-time as scores change, and retrieving optimal player combinations in seconds—miss the deadline, and you lose the toss!",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Embedding staleness is a critical failure mode in production. If your cricket_player_index embeddings are updated daily but queries arrive hourly, you risk retrieving outdated player stats. Always implement incremental indexing (batch updates every 1-4 hours) and monitor embedding-query freshness. Use metadata filtering to exclude stale documents. For real-time systems, consider streaming index updates or dual-index strategies (hot index for recent data, cold index for historical).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "RAG enables production systems to handle billions of queries by combining fast retrieval with accurate reranking under strict latency SLAs.",
+        "Distributed vector databases (Pinecone, Weaviate, Milvus) are essential for scaling RAG beyond single-machine limits to 10k+ QPS.",
+        "Document chunking strategy directly impacts retrieval quality; overlapping chunks prevent semantic boundary artifacts and improve context coverage.",
+        "Semantic reranking (ColBERT, cross-encoders) dramatically improves relevance but introduces latency; balance with approximate nearest-neighbor speed.",
+        "Embedding freshness is critical; stale vectors cause retrieval drift; implement streaming updates and metadata-based staleness filtering.",
+        "Prompt engineering for RAG must handle variable-length contexts; use sliding window techniques and context compression to prevent token overflow.",
+        "Production RAG systems fail silently when embeddings diverge from user intent; monitor retrieval quality metrics and implement A/B testing for index changes."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket analytics platform indexes 10 million match records. Queries arrive at 5000 QPS. Which challenge is most critical to solve first?",
+      "items": [
+        "Implementing approximate nearest-neighbor search to handle query throughput",
+        "Fine-tuning reranking models for perfect relevance",
+        "Creating overlapping document chunks",
+        "Adding metadata filtering for all queries"
+      ],
+      "answer": 0,
+      "explanation": "At 5000 QPS, brute-force vector search is infeasible (O(n) per query = catastrophic latency). Approximate nearest-neighbor indexing (HNSW, IVF) is mandatory for throughput. Relevance tuning, chunking strategy, and filtering are important but secondary to handling query velocity—they optimize a system that's already fast enough to serve users."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of indexing large corpora efficiently with these two knowledge checks. The first focuses on conceptual understanding of core mechanisms, while the second applies these concepts to a real-world scenario.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You are building a RAG system for a cricket analytics platform with 50,000 match reports. Your team debates chunking strategy: one engineer proposes fixed 256-token chunks, another suggests variable-length chunks based on sentence boundaries. Given that queries often ask about specific innings or match phases, which approach would better balance retrieval precision with semantic coherence, and why?",
+      "items": [
+        "Fixed 256-token chunks are always superior because they guarantee uniform vector dimensions",
+        "Variable-length chunks based on sentence boundaries are better because they preserve semantic units (like a cricket innings or bowling spell) and align chunks with meaningful query boundaries",
+        "Token-based chunking should be avoided entirely in favor of document-level indexing",
+        "The choice between fixed and variable chunks has no measurable impact on retrieval quality"
+      ],
+      "answer": 1,
+      "explanation": "Variable-length chunks based on sentence or logical boundaries are superior for this use case because they preserve semantic coherence—a cricket innings is a natural logical unit, just as a bowling spell or partnership is. When chunks align with meaningful segments, the embeddings capture richer semantic information, and queries asking about specific innings or phases will retrieve more relevant context. Fixed-token chunks (Option A) can arbitrarily split meaningful units, degrading semantic quality. Document-level indexing (Option C) would create vectors too broad for granular retrieval. Option D ignores empirical evidence showing chunking strategy significantly impacts RAG performance. In cricket terms, it's like dividing a match into uniform time blocks rather than by innings—the logical structure matters.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your RAG system indexes 100,000 cricket match transcripts using dense vector embeddings (384-dim). During testing, you notice the top-k semantic search sometimes returns historically similar matches but contextually irrelevant to user queries about specific player performances. For example, a query about 'Virat Kohli's aggressive batting in T20s' retrieves matches Kohli didn't play in, because the embeddings captured 'aggressive batting' semantically. What is the most effective solution given the constraints?",
+      "items": [
+        "Remove all player names from documents before embedding to reduce false semantic matches",
+        "Implement a reranker that uses cross-encoder models to evaluate query-document relevance, filtering results based on explicit player mention and contextual importance before passing to the LLM",
+        "Increase embedding dimensions to 1024 to capture finer semantic distinctions",
+        "Switch to sparse BM25 retrieval exclusively to avoid semantic drift"
+      ],
+      "answer": 1,
+      "explanation": "A reranker is the most effective solution because it adds a second filtering stage optimized for relevance rather than semantic similarity alone. While dense embeddings excel at capturing semantic meaning, they don't inherently understand that 'Virat Kohli's aggressive batting' must include Kohli himself. A cross-encoder reranker re-scores retrieved documents by jointly modeling the query and document, and can be trained or configured to penalize documents lacking explicit player mentions. This is like a cricket selector reviewing the top 20 candidate batsmen but then applying specific criteria (e.g., 'left-hander', 'against spin') to narrow to the perfect fit. Option A destroys useful information. Option C (higher dims) doesn't solve semantic relevance—more dimensions can amplify drift. Option D loses the semantic advantages entirely. Reranking preserves both semantic retrieval speed and adds precision filtering.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

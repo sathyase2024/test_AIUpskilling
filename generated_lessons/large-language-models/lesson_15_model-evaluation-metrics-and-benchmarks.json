@@ -197,6 +197,211 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production LLM evaluation, three dominant patterns emerge based on task complexity and resource constraints. The **multi-metric ensemble pattern** combines automatic metrics (BLEU, ROUGE, F1) with human spot-checks on 5-10% of outputs, optimal for high-volume classification tasks where false positives carry moderate cost. The **tiered evaluation funnel** applies lightweight automatic metrics as first-pass filters (rejecting obvious failures), then routes uncertain cases to human review, reducing annotation costs by 60-80% while maintaining quality gates. The **benchmark-driven continuous monitoring** pattern establishes baseline performance on fixed benchmark datasets (GLUE, SQuAD, MMLU variants) with production metrics tracking drift in real-time, catching degradation before users report issues. Trade-offs: ensemble patterns require maintaining multiple metric implementations and calibration overhead; tiered funnels introduce latency and require clear confidence thresholds; continuous monitoring demands infrastructure for automated retraining pipelines. Cost scales from $5K-50K monthly depending on annotation volume and human reviewer rates.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The multi-metric ensemble is like a captain using both conventional field placements AND reading conditions—you trust your primary strategy (automatic metrics) but verify with expert judgment (human review). The tiered evaluation funnel mirrors DRS (Decision Review System) usage: routine deliveries are auto-called without review, questionable LBW decisions go to third umpire, obvious edges aren't reviewed—each tier has decision rules. The continuous monitoring pattern resembles ongoing bowling rotation analysis during a match—track cumulative dot ball percentage, economy rates, and bowler fatigue metrics throughout innings, adjusting strategy if a pacer's pace drops from 145 to 138 kmph, signaling degradation. A captain doesn't redesign the field after every ball, but tracks patterns over overs to catch systematic drift before performance collapses in the death overs.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Single metric dependency\nclass BowlerPerformanceEval:\n    def evaluate_match(self, deliveries):\n        # Only tracks economy rate—misses consistency\n        economy = sum(runs) / overs_bowled\n        return {\"economy_rate\": economy}\n    \n    def make_selection_decision(self, economy):\n        if economy < 7.5:\n            return \"SELECT_BOWLER\"\n        # Brittles on one metric; misses 4-wicket spells at 8.2 economy\n        return \"REJECT\"\n\n# ✅ BEST PRACTICE: Multi-metric evaluation with tier gating\nclass BowlerPerformanceEval:\n    def __init__(self):\n        self.threshold_gate = {\"economy\": 8.5, \"wickets\": 0.5, \"dot_ball_pct\": 35}\n        self.human_review_threshold = 0.65  # Confidence score\n    \n    def evaluate_match(self, deliveries, match_context):\n        # Tier 1: Automatic metrics\n        economy = sum(runs) / overs_bowled\n        wicket_rate = wickets / overs_bowled\n        dot_percentage = dots / deliveries\n        \n        # Tier 2: Context-aware filtering\n        confidence = self._compute_confidence(\n            economy, wicket_rate, dot_percentage, match_context\n        )\n        \n        if confidence > self.human_review_threshold:\n            return {\"decision\": \"AUTO_SELECT\", \"metrics\": {\n                \"economy\": economy,\n                \"wicket_rate\": wicket_rate,\n                \"dot_pct\": dot_percentage,\n                \"confidence\": confidence\n            }}\n        else:\n            return {\"decision\": \"HUMAN_REVIEW\", \"metrics\": {\n                \"economy\": economy,\n                \"wicket_rate\": wicket_rate,\n                \"context_flags\": match_context[\"stage\"]  # death overs, powerplay, etc.\n            }}\n    \n    def _compute_confidence(self, economy, wicket_rate, dot_pct, context):\n        # Ensemble: weighted combination of normalized metrics\n        normalized_economy = 1 - (economy / 10)  # Lower is better\n        normalized_wickets = min(wicket_rate / 1.0, 1.0)  # Higher is better\n        normalized_dots = dot_pct / 100\n        \n        # Context-aware weighting: death overs prioritize dot balls\n        weights = {\n            \"powerplay\": {\"economy\": 0.3, \"wickets\": 0.4, \"dots\": 0.3},\n            \"middle\": {\"economy\": 0.4, \"wickets\": 0.3, \"dots\": 0.3},\n            \"death\": {\"economy\": 0.2, \"wickets\": 0.3, \"dots\": 0.5}\n        }\n        w = weights.get(context.get(\"stage\"), weights[\"middle\"])\n        \n        confidence = (\n            w[\"economy\"] * normalized_economy +\n            w[\"wickets\"] * normalized_wickets +\n            w[\"dots\"] * normalized_dots\n        )\n        return confidence",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is **overfitting evaluation to a single benchmark**—achieving 95% accuracy on SQuAD while the model fails silently on production questions with paraphrasing. This happens because you've optimized hyperparameters specifically for SQuAD's exact format and question style, creating a model that memorizes patterns rather than generalizing. Fix: Always evaluate on 2-3 demographically diverse, out-of-distribution benchmark datasets simultaneously (e.g., SQuAD + NewsQA + TriviaQA). Track metrics separately for each, and flag any benchmark where performance drops >5% from your primary metric—this signals brittleness. Implement monthly re-evaluation on held-out human annotations that weren't seen during tuning. In cricket terms: you can't select a bowler based solely on their Powerplay economy without checking death overs, road surfaces, or left-hand batsmen performance.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Multi-metric ensemble combines automatic metrics with 5-10% human review for high-volume tasks",
+        "Tiered evaluation funnel uses confidence thresholds to route cases: auto-approve (high confidence), human review (medium), auto-reject (low confidence)",
+        "Continuous monitoring on fixed benchmarks detects production drift faster than periodic batch evaluation",
+        "Context-aware metric weighting adjusts importance based on task stage (death overs prioritize dot balls over economy)",
+        "Never optimize solely on one benchmark—always cross-validate on 2-3 out-of-distribution datasets",
+        "Track both point metrics and confidence distributions to catch systematic drift before single-metric failures"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're evaluating an LLM for question-answering in production. Your model scores 92% F1 on SQuAD but only 78% on TriviaQA. What does this signal, and what's the best first action?",
+      "items": [
+        "The model is overfitted to SQuAD's format; implement re-evaluation on 3+ diverse benchmarks and add human review for TriviaQA-style questions",
+        "TriviaQA is a harder dataset; just accept the 78% as a limitation",
+        "Retrain only on TriviaQA data to boost that score",
+        "The metrics are incompatible; use only F1 from now on"
+      ],
+      "answer": 0,
+      "explanation": "A >14% gap between benchmarks indicates overfitting to SQuAD's specific question patterns and dataset biases. The model has learned SQuAD-specific shortcuts rather than generalizing QA skills. The correct fix is diversified evaluation (detects the gap), then targeted human review to diagnose which question types fail (paraphrasing, factoid vs. open-ended, etc.), then retraining with harder examples or regularization. Option B ignores systematic brittleness; Option C risks exacerbating overfitting to the opposite benchmark; Option D abandons the diagnostic signal entirely."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Model evaluation metrics and benchmarks are critical in production systems deployed by major technology companies. OpenAI uses comprehensive benchmarking across multiple datasets (MMLU, HellaSwag, TruthfulQA) before releasing ChatGPT updates to production. Google's Gemini undergoes evaluation on custom benchmarks spanning reasoning, safety, and multilingual capabilities before deployment at scale serving billions of users. Meta's LLaMA models are evaluated against established benchmarks to ensure quality across open-source releases. Netflix uses evaluation frameworks to assess recommendation model quality before A/B testing in their streaming platform. Uber applies real-time evaluation metrics to their routing and customer service models serving millions of daily requests. At scale, failures in evaluation can be catastrophic: miscalibrated safety metrics led to harmful outputs reaching users; weak reasoning benchmarks caused chatbots to fail on simple mathematical tasks; overlooked benchmark gaming resulted in models that scored well but performed poorly on real user queries. Production systems typically implement continuous evaluation pipelines that re-run benchmarks on every model iteration, maintain shadow evaluation on live traffic, and use automated alert systems when metrics fall below thresholds.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Player statistics (batting_average, strike_rate, bowling_economy) are evaluated metrics. The IPL leaderboard is the benchmark. But a player with perfect stats in practice nets (benchmark) might fail under pressure in a World Cup final (real-world production). Smart franchises don't just select players by leaderboard rankings—they combine multiple metrics, watch game footage (human evaluation), and test performance in actual match conditions before signing contracts worth millions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Relying solely on benchmark scores without production validation is a critical mistake. Many models achieve high MMLU scores but fail on simple real-world tasks. Always implement human evaluation and shadow testing before full deployment. Benchmark gaming (optimizing specifically for test metrics) creates models that look good on paper but perform poorly in production. Set evaluation thresholds conservatively and monitor drift continuously.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Automatic metrics (BLEU, ROUGE, perplexity) enable rapid iteration but miss semantic quality; always combine with human evaluation.",
+        "Benchmark performance rarely predicts real-world success—implement shadow evaluation and A/B testing before production deployment.",
+        "Human evaluation is expensive but essential for safety, factuality, and user satisfaction; allocate 15-30% of evaluation budget here.",
+        "Leaderboards drive progress but incentivize gaming; monitor benchmark saturation and continuously introduce harder test sets.",
+        "Meta-evaluation validates your evaluation process itself; track metric-outcome correlation and audit for systematic biases regularly.",
+        "Production systems require continuous monitoring: track metric drift, maintain evaluation pipelines, and alert on threshold violations.",
+        "Benchmark selection shapes model behavior; choose datasets aligned with real-world use cases, not just popular leaderboards."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A major AI company deployed a language model that scored 89% on MMLU (a reasoning benchmark) but users complained about factual errors in production. What evaluation approach should have prevented this?",
+      "items": [
+        "Increase MMLU score by retraining on more data",
+        "Combine automatic metrics with human evaluation focusing on factuality, and conduct shadow evaluation on real production queries",
+        "Trust the benchmark score since MMLU is a gold-standard benchmark",
+        "Switch to a different benchmark like HellaSwag"
+      ],
+      "answer": 1,
+      "explanation": "High benchmark scores don't guarantee production performance. The company needed human evaluation to catch factuality issues and shadow evaluation on real production queries before full deployment. Benchmarks measure specific capabilities but don't capture all aspects of model quality. Combining multiple evaluation approaches is essential."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of LLM evaluation metrics and benchmarks with these two quizzes. The first focuses on core conceptual knowledge, while the second applies your learning to real-world scenarios you might encounter when evaluating language models.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You are evaluating an LLM's performance on a customer service task. Your model achieves 85% BLEU score but receives poor human ratings for response quality and helpfulness. Why might this discrepancy occur, and what metric limitation does this reveal?",
+      "items": [
+        "BLEU is a reference-based metric that doesn't capture semantic quality, helpfulness, or factual accuracy—it only measures n-gram overlap with reference responses. A customer service model may need different valid phrasings that BLEU penalizes, even if they're more helpful to users.",
+        "BLEU scores are always inflated for customer service tasks because the metric was designed specifically for machine translation and doesn't account for domain differences.",
+        "The model is actually performing poorly, and BLEU scores are more reliable than human judgment, so the human raters were mistaken in their assessment.",
+        "BLEU cannot be used for any task other than machine translation, so this evaluation method is completely invalid for customer service applications."
+      ],
+      "answer": 0,
+      "explanation": "The correct answer highlights a fundamental limitation of automatic metrics like BLEU: they measure surface-level similarity to reference texts but don't evaluate semantic meaning, factual correctness, or usefulness. In customer service, multiple valid responses can address a customer's concern, but BLEU only rewards exact n-gram matches. This is why human evaluation is crucial—humans judge whether the response actually solves the problem, not whether it matches a predetermined reference. Option B is incorrect because metric bias is task-independent. Option C reverses the trustworthiness hierarchy; human judgment is the gold standard. Option D is false; BLEU, while originating in MT, is widely used across domains but with acknowledged limitations.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: BLEU is like counting only the number of boundaries hit (exact matches), but ignoring whether those shots were against good bowling, whether they won the match, or whether the batsman's technique was sound. A batter might score many boundaries against poor bowling and still not be a complete player. Human evaluation is like a cricket coach watching the full performance—technique, strategy, match situation, and outcome all matter.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building an LLM for a cricket analytics platform that must rank players by performance. You have three metric options: (1) Exact match accuracy on pre-written player comparisons, (2) ROUGE-L on a large cricket dataset, (3) Custom metric combining batting average, strike rate, and contextual factors with human annotation on edge cases. Which should you choose and why?",
+      "items": [
+        "Option 1: Exact match is fastest to compute and doesn't require annotation, making it the most efficient choice regardless of task complexity.",
+        "Option 2: ROUGE-L is the industry standard for all ranking tasks and should always be prioritized over custom metrics.",
+        "Option 3: A custom metric incorporating domain-specific cricket knowledge (batting average, strike rate, context) validated with human annotation best captures the complexity of player ranking and aligns with real-world cricket expertise.",
+        "Any of these would work equally well since all metrics measure the same underlying performance dimension."
+      ],
+      "answer": 2,
+      "explanation": "Option 3 is correct because ranking cricket players requires understanding nuanced domain-specific factors (batting average is only meaningful in context, strike rate matters differently in T20 vs Test cricket, recent form vs career statistics, etc.). Generic metrics like exact match or ROUGE-L ignore this cricket-specific knowledge. Custom metrics, validated against human expert judgment, capture the true complexity of the task. Option 1 fails because computational efficiency shouldn't override task relevance. Option 2 is incorrect because ROUGE-L, while useful for summarization and content matching, isn't designed for ranking tasks and lacks cricket domain knowledge. Option 4 is false; different metrics measure different aspects and suit different applications. This illustrates the principle: metric choice must be informed by task requirements and domain expertise, not convenience or tradition.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "key_points",
+      "content": "Key Takeaways from Knowledge Checks",
+      "items": [
+        "Automatic metrics are efficient but limited—they measure surface similarity, not semantic quality, helpfulness, or real-world impact. Always validate with human evaluation.",
+        "Task-specific and domain knowledge matter: generic metrics may fail on specialized applications like cricket analytics. Choose metrics aligned with your actual use case.",
+        "No single metric is perfect. Combine multiple metrics (automatic + human, reference-based + reference-free) to get a complete performance picture.",
+        "The metric-human evaluation gap signals an important insight about your model's behavior—investigate discrepancies rather than dismissing one source."
+      ],
+      "level": 2,
+      "language": ""
     }
   ]
 }

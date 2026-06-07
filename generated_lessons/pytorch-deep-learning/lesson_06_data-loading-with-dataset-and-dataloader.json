@@ -198,6 +198,179 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production PyTorch pipelines, three dominant patterns emerge for data loading: (1) Prefetching with pin_memory=True and num_workers>0 for I/O-bound workloads where data loading becomes the bottleneck—ideal for large image/video datasets where GPU remains idle waiting for batches; (2) Custom collate_fn with dynamic padding for variable-length sequences (NLP, time-series), trading minimal CPU overhead for flexibility in handling ragged tensors; (3) IterableDataset over map-style Dataset when streaming from databases, APIs, or distributed systems where random access is impossible or prohibitively expensive. The trade-off between these patterns centers on memory consumption, data loading latency, and code complexity. Prefetching consumes extra RAM to buffer future batches but reduces GPU idle time by 40-60%. Custom collate functions add ~5-10% CPU overhead but eliminate wasted padding tokens in NLP models. IterableDataset eliminates dataset size requirements and enables true streaming but sacrifices reproducibility and stratified sampling. Choose prefetching for compute-bound deep networks on fixed datasets; choose custom collate for variable-length data; choose IterableDataset only when dataset size exceeds available storage or comes from live sources.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Prefetching with num_workers is like having fielders pre-positioned based on pitch conditions before each delivery—you anticipate where the ball will go and stations are ready, minimizing reaction time when the batsman strikes. Using custom collate_fn resembles selecting your bowling rotation strategy: different bowlers (functions) handle different match situations (variable-length sequences) with tailored approaches rather than forcing all batsmen into one standard format. IterableDataset mirrors a T20 live-streaming model where you don't need to know the total match length beforehand—you process each over (batch) as it arrives from the live feed rather than downloading the entire match file. Pin memory to GPU is equivalent to keeping your fastest bowler fresh and on standby rather than having them warm up repeatedly. The num_workers parameter functions like your bowling squad size: too few workers and you're exhausted; too many and coordination chaos emerges. Setting shuffle=False on validation data is like maintaining consistent field placements during review phases—reproducibility requires deterministic ordering. Together, these decisions form your data pipeline strategy, just as field placement and bowling rotations define match strategy.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: CPU bottleneck, GPU starvation\nclass CricketMatchDataset(Dataset):\n    def __init__(self, match_ids):\n        self.match_ids = match_ids\n    \n    def __getitem__(self, idx):\n        # Slow: file I/O happens on main process during training\n        match_data = load_match_json(f'matches/{self.match_ids[idx]}.json')\n        video_frames = load_video_frames(f'videos/{self.match_ids[idx]}.mp4')\n        return torch.tensor(video_frames), torch.tensor(match_data['scores'])\n\n# Naive DataLoader—GPU waits 80% of time\nloader = DataLoader(CricketMatchDataset(match_ids), batch_size=32)\n\n\n# ✅ BEST PRACTICE: Parallel loading with prefetch\nclass OptimizedCricketDataset(Dataset):\n    def __init__(self, match_ids, cache_dir='./preprocessed'):\n        # Preprocess once: videos→tensors, JSONs→pickles\n        self.match_ids = match_ids\n        self.cache_dir = cache_dir\n    \n    def __getitem__(self, idx):\n        # Fast: memory-mapped or cached tensors\n        video = torch.load(f'{self.cache_dir}/video_{self.match_ids[idx]}.pt')\n        scores = torch.load(f'{self.cache_dir}/scores_{self.match_ids[idx]}.pt')\n        return video, scores\n\n# Parallel loading with 4 workers + pinned memory\nloader = DataLoader(\n    OptimizedCricketDataset(match_ids),\n    batch_size=32,\n    num_workers=4,  # CPU workers load 4 batches in parallel\n    pin_memory=True,  # Pre-allocate GPU host memory\n    shuffle=True,\n    persistent_workers=True  # Avoid worker restart overhead\n)\n\n\n# ✅ CUSTOM COLLATE for variable-length sequences (over-by-over data)\ndef cricket_collate_fn(batch):\n    # batch = [(overs_seq1, runs1), (overs_seq2, runs2), ...]\n    overs_sequences = [item[0] for item in batch]\n    run_targets = torch.tensor([item[1] for item in batch])\n    \n    # Pad sequences to longest in batch (not dataset max)\n    max_len = max(len(seq) for seq in overs_sequences)\n    padded_overs = torch.zeros(len(batch), max_len, dtype=torch.float32)\n    \n    for i, seq in enumerate(overs_sequences):\n        padded_overs[i, :len(seq)] = seq\n    \n    return padded_overs, run_targets  # Only pad to batch max, not global max\n\nloader = DataLoader(\n    CricketMatchDataset(match_ids),\n    batch_size=32,\n    collate_fn=cricket_collate_fn,  # Custom batching logic\n    num_workers=2\n)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Setting num_workers without preprocessing causes deadlock on Windows and massive slowdown on all OSes. GPU starvation results because raw file I/O (JSON parsing, video decompression) happens serially on main process while workers sit idle. FIX: (1) Preprocess dataset once to tensors/HDF5 before DataLoader creation—this 2-hour upfront cost saves 100+ hours of training time. (2) Move all heavy I/O into __getitem__, but only simple operations (tensor indexing, light augmentation). (3) Use num_workers=2-4 only after confirming I/O is fast (<10ms per sample). Verify with: profile using torch.profiler or simply observe if GPU utilization drops below 90% during training—if so, increase num_workers or reduce batch_size temporarily to diagnose.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Prefetching (num_workers + pin_memory) reduces GPU idle time by 40-60% for I/O-bound workloads; essential for image/video datasets.",
+        "Custom collate_fn enables dynamic padding for variable-length sequences, eliminating wasted computation on padding tokens—critical for NLP and time-series data.",
+        "IterableDataset bypasses dataset size requirements, enabling streaming from databases/APIs; sacrifices reproducibility and stratified sampling.",
+        "Preprocessing raw data to tensors before training is non-negotiable—file I/O in __getitem__ with num_workers causes massive slowdown or deadlock.",
+        "Set persistent_workers=True to avoid worker process restart overhead (50-200ms per epoch)—only disable if workers consume excessive memory.",
+        "shuffle=True on training data, shuffle=False on validation/test—reproducibility requires deterministic ordering for evaluation metrics.",
+        "Monitor GPU utilization (nvidia-smi) during training; <90% indicates data loading bottleneck—increase num_workers or batch_size.",
+        "pin_memory=True adds 2-5% memory overhead but accelerates GPU data transfer by 2-3×—use on any system with >90% free GPU memory."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a CNN on 500,000 cricket match images (40GB total). GPU utilization during training is 75%. Which action will have the highest impact?",
+      "items": [
+        "Increase batch_size from 32 to 128",
+        "Preprocess images to PNG format and set num_workers=4 with pin_memory=True",
+        "Reduce learning rate by 10× to improve convergence",
+        "Add dropout layers to reduce overfitting"
+      ],
+      "answer": 1,
+      "explanation": "The 75% GPU utilization indicates the GPU is idle 25% of the time waiting for data—this is a data loading bottleneck, not a model or hyperparameter issue. Preprocessing images to fast-access format + parallel loading (num_workers=4) + GPU memory pinning directly addresses this bottleneck and will push GPU utilization to 95%+. Increasing batch_size might help slightly but risks OOM and doesn't solve the fundamental I/O latency. Learning rate and regularization are unrelated to loading performance."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Data loading with PyTorch's Dataset and DataLoader is fundamental to production deep learning systems at scale. Google uses custom DataLoaders for training models on billions of search queries, processing terabytes of data across distributed TPU clusters. Netflix leverages efficient data pipelines to train recommendation models on user behavior sequences—poorly optimized loading causes training bottlenecks costing millions in compute. Meta's recommendation systems process petabytes of user interaction data through highly optimized DataLoaders to personalize billions of feeds daily. OpenAI used sophisticated data sampling strategies during GPT training to balance compute efficiency with data diversity across enormous datasets. Uber's real-time demand prediction models depend on low-latency data loading from streaming sources. When done wrong—missing shuffling, poor batching, or memory leaks—training slows dramatically, GPUs sit idle 40-60% of the time, and production inference systems miss SLA targets. Pinterest's image recommendation engine discovered that suboptimal DataLoader configurations wasted $50K+ monthly in unused GPU capacity. Properly implemented data loading ensures GPUs maintain >90% utilization, models converge faster, and systems scale cost-effectively.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A Dataset is your team's complete match statistics database (every batsman's runs, every bowler's wickets, weather conditions). A DataLoader is the match analyst who selects specific innings samples in mini-batches, shuffles opponents randomly for variety in training, and prefetches the next match analysis while you review current batsman performance—ensuring you never wait idle for data, just like your batsmen never wait for the next ball.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Dataset abstracts data logic; DataLoader handles batching, shuffling, and parallel loading for efficiency",
+        "num_workers>0 enables background processes to prefetch batches, preventing GPU idle time and 2-3x speed gains",
+        "Shuffling=True prevents model overfitting patterns and ensures diverse mini-batch distributions for robust training",
+        "Pin_memory=True transfers batches to GPU pinned memory, reducing PCIe latency by 10-30% on large datasets",
+        "Proper batch sizing balances memory usage, gradient stability, and hardware utilization—too small wastes compute, too large risks OOM",
+        "Custom samplers handle imbalanced cricket datasets (more sixes than dot balls) and sequential dependencies in time-series",
+        "Production systems require monitoring: log data loading times, catch batch errors early, validate pipeline correctness before training"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In production at Netflix, what is the PRIMARY consequence of inadequate DataLoader optimization?",
+      "items": [
+        "Model accuracy decreases by 5-10% immediately",
+        "GPU utilization drops to 40-60%, wasting millions in compute costs and extending training timelines",
+        "Data becomes corrupted during batch shuffling",
+        "Network bandwidth automatically scales down to save power"
+      ],
+      "answer": 1,
+      "explanation": "Poor data loading causes GPU idle time while the system waits for batches, dramatically reducing utilization efficiency. This directly wastes expensive GPU compute resources and delays model training completion—a critical concern for companies running large-scale systems. While accuracy might eventually suffer from undertraining, the immediate and measurable impact is compute waste."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of PyTorch's Dataset and DataLoader mechanisms with these two quizzes. The first focuses on conceptual understanding of core mechanisms, while the second applies your knowledge to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In PyTorch, when you create a custom Dataset class for cricket match statistics (innings scores, wickets, bowling figures), which method is absolutely required to implement and why?",
+      "items": [
+        "__init__() method only, to initialize the dataset with file paths and transformations",
+        "__len__() and __getitem__() methods, because DataLoader needs to know dataset size and fetch individual samples by index",
+        "transform() method, to normalize cricket statistics like runs and wickets to the same scale",
+        "collate_fn() method, to combine individual cricket records into batches for training"
+      ],
+      "answer": 1,
+      "explanation": "The __len__() and __getitem__() methods form the essential contract between a custom Dataset and PyTorch's DataLoader. __len__() tells DataLoader how many samples exist (like knowing total matches in a tournament), while __getitem__() specifies how to retrieve individual samples by index (like accessing the 5th match's statistics). Without these, DataLoader cannot iterate properly or create batches. While __init__() is typically implemented, it's not strictly required by the interface. The transform() method is optional for preprocessing, and collate_fn() is a helper for batch creation but not mandatory—DataLoader has default behavior if not provided."
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket player performance model using seasonal statistics. You have 10,000 player records with highly imbalanced classes (95% batsmen, 5% all-rounders). Your current DataLoader uses batch_size=32 with shuffle=True. Many batches contain only batsmen. What's the best approach to handle this?",
+      "items": [
+        "Increase batch_size to 256 so each batch is guaranteed to have more all-rounder samples through probability",
+        "Use WeightedRandomSampler in the DataLoader to oversample all-rounders and undersample batsmen, ensuring balanced representation across batches",
+        "Remove shuffle=True and manually sort data so all-rounder records come first in the dataset",
+        "Create separate DataLoaders for batsmen and all-rounders, then alternate between them during training epochs"
+      ],
+      "answer": 1,
+      "explanation": "WeightedRandomSampler is the standard PyTorch solution for class imbalance problems. It assigns higher sampling probabilities to minority classes (all-rounders) and lower probabilities to majority classes (batsmen), ensuring every batch has representative samples regardless of size. This is like strategically picking players for a practice session so you get a good mix of roles. Simply increasing batch_size doesn't fix imbalance—you might still get mostly batsmen. Removing shuffle and manual sorting destroys randomization and generalization. Creating separate DataLoaders defeats the purpose of mini-batch gradient descent and makes training inefficient. WeightedRandomSampler elegantly balances the dataset at sampling time without modifying underlying data."
     }
   ]
 }

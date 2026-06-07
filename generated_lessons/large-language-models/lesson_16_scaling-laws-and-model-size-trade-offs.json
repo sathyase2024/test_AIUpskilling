@@ -181,6 +181,168 @@
       "answer": -1,
       "explanation": "",
       "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns have emerged from scaling research: (1) Chinchilla-Optimal Training, which allocates compute equally between model parameters and training tokens—ideal when you have fixed compute budgets and need maximum downstream performance per FLOP spent; use this for resource-constrained deployments where retraining is infrequent and accuracy is paramount. (2) Inference-Optimized Scaling, which favors larger models trained on fewer tokens—critical for latency-sensitive applications where inference cost dominates (e.g., real-time API services); trades training efficiency for faster inference and reduced per-query compute. (3) Hybrid Ensemble Scaling, which deploys multiple smaller models specialized for different task families rather than one monolithic model—reduces per-inference latency, improves fault tolerance, and enables A/B testing of architectural variants, though increases operational complexity and memory footprint at serving time. The choice depends on your constraint bottleneck: if training budget is fixed, use Chinchilla; if inference latency or volume is the bottleneck, prefer Inference-Optimized; if you need task-specific accuracy and can afford orchestration overhead, Hybrid Ensemble delivers superior cost-per-quality metrics at scale.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Chinchilla-Optimal Training mirrors a balanced team composition—equal investment in batting depth and bowling quality ensures you win matches across all conditions, maximizing your win rate per training session (match). Inference-Optimized Scaling is like playing aggressive T20 cricket with a strong batting lineup: you sacrifice preparation time (tokens) for explosive performance (speed), perfect when you need quick results in fast-format tournaments where every over counts. Hybrid Ensemble Scaling resembles a captain rotating bowlers strategically—deploying a fast bowler for aggressive batsmen, a spinner for flat pitches, and a medium-pacer as a utility option. Rather than relying on one all-rounder, you match specialists to specific match situations (tasks), reducing wear on any single player (model) while improving win probability. The tradeoff: more coordination overhead during matches, but superior performance when conditions vary unpredictably across different grounds (domains).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Naive scaling without compute-optimality\nclass BowlerRotation_BadApproach:\n    def __init__(self, total_flops_budget):\n        # Allocate 80% to model, 20% to tokens (compute-inefficient)\n        self.model_params = int(0.80 * total_flops_budget)\n        self.training_tokens = int(0.20 * total_flops_budget)\n        # Results in severe undertrained model; downstream tasks suffer\n\n# BEST PRACTICE: Chinchilla-optimal allocation\nclass BowlerRotation_Chinchilla:\n    def __init__(self, total_flops_budget):\n        # Allocate 50% to model, 50% to tokens (compute-optimal)\n        self.model_params = int(0.50 * total_flops_budget)\n        self.training_tokens = int(0.50 * total_flops_budget)\n        # Maximizes validation loss reduction per FLOP; proven scaling law\n        self.compute_efficiency = self.validate_chinchilla_ratio()\n    \n    def validate_chinchilla_ratio(self):\n        # Verify N ≈ C/(6*D) where C=compute, D=training steps\n        ratio = self.model_params / self.training_tokens\n        return 0.166 < ratio < 0.167  # Should be ~1/6\n\n# INFERENCE-OPTIMIZED: Trade training efficiency for speed\nclass BowlerRotation_InferenceOptimal:\n    def __init__(self, total_flops_budget, latency_sla_ms):\n        if latency_sla_ms < 50:\n            # Stricter latency → use larger model, fewer tokens\n            self.model_params = int(0.70 * total_flops_budget)\n            self.training_tokens = int(0.30 * total_flops_budget)\n        else:\n            # Relaxed latency → approach Chinchilla balance\n            self.model_params = int(0.50 * total_flops_budget)\n            self.training_tokens = int(0.50 * total_flops_budget)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Assuming Chinchilla-Optimal (equal N and D tokens) always applies to YOUR use case. Many practitioners blindly follow the 50-50 split and deploy undertrained 7B models when inference latency constraints could justify a 13B model trained on fewer tokens. Fix: (1) Profile your inference SLA—if you need <50ms latency at 100k QPS, calculate the actual compute budget available per inference pass, then work backwards to determine optimal model size. (2) Run a small hyperparameter sweep comparing three allocations: (a) Chinchilla-optimal (50-50), (b) model-heavy (70-30), (c) token-heavy (30-70) on a representative downstream task validation set. (3) Select the allocation that minimizes your actual business metric (latency × throughput × accuracy loss), not theoretical loss curves. The Chinchilla paper optimizes loss in isolation—your production constraint is almost always a multi-dimensional tradeoff.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Chinchilla-Optimal balances parameter count and training tokens equally; maximizes loss reduction per compute dollar in isolated training scenarios",
+        "Inference-Optimized favors larger models with fewer training tokens when serving latency or per-query cost dominates total cost",
+        "Hybrid Ensemble deploys task-specialized smaller models instead of monolithic scaling; trades orchestration complexity for latency and fault tolerance gains",
+        "Always measure against YOUR constraint bottleneck (training budget, inference latency, memory, accuracy floor) rather than following patterns blindly",
+        "Validation on downstream tasks must drive pattern selection—theoretical loss curves don't capture domain-specific performance cliffs"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your team has a fixed compute budget of 1e24 FLOPs for training a cricket commentary generator. You must hit a latency SLA of 150ms per inference request at 50k QPS, and accuracy is secondary to speed. Which scaling pattern should you prioritize?",
+      "items": [
+        "Chinchilla-Optimal (50% params, 50% tokens) because it's the proven best practice",
+        "Inference-Optimized with a larger model (70% params, 30% tokens) to minimize latency at the cost of some training efficiency",
+        "Hybrid Ensemble with three 3B models specialized for (batting commentary, bowling analysis, field strategy) to distribute inference load",
+        "Token-heavy allocation (30% params, 70% tokens) to maximize downstream task accuracy regardless of latency"
+      ],
+      "answer": 1,
+      "explanation": "With a strict 150ms latency SLA and high QPS, inference speed is your binding constraint. Inference-Optimized scaling (answer B) favors larger models trained on fewer tokens, which reduces per-token latency and allows higher batch sizes—critical for meeting your SLA. Chinchilla-Optimal (A) prioritizes training efficiency over inference speed and would violate your latency requirement. Hybrid Ensemble (C) adds orchestration overhead that could worsen latency. Token-heavy (D) directly conflicts with your speed constraint. The correct choice trades off some training-time loss reduction for real-world latency performance, which is the right tradeoff when serving constraints dominate."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Scaling laws directly shape production decisions at major AI companies. OpenAI uses compute-optimal scaling to balance GPT model sizes—their 175B parameter GPT-3 operates at scale across millions of API requests daily, costing ~$0.002 per 1K tokens. Google's PaLM (540B parameters) and Gemini models are trained on TPU clusters consuming gigawatts of power; scaling efficiency determines profitability per inference. Meta's LLaMA models demonstrate that smaller, well-optimized models (7B–65B) can match larger competitors' downstream performance, reducing inference latency from 500ms to 50ms—critical for real-time feed ranking. Netflix uses smaller, distilled models for recommendation ranking to meet <100ms latency SLAs. Uber's routing predictions rely on scaling laws to decide: train one 10B model or five 2B task-specific models? Wrong decisions waste $millions in compute annually. At scale, a 2x increase in model size often requires 3–4x compute budget; companies must predict ROI before committing weeks of training.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A cricket_batsman improves with practice following predictable scaling laws—doubling training_hours doesn't double performance (diminishing returns, like loss curves). Teams must balance bowling_squad_depth (model size) with match_frequency (inference load). A smaller, specialized_bowler (distilled model) may outperform a generalist_all_rounder (large model) in specific conditions (downstream tasks) while consuming less stamina (compute). Strategic_squad_selection determines tournament_success—pick too large a squad, you waste resources; too small, you lose flexibility.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Scaling laws predict performance gains from increased model size and compute with reliable power-law exponents across domains.",
+        "Compute-optimal training allocates budget equally: model parameters and data tokens scale roughly 1:1 for minimal loss.",
+        "Smaller models achieve comparable downstream task performance through strategic fine-tuning, reducing latency and production costs dramatically.",
+        "Inference cost and latency dominate real-world decisions more than training cost when serving millions of requests daily.",
+        "Transfer learning unlocks efficiency: pre-train large, deploy small via distillation; achieves 90% accuracy at 10% compute.",
+        "Power-law exponents vary by task (0.07–0.5) and modality; always measure your specific domain before committing resources.",
+        "Production systems balance three competing demands: accuracy (scale up), speed (scale down), budget (optimize allocation)—no free lunch."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of scaling laws and model size trade-offs with these two quizzes. The first focuses on core conceptual mechanisms, while the second applies scaling principles to realistic deployment scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training two cricket commentary models: Bowler_Base (7 billion parameters) and Bowler_Elite (70 billion parameters). Both are trained on the same compute budget of 10^21 FLOPs. According to compute-optimal scaling laws, what should you expect regarding their test loss performance?",
+      "items": [
+        "Bowler_Elite will have significantly better test loss because it has 10× more parameters",
+        "Bowler_Base will have better test loss because the compute budget was distributed across fewer parameters, allowing more training tokens",
+        "Both models will achieve identical test loss since they use the same compute budget",
+        "Bowler_Elite will have worse test loss because larger models require exponentially more data to avoid overfitting"
+      ],
+      "answer": 1,
+      "explanation": "According to Chinchilla scaling and compute-optimal training, a fixed compute budget should be distributed between model size and training tokens following a specific ratio (approximately equal FLOPs on parameters and tokens). Bowler_Base with 7B parameters can be trained on more tokens within the same 10^21 FLOP budget compared to Bowler_Elite's 70B parameters. This means Bowler_Base gets more diverse training signal per parameter. Option 0 ignores the compute constraint. Option 2 is incorrect because scaling laws show clear performance differences with compute. Option 3 misunderstands modern scaling—larger models with appropriate token budgets generalize better, not worse. The key insight is that raw parameter count alone doesn't determine performance; the compute-to-parameter-to-token ratio matters most.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket analytics startup wants to deploy a real-time ball-by-ball commentary system. Current latency SLA is 150ms per prediction. Your team trained three models using the same data: Batsman_Small (2B params, 12ms latency), Batsman_Medium (13B params, 85ms latency), and Batsman_Large (70B params, 240ms latency). The Batsman_Large model scores 8% better on downstream commentary quality. What is the most appropriate scaling decision?",
+      "items": [
+        "Deploy Batsman_Large because downstream task performance is always more important than latency constraints",
+        "Deploy Batsman_Small because it's the fastest, even though it sacrifices quality",
+        "Deploy Batsman_Medium because it stays within the 150ms latency SLA while achieving strong downstream performance relative to the latency budget",
+        "Retrain all models on a smaller dataset to reduce latency across the board"
+      ],
+      "answer": 2,
+      "explanation": "This scenario reflects real-world trade-offs between model capability and deployment constraints. Batsman_Medium at 85ms latency provides a 35ms buffer within the 150ms SLA, enabling graceful degradation and accounting for network variability. While Batsman_Large offers 8% better quality, it violates the hard constraint and may cause production issues. The Pareto-optimal choice is Batsman_Medium—it maximizes performance within operational constraints. Option 0 ignores business requirements (latency SLA). Option 1 unnecessarily sacrifices too much quality without exploring the trade-off curve. Option 3 is inefficient because dataset size usually trades off against parameter count in compute-optimal training; shrinking data won't solve a latency problem caused by model size. The correct answer demonstrates that scaling decisions must balance model performance, inference costs, and system constraints simultaneously.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

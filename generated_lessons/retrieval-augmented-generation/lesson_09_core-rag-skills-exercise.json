@@ -230,6 +230,241 @@
       "answer": -1,
       "explanation": "",
       "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RAG systems operate through a multi-stage pipeline that combines vector embeddings, semantic search, and language model inference. When a query arrives, the retrieval engine converts it into a dense vector representation using an embedding model, then performs approximate nearest neighbor search across indexed documents to identify contextually relevant passages. These retrieved passages are concatenated with the original query and fed into a large language model's context window, which generates responses grounded in retrieved evidence. The memory model involves three key components: (1) the embedding space where semantic similarity is computed via cosine distance or dot product, (2) the vector index (FAISS, Pinecone, or similar) optimized for sub-linear retrieval latency, and (3) the generative model's context buffer which trades off retrieval result quantity against generation quality. Performance depends critically on embedding quality, index dimensionality, chunk size boundaries, and retrieval ranking—poorly chunked documents or misaligned embedding models create semantic gaps that no amount of LLM capability can overcome. The execution flow is strictly sequential: embed → search → rank → concatenate → generate, making retrieval bottlenecks the primary latency driver in production systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma (the batter) facing an unfamiliar bowling attack. Before stepping to the crease, he consults his team's database of match footage—this is your knowledge base. A scout (the embedding model) watches hours of footage and creates compact summaries of each bowler's patterns (embeddings). When Rohit faces a new delivery, he instantly recalls the 5 most similar deliveries he's previously seen (vector search retrieves top-k passages). His batting coach rapidly explains what happened in those similar situations and their outcomes (context concatenation). Armed with this retrieved context, Rohit makes an informed batting decision—playing a specific stroke (the LLM generates a response grounded in evidence). If the scout's summaries were poor (bad embeddings) or the retrieved footage showed irrelevant matches (low retrieval quality), Rohit's decision suffers regardless of his skill (even powerful LLMs fail with bad retrieval). The parallel reveals that RAG success depends entirely on the quality of your retrieval pipeline—the generative model is only as good as the evidence it receives.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom typing import List, Dict\nimport faiss\n\nclass CricketRAGEngine:\n    \"\"\"Advanced RAG internals with cricket-themed variables.\"\"\"\n    \n    def __init__(self, embedding_dim: int = 768):\n        self.embedding_dim = embedding_dim\n        self.player_knowledge_base: List[Dict] = []\n        self.match_embeddings = None\n        self.faiss_index = faiss.IndexFlatL2(embedding_dim)\n    \n    def index_match_documents(self, match_records: List[str], \n                             embeddings: np.ndarray) -> None:\n        \"\"\"Build vector index from match documentation.\"\"\"\n        self.match_embeddings = embeddings\n        self.faiss_index.add(embeddings.astype('float32'))\n        self.player_knowledge_base = [\n            {\"match_id\": i, \"commentary\": record}\n            for i, record in enumerate(match_records)\n        ]\n    \n    def retrieve_similar_innings(self, bowler_query: np.ndarray, \n                                k: int = 5) -> List[Dict]:\n        \"\"\"Retrieve top-k most similar past performances.\"\"\"\n        distances, indices = self.faiss_index.search(\n            bowler_query.reshape(1, -1).astype('float32'), k\n        )\n        retrieved_innings = []\n        for idx in indices[0]:\n            retrieved_innings.append({\n                \"rank\": len(retrieved_innings) + 1,\n                \"similarity_distance\": float(distances[0][len(retrieved_innings)]),\n                \"match_context\": self.player_knowledge_base[idx]\n            })\n        return retrieved_innings\n    \n    def generate_commentary_with_context(self, \n                                        rohit_query: str,\n                                        retrieval_context: List[Dict],\n                                        max_tokens: int = 150) -> str:\n        \"\"\"Generate response using retrieved context (simulated LLM).\"\"\"\n        context_str = \"\\n\".join([\n            f\"Similar match {r['match_context']['match_id']}: \"\n            f\"{r['match_context']['commentary']}\"\n            for r in retrieval_context\n        ])\n        \n        # Simulated LLM prompt construction\n        prompt = f\"\"\"Context from {len(retrieval_context)} similar innings:\n{context_str}\n\nNew situation: {rohit_query}\nAnalysis: \"\"\"\n        \n        # In production: call actual LLM (Claude, GPT, Llama)\n        return prompt\n\n# Usage demonstrating execution flow\nrag_engine = CricketRAGEngine(embedding_dim=768)\n\n# Mock data: past bowling performances (embeddings from real analysis)\nmock_embeddings = np.random.randn(100, 768)\nmock_commentary = [\n    \"Jasprit Bumrah bowled yorker at death, Kohli drove to leg boundary\",\n    \"Bumrah short ball, batter pulled for six\",\n] * 50\n\nrag_engine.index_match_documents(mock_commentary, mock_embeddings)\n\n# Retrieve phase\njasprit_bowling_query = np.random.randn(768)\nretrieved = rag_engine.retrieve_similar_innings(\n    jasprit_bowling_query, k=3\n)\n\n# Generate phase\nrohit_current_query = \"Facing Bumrah's yorkers in final over, what worked before?\"\nprompt_with_context = rag_engine.generate_commentary_with_context(\n    rohit_current_query, retrieved\n)\n\nprint(f\"Retrieved {len(retrieved)} similar innings\")\nprint(f\"Embedding space dimensionality: {rag_engine.embedding_dim}\")\nprint(f\"Index size: {rag_engine.faiss_index.ntotal} indexed matches\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The order of operations is critical—retrieve before generate. If you generate first and retrieve after, you lose the grounding benefit. Many production failures occur when retrieval is treated as optional post-processing rather than the foundation of the response pipeline.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG executes in strict sequence: embed → search → concatenate → generate. Each stage is a potential bottleneck.",
+        "Embedding quality directly determines retrieval quality; poor embeddings cannot be fixed downstream by the LLM.",
+        "The FAISS index trades memory for speed using approximate nearest neighbor algorithms (HNSW, IVF)—exact search is too slow at scale.",
+        "Context window size limits how many retrieved documents you can use; typical LLMs support 4K-200K tokens total.",
+        "Retrieval ranking matters more than you think; the 10th retrieved result may contradict the 1st, so ranking algorithms (BM25, learned reranking) prevent low-quality passages from dominating the prompt."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the RAG execution flow, what happens if your vector embeddings fail to capture semantic meaning—for example, embedding 'yorker' and 'full toss' as completely unrelated despite both being full-length deliveries?",
+      "items": [
+        "The LLM's superior understanding will recognize the semantic similarity and correct it during generation",
+        "The vector search will retrieve irrelevant documents, and the LLM will generate low-quality responses grounded in wrong evidence",
+        "The FAISS index will automatically re-cluster embeddings to fix the semantic gap",
+        "The ranking algorithm will filter out the bad retrieval results before generation"
+      ],
+      "answer": 1,
+      "explanation": "RAG's core principle is that retrieval quality is upstream of generation quality. Poor embeddings → poor retrieval → poor context → poor generation. No downstream component (LLM, reranking, or indexing) can compensate for fundamentally misaligned embeddings. The LLM can only work with what it receives; garbage in, garbage out. This is why embedding model selection is the first critical decision in any RAG system."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant RAG patterns emerge in production systems, each optimizing for different constraints. **Dense Retrieval with In-Memory Caching** prioritizes latency—ideal for real-time applications where sub-200ms response times matter. You pre-compute embeddings for your cricket match statistics corpus and cache frequently accessed queries (team performance, player averages) in Redis or similar. Trade-off: higher memory cost and stale data risk. **Hybrid Retrieval (BM25 + Vector Search)** combines lexical and semantic matching, catching both exact keyword matches ('fastest bowler') and semantic concepts ('death overs strategy'). This pattern costs more compute at query time but handles domain jargon better than pure vector search. **Iterative Refinement (Multi-hop RAG)** chains retrievals where early results inform subsequent queries—query the player database, then retrieve match context, then fetch commentary. Most expensive computationally but solves complex questions requiring context aggregation. Choose Dense Retrieval for high-QPS services, Hybrid for domain-heavy applications, and Iterative Refinement when information naturally hierarchizes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Dense Retrieval with caching is like a captain positioning fielders based on predictable batsman tendencies—you've studied the patterns and pre-positioned your slips and leg-side field to react instantly. Hybrid Retrieval mirrors the captain's decision to have both aggressive (boundary fielders) and defensive (catching positions) strategies active simultaneously, adapting to both the ball's actual behavior and expected line. Iterative Refinement is like using DRS (Decision Review System)—after the on-field umpire makes a call (first retrieval), you review the evidence (second retrieval) to refine understanding, then check boundary line detail (third retrieval), progressively building confidence in complex decisions. Each approach trades speed for accuracy differently: instant field positioning is fastest but misses surprises; having both strategies ready costs attention but catches more outcomes; DRS reviews take time but unlock higher accuracy for edge cases.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Naive retrieval without strategy\nclass CricketRAGAntiPattern:\n    def answer_question(self, question):\n        # Retrieves everything, no caching, no hybrid approach\n        all_matches = self.vector_store.search(question, top_k=1000)\n        context = ''.join([m['text'] for m in all_matches])\n        # LLM drowns in irrelevant data\n        return self.llm(f\"{question}\\n\\n{context}\")\n\n# ✅ BEST PRACTICE: Hybrid retrieval with caching strategy\nclass CricketRAGBestPractice:\n    def __init__(self):\n        self.vector_cache = {}  # Cache frequent queries\n        self.bm25_index = BM25Okapi(cricket_corpus)  # Lexical search\n        self.vector_index = FAISS(cricket_embeddings)  # Semantic search\n    \n    def answer_question(self, question):\n        # Check cache first\n        cache_key = hash(question)\n        if cache_key in self.vector_cache:\n            context = self.vector_cache[cache_key]\n        else:\n            # Hybrid: combine BM25 keyword match + vector semantic match\n            bm25_results = self.bm25_index.get_top_k(question, k=5)\n            vector_results = self.vector_index.search(question, k=5)\n            \n            # Rerank by combining scores (BM25 for exact, vector for meaning)\n            merged = self._rerank_hybrid(bm25_results, vector_results)\n            context = '\\n'.join([m['text'] for m in merged[:10]])\n            self.vector_cache[cache_key] = context\n        \n        return self.llm(f\"{question}\\n\\nContext:\\n{context}\")\n    \n    def _rerank_hybrid(self, bm25, vector):\n        # Normalize scores and blend them\n        return sorted(\n            [(r, 0.4*s) for r, s in bm25] + [(r, 0.6*s) for r, s in vector],\n            key=lambda x: x[1],\n            reverse=True\n        )",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Unbounded Context Injection. The most common beginner mistake is passing all retrieved documents directly to the LLM without truncation or ranking. This causes three failures: (1) context windows overflow, (2) 'lost in the middle' syndrome where models ignore middle passages, and (3) token costs explode. Fix: Always implement a reranker step. After retrieval, rank results by relevance score and pass only top-k results (typically 5-10 documents). Use a lightweight reranker model (like cross-encoders) or LLM-based scoring before final context assembly. For cricket_retriever, retrieve top 50 candidates, rerank to top 10, then send to LLM.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Dense Retrieval prioritizes speed via caching; use for real-time QPS-sensitive systems",
+        "Hybrid Retrieval combines BM25 (exact terms) + Vector (semantics) for domain robustness",
+        "Iterative Refinement chains multi-hop queries for complex reasoning but costs more compute",
+        "Always implement reranking to truncate context and prevent token overflow",
+        "Cache frequently asked questions to reduce embedding and LLM inference costs",
+        "Benchmark latency and accuracy trade-offs for your specific domain before production"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket statistics RAG system receives 500 QPS with 80% queries being about player rankings (which rarely change). Which pattern minimizes cost while maintaining latency?",
+      "items": [
+        "Iterative Refinement to decompose each query into substeps",
+        "Dense Retrieval with in-memory caching of ranking documents",
+        "Pure vector search with maximum top_k=1000 to ensure coverage",
+        "Hybrid BM25 + Vector with no caching"
+      ],
+      "answer": 1,
+      "explanation": "Dense Retrieval with caching is optimal here: the 80% hot queries (rankings) benefit massively from pre-computed embeddings cached in-memory, delivering sub-50ms responses. Iterative Refinement wastes compute on static data. Pure vector search doesn't leverage the keyword-exact nature of ranking queries. Hybrid without caching still re-computes embeddings unnecessarily. By caching the top ranking documents, you serve most queries from memory at near-zero cost."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RAG systems power production applications at massive scale across the industry. Google's AI Overviews integrate retrieval with generation to synthesize web results in real-time searches. OpenAI's ChatGPT plugins use RAG to access current information beyond training data cutoffs, serving millions of concurrent users. Netflix employs RAG for personalized content recommendation explanations, retrieving user history and similar titles to justify suggestions. Uber uses retrieval-augmented systems for real-time driver guidance by fetching current traffic patterns and route data. Meta's conversational AI retrieves historical conversation context and knowledge bases to maintain coherent dialogue at billions of scale. At scale (10M+ daily queries), common failure points include retrieval latency bottlenecks, hallucinations when relevant context is missing, vector database synchronization issues, and cascading failures when external knowledge sources go offline. Production systems require careful monitoring of retrieval quality metrics, embedding freshness, and fallback strategies when retrieval fails.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your batsman (language model) can't memorize every match statistic ever played. Instead, they consult the fielding coach (retrieval system) who instantly fetches relevant precedents—similar pitch conditions, opposing bowler techniques, past performance data—before deciding which shot to play. The better the coach's memory and speed, the smarter the batsman's decision.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG enables language models to access current, domain-specific knowledge without retraining, critical for production systems requiring real-time accuracy.",
+        "Retrieval quality directly impacts generation quality; poor query matching leads to hallucinations and contextual failures at scale.",
+        "Vector databases and embedding models must be continuously maintained and synchronized with source data to prevent stale or irrelevant context.",
+        "Production RAG systems require multi-layer monitoring: retrieval precision/recall, latency SLAs, embedding drift detection, and fallback mechanisms.",
+        "Chunking strategy, embedding model selection, and reranking pipelines are the most impactful optimization levers for balancing quality and cost.",
+        "Companies like OpenAI, Google, and Meta use RAG to serve billions of queries daily by decoupling knowledge currency from model updates.",
+        "Common production failures include retrieval bottlenecks under load, context window overflow, semantic mismatch between queries and indexed content, and circular reasoning loops."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of RAG fundamentals with these two knowledge checks. The first focuses on conceptual understanding of how retrieval and generation interact. The second presents a realistic scenario where you'll apply RAG principles to solve a problem.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a RAG system, why is the retrieval step performed BEFORE the generation step, rather than having the LLM generate answers directly from its training data?",
+      "items": [
+        "Retrieval adds current, domain-specific context that the LLM's training data may lack or be outdated on, allowing generation to produce more accurate and grounded responses.",
+        "Retrieval slows down response time intentionally to give users time to formulate better follow-up questions.",
+        "The generation step cannot function without retrieval because LLMs are unable to process any information independently.",
+        "Retrieval is only necessary for systems that use very small language models; larger models don't need it."
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is A. Retrieval augments the LLM with fresh, specific knowledge from your document corpus—similar to how a cricket analyst consults live match statistics before providing expert commentary rather than relying solely on historical patterns. This combats hallucination and keeps responses grounded in your actual data. Option B is incorrect because retrieval's purpose is efficiency and accuracy, not intentional slowdown. Option C misunderstands LLM capabilities; models can generate text independently, but RAG makes that generation better-informed. Option D is backwards; smaller models benefit more from retrieval augmentation, not less, because they have less training data encoded.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for a cricket statistics platform. Users ask questions like 'What's Virat Kohli's average against fast bowlers on Australian pitches?' Your embedding model sometimes returns semantically similar but factually irrelevant documents (e.g., articles about bowling techniques). What's the most effective approach to address this?",
+      "items": [
+        "Increase the similarity threshold so only the top 1 result is retrieved; this guarantees accuracy.",
+        "Implement a multi-stage retriever: use a dense embedding model for initial filtering, then apply a cross-encoder reranker to score retrieved documents by relevance-to-query before passing to the generator.",
+        "Replace your embedding model entirely with keyword-based search, since semantic search is fundamentally unreliable.",
+        "Add a rule: reject any query containing multiple keywords and ask users to simplify their questions."
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. Multi-stage retrieval—combining dense embeddings with cross-encoder reranking—is the gold standard for improving retrieval precision. The cross-encoder scores documents based on actual query-document pairs, catching false positives that embedding similarity alone missed. This is like having a first filter (quick fielder review) followed by a specialist (match analyst) who confirms whether a catch was fair. Option A is wrong because reducing results to 1 doc risks missing relevant information and has no mechanism to improve quality. Option C eliminates the semantic understanding that makes RAG work for complex queries. Option D artificially restricts user queries; the system should handle complexity, not force simplification.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

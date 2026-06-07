@@ -175,6 +175,261 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Streaming RAG operates through a multi-stage pipeline with distinct memory and execution phases. When a query arrives, the encoder processes it into a dense vector representation in microseconds. This embedding is compared against a pre-computed index of retrieval documents using optimized similarity metrics (cosine distance, L2 norm, or approximate nearest neighbor algorithms like FAISS or Annoy). The retrieval phase executes in sublinear time through hierarchical indexing structures, returning top-k candidates without exhaustive search. Retrieved contexts are concatenated into a prompt prefix, respecting token budgets through intelligent truncation strategies. The language model then streams tokens autoregressively, maintaining hidden state across the context window. Memory allocation pre-reserves GPU buffers for embeddings, KV-cache tensors, and attention matrices. Execution flow interleaves retrieval lookups with generation, allowing early stopping when confidence scores exceed thresholds or max-tokens limits approach. Performance bottlenecks typically manifest in embedding computation, similarity search latency, or model inference bandwidth rather than I/O operations when properly architected.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma batting in the 20th over of a T20 match, needing to score quickly. As each ball is bowled, he must instantly (1) encode the bowler's action—reading Jasprit Bumrah's run-up and grip angle into an internal 'mental vector' of what delivery is coming, exactly like the query encoder converts text to embeddings. (2) Next, Rohit retrieves from his memory bank the top-3 most similar deliveries he has faced before—scanning his experience database (corpus of past bowling patterns) to find the closest matches, like FAISS retrieving nearest neighbors from the document index. (3) He then conditions his shot selection on this retrieved context: if the pattern matches a yorker, he retrieves the defensive straight-bat technique; if a bouncer, he retrieves the pull-shot response. His muscle memory streams the response token-by-token—foot movement, bat angle, follow-through—rather than deciding the entire shot upfront, enabling him to adjust mid-execution if Bumrah deviates. (4) Finally, Virat Kohli at mid-pitch provides live feedback on shot effectiveness, which updates Rohit's retrieval weights: if a particular pattern-matching led to runs, that memory becomes 'hotter' for future retrievals. This reveals that streaming RAG's power lies in interleaving perception (encoding), memory lookup (retrieval), and adaptive response generation—mirroring how elite batsmen operate under real-time pressure.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom typing import Generator, List, Tuple\nimport faiss\n\nclass StreamingRAGBatsman:\n    \"\"\"Internal mechanics of streaming RAG with cricket-themed components.\"\"\"\n    \n    def __init__(self, embedding_dim: int = 768, top_k: int = 3):\n        self.embedding_dim = embedding_dim\n        self.top_k = top_k\n        self.bowling_corpus_embeddings = np.random.randn(1000, embedding_dim).astype('float32')\n        self.bowling_library = [f\"bowling_pattern_{i}\" for i in range(1000)]\n        \n        # FAISS index for sublinear retrieval\n        self.faiss_index = faiss.IndexFlatL2(embedding_dim)\n        self.faiss_index.add(self.bowling_corpus_embeddings)\n        \n        self.kv_cache = {\"key_states\": [], \"value_states\": []}\n        self.confidence_threshold = 0.75\n    \n    def encode_batting_query(self, incoming_delivery: str) -> np.ndarray:\n        \"\"\"Encodes bowler action into embedding vector (query encoding phase).\"\"\"\n        query_vector = np.random.randn(1, self.embedding_dim).astype('float32')\n        return query_vector / np.linalg.norm(query_vector)  # normalize\n    \n    def retrieve_similar_bowlings(self, query_embedding: np.ndarray) -> List[Tuple[str, float]]:\n        \"\"\"Retrieves top-k similar bowling patterns from corpus (retrieval phase).\"\"\"\n        distances, indices = self.faiss_index.search(query_embedding, self.top_k)\n        \n        # Convert L2 distance to similarity score\n        retrieved_patterns = []\n        for idx, dist in zip(indices[0], distances[0]):\n            similarity = 1.0 / (1.0 + dist)  # inverse distance as similarity\n            retrieved_patterns.append((\n                self.bowling_library[idx],\n                float(similarity)\n            ))\n        return retrieved_patterns\n    \n    def stream_shot_generation(self, \n                               retrieved_context: List[Tuple[str, float]],\n                               max_tokens: int = 50) -> Generator[str, None, None]:\n        \"\"\"Streams shot tokens autoregressively conditioned on retrieved context.\"\"\"\n        \n        # Build prompt from retrieved patterns\n        context_prefix = \"Previous similar deliveries: \" + \", \".join(\n            [f\"{pattern}({score:.2f})\" for pattern, score in retrieved_context]\n        )\n        \n        # Simulated token generation with KV-cache\n        shot_tokens = [\"plays\", \"confident\", \"drive\", \"down\", \"the\", \"ground\", \"for\", \"four\"]\n        \n        for token_idx, token in enumerate(shot_tokens[:max_tokens]):\n            # Accumulate KV-cache\n            self.kv_cache[\"key_states\"].append(np.random.randn(1, 64))  # simplified\n            self.kv_cache[\"value_states\"].append(np.random.randn(1, 64))\n            \n            # Early stopping if confidence exceeds threshold\n            confidence = 0.7 + (token_idx * 0.03)\n            if confidence >= self.confidence_threshold and token_idx > 3:\n                print(f\"[Early stop at token {token_idx}: confidence={confidence:.2f}]\")\n                break\n            \n            yield token\n    \n    def iterative_feedback_refinement(self, \n                                      shot_result: str,\n                                      retrieved_indices: List[int]):\n        \"\"\"Updates retrieval weights based on shot outcome feedback.\"\"\"\n        reward = 1.0 if \"boundary\" in shot_result or \"runs\" in shot_result else -0.5\n        \n        for idx in retrieved_indices:\n            # Increase weight of high-reward retrievals\n            scale_factor = 1.0 + (reward * 0.1)\n            self.bowling_corpus_embeddings[idx] *= scale_factor\n        \n        self.faiss_index.reset()  # rebuild index with updated weights\n        self.faiss_index.add(self.bowling_corpus_embeddings)\n        \n        return reward\n\n# Execution flow demonstration\nrag_batsman = StreamingRAGBatsman(top_k=3)\n\n# 1. Encode incoming delivery\ndelivery = \"fast bouncer at chest height\"\nquery_vec = rag_batsman.encode_batting_query(delivery)\n\n# 2. Retrieve similar patterns\nretrieved = rag_batsman.retrieve_similar_bowlings(query_vec)\nprint(f\"Retrieved patterns: {retrieved[:2]}\")\n\n# 3. Stream shot response\nprint(\"\\nStreaming shot: \", end=\"\")\nfor token in rag_batsman.stream_shot_generation(retrieved, max_tokens=50):\n    print(token, end=\" \", flush=True)\n\n# 4. Feedback loop\noutcome = \"plays pull shot for boundary\"\nreward = rag_batsman.iterative_feedback_refinement(outcome, indices=[0, 1, 2])\nprint(f\"\\n\\nFeedback reward: {reward}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Under-the-hood streaming RAG is highly sensitive to index staleness. If document embeddings are not periodically recomputed (especially after fine-tuning), retrieval quality degrades silently—queries may appear to work while returning irrelevant context. For production systems, implement index refresh schedules and monitor embedding drift metrics. Also, KV-cache memory grows linearly with sequence length; always set hard token limits to prevent OOM errors during streaming generation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Streaming RAG execution splits into five sequential phases: query encoding → similarity search (sublinear via FAISS/Annoy) → context truncation → autoregressive token generation with KV-cache → optional early stopping.",
+        "Memory model pre-allocates GPU buffers for embeddings (query + corpus), attention matrices, and KV-cache tensors; this deterministic layout enables predictable latency and throughput.",
+        "Performance bottlenecks shift from I/O to compute: embedding inference and similarity search dominate latency in retrieval, while model inference bandwidth (tokens/sec) dominates in generation.",
+        "Streaming enables adaptive execution: confidence thresholds, dynamic context truncation, and token-level early stopping reduce unnecessary computation without full query re-processing.",
+        "Index staleness and KV-cache overflow are the two most critical failure modes; production systems must implement refresh schedules and hard token limits to avoid silent quality degradation or out-of-memory crashes."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a streaming RAG system, what is the primary advantage of pre-allocating GPU buffers for embeddings and KV-cache tensors during the initialization phase?",
+      "items": [
+        "It allows the model to retrieve documents faster by caching them in RAM.",
+        "It enables predictable latency and throughput by eliminating dynamic memory allocation overhead during runtime execution.",
+        "It reduces the size of the embedding index so more documents can be stored.",
+        "It allows early stopping to work without generating any tokens."
+      ],
+      "answer": 1,
+      "explanation": "Pre-allocating GPU buffers eliminates dynamic memory allocation overhead at runtime, which can cause latency spikes and unpredictable performance. This deterministic memory layout is crucial for streaming systems where low and consistent latency is required. Options A, C, and D mischaracterize aspects of GPU memory management or streaming RAG mechanics.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge when streaming RAG responses: (1) **Chunked Retrieval with Progressive Streaming** retrieves all context upfront, then streams tokens as the LLM generates—optimal for latency-sensitive applications where you need fast time-to-first-token and can tolerate moderate context sizes (typically 4K-8K tokens). Trade-off: requires full retrieval before generation begins. (2) **Iterative Retrieval During Generation** performs retrieval in parallel with streaming, re-ranking or fetching new documents as generation progresses—ideal for open-domain questions where initial context may be insufficient, but incurs higher computational cost and variable latency. (3) **Hybrid Caching Pattern** pre-computes embeddings and maintains hot-cache for frequently accessed chunks (e.g., company documentation, FAQ datasets), reducing retrieval latency from 50-200ms to <10ms for cache hits. Production systems typically combine patterns: cache for known contexts, chunked retrieval as fallback, and iterative refinement for quality-critical domains. Cost trade-offs: caching increases storage 2-3x; iterative retrieval multiplies API calls 3-5x; progressive streaming reduces memory footprint by 40-60% versus batch processing.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Chunked Retrieval mirrors setting your field before the first ball—you commit to your slip cordon, fine leg, and deep cover based on the batter's likely shots (your query analysis), then execute (stream) your bowling without adjustments. Iterative Retrieval is like dynamic fielding in T20: reading each shot in real-time and repositioning fielders mid-over as the batsman's intent becomes clearer—expensive in effort but highly adaptive. The Hybrid Caching Pattern resembles your captain's playbook against known opponents: you've already studied Virat Kohli's weaknesses (pre-computed embeddings), so you execute the planned strategy instantly rather than analyzing fresh. Most elite teams use a hybrid approach—pre-planned strategies for predictable opponents, but eyes-open adjustments when facing unexpected batting patterns, balancing preparation cost against in-match flexibility.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Chunked Retrieval with Streaming + Monitoring\nclass CricketScoreRAG:\n    def __init__(self, embedding_model, llm_stream):\n        self.embedding_model = embedding_model\n        self.llm_stream = llm_stream\n        self.retrieval_cache = {}  # Cache hot documents\n    \n    def stream_match_commentary(self, cricket_query: str):\n        # Pre-retrieve ALL context (one latency hit)\n        query_embedding = self.embedding_model.encode(cricket_query)\n        top_k_innings = self.retrieve_cached_innings(\n            query_embedding, \n            k=5,\n            cache_threshold=0.85  # Use cache if similarity > 0.85\n        )\n        \n        # Assemble context window\n        context = self._build_context_window(top_k_innings)\n        \n        # Stream generation with clear feedback mechanism\n        token_count = 0\n        for token in self.llm_stream.generate(cricket_query, context):\n            yield token\n            token_count += 1\n            \n            # Log streaming metrics\n            if token_count % 10 == 0:\n                self.metrics.record_streaming_latency(token_count)\n    \n    # ANTI-PATTERN: Retrieving during each generation step\n    def stream_match_commentary_bad(self, cricket_query: str):\n        for token in self.llm_stream.generate_token():\n            # ❌ WRONG: Triggers 50+ retrievals for a 50-token response\n            if self.should_retrieve_new_context(token):\n                new_docs = self.retrieve_innings(cricket_query)  # EXPENSIVE\n            yield token\n            # Result: 3-5x latency increase, unstable token arrival times\n\n# BEST PRACTICE: Cache warm innings data\nclass CachedInningsRetriever:\n    def retrieve_cached_innings(self, embedding, k=5, cache_threshold=0.85):\n        cache_hits = self.retrieval_cache.get(embedding.tobytes())\n        if cache_hits and cache_hits['similarity'] > cache_threshold:\n            return cache_hits['documents']  # <10ms response\n        \n        # Cache miss: retrieve, store, return\n        docs = self.vector_store.search(embedding, k=k)\n        self.retrieval_cache[embedding.tobytes()] = {\n            'documents': docs,\n            'similarity': docs[0]['score']\n        }\n        return docs",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Over-Aggressive Context Truncation** is the #1 beginner mistake. Developers often limit context to 2K tokens to achieve <500ms latency, but this causes the retriever to return incomplete information—the LLM then hallucinates details ('The batsman scored 150 runs') that contradict your retrieved documents. **Fix**: Use progressive streaming instead—retrieve full context (4K-8K tokens), but stream tokens to the user immediately while the LLM generates. This maintains context richness while delivering fast time-to-first-token (typically 100-200ms). Measure actual latency: time-to-first-token + first-10-tokens, not end-to-end generation time. If still too slow, implement chunked retrieval caching for your top-20 queries rather than cutting context globally.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Chunked Retrieval (retrieve-then-stream) optimizes latency for known query types; use when context is stable and queries are similar",
+        "Iterative Retrieval adapts mid-generation but costs 3-5x more compute; reserve for open-domain, high-stakes applications (medical QA, legal research)",
+        "Hybrid Caching reduces retrieval latency from 50-200ms to <10ms for frequently-accessed documents; pre-compute embeddings for static knowledge bases",
+        "Cache hit rate depends on query diversity: sports commentary (narrow domain) achieves 60-80% hits; general knowledge (broad domain) achieves 20-40% hits",
+        "Monitor token-arrival variance: streaming should feel smooth (<100ms between tokens); variance >200ms indicates retrieval bottlenecks mid-generation",
+        "Context window size is the primary latency lever: every 1K additional tokens adds ~50-80ms to first-token latency; balance context richness against user experience"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket commentary RAG for live match analysis. Queries vary widely ('What was Kohli's average against fast bowlers in 2023?' vs 'Explain this boundary'). Your current system takes 800ms to return the first token. Which pattern should you prioritize?",
+      "items": [
+        "Iterative Retrieval—fetch new documents as generation progresses to handle query diversity",
+        "Hybrid Caching with Chunked Retrieval—pre-compute embeddings for common cricket metrics (player stats, match history), then stream tokens immediately",
+        "Progressive Streaming only—remove context limits entirely to get more accuracy",
+        "Implement DRS-style verification—re-retrieve after every 5 tokens to verify accuracy"
+      ],
+      "answer": 1,
+      "explanation": "Hybrid Caching (answer B) is optimal here. Live cricket commentary has predictable hot queries (player stats, recent matches, venue records)—these are cacheable. By pre-computing embeddings for cricket's high-frequency queries and maintaining a warm cache, you hit <10ms retrieval for 60-70% of queries, dropping first-token latency to 150-200ms. Chunked Retrieval then handles the remaining 30-40% of novel queries with acceptable 400-500ms latency. Iterative Retrieval (A) would make latency unpredictable during live matches (customers see variable 300ms-1.5s delays). Answer C removes the latency optimization you need. Answer D is impractical—re-retrieving every 5 tokens would increase computational cost 10x."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Streaming RAG powers production systems at massive scale across tech giants. Google uses RAG for Search Generative Experience (SGE), combining real-time web retrieval with streaming responses to billions of queries daily. OpenAI integrates RAG in ChatGPT plugins and enterprise deployments, handling millions of concurrent requests. Netflix uses retrieval-augmented systems for personalized content recommendations with real-time streaming. Meta deployed RAG for Retrieval-Augmented Generation in their recommendation feeds, processing petabytes of user interaction data. Uber streams context-aware responses for customer support and driver instructions. Airbnb leverages RAG for search ranking and personalized listing descriptions. When done wrong, systems face critical failures: hallucinations increase without proper retrieval validation, latency balloons (users abandon after 3 seconds), context windows overflow causing token waste, and stale embeddings diverge from fresh data. Production systems must handle 99.9% uptime, manage embedding staleness, implement circuit breakers for retrieval failures, and cache aggressively.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A streaming RAG system is like a cricket captain building an innings. The opening batsman (initial query) steps up to the crease. Your fielding team (retrieval module) immediately positions itself based on the batter's stance (embedding alignment). As each ball is bowled (token generated), fielders adjust positions in real-time (context refinement), communicating hand signals back to the captain (feedback loops). The commentary (streamed response) flows continuously to viewers without waiting for the entire innings to finish. If your fielders are out of position (poor retrieval), the batter scores freely (hallucinations). If communication breaks down mid-over (retrieval latency), the captain makes poor decisions (generation quality drops). Great teams practice these coordination patterns relentlessly—just like optimizing RAG workflows.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production-scale Streaming RAG with monitoring\nimport asyncio\nfrom datetime import datetime\nfrom typing import AsyncIterator\nimport logging\n\nclass ProductionStreamingRAG:\n    def __init__(self, retriever, llm, cache_ttl=3600):\n        self.retriever = retriever\n        self.llm = llm\n        self.cache_ttl = cache_ttl\n        self.query_metrics = {}\n        self.logger = logging.getLogger('streaming_rag')\n    \n    async def stream_response(\n        self, \n        cricket_query: str, \n        user_id: str\n    ) -> AsyncIterator[str]:\n        \"\"\"Stream RAG response with production safeguards\"\"\"\n        start_time = datetime.now()\n        retrieval_latency = 0\n        \n        try:\n            # Retrieve with timeout\n            retrieval_start = datetime.now()\n            batting_docs = await asyncio.wait_for(\n                self.retriever.fetch_top_k(\n                    cricket_query, \n                    k=5, \n                    user_context=user_id\n                ),\n                timeout=2.0  # Must complete within 2 seconds\n            )\n            retrieval_latency = (datetime.now() - retrieval_start).total_seconds()\n            \n            # Validate retrieval quality\n            if not batting_docs or len(batting_docs) == 0:\n                self.logger.warning(f\"No docs retrieved for: {cricket_query}\")\n                yield \"[Insufficient context] \"\n                batting_docs = []  # Degrade gracefully\n            \n            # Stream generation with context\n            context_str = \"\\n\".join(\n                [f\"[Source {i}] {doc['content']}\" \n                 for i, doc in enumerate(batting_docs[:3])]\n            )\n            \n            token_count = 0\n            async for token in self.llm.stream_with_context(\n                query=cricket_query,\n                context=context_str,\n                max_tokens=150\n            ):\n                token_count += 1\n                yield token\n                \n                # Safety check: stop if response is too long\n                if token_count > 200:\n                    self.logger.warning(f\"Token limit exceeded for user {user_id}\")\n                    break\n            \n            # Log metrics\n            total_latency = (datetime.now() - start_time).total_seconds()\n            self.query_metrics[user_id] = {\n                'query': cricket_query,\n                'retrieval_latency': retrieval_latency,\n                'total_latency': total_latency,\n                'tokens_generated': token_count,\n                'docs_retrieved': len(batting_docs),\n                'timestamp': datetime.now().isoformat()\n            }\n            \n            if total_latency > 5.0:\n                self.logger.warning(\n                    f\"Slow response: {total_latency}s for user {user_id}\"\n                )\n        \n        except asyncio.TimeoutError:\n            self.logger.error(f\"Retrieval timeout for query: {cricket_query}\")\n            yield \"[Retrieval timeout - using cached response]\\n\"\n            # Fallback to cached response\n            yield await self._get_cached_fallback(cricket_query)\n        \n        except Exception as e:\n            self.logger.error(f\"RAG pipeline error: {str(e)}\")\n            yield \"[Error generating response. Please try again.]\\n\"\n    \n    async def _get_cached_fallback(self, query: str) -> str:\n        \"\"\"Retrieve cached response for fallback\"\"\"\n        return \"Information temporarily unavailable. Try rephrasing your query.\"\n\n# Usage in API endpoint\nasync def cricket_rag_endpoint(query: str, user_id: str):\n    rag_system = ProductionStreamingRAG(\n        retriever=vector_db_client,\n        llm=streaming_llm\n    )\n    \n    async def event_generator():\n        async for chunk in rag_system.stream_response(query, user_id):\n            yield f\"data: {chunk}\\n\\n\"\n    \n    return event_generator()",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Production code includes timeout handling (2s for retrieval), graceful degradation when retrieval fails, token limits, comprehensive metrics logging, circuit-breaker fallbacks to cached responses, and latency monitoring. Real systems must prioritize reliability over perfection."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Common Production Pitfalls\n\n1. **No Timeout on Retrieval** — If your vector DB query hangs, the entire response stalls. Always set strict timeouts (typically 1-3s).\n\n2. **Unvalidated Embeddings** — Stale or miscalibrated embeddings lead to irrelevant context and hallucinations. Monitor embedding drift quarterly.\n\n3. **Unbounded Token Generation** — Without max_tokens, streaming can exhaust memory or token budgets. Cap at 150-300 tokens for streaming.\n\n4. **No Fallback Strategy** — When retrieval fails, response quality tanks. Implement cached responses, default templates, or degraded modes.\n\n5. **Ignoring Latency** — Users abandon after 3 seconds. Measure retrieval + generation latency separately. Optimize the slowest component first.\n\n6. **Missing Attribution** — Users need to know where facts came from. Always include [Source] citations in streamed output.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Streaming RAG powers production systems at Google (SGE), OpenAI (ChatGPT plugins), Netflix, Meta, Uber, and Airbnb at petabyte scales.",
+        "Production failures occur from stale embeddings, retrieval timeouts, unbounded generation, and missing fallback strategies—implement circuit breakers immediately.",
+        "Set strict timeouts (1-3s) on retrieval calls and cap streamed tokens (150-300) to maintain sub-3s user perception latency.",
+        "Monitor retrieval quality separately from generation quality; stale embeddings diverge from data without quarterly validation and retraining.",
+        "Always include source citations [Source N] in streamed responses; validates factuality and builds user trust in RAG systems.",
+        "Cache frequent queries and implement graceful degradation: when retrieval fails, serve cached or templated responses rather than hallucinations.",
+        "Measure three latencies: embedding lookup, retrieval roundtrip, and token generation; optimize slowest bottleneck first for scale."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of streaming RAG responses with these two knowledge checks. Quiz 1 focuses on core conceptual mechanisms, while Quiz 2 applies your knowledge to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In streaming RAG, why is token-level emission preferable to generating the entire response before streaming it to the user?",
+      "items": [
+        "Token-level emission reduces latency by allowing users to see partial responses immediately while generation continues, improving perceived response time and user experience.",
+        "Token-level emission decreases the computational cost of the language model by allowing it to process fewer tokens overall.",
+        "Token-level emission eliminates the need for retrieval augmentation entirely by streaming raw context directly to users.",
+        "Token-level emission guarantees that the final response will be factually accurate by preventing hallucinations before they occur."
+      ],
+      "answer": 0,
+      "explanation": "Token-level emission is the correct approach because it provides immediate feedback to users, reducing perceived latency—similar to a cricket commentator providing live ball-by-ball updates rather than summarizing the entire match after it ends. Users see content as it's generated, improving engagement and user experience. Option 1 is correct. Option 2 is incorrect because streaming doesn't reduce computational cost; it distributes it over time. Option 3 is false because retrieval is still essential in streaming RAG. Option 4 is misleading because token-level streaming doesn't inherently prevent hallucinations—those require proper retrieval and grounding mechanisms to mitigate.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a streaming RAG cricket commentary system. During generation, the LLM begins producing text about a player's statistics that contradicts the retrieved context. Your system has already streamed 15 tokens to the user. What is the most practical approach to handle this divergence?",
+      "items": [
+        "Immediately stop the stream, retrieve fresh context, and restart generation from the beginning to ensure accuracy.",
+        "Continue streaming the current response while simultaneously monitoring semantic alignment with retrieved context; flag inconsistencies for the next generation cycle and log them for feedback loop refinement.",
+        "Allow the LLM to complete its entire response without interruption, then fact-check the entire output against context before sending it to the user.",
+        "Interrupt the stream, discard all tokens generated so far, and regenerate using a different retrieval strategy without any user notification."
+      ],
+      "answer": 1,
+      "explanation": "Option 1 (continuing with monitoring and feedback) is the most practical for streaming systems. In streaming RAG, once tokens are emitted, they cannot be retracted without poor user experience—like a cricket commentator restarting mid-sentence repeatedly would confuse listeners. The pragmatic approach is to complete the stream, monitor quality, and use feedback loops to improve future retrievals and generations. This aligns with the iterative refinement pattern in RAG systems. Option 0 is disruptive to the streaming experience and wastes already-emitted tokens. Option 2 defeats the purpose of streaming by introducing unacceptable latency. Option 3 is similarly problematic and creates inconsistent user experience without explanation. Monitoring and feedback loops allow continuous improvement while maintaining streaming responsiveness.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

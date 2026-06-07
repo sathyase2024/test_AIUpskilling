@@ -150,6 +150,264 @@
       "answer": -1,
       "explanation": "",
       "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Semantic search operates through a multi-layered computational pipeline that transforms raw text into fixed-dimensional vector embeddings, then performs approximate nearest neighbor (ANN) search in high-dimensional vector space. At runtime, query text passes through an encoder (typically a transformer-based model like BERT or sentence-transformers) which generates dense embeddings—numerical representations capturing semantic meaning. These embeddings are indexed using specialized data structures (HNSW graphs, IVF indices, or learned indices) that enable sublinear retrieval time complexity. During inference, the query embedding is compared against all indexed document embeddings using distance metrics (cosine similarity, L2 distance, inner product) to identify k nearest neighbors. Memory overhead scales with embedding dimensionality (typically 384-1536 dimensions) and corpus size; a 1M document corpus with 768-dim embeddings requires ~3GB storage. Execution flow involves: (1) encoding, (2) index lookup with pruning heuristics, (3) distance computation on candidates, (4) sorting and retrieval. GPU acceleration significantly reduces latency from milliseconds to microseconds per query. Reranking stages further refine results by applying cross-encoder models that score query-document pairs jointly, trading computational cost for precision improvement.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma is the batting captain selecting which bowlers Jasprit Bumrah and Mohammed Shami should face. The query embedding is Rohit's mental assessment of the situation—his understanding of match conditions, opponent strengths, and required strategy (encoding stage). The indexed document embeddings are like the database of every previous delivery Bumrah and Shami have bowled—thousands of performances stored in memory. When Rohit decides who should bowl next, the search algorithm scans this massive historical record using a fast lookup structure (HNSW index) that groups similar bowling styles together, rather than checking every single delivery one-by-one (ANN search with pruning). The distance metric—cosine similarity—measures how closely the current game situation matches past scenarios: high similarity means \"Bumrah's pace bowling worked well in these identical conditions before.\" Virat Kohli, as vice-captain, then watches the first few bowlers selected and makes a final decision, ranking them by expected effectiveness (cross-encoder reranking). This parallel reveals that semantic search mirrors real-world decision-making: we don't exhaustively examine all options, but use intelligent indexing shortcuts to narrow the search space, then refine with expert judgment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom sklearn.metrics.pairwise import cosine_similarity\nfrom collections import defaultdict\n\nclass CricketRetrievalEngine:\n    \"\"\"Internal mechanics of semantic search for cricket commentary retrieval.\"\"\"\n    \n    def __init__(self, embedding_dim=768, hnsw_m=16):\n        self.embedding_dim = embedding_dim\n        self.hnsw_m = hnsw_m  # HNSW branching factor\n        self.document_embeddings = []  # Dense vectors (N, 768)\n        self.document_ids = []  # Metadata: player names, match IDs\n        self.hnsw_graph = defaultdict(set)  # Approximate NN graph\n        self.memory_usage = 0\n    \n    def index_commentary(self, embeddings, metadata):\n        \"\"\"Index cricket commentary with memory tracking.\"\"\"\n        self.document_embeddings = np.array(embeddings, dtype=np.float32)\n        self.document_ids = metadata\n        \n        # Calculate memory: (num_docs * embedding_dim * 4 bytes) + graph overhead\n        self.memory_usage = (\n            len(embeddings) * self.embedding_dim * 4 / (1024**2)  # MB\n        )\n        print(f\"Indexed {len(embeddings)} commentaries. Memory: {self.memory_usage:.1f}MB\")\n        \n        # Build simplified HNSW graph\n        self._build_hnsw_layer_zero()\n    \n    def _build_hnsw_layer_zero(self):\n        \"\"\"Construct hierarchical navigable small world graph (layer 0).\"\"\"\n        for doc_idx in range(len(self.document_embeddings)):\n            # For each document, find M nearest neighbors\n            similarities = cosine_similarity(\n                [self.document_embeddings[doc_idx]], \n                self.document_embeddings\n            )[0]\n            nearest = np.argsort(similarities)[-self.hnsw_m:]\n            self.hnsw_graph[doc_idx].update(nearest)\n    \n    def retrieve(self, query_embedding, k=5, search_ef=100):\n        \"\"\"Retrieve top-k semantically similar documents.\n        \n        Args:\n            query_embedding: Query vector (768,)\n            k: Number of results\n            search_ef: Expansion factor (higher = more accurate, slower)\n        \"\"\"\n        # Stage 1: ANN search with HNSW pruning\n        candidates = self._hnsw_greedy_search(\n            query_embedding, search_ef\n        )\n        \n        # Stage 2: Score candidates with exact cosine similarity\n        similarities = cosine_similarity(\n            [query_embedding],\n            self.document_embeddings[candidates]\n        )[0]\n        \n        # Stage 3: Rank and return\n        top_indices = np.argsort(similarities)[-k:][::-1]\n        results = [\n            {\n                'player': self.document_ids[candidates[idx]]['player'],\n                'match_id': self.document_ids[candidates[idx]]['match_id'],\n                'similarity': float(similarities[idx]),\n                'commentary': self.document_ids[candidates[idx]]['text'][:50]\n            }\n            for idx in top_indices\n        ]\n        return results\n    \n    def _hnsw_greedy_search(self, query_embedding, ef):\n        \"\"\"Greedy search with ef candidates returned.\"\"\"\n        # Start from random entry point\n        current = 0\n        candidates = {current}\n        \n        # Greedy search: iteratively move to closer neighbors\n        for _ in range(5):  # iterations\n            neighbors = list(self.hnsw_graph.get(current, []))\n            best_neighbor = max(\n                neighbors,\n                key=lambda n: np.dot(\n                    query_embedding, \n                    self.document_embeddings[n]\n                )\n            )\n            if np.dot(query_embedding, self.document_embeddings[best_neighbor]) > \\\n               np.dot(query_embedding, self.document_embeddings[current]):\n                current = best_neighbor\n            \n            candidates.update(neighbors[:ef])\n        \n        return list(candidates)[:ef]\n    \n    def cross_encoder_rerank(self, query, retrieval_results, top_k=3):\n        \"\"\"Rerank with cross-encoder (simulate with simple rule).\"\"\"\n        # In practice: use cross-encoder model\n        # Here: boost relevance if query mentions player name\n        reranked = []\n        for result in retrieval_results:\n            boost = 1.0\n            if any(word.lower() in result['player'].lower() \n                   for word in query.lower().split()):\n                boost = 1.15\n            reranked.append({\n                **result,\n                'reranked_score': result['similarity'] * boost\n            })\n        \n        reranked.sort(key=lambda x: x['reranked_score'], reverse=True)\n        return reranked[:top_k]\n\n# Usage: Rohit Sharma vs Bumrah performance retrieval\nengine = CricketRetrievalEngine(embedding_dim=768)\n\n# Mock embeddings for Bumrah's 10 deliveries\nbumrah_deliveries = np.random.randn(10, 768).astype(np.float32)\nmetadata = [\n    {\n        'player': 'Jasprit Bumrah',\n        'match_id': 'IND_vs_AUS_2023',\n        'text': 'Bumrah bowls a yorker at 145 kmph...'\n    }\n    for _ in range(10)\n]\n\nengine.index_commentary(bumrah_deliveries, metadata)\n\n# Query: \"yorker at 145 kmph\"\nquery_vec = np.random.randn(768).astype(np.float32)\nresults = engine.retrieve(query_vec, k=5)\nfinal_results = engine.cross_encoder_rerank(\n    \"Bumrah yorker pace\", results, top_k=3\n)\n\nprint(\"\\nRetrieved deliveries:\")\nfor r in final_results:\n    print(f\"  {r['player']}: {r['reranked_score']:.3f}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Vector dimensionality creates a 'curse of dimensionality'—in spaces >100 dimensions, all points become roughly equidistant from each other. For production systems with billions of documents, ANN indices (HNSW, IVF) are mandatory; naive brute-force similarity will timeout. Also, embedding quality directly determines retrieval quality: garbage embeddings = garbage results, regardless of how optimized your search is. Always validate on a held-out test set.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Embeddings are transformed into fixed-dimensional vectors; search happens in this vector space via distance metrics like cosine similarity.",
+        "HNSW and IVF indices reduce search complexity from O(n) brute-force to O(log n), critical for million-scale corpora.",
+        "Memory consumption scales with embedding dimension × corpus size; a 1M docs × 768-dim setup needs ~3GB.",
+        "Cross-encoder reranking refines top-k results by jointly scoring query-document pairs, sacrificing speed for precision.",
+        "Query encoding, index lookup, candidate scoring, and sorting form the execution pipeline; GPU acceleration cuts latency dramatically."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the code example, why does the `_hnsw_greedy_search` method limit candidates to `ef` items instead of returning all neighbors found?",
+      "items": [
+        "To reduce memory footprint and improve retrieval speed by trading off exhaustiveness for efficiency",
+        "Because HNSW requires exactly ef neighbors to function",
+        "To avoid integer overflow errors",
+        "To match the batch size of the cross-encoder reranker"
+      ],
+      "answer": 0,
+      "explanation": "The expansion factor (ef) in HNSW is a tuning parameter that controls the accuracy-speed tradeoff. Smaller ef → faster retrieval but potentially missing true neighbors; larger ef → more thorough search but slower execution. Returning all neighbors would defeat the purpose of approximate nearest neighbor search. This mirrors field placement in cricket: you don't put fielders everywhere (that wastes resources), you position them strategically to maximize likelihood of catches given expected shot patterns."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems employ three dominant patterns, each with distinct trade-offs. The **Retriever-Only Pattern** uses dense embeddings (e.g., ColBERT, DPR) for speed—optimal when you have <100M documents and latency budgets under 500ms. The **Retriever + Reranker Pattern** adds a cross-encoder pass, increasing latency by 200-400ms but improving recall from ~70% to ~85% on complex queries; use this when accuracy matters more than sub-second response times. The **Hybrid Dense-Sparse Pattern** combines BM25 (lexical matching) with semantic embeddings, handling both exact terminology matches and conceptual similarity—essential for technical domains where both \"transformer architecture\" and \"attention mechanism\" must surface relevant results. Trade-offs: pure dense retrieval is fastest but misses exact matches; pure lexical search struggles with paraphrasing; hybrid approaches require maintaining dual indices (20-30% storage overhead) but provide robustness across query types. Cost considerations: dense retrieval requires GPU memory for embedding generation; cross-encoder reranking demands inference compute; lexical indexing is CPU-efficient but less semantically rich. Choose based on your document count, query complexity, and SLA requirements.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The Retriever-Only Pattern is aggressive batting strategy—go for maximum scoring with minimal defensive strokes, but risk getting out if the bowler adjusts. The Retriever + Reranker Pattern mirrors DRS reviews: retrieve your initial decision (appeal), then validate with deeper analysis before committing. The Hybrid Dense-Sparse approach resembles field placement decisions—you don't rely solely on catching slips (semantic understanding) or just the slip cordon (lexical precision); instead, position fielders for both aggressive take-downs and defensive coverage. In Test cricket, you might use pure aggressive retrieval early in the innings when conditions favor risk-taking; switch to hybrid strategies in challenging middle overs when both orthodox and unusual deliveries threaten; add reranking only in crucial final moments when getting it exactly right matters more than speed. Each pattern's \"bowling selection\" (algorithm choice) must match the match situation (domain, latency, accuracy needs).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Single-stage retrieval without validation\nclass CricketScoreRetriever:\n    def retrieve_batting_stats(self, query):\n        # Returns top result immediately without checking quality\n        embedding = self.encoder.encode(query)\n        scores = cosine_similarity(embedding, self.database)\n        return self.database[scores.argmax()]\n\n# Query: \"Kohli's average in T20 finals\"\n# Problem: Returns random high-scoring article if embedding is slightly off\n\n---\n\n# BEST PRACTICE: Multi-stage with confidence thresholding\nclass CricketScoreRetrieverProduction:\n    def retrieve_batting_stats(self, query, confidence_threshold=0.72):\n        # Stage 1: Dense retrieval\n        embedding = self.encoder.encode(query)\n        dense_scores = cosine_similarity(embedding, self.dense_index)\n        dense_candidates = self.get_top_k(dense_scores, k=50)\n        \n        # Stage 2: Lexical re-enforcement\n        lexical_scores = self.bm25.score_batch(query, dense_candidates)\n        hybrid_scores = 0.6 * dense_scores + 0.4 * lexical_scores\n        \n        # Stage 3: Cross-encoder reranking with quality gate\n        reranker_scores = self.cross_encoder.predict(\n            [(query, doc) for doc in dense_candidates]\n        )\n        final_candidates = [\n            (doc, score) for doc, score in zip(dense_candidates, reranker_scores)\n            if score >= confidence_threshold\n        ]\n        \n        # Returns ordered results with confidence scores\n        return sorted(final_candidates, key=lambda x: x[1], reverse=True)\n\n# Query: \"Kohli's average in T20 finals\"\n# Returns: [(Document(content, metadata), score=0.89), ...]\n# Benefit: Validates relevance at multiple stages, returns confidence scores",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is **treating embedding similarity scores as absolute relevance measures**. A similarity score of 0.85 doesn't mean the document is 85% relevant—it only means the embedding vector alignment is strong. This causes catastrophic failures when: (1) semantically unrelated documents share similar vector space regions (homonym collapse—\"bat\" the animal vs. cricket bat), (2) you set a single global threshold (e.g., >0.75) across all queries without accounting for query difficulty, (3) you rely solely on cosine similarity without considering document quality, recency, or domain-specific metadata. **Fix:** Always implement a reranker as a second stage to compute actual relevance scores independent of embedding space geometry. Use percentile-based thresholding relative to your top-k results (e.g., \"keep documents within 5% of the top score\") rather than absolute thresholds. Combine similarity with metadata filters (publish date, authority, source credibility) before final ranking. Monitor your false positive rate by sampling retrieved documents and having domain experts rate relevance—this reveals when your embedding space diverges from actual semantic meaning.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Retriever-Only Pattern: Fastest (~100ms), suitable for high-volume, simple queries; trade accuracy for speed",
+        "Retriever + Reranker Pattern: Balanced approach (~400ms), improves recall to 85%+; use when accuracy matters",
+        "Hybrid Dense-Sparse Pattern: Robustness across query types; handles both exact terminology and conceptual matches",
+        "Confidence thresholding prevents false positives; always validate retrieval quality with reranking",
+        "Avoid relying on embedding similarity scores alone—combine with lexical signals and metadata filters",
+        "Monitor retrieval metrics (recall@k, MRR) in production; adjust pattern based on actual query performance"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for a cricket statistics database with 50M match records. Latency SLA is 800ms. Your initial hybrid dense-sparse approach achieves 78% recall but takes 600ms. You notice exact-match queries for player names are being outranked by semantically similar articles. What's the best optimization?",
+      "items": [
+        "Remove the BM25 lexical component entirely to speed up retrieval",
+        "Increase the weight of BM25 scores in the hybrid ranking formula; add a boost for exact-match queries",
+        "Add a third cross-encoder reranking stage to improve semantic understanding",
+        "Replace dense embeddings with pure BM25 to eliminate embedding computation overhead"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct. You have latency budget remaining (800ms SLA, currently 600ms), so you can afford the fix without compromising speed. Increasing BM25 weight directly addresses the exact-match problem (player names are lexical tokens, not semantic concepts). A boost mechanism for exact matches further ensures terminology is prioritized. Option A (removing BM25) loses the lexical advantage that's solving your actual problem. Option C adds latency when you're already at 600ms—risky. Option D reverts to pure lexical search, losing semantic recall you've built. The hybrid pattern is working; you just need to rebalance the weights toward the component that handles your specific failure case."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Semantic search and similarity metrics power retrieval systems at massive scale across tech giants. Google's Search and Vertex AI use dense embeddings with approximate nearest neighbor (ANN) indexes to retrieve relevant documents from billions of web pages in milliseconds. OpenAI's ChatGPT integrates RAG with semantic reranking to ground responses in retrieved documents, processing millions of queries daily. Netflix uses collaborative filtering combined with semantic similarity to recommend content from catalogs exceeding 10,000 titles. Meta's Feed Ranking system combines dense and sparse retrieval to personalize content for 3 billion users. Uber's search infrastructure uses hybrid retrieval for matching riders with drivers across dynamic geographies. At scale, inefficient similarity computations cause latency spikes; poor embedding quality leads to irrelevant results; inadequate reranking allows hallucinations. Systems must balance computational cost against retrieval quality, requiring careful tuning of embedding dimensions, index types, and reranking thresholds.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Dense embeddings are like a batter's positioning—capturing subtle spatial relationships that reveal optimal shot placement. Sparse BM25 retrieval is like analyzing exact ball type and seam position—precise keyword matching. Reranking is like the captain's strategy review—taking the top candidates and applying expert judgment to select the best XI. At scale, you can't check every possible player (full database scan), so you use fast filters (dense search) followed by careful evaluation (cross-encoder reranking) to field the winning team within time constraints.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Production systems often fail when semantic search parameters are tuned on small datasets then deployed at scale. Embedding models trained on general text may perform poorly on domain-specific queries (e.g., medical, legal, financial). Reranking every candidate is computationally expensive—always use a two-stage pipeline (fast retrieval → expensive reranking). Monitor embedding quality drift over time as data distributions shift. Never rely solely on similarity scores without human evaluation; always validate retrieved results against ground truth.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Semantic search combines dense embeddings with ANN indexes to retrieve candidates at scale from billions of documents in milliseconds.",
+        "Hybrid dense-sparse retrieval captures both semantic meaning and exact keyword matches, improving precision and recall simultaneously.",
+        "Cross-encoder reranking applies expensive fine-grained similarity scoring to top candidates, dramatically improving final ranking quality.",
+        "Query expansion and transformation handle synonyms, typos, and context gaps before retrieval, increasing recall for edge cases.",
+        "Production systems require careful tuning: embedding dimensions, index types, reranking thresholds, and latency budgets must balance quality and cost.",
+        "Similarity metrics (cosine, L2, dot product) are differentiable and efficient, enabling end-to-end optimization of retrieval pipelines.",
+        "Real-world RAG at scale (Google, OpenAI, Meta, Netflix) depends on two-stage pipelines: fast filtering followed by intelligent reranking."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Why do production RAG systems use a two-stage retrieval pipeline (dense retrieval + reranking) instead of reranking all documents in the corpus?",
+      "items": [
+        "Two-stage pipelines are always more accurate than single-stage systems",
+        "Computing similarity scores for billions of documents is computationally infeasible; fast retrieval filters to candidates before expensive reranking",
+        "Reranking requires labeled training data that's unavailable for large corpora",
+        "Dense embeddings alone cannot capture semantic meaning, so reranking is mandatory"
+      ],
+      "answer": 1,
+      "explanation": "Two-stage pipelines exist because reranking every document in a billion-scale corpus is computationally prohibitive. Dense retrieval quickly filters to a manageable set of top-k candidates (e.g., 100-1000), then expensive cross-encoder reranking applies sophisticated similarity scoring only to these candidates. This approach maintains quality while respecting latency budgets in production systems.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of semantic search and similarity metrics with these two knowledge checks. The first quiz focuses on core conceptual understanding, while the second applies these concepts to real-world retrieval scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In semantic search, why do dense vector embeddings (like those from transformer models) often outperform sparse bag-of-words representations when measuring similarity between a query and documents?",
+      "items": [
+        "Dense embeddings capture semantic meaning and relationships between words, allowing the model to find documents with similar intent even if they use different vocabulary",
+        "Dense embeddings are faster to compute because they use fewer dimensions than sparse vectors",
+        "Sparse representations are outdated and have been completely replaced by dense methods in all applications",
+        "Dense embeddings automatically handle spelling mistakes and typos without any preprocessing"
+      ],
+      "answer": 0,
+      "explanation": "Dense vector embeddings succeed because they encode semantic relationships and contextual meaning learned from large training corpora. This allows matching documents with similar intent despite different wording—like recognizing that 'cricket bat' and 'willow stick used for batting' are semantically related. Sparse bag-of-words methods would only match exact or near-exact word overlaps. Option B is incorrect because sparse vectors are often faster. Option C ignores that sparse methods (like BM25) remain valuable in hybrid systems. Option D is wrong because embeddings still require preprocessing for typos; they don't magically handle them. The semantic capture of dense methods is what makes them superior for understanding intent.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for a cricket statistics database. Your dense retriever using cosine similarity is returning documents about 'bowling averages,' but users searching 'ball delivery techniques' are getting irrelevant results about 'fast bowling speeds.' Which combination of techniques would best address this semantic drift?",
+      "items": [
+        "Increase the similarity threshold from 0.7 to 0.95 and use only BM25 retrieval",
+        "Apply query expansion to generate synonyms like 'throwing method' and 'pitch technique,' then use a cross-encoder reranker to validate semantic relevance",
+        "Switch to a completely different embedding model and retrain it on cricket-specific data",
+        "Remove all documents containing the word 'bowling' from the retrieval index"
+      ],
+      "answer": 1,
+      "explanation": "Query expansion bridges the semantic gap by generating related terms ('throwing method,' 'pitch technique') that better express the user's intent, similar to how a captain might call plays using different terminology than the commentator. The cross-encoder then reranks results by directly comparing the expanded query with retrieved documents, catching genuine semantic matches while filtering false positives. Option A fails because raising thresholds would reduce recall further and BM25 alone won't capture the semantic nuance. Option C is overkill and unnecessary—the model likely works well; the issue is query formulation. Option D is destructive and removes valid information. Query transformation plus reranking is the proven pattern for handling semantic drift in multi-stage retrieval pipelines.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

@@ -197,6 +197,189 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production NumPy code, three patterns dominate: (1) **In-place operations** (`+=`, `.sort(axis=0)`) for memory-constrained environments where you process large datasets repeatedly and can sacrifice immutability for 20-40% memory savings; use when your arrays exceed available RAM or you're optimizing for batch processing pipelines. (2) **Vectorization over loops** consistently outperforms explicit Python iteration by 10-100x because vectorized operations execute in compiled C code with cache optimization; always prefer `np.sum(arr)` over `for x in arr: total += x`, even though the loop is readable. (3) **View-based indexing** (`arr[::2, 1:5]`) creates zero-copy references rather than copies—critical for chained operations on multi-gigabyte arrays, but dangerous if you modify the view without understanding the parent array mutates too. Trade-offs: in-place saves memory but breaks functional programming patterns; vectorization requires reshaping mental models; views trade safety for speed. Measure with `%timeit` and `memory_profiler` before optimizing—premature optimization on small datasets (< 100MB) adds cognitive load without benefit.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: In-place operations are like **aggressive field placements**—you commit your fielders to attacking positions, saving resources (fewer substitutions) but risking boundaries if the batter exploits gaps. Vectorization mirrors **bowling rotation strategy**—rather than asking one bowler to deliver all overs (exhausting), you rotate specialist bowlers (compiled NumPy functions) who execute their role perfectly, preserving energy and consistency. View-based indexing resembles **DRS usage**—you reference the original decision (parent array) without duplicating the review infrastructure, but if you modify your understanding (the view), it affects the original record retroactively. In squad selection, you'd avoid redundant operations like asking a batsman to take guard twice (creating duplicate arrays) when you can reference the same player's statistics. Smart captains rotate strategies based on match conditions—similarly, choose in-place when memory is scarce, vectorize when speed matters, and use views when processing derived datasets sequentially without modification.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\n\n# Dataset: cricket batting statistics (runs per over across 100 matches)\nbatting_stats = np.random.randint(0, 12, size=(100, 50))  # 100 matches, 50 overs each\n\n# ❌ ANTI-PATTERN: Creating unnecessary copies\nprint(\"Anti-pattern (memory wasteful):\")\ntemp_copy = batting_stats.copy()  # Redundant copy\ntemp_copy2 = temp_copy + 5  # Another copy\ntemp_copy3 = temp_copy2 * 2  # Yet another copy\naverage_runs_bad = np.mean(temp_copy3)  # Uses 4x memory\n\n# ✅ BEST PRACTICE 1: Vectorization without copies\nprint(\"\\nBest practice (vectorized):\")\naverage_runs_good = np.mean((batting_stats + 5) * 2)  # Single pass, no intermediate arrays\n\n# ✅ BEST PRACTICE 2: In-place for repeated aggregations\nprint(\"\\nBest practice (in-place for memory efficiency):\")\nruns_per_match = np.sum(batting_stats, axis=1)  # View-safe aggregation\nruns_per_match += 10  # Modify only final result, not source\n\n# ✅ BEST PRACTICE 3: Use views for chained operations\nprint(\"\\nBest practice (view-based):\")\nfirst_half_overs = batting_stats[:, :25]  # Zero-copy view\nhigh_scoring_matches = first_half_overs[np.sum(first_half_overs, axis=1) > 100]  # Filter without duplicating\n\nprint(f\"Original shape: {batting_stats.shape}\")\nprint(f\"View shares memory: {first_half_overs.base is batting_stats}\")\nprint(f\"Vectorized mean: {average_runs_good}\")\nprint(f\"In-place runs: {runs_per_match[:5]}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Modifying a view unexpectedly mutates the parent array. Beginners create a view with `bowling_stats = match_data[:, 5:10]`, later modify it with `bowling_stats[0] = 999`, and are shocked when `match_data` changes too. Fix: (1) If you need independent data, explicitly copy: `bowling_stats = match_data[:, 5:10].copy()` (2) Use views intentionally for read-only operations; add comments explaining parent dependency. (3) Check with `arr.base is not None` to detect if an array is a view before modifying it.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Vectorized operations beat explicit loops by 10-100x because NumPy delegates to optimized C code",
+        "In-place operations save 20-40% memory for repeated processing but sacrifice functional purity",
+        "Views (slices) share memory with parent arrays—powerful for efficiency but dangerous if modified unintentionally",
+        "Profile before optimizing: use %timeit and memory_profiler to validate that micro-optimization matters at your data scale",
+        "Always copy when semantics require independence, view when chaining read-heavy operations"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're processing cricket match data: 1000 matches × 300 overs each. You need to normalize each match's run totals by subtracting the match mean, then apply a cap. Which approach is best practice?",
+      "items": [
+        "Create three copies: runs_copy1 = data.copy(); runs_copy2 = runs_copy1 - runs_copy1.mean(axis=1); runs_copy3 = np.minimum(runs_copy2, 10)",
+        "Use vectorization: np.minimum(data - data.mean(axis=1, keepdims=True), 10) without storing intermediates",
+        "Loop through each match: for i in range(1000): data[i] -= data[i].mean(); data[i] = np.minimum(data[i], 10)",
+        "Create a view and modify in-place: view = data[:]; view -= view.mean(axis=1, keepdims=True); then copy the result"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct. The vectorized approach with keepdims=True broadcasts the match means correctly across overs, executes in compiled NumPy code, and avoids creating unnecessary intermediate arrays. Option A wastes memory with three copies. Option C is slow (Python loop overhead, no C acceleration). Option D creates confusion by modifying via a view—semantically unclear and risky. The keepdims=True parameter is essential: it maintains the dimension for proper broadcasting, turning shape (1000,) into (1000, 1) to subtract from (1000, 300)."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "NumPy powers production systems at planetary scale. Google uses NumPy-optimized tensor operations in TensorFlow serving billions of predictions daily across YouTube recommendations and Search. Netflix leverages NumPy's vectorized operations for processing millions of user-interaction arrays to train collaborative filtering models. Uber relies on NumPy for real-time feature computation across ride-matching algorithms handling 100M+ daily requests. OpenAI uses optimized NumPy broadcasting in transformer preprocessing pipelines for GPT models. Meta's computer vision systems depend on NumPy's C-level performance for image batch processing at datacenter scale. When NumPy operations fail—through memory misalignment, incorrect broadcasting, or non-contiguous arrays—inference latency spikes by 10-100x, costing companies millions in wasted compute. Poor indexing strategies can cause cache misses, reducing GPU throughput from 1000+ TFLOPS to <100 TFLOPS.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Broadcasting is like a single bowler's technique applying across an entire over—one rule, many deliveries. Vectorization is batting the full 11-player team simultaneously instead of one batter at a time. ndarrays are like a batting order card: homogeneous (all batters, no spectators), multidimensional (team × position × stats), and optimized for quick lookups. When you misalign shapes during broadcasting, it's like trying to field 11 players in a 10-fielder format—the system crashes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "NumPy ndarrays are homogeneous, contiguous memory blocks enabling C-level performance critical for 1000x speedups over Python loops.",
+        "Broadcasting automatically aligns incompatible shapes, eliminating loops and reducing memory copies—essential for batched ML inference systems.",
+        "Vectorized operations compile to BLAS/LAPACK routines, leveraging CPU cache and SIMD instructions for production-scale throughput.",
+        "Indexing and slicing must respect memory layout (row-major C vs column-major Fortran) to avoid performance cliffs in real systems.",
+        "ufuncs apply element-wise operations without Python interpreter overhead, allowing Netflix and Google to process millions of arrays per second.",
+        "View vs copy semantics prevent unexpected mutations and memory bloat—critical when processing petabyte-scale datasets at Uber and Meta.",
+        "NumPy fundamentals are the non-negotiable foundation for TensorFlow, PyTorch, and Jax; mastery here unlocks debugging and optimization skills."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Ignoring memory layout (C-contiguous vs Fortran-contiguous) in production can cause 50-100x slowdowns. Always check `arr.flags['C_CONTIGUOUS']` before batched operations. Non-contiguous slices force data copies, multiplying memory usage—a hidden killer in cloud inference pipelines.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a real-time cricket player performance system for 1M batters. Each batter has 50 stats (batting_avg, strike_rate, etc.). You need to compute z-scores (subtract mean, divide by std) across all batters. Which approach avoids unnecessary copies and runs fastest?",
+      "items": [
+        "Loop through each batter, compute mean/std individually, then z-score—explicit but slow",
+        "Use broadcasting: (batter_stats - mean) / std where mean and std are shape (50,) and batter_stats is (1000000, 50)",
+        "Convert to pandas DataFrame, apply groupby().transform()—cleaner but adds overhead",
+        "Use for-loop with NumPy scalar operations inside—maintains Python control flow"
+      ],
+      "answer": 1,
+      "explanation": "Option B uses broadcasting to align (1M, 50) with (50,), computing all batters in one vectorized operation. This avoids Python loops, respects memory layout, and compiles to a single BLAS call. Options A and C are slower; Option D defeats the purpose of NumPy. At 1M scale, broadcasting is 100-1000x faster."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of NumPy fundamentals with these two knowledge checks. The first quiz focuses on core mechanisms and concepts, while the second presents a real-world scenario where you must apply what you've learned.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You have a 2D array `batting_stats` with shape (11, 4) representing 11 players and their runs, wickets, averages, and strike rates respectively. When you perform `batting_stats + 5`, what happens and why?",
+      "items": [
+        "The scalar 5 is broadcast across all elements; each element receives the addition operation independently",
+        "NumPy creates a new array and adds 5 only to the first column",
+        "The operation fails because you cannot add a scalar to a 2D array",
+        "NumPy adds 5 to the shape, resulting in shape (16, 9)"
+      ],
+      "answer": 0,
+      "explanation": "Broadcasting is a fundamental NumPy mechanism that automatically aligns shapes during operations. When a scalar (0-dimensional) is combined with any array, NumPy stretches the scalar to match the array's shape and applies the operation element-wise. In this case, 5 is conceptually expanded to a (11, 4) array filled with 5s, then added to `batting_stats`. Option B is incorrect because broadcasting doesn't target specific columns; C is wrong because scalars are explicitly supported through broadcasting; D confuses broadcasting with shape modification—broadcasting never changes the original array's shape, it only facilitates computation.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket analytics pipeline in TensorFlow. You have player performance data: `centuries = np.array([2, 5, 3])` (3 batsmen), `matches_played = np.array([20, 45, 30])` (corresponding matches). You need to compute centuries per match for each player to feed into a neural network. Which approach is most efficient and correct?",
+      "items": [
+        "Use vectorized division: `centuries / matches_played` to get an array of ratios in one operation",
+        "Loop through each player with a for loop and divide individually, then create a new array",
+        "Reshape both arrays to (3, 1) and use matrix multiplication",
+        "Convert to lists, divide elements manually, then convert back to numpy array"
+      ],
+      "answer": 0,
+      "explanation": "Vectorized operations are the core strength of NumPy and essential for TensorFlow pipelines. `centuries / matches_played` performs element-wise division directly, returning `[0.1, 0.111..., 0.1]` instantly without explicit loops. This is orders of magnitude faster than option B (loops avoid NumPy's compiled C backend), more semantically correct than option C (matrix multiplication is unnecessary here), and far more efficient than option D (converting to Python lists loses NumPy's performance advantages). Vectorization is a best practice because it's cleaner, faster, and directly compatible with TensorFlow's data ingestion layer.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

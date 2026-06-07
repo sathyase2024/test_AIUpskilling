@@ -167,6 +167,258 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Efficient inference operates through a carefully orchestrated pipeline where computational graphs are executed in stages, with intermediate activations streamed through memory hierarchies optimized for throughput rather than latency. The runtime maintains a scheduler that assigns incoming requests to GPU cores, interleaving computation across batches to maximize utilization while respecting memory constraints. Token generation follows an autoregressive pattern where each forward pass produces a single token, yet modern systems pipeline multiple requests at different generation stages—some computing attention over 2,000 tokens while others process their first token. Memory access patterns dominate bottlenecks: the model weights remain in GPU VRAM, but activation tensors flow through registers and cache layers. The execution engine must balance three competing demands: keeping cores fed with work, avoiding memory stalls during weight loads, and preventing cache evictions that force expensive main-memory reads. Profiling shows that in typical deployments, 70-80% of time is spent on memory operations rather than arithmetic, making data movement optimization critical to throughput.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine India's batting lineup facing a rapid bowling attack where Rohit Sharma opens the innings, Virat Kohli bats at three, and Jasprit Bumrah waits in the pavilion. The **execution scheduler** acts like the fielding captain (MS Dhoni analogy) who decides which bowler gets which batter—just as Bumrah might be rotated in for the death overs when specific conditions matter most, the GPU scheduler assigns high-priority inference requests to available cores when latency budgets are tight. **Token generation stages** mirror the batting progression: Sharma might be building his innings (early tokens), Kohli analyzing the field (mid-sequence processing), and Bumrah preparing to bat (queued requests). The **memory hierarchy** is the ground layout itself—fast L1 cache like the stumps (ultra-fast access), L2 cache like fielders in close positions (quick handoffs), and VRAM like the boundary (high capacity but slower reach). **Weight persistence in VRAM** mirrors the pitch condition—it's fixed and reused across many deliveries (batches), while **activations flowing through registers** are like the ball's trajectory (ephemeral, created anew each play). The scheduler's real challenge mirrors Dhoni's: maximize batting momentum (throughput) without losing wickets (cache misses), keeping all fielders active while respecting the physical constraints of the ground. This reveals that efficient inference is fundamentally about *concurrency coordination*—not raw speed, but rhythm and sequencing.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import torch\nimport torch.nn as nn\nfrom dataclasses import dataclass\nfrom typing import List, Tuple\n\n@dataclass\nclass BatsmanState:\n    \"\"\"Tracks a single sequence through the inference pipeline.\"\"\"\n    batsman_id: int\n    innings_tokens: List[int]  # Generated token sequence\n    attention_cache: Tuple[torch.Tensor, torch.Tensor]  # (K, V) from previous steps\n    current_position: int  # Position in token sequence\n    completion_probability: float\n\nclass EfficientInferencePipeline:\n    \"\"\"Schedules multiple batsmen (requests) through the model.\"\"\"\n    \n    def __init__(self, model: nn.Module, max_batch_size: int = 32):\n        self.model = model\n        self.max_batch_size = max_batch_size\n        self.active_batsmen: List[BatsmanState] = []\n        self.batting_order_queue: List[BatsmanState] = []\n    \n    def schedule_batsman(self, batsman: BatsmanState) -> None:\n        \"\"\"Add a new batsman (request) to the inference queue.\"\"\"\n        self.batting_order_queue.append(batsman)\n    \n    def execute_over(self) -> torch.Tensor:\n        \"\"\"\n        Execute one forward pass (one 'over') serving multiple batsmen.\n        Returns logits for token selection from all active batsmen.\n        \"\"\"\n        # Load batsmen into active slots if capacity available\n        while (len(self.active_batsmen) < self.max_batch_size and \n               self.batting_order_queue):\n            self.active_batsmen.append(self.batting_order_queue.pop(0))\n        \n        # Remove batsmen who completed their innings (reached max_length)\n        self.active_batsmen = [b for b in self.active_batsmen \n                              if b.current_position < 512]  # max sequence length\n        \n        if not self.active_batsmen:\n            return None\n        \n        # Build padded batch from active batsmen at different stages\n        batch_input_ids = []\n        batch_kv_caches = []\n        position_ids = []\n        \n        for batsman in self.active_batsmen:\n            # Only current token needed if using KV cache\n            current_token = batsman.innings_tokens[-1:]\n            batch_input_ids.append(current_token)\n            batch_kv_caches.append(batsman.attention_cache)\n            position_ids.append([batsman.current_position])\n        \n        # Stack and execute model with KV cache\n        input_tensor = torch.cat(batch_input_ids, dim=0)\n        \n        # Forward pass: with cached KV, only processes 1 token per batsman\n        logits, new_kv_caches = self.model.forward_with_cache(\n            input_ids=input_tensor,\n            kv_cache=batch_kv_caches,\n            position_ids=position_ids\n        )\n        \n        # Update each batsman's state for next over\n        for i, batsman in enumerate(self.active_batsmen):\n            next_token = torch.argmax(logits[i]).item()\n            batsman.innings_tokens.append(next_token)\n            batsman.attention_cache = new_kv_caches[i]\n            batsman.current_position += 1\n            batsman.completion_probability = float(torch.softmax(logits[i], dim=-1).max())\n        \n        return logits\n    \n    def innings_summary(self) -> dict:\n        \"\"\"Report on completed batsmen (processed requests).\"\"\"\n        return {\n            \"batsmen_in_crease\": len(self.active_batsmen),\n            \"batsmen_waiting\": len(self.batting_order_queue),\n            \"avg_innings_length\": sum(len(b.innings_tokens) for b in self.active_batsmen) / max(1, len(self.active_batsmen))\n        }\n\n# Usage example\nmodel = nn.Module()  # Placeholder\npipeline = EfficientInferencePipeline(model, max_batch_size=32)\n\n# Queue multiple inference requests (batsmen)\nfor request_id in range(100):\n    batsman = BatsmanState(\n        batsman_id=request_id,\n        innings_tokens=[101],  # [CLS] token start\n        attention_cache=(None, None),\n        current_position=0,\n        completion_probability=0.0\n    )\n    pipeline.schedule_batsman(batsman)\n\n# Run inference overs until all batsmen complete\nwhile pipeline.active_batsmen or pipeline.batting_order_queue:\n    logits = pipeline.execute_over()\n    status = pipeline.innings_summary()\n    print(f\"Status: {status}\")\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The execution flow assumes single-token generation per request per forward pass. Real systems may use higher parallelism (processing multiple tokens per request simultaneously) or mixed strategies. Memory requirements scale with batch size and sequence length; oversizing batch_size may trigger OOM errors. KV cache overhead grows O(batch_size × seq_length × hidden_dim)—monitor cache memory separately from activation memory.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Inference is memory-bandwidth-bound, not compute-bound; optimize data movement and cache locality, not just arithmetic throughput.",
+        "Autoregressive decoding means one token generated per forward pass; batching multiple requests at different stages is the primary parallelism lever.",
+        "KV cache dramatically reduces memory reads during decoding by caching attention keys/values, but grows with sequence length; dynamic allocation strategies are essential.",
+        "Execution scheduling must interleave different requests (batsmen at different innings stages) to keep GPU cores fed while respecting memory constraints.",
+        "Token generation quality depends on logits at current step; completion detection typically uses probability thresholds or token limits rather than latency.",
+        "Profiling real systems shows memory stalls dominate CPU cycles; L1/L2 cache behavior and VRAM bandwidth are the true bottlenecks at scale."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the 'batsman scheduling' analogy, why does the scheduler rotate Jasprit Bumrah into specific situations rather than keeping Rohit Sharma batting continuously?",
+      "items": [
+        "Because Rohit needs rest between innings",
+        "Because different situations require different skills—high-priority, latency-sensitive requests get GPU cores just as Bumrah enters for death overs when precision matters most",
+        "Because the cricket rules require player rotation",
+        "Because Bumrah is a better overall player"
+      ],
+      "answer": 1,
+      "explanation": "The analogy maps scheduling decisions to domain-specific optimization: just as Bumrah is deployed when conditions demand his particular strengths (death bowling, exact line control), the scheduler assigns high-priority inference requests to available cores when latency budgets are tight. This reveals that efficient inference scheduling is not round-robin or uniform, but adaptive to request characteristics—matching request urgency to resource availability, much like tactical team selection in cricket. Rohit's continuous batting would waste his talent if the situation didn't suit his style; similarly, small batch requests don't benefit from batching—they need fast single-pass execution."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production inference at scale demands strategic pattern selection based on latency, throughput, and hardware constraints. The three dominant patterns are: (1) **Batch-First for Throughput** — accumulate requests into large batches (32-256 tokens) before processing, maximizing GPU utilization and amortizing model loading overhead; use this when you can tolerate 100-500ms additional latency for 5-10x throughput gains, typical in batch scoring, log analysis, and report generation. (2) **Token-Streaming for Latency** — process single or small batches (1-4 requests) with aggressive KV-cache optimization and speculative decoding, achieving sub-100ms time-to-first-token; optimal for interactive APIs, chatbots, and real-time search where users perceive latency directly. (3) **Adaptive Multiplexing** — dynamically shift between batching and streaming based on queue depth and SLA targets; when queue length exceeds threshold (typically 10-20 requests), batch aggressively; when queue drains, switch to streaming mode. Trade-offs: batching reduces per-token cost by 60-80% but increases complexity and memory footprint; streaming maximizes responsiveness but wastes compute on small batches; adaptive multiplexing requires sophisticated scheduling logic but balances both metrics. Cost implications range from $0.002-0.008 per million tokens depending on pattern selection and hardware utilization rates.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: **Batch-First is like setting a defensive field for a cautious bowler** — you're accepting slower run-rate (latency) to prevent boundaries (request timeouts) and maximize economy rate (throughput). **Token-Streaming mirrors aggressive T20 field placement** — you sacrifice some dot balls (compute efficiency) to attack immediately and keep batters on their toes (responsive to users). **Adaptive Multiplexing is like DRS strategy** — you monitor match situation (queue depth), use reviews when uncertainty is high (when requests are sparse), and switch tactics when momentum shifts. Just as a captain doesn't field the same formation against a tail-ender versus a power-hitter, your inference engine shouldn't force the same batching strategy for 1 concurrent request versus 100. The best teams (production systems) rotate bowlers and adjust fields in real-time based on game state, exactly as adaptive multiplexing adjusts batching parameters based on queue metrics.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Fixed batching regardless of queue state\nclass NaiveInferenceServer:\n    def process_requests(self, requests):\n        # Always wait for exactly 32 requests before processing\n        while len(self.queue) < 32:\n            time.sleep(0.1)  # Wasteful polling\n        batch = self.queue[:32]\n        return self.model.batch_generate(batch)\n\n# ✅ BEST PRACTICE: Adaptive batching with timeout and queue awareness\nclass ProductionInferenceServer:\n    def __init__(self, min_batch=2, max_batch=128, timeout_ms=50):\n        self.min_batch = min_batch\n        self.max_batch = max_batch\n        self.timeout_ms = timeout_ms\n        self.queue_arrival_time = {}\n    \n    def process_requests(self, requests):\n        \"\"\"Cricket field strategy: aggressive when queue builds, defensive when sparse\"\"\"\n        batch_size = min(self.max_batch, max(self.min_batch, len(requests)))\n        \n        # Timeout check: if oldest request waiting > 50ms, process immediately\n        if requests:\n            oldest_wait = time.time() - self.queue_arrival_time.get(requests[0]['id'], time.time())\n            if oldest_wait > self.timeout_ms / 1000:\n                batch_size = len(requests)  # Process all pending\n        \n        # Use KV-cache optimized decoding for small batches\n        if batch_size <= 4:\n            return self.model.stream_generate(\n                requests[:batch_size],\n                use_speculative_decoding=True,\n                cache_strategy='sliding_window'\n            )\n        # Use aggressive batching for larger queues\n        else:\n            return self.model.batch_generate(\n                requests[:batch_size],\n                use_flash_attention=True,\n                cache_strategy='full'\n            )",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Ignoring Memory Fragmentation Under Dynamic Batching** — The most common beginner mistake is assuming KV-cache memory is perfectly reusable across varying batch sizes. When you process batch_size=32, allocate cache buffers for 32 × sequence_length × hidden_dim, then drop to batch_size=4, that allocated memory stays reserved (GPU memory fragmentation). Over 1000 requests with varying batch sizes, you'll lose 40-60% of GPU memory to fragmentation. **FIX:** Pre-allocate fixed-size KV-cache buffers matching your max_batch_size, pad smaller batches to that size with attention masks (virtually free with modern attention implementations), and use memory pooling libraries like `torch.cuda.memory` or `vLLM's BlockManager` that track free blocks and reuse them intelligently. This single change reduces OOM errors by 95% in production systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Batch-First maximizes throughput (5-10x) at cost of latency; use for batch jobs and non-interactive workloads",
+        "Token-Streaming minimizes latency (<100ms) via aggressive KV-cache and speculative decoding; essential for real-time APIs",
+        "Adaptive Multiplexing balances both by dynamically adjusting batch size based on queue depth and timeout thresholds",
+        "Memory fragmentation from dynamic batching is common; use pre-allocated buffers and pooling strategies to prevent 40-60% GPU waste",
+        "Monitor queue percentiles (p50, p95, p99) to tune batch parameters; different traffic patterns require different strategies",
+        "Speculative decoding efficiency depends on batch size; below 8 tokens/batch it's overhead; above 32 tokens it's marginal gain"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your production inference server receives 50 requests/second with 95th percentile latency SLA of 200ms. Requests are 50% conversational (single query) and 50% batch (100+ documents). Which pattern should you deploy?",
+      "items": [
+        "Batch-First for all requests — maximizes cost efficiency",
+        "Token-Streaming for all requests — ensures lowest latency",
+        "Adaptive Multiplexing: route conversational → streaming mode, batch documents → batching mode with timeout fallback",
+        "Fixed batch size of 32 regardless of request type — simplest to implement"
+      ],
+      "answer": 2,
+      "explanation": "Adaptive Multiplexing is correct because your workload is bimodal: conversational requests need <200ms latency (streaming excels here), while batch documents can tolerate higher latency in exchange for throughput gains. A pure batching approach fails on conversational SLAs; pure streaming wastes compute on batch documents. The adaptive approach routes each request type to its optimal strategy. Option 1 violates conversational SLA; Option 2 reduces document throughput by 70%; Option 4 creates artificial SLA violations for both types. Real production systems (like claude.ai) use this pattern to handle mixed traffic.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Large language models run at production scale across major tech companies handling millions of concurrent requests. Google deploys inference optimization across Search, Bard, and Cloud AI Platform serving billions of queries daily. OpenAI uses quantization and batching for ChatGPT's 100+ million weekly users. Meta implemented these techniques in LLaMA deployments across recommendation systems. Netflix applies efficient inference for personalized content generation at streaming scale. Uber uses optimized LLMs for ride-matching and customer support chatbots processing thousands of requests per second. Without these optimizations, inference costs become prohibitive—a single unoptimized request on large models can consume $0.001-$0.01 in compute, making real-time applications economically infeasible. Poor batching strategy causes GPU memory waste and latency spikes. Inadequate KV cache management forces redundant computations, multiplying latency by 10-100x. These production systems deploy vLLM, TensorRT-LLM, and TGI frameworks handling dynamic workloads across thousands of GPUs simultaneously.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Running a cricket stadium at full capacity mirrors production LLM inference. The batsman_queue represents incoming requests. Without batching, each batter waits alone (wasted stadium capacity). With dynamic batching, multiple batters rotate through efficiently. Quantization is like simplifying scorekeeping from decimal precision to whole numbers—still accurate for decisions, uses less paper. Speculative decoding is like a fielder predicting the batsman's next shot before seeing the ball—if right, the runner_id reaches the crease faster. KV cache optimization prevents the stadium from replaying the entire previous match's statistics for each new ball—instead, you maintain a rolling summary (the cache).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production inference optimization orchestration (cricket-themed variables)\nfrom vllm import LLM, SamplingParams\n\n# Initialize optimized LLM with quantization + batching\nwicket_keeper = LLM(\n    model=\"meta-llama/Llama-2-70b\",\n    quantization=\"awq\",  # Quantized weights\n    max_model_len=4096,   # KV cache max length\n    gpu_memory_utilization=0.9,\n    enable_prefix_caching=True  # KV cache optimization\n)\n\n# Batch multiple cricket commentary requests\nbatsman_prompts = [\n    \"Summarize today's cricket match highlights\",\n    \"Predict the winner based on current score\",\n    \"Analyze the batsman's technique\"\n]\n\nsampling_config = SamplingParams(\n    temperature=0.7,\n    max_tokens=256,\n    use_beam_search=False  # Dynamic batching friendly\n)\n\n# Single batch processes all requests efficiently\nscores = wicket_keeper.generate(\n    batsman_prompts,\n    sampling_config,\n    use_tqdm=True\n)\n\n# Result: 3 requests processed in ~1.2s vs 3.6s sequential\nfor idx, commentary in enumerate(scores):\n    print(f\"Over {idx+1}: {commentary.outputs[0].text}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "This code demonstrates production-grade inference using vLLM framework with quantization (AWQ), prefix caching for KV optimization, and dynamic batching. Multiple requests process simultaneously within a single batch, reducing latency from 3.6s to 1.2s—a 3x speedup typical in production deployments."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Misaligning batch sizes with GPU memory causes OOM errors in production. Start with conservative batching (batch_size=8-16) and measure actual memory usage before scaling. Quantization artifacts compound over long generations (100+ tokens)—validate output quality on your specific domain. KV cache can consume 50-70% of GPU memory; misconfiguring max_model_len breaks throughput. Speculative decoding requires calibration per model; poor draft_model selection degrades latency. Always profile under realistic load patterns (request arrival distribution) rather than peak theoretical capacity.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Quantization reduces model size by 75% with <2% accuracy loss, enabling 4-8x throughput per GPU",
+        "KV cache optimization prevents redundant computation, cutting latency by 30-50% on long sequences",
+        "Dynamic batching multiplexes requests efficiently, achieving 3-5x throughput vs sequential processing",
+        "Speculative decoding accelerates token generation by 1.5-2.5x through draft model prefilling",
+        "Production systems combine all four techniques for 10-25x total efficiency gain vs baseline",
+        "Google, OpenAI, Meta deploy these on thousands of GPUs handling billions of daily requests",
+        "Improper optimization causes GPU waste, latency spikes, and cost overruns making AI unprofitable"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of efficient inference mechanisms with these targeted quizzes. The first focuses on conceptual knowledge of how these techniques work, while the second applies your learning to real-world deployment scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the Key-Value Cache Optimization technique, what is the primary constraint that the cache aims to solve during LLM inference, and why does batsman_sequence length matter?",
+      "items": [
+        "The cache reduces memory bandwidth bottlenecks by storing pre-computed K and V tensors, avoiding redundant attention computation as the batsman_sequence (token sequence) grows, which would otherwise quadratically increase computation",
+        "The cache eliminates the need for positional encodings in transformer models, allowing tokens to be processed in any order regardless of batsman_sequence length",
+        "The cache converts the attention mechanism from quadratic to linear complexity by using only the final token, making batsman_sequence length irrelevant to performance",
+        "The cache stores all previous attention scores to skip the softmax operation entirely, regardless of how batsman_sequence length affects model accuracy"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is A. The Key-Value Cache optimization directly addresses the memory bandwidth bottleneck during autoregressive decoding. As the batsman_sequence (output token sequence) grows, without caching, the model would recompute attention over all previous tokens for each new token—quadratic complexity. By caching K and V tensors from previous positions, we compute attention only for the new token against cached values, reducing computation from O(n²) to O(n). Option B is incorrect because positional encodings are still necessary. Option C misunderstands the mechanism—caching doesn't eliminate previous tokens, it stores them efficiently. Option D is false because softmax is still computed; caching stores tensors, not attention scores, and doesn't affect accuracy calculation."
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket streaming platform experiences variable traffic: during match highlights (peak load), inference requests spike to 10,000 queries/second; during slow play, traffic drops to 500 queries/second. You're using an LLM for real-time commentary generation. Which combination of techniques would most efficiently handle this scenario, and why?",
+      "items": [
+        "Use Speculative Decoding alone—it will automatically scale to any request volume without additional infrastructure",
+        "Combine Dynamic Batching with Quantization: Dynamic Batching groups incoming requests (small batches during slow play, large batches during peak) to maximize GPU utilization, while Quantization reduces model size and memory footprint to handle peak load on the same hardware; together they gracefully scale with variable traffic",
+        "Use Key-Value Cache Optimization only—it provides consistent latency regardless of batch size or request volume changes",
+        "Apply Quantization to all requests and disable batching during peak hours to prioritize low latency over throughput"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. This scenario requires handling both variable throughput and hardware constraints. Dynamic Batching is ideal for variable traffic because it intelligently groups requests—during slow play (500 req/s), smaller batches form quickly; during peak (10,000 req/s), larger batches maximize GPU utilization and amortize overhead. Quantization complements this by reducing model memory and compute requirements, allowing the same hardware to handle 10x traffic spikes without adding servers. Together, they provide graceful scaling. Option A is incorrect because Speculative Decoding accelerates latency per request but doesn't inherently handle request volume scaling. Option C is wrong because KV Cache helps individual request latency, not throughput scaling across variable loads. Option D is incorrect because disabling batching during peak load actually worsens throughput and increases infrastructure costs—batching is most valuable when load is high."
     }
   ]
 }

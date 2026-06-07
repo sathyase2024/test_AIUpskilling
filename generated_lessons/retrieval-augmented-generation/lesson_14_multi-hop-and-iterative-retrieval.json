@@ -210,6 +210,168 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge for multi-hop retrieval systems: (1) **Sequential Chain-of-Thought**, where each retrieval step is conditioned on the previous result's context, best for dependency-heavy queries where later facts depend on earlier discoveries—trades computational cost for precision, requiring N forward passes through the retriever. (2) **Parallel Fan-Out**, where multiple candidate paths are explored simultaneously and ranked post-hoc, optimal for time-constrained systems with sufficient compute budget, reducing latency at the cost of higher API calls and context management complexity. (3) **Hybrid Adaptive**, which dynamically switches strategies based on query complexity signals (question decomposition depth, entity count, temporal constraints)—most versatile but requires careful threshold tuning and monitoring. Each pattern's cost-benefit analysis hinges on your latency SLA, retriever accuracy, and document collection size. Sequential excels with small, curated corpora; parallel suits large-scale web-indexed systems; adaptive maximizes ROI across heterogeneous query distributions by detecting when simpler single-hop retrieval suffices versus when deep reasoning chains justify overhead.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Sequential Chain-of-Thought mirrors a captain's bowling rotation strategy—each bowler selection depends on runs conceded by the previous bowler, requiring real-time adaptation. Parallel Fan-Out resembles setting multiple field placements simultaneously (short leg, slip, square leg) to probe different batsman weaknesses at once, hoping to identify the optimal setup. Hybrid Adaptive is like using DRS (Decision Review System) strategically: you don't challenge every close decision, but you use reviews when uncertainty is highest and stakes matter most. Just as a captain wastes reviews on obvious decisions, your system shouldn't trigger expensive multi-hop chains for straightforward queries. The best teams use pattern recognition—if the batsman is driving aggressively, you rotate bowlers (sequential); if probing early in the innings, you field aggressively (parallel); if it's a close match moment, you selectively escalate (adaptive). Knowing which pattern suits each game situation determines whether you conserve resources or invest for precision.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Adaptive Pattern Selection\nclass AdaptiveMultiHopRetriever:\n    def __init__(self, simple_threshold=0.7, hop_budget=3):\n        self.simple_threshold = simple_threshold\n        self.hop_budget = hop_budget\n\n    def retrieve(self, cricket_query):\n        complexity_score = self.estimate_query_complexity(cricket_query)\n        \n        if complexity_score < self.simple_threshold:\n            # Single-hop sufficient: \"Who won the 2023 World Cup?\"\n            return self.single_hop_retrieve(cricket_query)\n        \n        elif complexity_score < 0.85:\n            # Sequential chain: decompose and iterate\n            return self.sequential_chain_retrieve(\n                cricket_query, \n                max_hops=self.hop_budget\n            )\n        \n        else:\n            # Parallel exploration for high-complexity: \"Compare batting strategies across formats\"\n            return self.parallel_fan_out_retrieve(\n                cricket_query, \n                num_paths=3,\n                max_hops=self.hop_budget\n            )\n    \n    def estimate_query_complexity(self, query):\n        features = [\n            len(query.split()),  # Length\n            query.count(\"vs\"),   # Comparisons\n            query.count(\"why\"),  # Reasoning chains\n        ]\n        return min(1.0, sum(features) / len(features))\n\n# ANTI-PATTERN: Always using Parallel (wastes tokens and latency)\nclass NaiveMultiHopRetriever:\n    def retrieve(self, cricket_query):\n        # Indiscriminately parallelizes ALL queries\n        paths = []\n        for _ in range(5):  # Fixed 5 paths, regardless of complexity\n            paths.append(self.retrieve_path(cricket_query))\n        return self.rank_paths(paths)\n    \n    # Problem: \"When did Virat Kohli debut?\" triggers 5 parallel retrievals\n    # and 15 LLM calls instead of 1, multiplying costs by 15x with no accuracy gain",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Unbounded Iterative Loops Without Convergence Checks**. The most common beginner mistake is implementing multi-hop retrieval that never terminates—each hop generates a new query, which retrieves new context, which generates yet another query, spiraling until token limits or timeouts. **Exact fix**: (1) Implement hard stop conditions—maximum hops (e.g., 3-5), maximum tokens spent on retrieval (e.g., 8K tokens), and a convergence checker that detects when recent hops add negligible new information using embedding similarity thresholds (if new_hop_similarity > 0.92 to previous_hop, stop). (2) Track a \"retrieval budget\" counter incremented per API call, failing safely when exceeded. (3) Log each hop's contribution score; if hop N's unique information is <5% of total context, terminate. Example: `if total_tokens_used > budget or hops_performed >= max_hops or (prev_relevance_score - curr_relevance_score < 0.01): break`. Without these guards, a 3-document question can explode to 50+ retrievals, multiplying latency 10x and costs 50x while degrading quality through context dilution.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Sequential Chain-of-Thought: Use for dependency chains where each answer unlocks the next query; optimal for 3-5 hop depth and small, curated document collections.",
+        "Parallel Fan-Out: Deploy when exploring multiple hypotheses simultaneously; ideal for large corpora and ample compute; requires robust reranking to merge parallel paths.",
+        "Hybrid Adaptive: Detect query complexity upfront; route simple queries (single-hop) directly; reserve multi-hop expense for genuinely complex reasoning chains.",
+        "Always instrument convergence checks: max hops, token budgets, relevance plateaus—prevent runaway retrieval loops that degrade quality and explode costs.",
+        "Measure ROI per pattern: track accuracy gain vs. token cost ratio; iterate thresholds based on production metrics, not intuition alone."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for a cricket statistics database. Your logs show that 60% of user queries are simple factual lookups (e.g., 'Sachin's career runs?'), but your system applies 3-hop multi-hop retrieval to all queries uniformly. What pattern should you adopt to optimize cost and latency?",
+      "items": [
+        "Stick with uniform 3-hop retrieval—consistency is more important than cost",
+        "Switch to Hybrid Adaptive: route simple queries to single-hop, reserve multi-hop for complex reasoning questions",
+        "Use Parallel Fan-Out for all queries to maximize accuracy coverage",
+        "Remove multi-hop entirely and use only single-hop retrieval"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is (B) Hybrid Adaptive. Since 60% of queries are simple factual lookups, applying expensive 3-hop retrieval to them wastes tokens and latency with zero accuracy gain. Adaptive routing detects these simple queries via complexity scoring (low keyword count, no comparisons, no reasoning words) and routes them directly to single-hop retrieval, reserving multi-hop chains for the remaining 40% of complex questions ('Compare batting techniques across formats' or 'Why did this strategy work in T20 but fail in Tests?'). This maximizes ROI. Option (A) conflates consistency with efficiency. Option (C) adds unnecessary parallelism cost. Option (D) removes the tool entirely for cases where it's genuinely needed. Adaptive is the production-proven winner."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Multi-hop and iterative retrieval powers production systems at massive scale. Google's Search Generative Experience uses iterative refinement to synthesize answers across millions of indexed documents. OpenAI's ChatGPT integrates retrieval-augmented generation to ground responses in current information and reduce hallucinations. Netflix employs multi-hop reasoning to recommend content by connecting user preferences → viewing history → similar user clusters → titles. Uber uses iterative retrieval for driver-passenger matching by reasoning across location graphs, availability, and ratings across multiple hops. Meta's Knowledge Graph leverages multi-hop retrieval for entity disambiguation across billions of social connections. At scale (billions of queries daily), failures cascade quickly: insufficient context window management causes token overflow; poor passage ranking surfaces irrelevant data; feedback loops without proper decay create feedback amplification. Wrong reranking strategies degrade relevance by 15-40%, directly impacting user satisfaction and revenue metrics.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A batsman facing a fast bowler must adapt through multiple deliveries (iterations). Each ball provides feedback—line, length, speed. The batsman retrieves information from that delivery, adjusts stance and strategy, then prepares for the next ball. Multi-hop retrieval is like a batsman analyzing three consecutive deliveries to identify the bowler's pattern: first ball tells pace, second reveals spin tendency, third confirms field placement strategy. Without iteration, the batsman only reacts to one delivery. With multi-hop reasoning across three deliveries, they predict and dominate.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Iterative retrieval refinement reduces hallucinations by grounding LLM responses in retrieved evidence across multiple retrieval cycles.",
+        "Multi-hop reasoning connects information across 2-4+ retrieval steps; diminishing returns occur beyond 4 hops due to context drift and token overhead.",
+        "Passage ranking and reranking are critical: poor ranking wastes 30-50% of context window on irrelevant passages, degrading final answer quality.",
+        "Query expansion transforms vague user queries into multiple semantic variants, improving recall by 20-35% in production systems.",
+        "Feedback loops enable self-correction but require decay mechanisms to prevent cascading errors and reward amplification across iterations.",
+        "Context window management is a hard constraint: allocate budget across retrieval results, reasoning steps, and final response generation.",
+        "At production scale (billions of queries), batch processing, caching, and async retrieval are mandatory; synchronous multi-hop adds 2-5s latency per request."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of multi-hop and iterative retrieval concepts with these two knowledge checks. The first quiz focuses on core mechanisms, while the second presents a real-world scenario where you must apply what you've learned.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a multi-hop retrieval system, you're building a RAG pipeline to answer questions about cricket team compositions. Your initial query retrieves documents about the Indian cricket squad, but the user's actual question requires information about player injuries AND recent form. What is the primary reason iterative retrieval with query transformation is necessary here?",
+      "items": [
+        "Each retrieval iteration refines the query based on intermediate results, allowing the system to uncover related documents that wouldn't be found in a single retrieval pass",
+        "Iterative retrieval slows down the system intentionally to reduce hallucinations",
+        "It prevents the language model from seeing too many documents at once, which causes confusion",
+        "Multi-hop retrieval is only useful when the knowledge base contains contradictory information"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is A. Multi-hop and iterative retrieval work by using results from one retrieval pass to inform and refine subsequent queries. In this cricket example, the first retrieval might return squad information, but without explicitly transforming the query to ask about 'recent injuries' and 'player form', those crucial documents would be missed. Each iteration builds on prior context, creating a chain of reasoning similar to a batsman studying the bowler's patterns across multiple deliveries. Option B is incorrect because iteration improves accuracy rather than reducing speed intentionally. Option C misunderstands context windows—the system can handle multiple documents. Option D is false because iterative retrieval is essential even in consistent knowledge bases when questions require multiple reasoning steps.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're implementing a RAG system for a cricket analytics platform. A user asks: 'Which left-handed batsmen from the 2023 World Cup squad performed better in T20 formats compared to ODI formats in the last 12 months?' Your system retrieves documents about World Cup squads, but initial results don't include performance comparison data. What should your reranking and feedback loop prioritize in the next retrieval iteration?",
+      "items": [
+        "Rerank by document recency alone, ensuring the newest documents appear first regardless of relevance",
+        "Transform the query to separately retrieve (1) left-handed batsmen statistics and (2) format-specific performance data, then use a reranking signal that prioritizes documents containing comparative metrics between T20 and ODI",
+        "Stop iterating and provide an answer based on the first retrieval, as additional iterations indicate the question is unanswerable",
+        "Request the user to split their question into four separate simpler questions instead of using multi-hop retrieval"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. This scenario requires true multi-hop reasoning: the system must first identify the relevant left-handed batsmen, then fetch their performance data across two formats, and finally retrieve comparative metrics. By decomposing the complex query and using targeted retrieval iterations with intelligent reranking (prioritizing documents with format comparisons), the system can bridge the gap between initial results and the specific answer needed. This mirrors a cricket analyst watching multiple match recordings to compare a player's technique in different formats. Option A fails because recency alone ignores relevance—old but highly relevant performance data might be filtered out. Option C incorrectly assumes unanswerable questions should block iteration; complex questions are precisely when multi-hop is essential. Option D dismisses the power of iterative RAG; the system should handle this complexity, not defer to the user.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

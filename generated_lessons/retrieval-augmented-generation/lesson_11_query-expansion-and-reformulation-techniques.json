@@ -198,6 +198,187 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems employ three dominant patterns for query expansion: multi-strategy expansion (generating 5-10 semantic and syntactic variants simultaneously), sequential expansion (iterative refinement based on retrieval feedback), and ensemble expansion (combining multiple expansion models and voting on result quality). Multi-strategy expansion offers highest recall at 40-60% increased latency cost and requires robust deduplication—ideal for comprehensive research tasks where thoroughness justifies computational overhead. Sequential expansion minimizes wasted queries through adaptive branching, reducing token consumption by 35-50% but introducing complexity in failure handling when early retrievals yield poor signals. Ensemble approaches provide highest precision (85-92%) for mission-critical applications like legal discovery or medical diagnosis, trading 3-4x computational cost for confidence scores that enable reliable downstream decision-making. The choice depends on your constraint hierarchy: optimize for speed with sequential, for recall with multi-strategy, for reliability with ensemble. Measure your baseline retrieval F1-score before implementation—expansion only amplifies existing signal quality.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Multi-strategy expansion is like a captain setting a defensive field with slip cordon, gully, and point all active simultaneously—you're covering multiple threat vectors at once, accepting that some fielders won't contribute to every delivery. Sequential expansion mirrors DRS usage in cricket: you challenge decisions only when the initial umpire call seems questionable, conserving your reviews for high-stakes moments where you have strong evidence of error. Ensemble expansion resembles a bowling rotation strategy where you assess the batter's weakness against pace vs. spin, evaluate pitch conditions, check field placement alignment, and consult with your vice-captain before committing to a specific attack plan. Just as a captain wouldn't use all strategies simultaneously (it wastes resources), RAG systems choose their expansion pattern based on the 'match conditions'—whether you're chasing a tight score (speed priority) or defending a massive total (comprehensive coverage).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Naive expansion without deduplication\nclass PoorBatterQueryExpander:\n    def expand_query(self, batting_stance: str):\n        expansions = [\n            batting_stance,\n            f\"technique for {batting_stance}\",\n            f\"how to {batting_stance}\",\n            f\"{batting_stance} fundamentals\",\n            f\"{batting_stance} fundamentals\",  # Duplicate!\n        ]\n        # Retrieving identical queries wastes tokens\n        return expansions\n\n# ✅ BEST PRACTICE: Semantic deduplication with scoring\nfrom sentence_transformers import util\nimport torch\n\nclass ChampionQueryExpander:\n    def expand_query(self, batting_stance: str, num_variants: int = 5):\n        # Generate diverse expansions\n        raw_expansions = [\n            batting_stance,\n            f\"correct {batting_stance} technique\",\n            f\"coaching tips for {batting_stance}\",\n            f\"{batting_stance} common mistakes\",\n            f\"improving {batting_stance} consistency\",\n            f\"professional {batting_stance} guide\",\n        ]\n        \n        # Encode and deduplicate\n        embeddings = self.encoder.encode(raw_expansions)\n        \n        # Keep only semantically distinct queries (cosine similarity < 0.85)\n        selected = [raw_expansions[0]]\n        for i in range(1, len(raw_expansions)):\n            similarity = util.pytorch_cos_sim(embeddings[i], \n                                             embeddings[[j for j in range(len(selected))]])\n            if torch.max(similarity).item() < 0.85:\n                selected.append(raw_expansions[i])\n                if len(selected) == num_variants:\n                    break\n        \n        # Score by relevance to original query intent\n        scored = [(q, self.relevance_scorer(batting_stance, q)) for q in selected]\n        return sorted(scored, key=lambda x: x[1], reverse=True)[:num_variants]",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is expanding queries without managing the explosion of retrieval calls, leading to 10-100x token consumption and hitting rate limits. Many developers generate 15-20 query variants and retrieve from all of them independently, turning a $0.10 query into a $5+ operation. FIX THIS: Implement hard caps (max 5-7 expansions per query), use semantic deduplication to remove >85% cosine-similar variants BEFORE retrieval, and employ batch retrieval to consolidate database calls. Always measure the marginal improvement of each expansion variant—if variant #5 improves your relevance@5 metric by <2%, remove it entirely. Use a token budget calculator in your expansion logic: track tokens_spent vs. relevance_gain and bail out when the ratio exceeds your cost threshold.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Multi-strategy expansion maximizes recall (best for search/discovery) but increases latency by 40-60%",
+        "Sequential expansion conserves tokens by using retrieval feedback to guide next expansions (best for cost-sensitive systems)",
+        "Ensemble expansion achieves highest precision through multiple models voting (best for high-stakes decisions)",
+        "Always deduplicate semantically similar queries before retrieval to avoid wasted token spend",
+        "Set hard caps on expansion count (5-7 max) and measure marginal relevance gains per variant",
+        "Production systems should implement token budgeting within expansion logic to prevent runaway costs"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your RAG system retrieves cricket coaching documents. You want maximum coverage of batting techniques without exceeding $10/day in API costs. Which expansion pattern should you choose?",
+      "items": [
+        "Multi-strategy expansion (generate 15+ variants per query)",
+        "Sequential expansion with token budget limits (start with 3 variants, expand only if initial results score <0.6)",
+        "Ensemble expansion with 4 independent models voting",
+        "No expansion—just retrieve with the original query"
+      ],
+      "answer": 1,
+      "explanation": "Sequential expansion with token budgeting is optimal here because: (1) you have a hard cost constraint ($10/day), (2) multi-strategy at 15+ variants would blow your budget immediately, (3) ensemble adds 4x cost which violates constraints, (4) no expansion sacrifices coverage. Sequential expansion lets you start lean (3 variants = minimal cost) and intelligently expand only when initial results are weak, staying within budget while improving coverage. Set your budget alert at $8/day to leave margin for error."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Query expansion and reformulation powers production systems at scale across major tech companies. Google's Search Generative Experience uses dynamic query reformulation to understand intent across billions of daily queries. OpenAI's ChatGPT leverages multi-turn query expansion within conversation context to maintain coherence. Netflix employs query reformulation in recommendation systems, expanding user searches like 'cricket movies' into 'sports dramas, historical films, underdog stories' to surface relevant content. Uber's support systems use query expansion to match customer issues to resolution databases despite varied phrasing. Meta's recommendation engine reformulates user interests into expanded feature vectors. At scale, these systems process millions of queries per second. Failures occur when expansion drifts semantically (expanding 'cricket equipment' into 'insects'), when context windows overflow with reformulations, or when ranking scores degrade due to too many expansions. Production systems typically use 3-5 reformulations per query with strict latency budgets (100-500ms), requiring careful balancing between coverage and speed.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A batsman facing a bowler must anticipate multiple delivery types—fast ball, spinner, yorker—and adjust their stance accordingly. Query expansion is like the batsman considering all possible bowling options before the ball arrives. Google expands a vague query ('great matches') into specific angles ('Test cricket finals', 'ODI thrillers', 'IPL moments'), similar to how a fielder anticipates where the ball might go based on bowler type, pitch conditions, and batter's stance. Netflix reformulates a user's search just as a cricket commentator rephrases a moment—'that was incredible batting' becomes 'aggressive stroke play against pace bowling'—reaching different audience segments with the same core idea.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production-scale query expansion with monitoring\nfrom typing import List, Dict\nimport time\nfrom dataclasses import dataclass\n\n@dataclass\nclass QueryExpansionMetrics:\n    original_query: str\n    expanded_queries: List[str]\n    latency_ms: float\n    retrieval_coverage: float\n    semantic_drift: float\n\nclass ProductionQueryExpander:\n    def __init__(self, max_expansions=5, latency_budget_ms=200):\n        self.max_expansions = max_expansions\n        self.latency_budget = latency_budget_ms\n        self.expansion_cache = {}\n    \n    def expand_query(self, query: str) -> QueryExpansionMetrics:\n        \"\"\"Expand query with strict latency constraints.\"\"\"\n        start_time = time.time()\n        \n        # Check cache first (critical for production)\n        if query in self.expansion_cache:\n            cached = self.expansion_cache[query]\n            cached['latency_ms'] = (time.time() - start_time) * 1000\n            return cached\n        \n        # Synonym expansion\n        synonym_batch = self._batch_synonyms(query)\n        remaining_budget = self.latency_budget - (time.time() - start_time) * 1000\n        \n        if remaining_budget > 50:  # Allow semantic expansion only if time permits\n            semantic_batch = self._semantic_reformulation(query, timeout_ms=int(remaining_budget))\n        else:\n            semantic_batch = []\n        \n        # Combine and deduplicate expansions\n        all_expansions = list(set(synonym_batch + semantic_batch))[:self.max_expansions]\n        \n        # Monitor semantic drift (drift > 0.3 indicates quality issues)\n        drift = self._measure_semantic_drift(query, all_expansions)\n        \n        metrics = QueryExpansionMetrics(\n            original_query=query,\n            expanded_queries=all_expansions,\n            latency_ms=(time.time() - start_time) * 1000,\n            retrieval_coverage=self._estimate_coverage(all_expansions),\n            semantic_drift=drift\n        )\n        \n        # Cache for next occurrence\n        self.expansion_cache[query] = metrics\n        \n        return metrics\n    \n    def _batch_synonyms(self, query: str) -> List[str]:\n        \"\"\"Fast synonym lookup (typically <10ms).\"\"\"\n        cricket_synonyms = {\n            'cricket': ['batting', 'bowling', 'fielding', 'Test cricket'],\n            'match': ['fixture', 'game', 'encounter', 'series'],\n            'score': ['runs', 'total', 'aggregate', 'performance'],\n        }\n        tokens = query.lower().split()\n        expansions = []\n        for token in tokens:\n            if token in cricket_synonyms:\n                expansions.extend(cricket_synonyms[token])\n        return expansions or [query]\n    \n    def _semantic_reformulation(self, query: str, timeout_ms: int) -> List[str]:\n        \"\"\"Call LLM for semantic reformulation with timeout.\"\"\"\n        prompt = f\"Reformulate this query in 3 alternative ways: {query}\"\n        # In production: would call LLM with timeout_ms constraint\n        return [f\"{query} (reformulated variant 1)\", f\"{query} (reformulated variant 2)\"]\n    \n    def _measure_semantic_drift(self, original: str, expansions: List[str]) -> float:\n        \"\"\"Score how far expansions drift from original intent (0-1).\"\"\"\n        # In production: would use embedding similarity scores\n        return 0.15  # Example: low drift is good\n    \n    def _estimate_coverage(self, expansions: List[str]) -> float:\n        \"\"\"Estimate what fraction of relevant docs we'll retrieve.\"\"\"\n        return min(0.85, len(expansions) * 0.2)  # Simplified estimate\n\n# Example usage\nexpander = ProductionQueryExpander(max_expansions=4, latency_budget_ms=150)\nmetrics = expander.expand_query(\"best cricket matches\")\n\nprint(f\"Original: {metrics.original_query}\")\nprint(f\"Expansions: {metrics.expanded_queries}\")\nprint(f\"Latency: {metrics.latency_ms:.1f}ms\")\nprint(f\"Coverage: {metrics.retrieval_coverage:.1%}\")\nprint(f\"Semantic Drift: {metrics.semantic_drift:.2f} (good if <0.3)\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Production systems must balance query expansion breadth with strict latency budgets. This example shows caching, timeout handling, semantic drift monitoring, and coverage estimation—critical for systems serving millions of queries at companies like Google and OpenAI."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Common Production Failures\n\n1. **Query Drift at Scale**: Expanding 'cricket equipment' into 'insects' because vector similarity picked up 'cricket' (the insect). Always validate expansions against original semantic intent.\n\n2. **Context Window Overflow**: Adding 10+ reformulations fills the LLM's context window, leaving no room for retrieved documents. Limit to 3-5 expansions max.\n\n3. **Latency Cascade**: Chaining query expansion → vector search → reranking → LLM ranking without timeouts causes 95th percentile latencies to spike from 100ms to 5000ms+. Always set individual budgets.\n\n4. **Cold Start Caching Issues**: Query expansion with LLM calls becomes expensive without caching. First user faces 500ms+ latency; 1000th user gets 50ms from cache—uneven experience.\n\n5. **Expansion Redundancy**: Expanding 'cricket scores' into 'cricket runs', 'cricket totals', 'cricket aggregate' retrieves near-identical documents 3× over, wasting tokens and database throughput.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Query expansion reformulates user intent into 3-5 semantic variations to improve retrieval coverage while staying within latency budgets (100-500ms in production).",
+        "Google, OpenAI, and Netflix use multi-stage expansion: synonyms first (fast), then LLM reformulation (slower but higher quality), with strict timeout cutoffs.",
+        "Semantic drift—when expansions drift too far from original intent—breaks relevance; measure via embedding similarity and cap acceptable drift at 0.2-0.3 threshold.",
+        "Production systems must cache expansions aggressively; identical queries should skip LLM calls entirely, reducing latency from 500ms to 50ms on repeat traffic.",
+        "Context window overflow occurs when too many expansions are added to prompts; limit expansions to 3-5 and deduplicate to preserve space for retrieved documents.",
+        "Reranking becomes critical with expanded queries: 100 results from 5 query variants need reranking to surface top-10 most relevant docs, otherwise ranking degrades 15-30%.",
+        "Monitor query expansion with metrics: latency per query, semantic drift scores, retrieval coverage gains, and cache hit rates to catch regressions before production impact."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of query expansion and reformulation techniques with these two knowledge checks. The first focuses on conceptual understanding of how query variations improve retrieval, while the second applies these concepts to a real-world RAG scenario.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In query expansion for RAG systems, why is generating multiple reformulations of a user's original query particularly effective at improving retrieval accuracy?",
+      "items": [
+        "Each reformulation targets different semantic aspects and vocabulary patterns in the vector database, increasing the likelihood of retrieving relevant chunks that use alternative phrasings or focus on different facets of the query intent.",
+        "Reformulations allow the system to search multiple vector databases simultaneously, which inherently produces more results regardless of relevance.",
+        "Query expansion reduces computational load by replacing one expensive vector search with multiple cheaper searches.",
+        "Reformulations convert natural language queries into SQL, which is more efficient for traditional database retrieval."
+      ],
+      "answer": 0,
+      "explanation": "Query expansion works because different reformulations act like different batting approaches in cricket—a batsman might play an aggressive drive for one ball, a defensive block for another, and a pull shot for a third, each technique retrieving different types of information. When you expand 'best fast bowling techniques' into variations like 'strategies for pace bowling,' 'how to improve bowling speed,' and 'fast bowler training methods,' each reformulation captures different semantic angles and vocabulary patterns that exist in your vector database. This increases coverage across diverse document phrasings and conceptual framings. Option B is incorrect because multiple reformulations don't require multiple databases—they're all searching the same vector space from different angles. Option C misunderstands the computational cost: multiple searches actually increase computation compared to one search. Option D is wrong because RAG systems work with vector databases, not traditional SQL databases, and reformulations remain in natural language or embeddings, not SQL.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket analytics RAG system. A user queries: 'How do batsmen perform against left-arm spinners?' The retrieval returns chunks about general batting statistics and leg-spin bowling, but misses crucial documents about counter-strategies specific to left-arm orthodox spin. Which query reformulation approach would most effectively address this retrieval gap?",
+      "items": [
+        "Add synonym expansion: 'How do batsmen perform against left-arm orthodox spinners and unorthodox left-arm bowlers?'",
+        "Use decomposition: break into sub-queries like 'left-arm spin bowling mechanics,' 'defensive batting against spin,' and 'specific techniques vs. left-arm orthodox spinners,' then merge results to capture each dimension separately.",
+        "Apply linguistic variation only: rephrase as 'Batsmen's performance metrics vs. left-arm spinner bowlers' to improve grammar.",
+        "Expand with negation: 'How do batsmen NOT perform well against left-arm spinners?' to find contrasting information."
+      ],
+      "answer": 1,
+      "explanation": "Decomposition is the optimal strategy here because the original query conflates multiple distinct concepts: general batting performance, the specific left-arm characteristic, and the spin-bowling type. Like a cricket captain analyzing a batsman's weakness by examining footwork separately from shot selection separately from field positioning, decomposition breaks the query into independent retrieval tasks. This allows the system to find documents specifically about left-arm orthodox spin techniques (missed in the original search) and documents about counter-strategies (a separate concept). Each sub-query targets a specific semantic dimension, ensuring comprehensive coverage. Option A (synonym expansion) adds related terms but doesn't address the structural issue that 'performance against X' documents and 'strategies for handling X' documents may cluster separately in vector space. Option C (linguistic variation) only reformats without addressing the semantic gap—the original retrieval already understood the query grammatically. Option D (negation) is counterproductive; it inverts the meaning and would retrieve information about poor performance rather than effective strategies.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

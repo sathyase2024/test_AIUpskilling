@@ -177,6 +177,270 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Hybrid search systems execute a dual-pipeline architecture where BM25 and dense retrieval operate in parallel on indexed documents. The BM25 pipeline tokenizes the query, applies inverse document frequency (IDF) weighting, and scores documents via term frequency normalized by document length using the Robertson-Spark Jones formula. Simultaneously, the dense pipeline encodes the query into a high-dimensional vector using a transformer encoder, then computes cosine similarity against pre-computed document embeddings stored in an approximate nearest neighbor (ANN) index like HNSW or IVF. Both pipelines retrieve their top-k candidates independently—typically 100-1000 documents each—maintaining separate ranking scores. The fusion layer normalizes these heterogeneous score distributions (BM25 raw scores vs. cosine similarities in [0,1]) using techniques like min-max scaling or reciprocal rank fusion (RRF), then applies weighted combination: final_score = α × normalized_bm25 + (1−α) × normalized_dense. Optional cross-encoder re-ranking then scores the fused top-m candidates using a fine-tuned transformer, reordering before presentation. Memory consumption scales linearly with corpus size: BM25 requires inverted index storage (typically 5-15% of raw text), while dense retrieval demands high-dimensional vectors (768-1024 dimensions × corpus size × 4 bytes per float). Latency is dominated by ANN lookup (milliseconds) and cross-encoder inference (tens to hundreds of milliseconds per document), with careful indexing strategy being critical for production systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma's team preparing for a match against Jasprit Bumrah's bowling attack. The BM25 pipeline is like the team's opening batsmen (Rohit and another opener) who study the specific bowlers' names, past deliveries, and exact match statistics from scorecards—they retrieve candidates by exact keyword matching, just as BM25 matches query terms directly against indexed text. The dense retrieval pipeline, meanwhile, is like Virat Kohli studying Bumrah's overall bowling patterns, body language, and subtle variations in technique—he understands the deeper semantic patterns without needing exact terms. The fusion layer acts like the team's coach combining both intelligence sources: the detailed scorecard analysis (BM25 scores) and Kohli's intuitive understanding (dense scores) into one batting strategy, weighting each perspective based on the specific match conditions. The cross-encoder re-ranking is like a senior player making the final call on which approach to emphasize in the next over based on live field conditions. This parallel reveals that neither mechanical exact matching nor intuitive pattern recognition alone is optimal—success requires integrating both precise information retrieval and semantic understanding, just as winning cricket requires both tactical data and adaptive expertise.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom rank_bm25 import BM25Okapi\nfrom sklearn.preprocessing import MinMaxScaler\nfrom sentence_transformers import SentenceTransformer, util\n\nclass CricketMatchRetriever:\n    def __init__(self, bm25_weight=0.4, dense_weight=0.6):\n        self.bm25_weight = bm25_weight\n        self.dense_weight = dense_weight\n        self.encoder = SentenceTransformer('all-MiniLM-L6-v2')\n        self.bm25_index = None\n        self.dense_embeddings = None\n        self.documents = []\n        self.scaler = MinMaxScaler()\n\n    def index_cricket_matches(self, match_documents):\n        \"\"\"Index cricket match reports using hybrid approach.\"\"\"\n        self.documents = match_documents\n        \n        # BM25 indexing: tokenize and build inverted index\n        tokenized_docs = [doc.lower().split() for doc in match_documents]\n        self.bm25_index = BM25Okapi(tokenized_docs)\n        \n        # Dense indexing: encode all documents to vectors\n        self.dense_embeddings = self.encoder.encode(\n            match_documents, \n            convert_to_tensor=True\n        )\n\n    def hybrid_search(self, batting_query, top_k=10):\n        \"\"\"Retrieve cricket match documents using fusion strategy.\"\"\"\n        # BM25 retrieval: exact term matching\n        bm25_scores = self.bm25_index.get_scores(\n            batting_query.lower().split()\n        )\n        bm25_scores = np.array(bm25_scores).reshape(-1, 1)\n        bm25_scores_normalized = self.scaler.fit_transform(bm25_scores).flatten()\n        \n        # Dense retrieval: semantic similarity\n        query_embedding = self.encoder.encode(batting_query, convert_to_tensor=True)\n        dense_scores = util.pytorch_cos_sim(query_embedding, self.dense_embeddings)[0]\n        dense_scores_normalized = dense_scores.cpu().numpy()\n        \n        # Fusion: weighted combination\n        fused_scores = (\n            self.bm25_weight * bm25_scores_normalized + \n            self.dense_weight * dense_scores_normalized\n        )\n        \n        # Return top-k matches\n        top_indices = np.argsort(fused_scores)[::-1][:top_k]\n        return [\n            {\n                'rank': i + 1,\n                'document': self.documents[idx],\n                'bm25_score': float(bm25_scores_normalized[idx]),\n                'dense_score': float(dense_scores_normalized[idx]),\n                'fused_score': float(fused_scores[idx])\n            }\n            for i, idx in enumerate(top_indices)\n        ]\n\n# Usage\ncricket_docs = [\n    \"Rohit Sharma scored 150 runs against Jasprit Bumrah's bowling\",\n    \"Virat Kohli's batting technique against short-pitched deliveries\",\n    \"Bumrah's yorker execution in the death overs\"\n]\n\nretriever = CricketMatchRetriever(bm25_weight=0.35, dense_weight=0.65)\nretriever.index_cricket_matches(cricket_docs)\n\nresults = retriever.hybrid_search(\n    batting_query=\"Rohit's performance against pace bowling\"\n)\nfor result in results:\n    print(f\"Rank {result['rank']}: {result['document'][:50]}...\")\n    print(f\"  BM25: {result['bm25_score']:.3f} | Dense: {result['dense_score']:.3f} | Fused: {result['fused_score']:.3f}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Score normalization is critical in hybrid systems. Raw BM25 scores (unbounded, corpus-dependent) and cosine similarities (bounded [0,1]) are incomparable. Always normalize both to [0,1] using min-max scaling or other techniques before fusion. Skipping this step leads to one signal completely dominating the other, defeating the purpose of hybridization.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "BM25 and dense retrieval execute in parallel independent pipelines with separate scoring systems",
+        "Score normalization is mandatory before fusion—raw scores from different algorithms are not directly comparable",
+        "Reciprocal Rank Fusion (RRF) and weighted linear combination are the most common fusion strategies",
+        "ANN indexing (HNSW, IVF) enables sub-millisecond dense retrieval even for billion-scale corpora",
+        "Memory footprint scales with both inverted index size and embedding dimensions; optimize storage with quantization if needed",
+        "Cross-encoder re-ranking on fused candidates adds latency but significantly improves final ranking quality",
+        "Weight tuning (α parameter) should be data and task-specific; start with 0.4-0.6 for dense weight on domain text"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a hybrid search system with BM25 and dense retrieval, why is score normalization essential before fusion?",
+      "items": [
+        "BM25 scores are unbounded and corpus-dependent, while cosine similarities are bounded [0,1]; without normalization, one signal dominates regardless of actual relevance quality",
+        "Normalization reduces memory usage by converting scores to smaller numerical ranges",
+        "It ensures that the cross-encoder always selects the correct re-ranking candidate",
+        "Normalized scores allow the system to work without an ANN index"
+      ],
+      "answer": 0,
+      "explanation": "BM25 produces raw term frequency scores that scale with document length and corpus statistics (unbounded, varies widely), while cosine similarity in dense retrieval is mathematically bounded to [0,1]. Directly adding a BM25 score of 50 to a cosine similarity of 0.8 is meaningless—they're on incompatible scales. Normalization (via min-max scaling, z-score, or RRF) maps both to comparable ranges so the fusion weights (α and 1−α) actually control the relative contribution. Without normalization, whichever algorithm naturally produces larger numbers will dominate, defeating the hybrid system's purpose of balanced signal integration.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production hybrid search implementations follow three dominant patterns, each optimized for different retrieval scenarios. The **early fusion** pattern scores documents through BM25 and dense retrieval independently, then combines ranked lists via weighted arithmetic mean or RRF (Reciprocal Rank Fusion). This approach is computationally efficient—both retrievers run in parallel—but loses ranking signal interaction. Trade-off: fast inference (~50-100ms), but fusion weights require manual tuning per domain. The **late fusion** pattern retrieves candidates from both methods, then applies cross-encoder re-ranking on the merged set. This captures semantic relevance precisely but increases latency by 30-50% and requires GPU infrastructure for re-rankers. Use when recall matters more than latency (e-discovery, academic search). The **adaptive routing** pattern analyzes query characteristics (lexical density, named entities, ambiguity) and routes to BM25-heavy or dense-heavy pipelines dynamically. Most expensive to develop—requires query classifiers—but delivers optimal precision-recall-latency trade-offs. For cost-conscious systems, early fusion with RRF is recommended baseline; scale to late fusion once re-ranking infrastructure exists.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Early fusion is like setting your field placement before understanding the batter's strengths—you decide on slip cordon and mid-field positioning regardless of left-hand vs right-hand grip. Late fusion is like using DRS (Decision Review System) after the initial umpire call: you gather additional evidence (slow-motion, hot-spot) then make the final decision, but it costs time and reviews. Adaptive routing mirrors captaincy decisions in T20 cricket: analyzing opposition batsmen profiles (aggressive hitters vs accumulator types) and adjusting your bowling rotation and field dynamically. Against Virat Kohli, you might use tight off-field placement and yorkers; against a tail-ender, you spread the field. Similarly, for named-entity queries like \"Tendulkar centuries at MCG,\" route to BM25 first; for semantic queries like \"cricket strategy against leg-spin bowlers,\" prioritize dense retrieval. The cost-accuracy trade-off mirrors choosing between quick field adjustments (cheap but risky) versus full-team tactical resets (expensive but precise).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Early Fusion with RRF (Reciprocal Rank Fusion)\nfrom collections import defaultdict\nimport numpy as np\n\ndef hybrid_search_best_practice(query, bm25_scorer, dense_scorer, k=10):\n    \"\"\"Efficient early fusion using Reciprocal Rank Fusion\"\"\"\n    # Run both retrievers in parallel\n    bm25_results = bm25_scorer.retrieve(query, k=k)  # {doc_id: score}\n    dense_results = dense_scorer.retrieve(query, k=k)  # {doc_id: score}\n    \n    # RRF formula: 1 / (60 + rank)\n    rrf_scores = defaultdict(float)\n    for rank, (doc_id, score) in enumerate(bm25_results.items(), 1):\n        rrf_scores[doc_id] += 1.0 / (60 + rank)\n    for rank, (doc_id, score) in enumerate(dense_results.items(), 1):\n        rrf_scores[doc_id] += 1.0 / (60 + rank)\n    \n    # Return merged ranked list\n    return sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:k]\n\n# ANTI-PATTERN: Manual weighted average without normalization\ndef hybrid_search_antipattern(query, bm25_scorer, dense_scorer, k=10):\n    \"\"\"❌ AVOID: Assumes scores are comparable across scorers\"\"\"\n    bm25_results = bm25_scorer.retrieve(query, k=k)\n    dense_results = dense_scorer.retrieve(query, k=k)\n    \n    # BUG: BM25 scores (0-infinite) and dense scores (0-1) are incomparable\n    # A dense score of 0.8 != importance of BM25 score of 0.8\n    merged = defaultdict(float)\n    for doc_id, score in bm25_results.items():\n        merged[doc_id] += 0.5 * score  # Scales wrong!\n    for doc_id, score in dense_results.items():\n        merged[doc_id] += 0.5 * score  # Incompatible scale\n    \n    return sorted(merged.items(), key=lambda x: x[1], reverse=True)[:k]",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is **assuming BM25 and dense retrieval scores are directly comparable**. BM25 scores range from 0 to unbounded (depends on term frequencies and document length), while dense retrieval scores typically range from -1 to 1 (cosine similarity). Naively averaging them (e.g., `(bm25_score + dense_score) / 2`) causes one retriever to dominate. Fix: (1) **Use Reciprocal Rank Fusion (RRF)** which converts ranks to normalized scores, eliminating scale dependency, or (2) **Apply min-max normalization** per retriever before blending—compute `normalized_bm25 = (score - min_score) / (max_score - min_score)`, repeat for dense scores, then blend. RRF is production-preferred because it's parameter-free; normalization requires scanning candidate sets to compute min/max. Always validate fusion on your domain's development set before deploying.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Early fusion (RRF): Fast, parallel execution, requires no re-ranker, best for high-throughput systems",
+        "Late fusion: GPU-accelerated re-ranking adds 30-50ms latency but maximizes precision; use when accuracy >> speed",
+        "Adaptive routing: Route queries dynamically based on lexical/semantic characteristics; most complex but optimal cost-accuracy trade-off",
+        "Never directly average scores from different retrievers without normalization (RRF or min-max scaling)",
+        "Test fusion strategies on domain-specific evaluation sets; default weights rarely transfer across domains"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket search platform retrieves documents about batting techniques. BM25 excels on exact matches (\"Tendulkar pull shot\") but misses semantic variants (\"Tendulkar's technique against short-pitched balls\"). Dense retrieval handles semantics but is slower. Which pattern best balances both needs in production?",
+      "items": [
+        "Late fusion with cross-encoder re-ranking on top 100 candidates",
+        "Early fusion with RRF on top 10 from each retriever",
+        "Adaptive routing: use BM25-heavy weights for named entities, dense-heavy for technique queries",
+        "Replace BM25 entirely with a larger embedding model"
+      ],
+      "answer": 2,
+      "explanation": "Adaptive routing (answer C) is optimal here because your use case has clear lexical vs. semantic patterns: player names (Tendulkar) are lexical signals suited to BM25, while technique descriptions are semantic. Routing dynamically captures both strengths. Early fusion (B) works but doesn't optimize weights per query type. Late fusion (A) adds unnecessary latency and cost for this scenario. Replacing BM25 (D) loses the exact-match advantage on player/shot names."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Hybrid search powers production systems at scale across industry leaders. Google integrates BM25 lexical matching with dense retrieval in Search and Gmail, processing billions of queries daily. OpenAI's ChatGPT uses hybrid retrieval to ground responses in retrieved documents, combining keyword precision with semantic understanding. Netflix leverages hybrid search for content discovery—BM25 catches exact show titles while dense embeddings surface thematically similar recommendations. Meta's search infrastructure fuses lexical and semantic signals across 3 billion users. Uber uses hybrid retrieval for real-time support ticket routing, matching customer language exactly while understanding intent semantically. At scale (millions of queries/sec), failures occur when: single-signal systems miss edge cases (BM25-only fails on synonyms; dense-only fails on rare terms), fusion weights aren't tuned per use-case, or embeddings become stale. Re-ranking latency becomes critical—a 50ms retrieval serving 1M queries needs sub-millisecond re-rankers.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: BM25 is your opening batsman—reliable, precise, catches exact deliveries (keywords) with consistency. Dense retrieval is your spinner bowler—adapts to pitch conditions (semantic meaning), deceives through subtlety, handles varied field placements (synonyms, paraphrases). The match captain (fusion strategy) decides batting order and bowling change timing. A championship team (production system) never relies on one player—they balance aggression (recall from dense) with defense (precision from lexical). Cross-encoder scoring is like the third umpire review: when batsman/bowler appeal (retrieval results are borderline), the video evidence (fine-grained scoring) makes the final call.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# Production hybrid search at scale (simplified)\nfrom elasticsearch import Elasticsearch\nfrom sentence_transformers import CrossEncoder\nimport numpy as np\n\nclass HybridSearchBatsman:\n    def __init__(self, bm25_weight=0.4, dense_weight=0.6):\n        self.es = Elasticsearch(['localhost:9200'])\n        self.reranker = CrossEncoder('cross-encoder/mmarco-mMiniLMv2-L12-H384')\n        self.bm25_weight = bm25_weight\n        self.dense_weight = dense_weight\n    \n    def search_cricket_stats(self, query_over, top_k=10):\n        # Stage 1: Parallel BM25 and dense retrieval\n        bm25_hits = self.es.search(\n            index='cricket_stats',\n            body={\n                'query': {'multi_match': {\n                    'query': query_over,\n                    'fields': ['player_name', 'match_type', 'performance']\n                }},\n                'size': top_k * 2\n            }\n        )['hits']['hits']\n        \n        dense_hits = self.es.search(\n            index='cricket_stats',\n            body={\n                'query': {'knn': {\n                    'embedding': {\n                        'vector': self.encode(query_over),\n                        'k': top_k * 2\n                    }\n                }},\n                'size': top_k * 2\n            }\n        )['hits']['hits']\n        \n        # Stage 2: Normalize and fuse scores\n        bm25_scores = {hit['_id']: hit['_score'] for hit in bm25_hits}\n        dense_scores = {hit['_id']: hit['_score'] for hit in dense_hits}\n        \n        bm25_max = max(bm25_scores.values()) if bm25_scores else 1\n        dense_max = max(dense_scores.values()) if dense_scores else 1\n        \n        fused = {}\n        for doc_id in set(list(bm25_scores.keys()) + list(dense_scores.keys())):\n            norm_bm25 = (bm25_scores.get(doc_id, 0) / bm25_max)\n            norm_dense = (dense_scores.get(doc_id, 0) / dense_max)\n            fused[doc_id] = (self.bm25_weight * norm_bm25 + \n                           self.dense_weight * norm_dense)\n        \n        # Stage 3: Re-rank top candidates with cross-encoder\n        candidates = sorted(fused.items(), key=lambda x: x[1], reverse=True)[:top_k]\n        docs = [self.es.get(index='cricket_stats', id=doc_id)['_source'] \n                for doc_id, _ in candidates]\n        \n        pairs = [[query_over, doc.get('content', '')] for doc in docs]\n        rerank_scores = self.reranker.predict(pairs)\n        \n        final_results = sorted(\n            zip(docs, rerank_scores),\n            key=lambda x: x[1],\n            reverse=True\n        )[:top_k]\n        \n        return final_results\n    \n    def encode(self, text):\n        # Placeholder: use actual embedding model\n        return np.random.rand(384)\n\n# Usage\nbatsman = HybridSearchBatsman(bm25_weight=0.35, dense_weight=0.65)\nresults = batsman.search_cricket_stats('Virat Kohli Test century performances')",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Production hybrid search architecture with three-stage pipeline: parallel retrieval, score fusion, and cross-encoder re-ranking. Tunable weights let you favor precision (↑ BM25) or recall (↑ dense) per domain. Re-ranking stage catches fusion errors before ranking."
+    },
+    {
+      "type": "warning_box",
+      "content": "⚠️ Warning: Hybrid search is not free. Each query hits both BM25 index AND vector database, doubling latency. Production systems use caching (Redis), query batching, and GPU re-ranking to stay under SLA. Never re-rank all results—use hybrid fusion to pre-filter to ~100 candidates, then expensive re-rank only top-k. Embedding staleness is critical: if your vector index lags document updates by hours, hybrid search becomes semantically inconsistent. Test fusion weights empirically on YOUR domain; generic 0.5/0.5 splits fail.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Hybrid search fuses BM25 (lexical precision) and dense retrieval (semantic recall) to avoid single-signal brittleness at scale.",
+        "Production systems use three-stage pipelines: parallel retrieval → score fusion → cross-encoder re-ranking for latency efficiency.",
+        "Score normalization is critical; raw BM25 and dense scores have different ranges; always divide by max before weighted fusion.",
+        "Re-ranking is the bottleneck; limit candidates to ~100 before applying expensive cross-encoders to meet production latency SLAs.",
+        "Fusion weights are domain-specific; e-commerce needs higher BM25 (exact SKU matching), support tickets need higher dense (intent semantics).",
+        "Embedding staleness breaks hybrid systems; sync vector index updates with document changes hourly, not weekly.",
+        "Multi-query retrieval amplifies hybrid benefits; generate 3–5 reformulations per query and fuse results to improve recall by 15–30%."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Why does a production system re-rank hybrid results with a cross-encoder instead of using fusion scores directly?",
+      "items": [
+        "Fusion scores ignore interaction between query and document; cross-encoders see both and score relevance holistically.",
+        "BM25 and dense scores are already perfectly calibrated, so re-ranking is redundant.",
+        "Re-ranking reduces latency by eliminating one of the retrieval stages.",
+        "Cross-encoders are cheaper to run than the fusion computation."
+      ],
+      "answer": 0,
+      "explanation": "Cross-encoders see both query and document as a pair, capturing nuanced relevance signals that independent scores miss. A query like 'fast bowler injury recovery' might score high on both BM25 (exact keyword match) and dense (semantic match), but a cross-encoder realizes the document is about cricket injury prevention (relevant) vs. general sports physiology (less relevant). Fusion scores are linear and ignore query-document interaction; cross-encoders model that interaction directly."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of hybrid search mechanics and real-world decision-making with these two knowledge checks. The first focuses on conceptual mastery of how BM25 and dense retrieval work together. The second presents a realistic scenario where you must choose the right hybrid strategy.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a hybrid search system using BM25 and dense vectors, a user searches for 'fastest bowler in cricket history.' BM25 returns documents containing the exact phrase 'fastest bowler' with high scores, but misses relevant articles using synonyms like 'quickest pacer' and 'speed gun readings.' Dense retrieval catches these semantic matches. When these results are fused using Reciprocal Rank Fusion (RRF), why does the dense retrieval result for 'quickest pacer' sometimes rank higher than the BM25 exact-match result?",
+      "items": [
+        "Because RRF gives equal weight to both rankers regardless of individual scores, and the dense result's stronger performance across multiple semantic interpretations can compensate for BM25's initial advantage",
+        "Because dense embeddings always outperform BM25 in modern search systems",
+        "Because the exact phrase 'fastest bowler' is less relevant than semantic similarity",
+        "Because RRF penalizes lexical matches to promote diversity in results"
+      ],
+      "answer": 0,
+      "explanation": "RRF (Reciprocal Rank Fusion) normalizes rankings from both BM25 and dense retrieval, treating each ranker's position equally in the fusion formula: RRF(d) = Σ(1/(k + rank_i(d))). This means a document ranked 2nd by dense retrieval and 10th by BM25 can outscore a document ranked 1st by BM25 but 50th by dense retrieval. In this cricket example, 'quickest pacer' may rank lower individually in BM25 but higher in dense retrieval because it captures the semantic intent better. When combined, dense retrieval's strong signal can dominate the fusion. Option B is incorrect because performance isn't about absolute superiority but complementary strengths. Option C misses that exact matches remain valuable—they just need fusion logic. Option D is false; RRF doesn't inherently penalize lexical matches, it balances signals."
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for a cricket analytics platform. Users query match statistics like 'Which Indian batsman has the highest average against fast bowling on flat pitches?' Your BM25 index struggles because queries use domain-specific terms ('flat pitches') that rarely appear verbatim in documents, while your dense embeddings excel at semantic understanding. However, dense-only search sometimes retrieves off-topic cricket content (e.g., pitch maintenance instead of batting). You have three options: (1) Increase BM25 weight in fusion to 70%, (2) Add query expansion using a cricket domain glossary before hybrid search, (3) Switch entirely to dense retrieval with a stricter similarity threshold. Which is the best first step?",
+      "items": [
+        "Switch entirely to dense retrieval with a stricter similarity threshold to eliminate false positives",
+        "Add query expansion using a cricket domain glossary before hybrid search to bridge the vocabulary gap and improve BM25 precision",
+        "Increase BM25 weight in fusion to 70% to prioritize exact lexical matches",
+        "Replace both BM25 and dense retrieval with a rule-based system designed for cricket statistics"
+      ],
+      "answer": 1,
+      "explanation": "Query expansion is the best first step because it addresses the root cause: BM25's vocabulary mismatch with domain-specific cricket terminology. By expanding 'flat pitches' to include synonyms like 'flat playing surfaces,' 'batting-friendly wickets,' or 'low-bounce pitches,' BM25 can match relevant documents it would otherwise miss. This improves hybrid search quality without losing either signal. Option A (strict dense threshold) would eliminate valuable semantic matches and reintroduce the original vocabulary problem. Option C (increase BM25 weight) doesn't solve the underlying lexical gap—it just changes weights, likely returning fewer relevant results overall. Option D abandons the proven advantages of hybrid search for a brittle, hard-to-maintain rule system. Query expansion leverages both rankers more effectively by ensuring BM25 has the vocabulary to compete fairly in the fusion step."
     }
   ]
 }

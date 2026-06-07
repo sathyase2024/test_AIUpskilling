@@ -195,6 +195,178 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch workflows rely on three dominant patterns: the training loop pattern, which encapsulates forward pass, loss computation, backward pass, and optimizer stepping into reusable blocks with explicit checkpoint management; the distributed data parallel (DDP) pattern, which distributes batches across GPUs to achieve linear scaling but introduces synchronization overhead and requires careful gradient accumulation; and the mixed precision training pattern, which uses float16 for computations while maintaining float32 for weight updates, reducing memory consumption by 50% and accelerating training 1.5-3x on modern hardware, though it introduces numerical instability risks requiring loss scaling. Choose the training loop pattern for single-GPU development and prototyping due to its simplicity and debugging transparency. Use DDP when your batch size exceeds single GPU memory or when training time becomes a bottleneck—the synchronization cost (typically 10-15% overhead) is negligible beyond 4 GPUs. Apply mixed precision only after establishing baseline performance; the engineering complexity of handling underflow in gradients outweighs benefits for small models. The critical trade-off: code simplicity versus computational efficiency. Beginners should master the training loop pattern first, then add distributed training, then optimize with mixed precision—attempting all simultaneously produces unmaintainable code and difficult-to-debug numerical issues.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The training loop pattern is like your standard field placement—proven, reliable, and lets you focus on bowling strategy without overcomplicating things. Distributed data parallel (DDP) is like deploying multiple bowling rotations simultaneously across matches in different cities: you get results faster, but you need a communication system (like team management) to keep everyone synchronized. Mixed precision training is like choosing when to play aggressive shots (float16 speed) versus defensive strokes (float32 stability)—maximize scoring rate during favorable conditions, but fall back to safety when the ball is moving unpredictably. A captain wouldn't field four new bowling strategies in the same match; similarly, add patterns incrementally as your model and dataset grow, ensuring each layer works perfectly before adding complexity.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Unstructured training with no checkpointing or validation separation\ndef train_cricket_model_bad(model, data, epochs=100):\n    optimizer = torch.optim.Adam(model.parameters())\n    for epoch in range(epochs):\n        for batch in data:\n            output = model(batch)\n            loss = F.mse_loss(output, batch.target)\n            loss.backward()\n            optimizer.step()\n            optimizer.zero_grad()\n            print(loss.item())  # Massive I/O overhead\n    return model  # No checkpoint saved, no validation metrics\n\n# ✅ BEST PRACTICE: Structured training with checkpointing and validation\nclass CricketTrainer:\n    def __init__(self, model, optimizer, device='cuda'):\n        self.model = model\n        self.optimizer = optimizer\n        self.device = device\n        self.best_val_loss = float('inf')\n    \n    def train_epoch(self, train_loader, criterion):\n        self.model.train()\n        epoch_loss = 0.0\n        for batch_idx, (batting_features, bowling_features, target) in enumerate(train_loader):\n            batting_features = batting_features.to(self.device)\n            bowling_features = bowling_features.to(self.device)\n            target = target.to(self.device)\n            \n            # Forward pass\n            prediction = self.model(batting_features, bowling_features)\n            loss = criterion(prediction, target)\n            \n            # Backward pass with gradient clipping\n            self.optimizer.zero_grad()\n            loss.backward()\n            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)\n            self.optimizer.step()\n            \n            epoch_loss += loss.item()\n        \n        return epoch_loss / len(train_loader)\n    \n    def validate(self, val_loader, criterion):\n        self.model.eval()\n        val_loss = 0.0\n        with torch.no_grad():  # Critical: disable gradient computation\n            for batting_features, bowling_features, target in val_loader:\n                batting_features = batting_features.to(self.device)\n                bowling_features = bowling_features.to(self.device)\n                target = target.to(self.device)\n                \n                prediction = self.model(batting_features, bowling_features)\n                loss = criterion(prediction, target)\n                val_loss += loss.item()\n        \n        return val_loss / len(val_loader)\n    \n    def save_checkpoint(self, epoch, metrics, filepath):\n        checkpoint = {\n            'epoch': epoch,\n            'model_state': self.model.state_dict(),\n            'optimizer_state': self.optimizer.state_dict(),\n            'metrics': metrics\n        }\n        torch.save(checkpoint, filepath)\n    \n    def fit(self, train_loader, val_loader, criterion, epochs=100, checkpoint_dir='./checkpoints'):\n        os.makedirs(checkpoint_dir, exist_ok=True)\n        for epoch in range(epochs):\n            train_loss = self.train_epoch(train_loader, criterion)\n            val_loss = self.validate(val_loader, criterion)\n            \n            if val_loss < self.best_val_loss:\n                self.best_val_loss = val_loss\n                self.save_checkpoint(epoch, {'train': train_loss, 'val': val_loss},\n                                   os.path.join(checkpoint_dir, 'best_model.pt'))\n            \n            if epoch % 10 == 0:\n                print(f'Epoch {epoch}: Train Loss={train_loss:.4f}, Val Loss={val_loss:.4f}')\n\n# Usage\nmodel = CricketPredictionNet()\ntrainer = CricketTrainer(model, torch.optim.Adam(model.parameters()))\ntrainer.fit(train_loader, val_loader, F.mse_loss, epochs=100)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Forgetting to call model.eval() during validation is the #1 beginner mistake that silently corrupts results. During training, layers like BatchNorm and Dropout behave differently—BatchNorm tracks running statistics, Dropout randomly zeros activations. In eval mode, BatchNorm uses accumulated statistics and Dropout is disabled. If you validate with model.train() still active, your validation loss will be artificially low and your model selection will be completely wrong. Fix: Always wrap validation code with `with torch.no_grad(): model.eval()` and restore `model.train()` before the next epoch. Use a helper class (like CricketTrainer above) to enforce this pattern programmatically rather than relying on manual discipline.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Encapsulate training loops in reusable classes to avoid bugs and improve debugging",
+        "Always use torch.no_grad() during validation to save memory and computation",
+        "Implement checkpointing based on validation metrics, not just epoch count",
+        "Use gradient clipping to prevent exploding gradients in RNNs and transformer models",
+        "Separate train/validation data and toggle model.train()/model.eval() explicitly",
+        "Scale patterns progressively: master single-GPU training before distributed training",
+        "Mixed precision requires loss scaling—don't use it without understanding the numerical risks"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket match outcome predictor and notice your validation loss is much lower than training loss, even though your model isn't overfitting. What is the most likely cause?",
+      "items": [
+        "Your validation set is too easy",
+        "You forgot to call model.eval() during validation, so BatchNorm is using batch statistics instead of running statistics",
+        "Your learning rate is too high",
+        "Your model has too many parameters"
+      ],
+      "answer": 1,
+      "explanation": "During training, BatchNorm layers compute and track running statistics of the data. In eval mode, they use these accumulated statistics. If validation runs with model.train() still active, BatchNorm uses the current batch's statistics (which are well-fit to that batch), artificially lowering the validation loss. This is a systematic bug that leads to incorrect model selection. The fix is enforcing model.eval() during validation with torch.no_grad()."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "PyTorch powers production systems at scale across the world's largest tech companies. Google uses PyTorch in TensorFlow's research division and production recommendation systems serving billions of users daily. Meta (Facebook) built PyTorch itself and deploys it across content ranking, computer vision for image moderation, and language models. Netflix uses PyTorch-based models to personalize recommendations for 250+ million subscribers, processing terabytes of viewing data. OpenAI relies on PyTorch for training GPT models and deployment infrastructure. Uber uses it for demand forecasting and autonomous vehicle perception systems handling millions of trips. At scale, failures are catastrophic: a faulty gradient computation can cause recommendation models to collapse user engagement by 15%, costing platforms millions daily. Incorrect tensor shape handling crashes distributed training across GPU clusters. AutoGrad bugs lead to models converging to local minima, rendering predictions useless. Production systems require rigorous validation, gradient clipping, batch normalization, and careful numerical stability checks—corners cut during development become expensive production disasters.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: PyTorch is your coaching system. During practice (training), AutoGrad watches every stroke you play and calculates exactly which muscles need adjustment—like a coach analyzing your batting technique frame-by-frame. Tensors are like the scoreboard data (runs, wickets, balls faced). Loss functions measure how far your current batting average is from your target. Optimization adjusts your stance incrementally. At the professional level (production), one miscalibration in your technique compounds across thousands of matches, losing tournaments. Just as elite teams validate every player's form before matches, production ML systems validate gradients, check for NaN values, and monitor model drift continuously.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Tensors are multi-dimensional arrays optimized for GPU computation, fundamental to all PyTorch operations.",
+        "AutoGrad automatically computes gradients via backpropagation, enabling efficient optimization without manual calculus.",
+        "nn.Module provides reusable, composable building blocks for constructing complex neural architectures systematically.",
+        "Loss functions quantify prediction error; optimizers iteratively adjust weights to minimize loss using gradients.",
+        "Proper initialization, gradient clipping, and batch normalization prevent training instability at scale.",
+        "Production systems require rigorous validation, monitoring for NaN/Inf values, and continuous model drift detection.",
+        "PyTorch's dynamic computation graphs enable flexible research while maintaining production-grade performance and reliability."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of PyTorch's core mechanisms with the following conceptual and applied quizzes. These questions mirror real scenarios you'll encounter when building deep learning models.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket batting performance model using PyTorch. During the backward pass, you notice that gradients are accumulating incorrectly across batches, causing your loss to spike unexpectedly. Which mechanism are you most likely forgetting to use after each optimizer.step() call?",
+      "items": [
+        "optimizer.zero_grad()",
+        "loss.backward()",
+        "torch.no_grad()",
+        "tensor.detach()"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is optimizer.zero_grad(). In PyTorch, gradients accumulate by default across iterations. If you don't zero the gradients after each optimization step, old gradients from previous batches will be added to new gradients, causing incorrect updates and unstable training. loss.backward() computes gradients (not clearing them), torch.no_grad() disables gradient tracking for inference, and tensor.detach() removes a tensor from the computation graph. Only zero_grad() explicitly clears accumulated gradients, which is essential for proper batch-wise training."
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket innings prediction model uses nn.Module with three hidden layers. You've implemented forward() correctly and instantiated an Adam optimizer. However, when you call loss.backward(), you get an error: 'leaf variable has been modified by an in-place operation'. Which of the following is the most likely culprit?",
+      "items": [
+        "Using relu() instead of F.relu() in forward()",
+        "Using in-place operations like tensor[0] += value inside forward()",
+        "Calling loss.backward() twice without zero_grad()",
+        "Not wrapping inference code in torch.no_grad()"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is using in-place operations like tensor[0] += value inside forward(). PyTorch's autograd cannot track in-place modifications to leaf variables (parameters) because they destroy the original value needed to compute gradients. In-place operations modify tensors directly in memory, breaking the computation graph. relu() vs F.relu() has no functional difference in terms of in-place behavior. Calling backward() twice without zero_grad() causes gradient accumulation, not in-place operation errors. torch.no_grad() prevents gradient computation but doesn't cause in-place modification errors. Always use out-of-place operations (like tensor + value) in nn.Module forward() methods."
+    },
+    {
+      "type": "quiz",
+      "content": "You're designing a model to predict cricket match outcomes. You've built your network inheriting from nn.Module and trained it successfully. Now you need to use this trained model to make predictions on new match data without computing gradients (to save memory and speed). Which approach is correct?",
+      "items": [
+        "Set model.train() mode and call forward() normally",
+        "Call model.eval() and wrap predictions in torch.no_grad() context manager",
+        "Use model.half() to convert to float16 precision",
+        "Set requires_grad=False on all tensors before loading the model"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is model.eval() with torch.no_grad(). model.eval() disables dropout and batch normalization layers (which behave differently during training vs. evaluation), while torch.no_grad() prevents gradient computation entirely, saving memory and speeding up inference. model.train() enables training-specific behaviors, which wastes resources during inference. model.half() only changes precision (float16) and doesn't affect gradient computation. Setting requires_grad=False is unnecessary when using torch.no_grad() and doesn't address the fundamental need to switch to evaluation mode. This is the standard PyTorch pattern for inference: always use model.eval() and torch.no_grad() together."
     }
   ]
 }
