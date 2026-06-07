@@ -207,11 +207,11 @@ export default function EmbeddedEditor({ topicSlug }: Props) {
     setExecError(null)
     try {
       let result: ExecResult
-      if (lang === 'javascript' || lang === 'typescript') {
+      if (lang === 'javascript') {
         // Run instantly in the browser — no server round-trip
         result = runInBrowser(code)
       } else {
-        // Python, Java → backend subprocess
+        // Python, TypeScript, Java → backend subprocess
         result = await runOnBackend(lang, code)
       }
       setOutput(result)
@@ -358,7 +358,7 @@ export default function EmbeddedEditor({ topicSlug }: Props) {
               {running && (
                 <div className="flex items-center gap-2 text-white/40">
                   <div className="w-3 h-3 border border-green-500/40 border-t-green-500 rounded-full animate-spin" />
-                  Executing on Piston…
+                  Executing…
                 </div>
               )}
               {!running && !output && !execError && (

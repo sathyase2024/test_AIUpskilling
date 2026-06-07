@@ -10,7 +10,11 @@ const execAsync = promisify(exec);
 const EXEC_OPTS = {
   timeout: 15_000,
   maxBuffer: 512 * 1024,
-  env: { PATH: process.env.PATH },
+  env: {
+    PATH: process.env.PATH,
+    JAVA_HOME: process.env.JAVA_HOME,
+    HOME: process.env.HOME ?? '/tmp',
+  },
 };
 
 interface ExecResult { stdout: string; stderr: string; exitCode: number }
@@ -34,12 +38,12 @@ export class CodeService {
     switch (language) {
       case 'python':     return this.runPython(code);
       case 'java':       return this.runJava(code);
-      case 'javascript':
-      case 'typescript': return this.runNode(code);
+      case 'javascript': return this.runNode(code);
+      case 'typescript': return this.runTypeScript(code);
       default:
         return {
           stdout: '',
-          stderr: `${language} execution is not yet available. Use Python, JavaScript, or Java.`,
+          stderr: `${language} execution is not yet available. Use Python, JavaScript, TypeScript, or Java.`,
           exitCode: 1,
         };
     }
@@ -86,12 +90,29 @@ export class CodeService {
     }
   }
 
-  // ── JavaScript / TypeScript (Node.js) ────────────────────────────────────────
+  // ── JavaScript ───────────────────────────────────────────────────────────────
   private async runNode(code: string): Promise<ExecResult> {
-    const file = join(tmpdir(), `js_${tag()}.mjs`);
+    const file = join(tmpdir(), `js_${tag()}.js`);
     try {
       await writeFile(file, code, 'utf8');
       const { stdout, stderr } = await execAsync(`node ${file}`, EXEC_OPTS);
+      return { stdout, stderr, exitCode: 0 };
+    } catch (err: any) {
+      return handleError(err);
+    } finally {
+      unlink(file).catch(() => {});
+    }
+  }
+
+  // ── TypeScript (Node 22 experimental strip-types) ─────────────────────────
+  private async runTypeScript(code: string): Promise<ExecResult> {
+    const file = join(tmpdir(), `ts_${tag()}.ts`);
+    try {
+      await writeFile(file, code, 'utf8');
+      const { stdout, stderr } = await execAsync(
+        `node --experimental-strip-types ${file}`,
+        EXEC_OPTS,
+      );
       return { stdout, stderr, exitCode: 0 };
     } catch (err: any) {
       return handleError(err);

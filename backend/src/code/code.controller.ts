@@ -1,5 +1,5 @@
-import { Controller, Post, Body, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Controller, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CodeService } from './code.service';
 
@@ -9,8 +9,8 @@ export class CodeController {
   constructor(private readonly codeService: CodeService) {}
 
   @Post('execute')
-  @SkipThrottle() // rate-limit handled inside CodeService per IP
-  @ApiOperation({ summary: 'Execute code via Piston sandbox' })
+  @Throttle({ global: { limit: 20, ttl: 60_000 } }) // 20 executions/min per IP
+  @ApiOperation({ summary: 'Execute code in a server-side sandbox' })
   async execute(@Body() body: { code: string; language: string }) {
     if (!body.code?.trim()) {
       throw new HttpException('code is required', HttpStatus.BAD_REQUEST);
