@@ -195,6 +195,182 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production encoder-decoder systems, three dominant patterns emerge based on computational constraints and task requirements. **Fine-tuning the entire model** (both encoder and decoder) provides maximum expressiveness and is the gold standard when you have sufficient labeled data (typically 10K+ examples) and GPU memory. This pattern achieves state-of-the-art performance but incurs high computational costs during training and inference. **Freezing the encoder and fine-tuning only the decoder** offers a middle ground—the pre-trained encoder's representations remain fixed, dramatically reducing training time and memory usage while still allowing task-specific adaptation. This pattern works well for related tasks where source-side understanding is already robust. **Prompt-based few-shot inference** (using in-context learning without fine-tuning) minimizes computational overhead entirely, leveraging the model's pre-training knowledge through strategic prompting; however, it typically underperforms fine-tuned approaches on complex reasoning tasks. Trade-offs cluster around the accuracy-efficiency frontier: full fine-tuning sacrifices speed and cost for accuracy, decoder-only fine-tuning balances both, and few-shot inference maximizes speed but may compromise accuracy on domain-specific tasks. Choose based on your labeled data volume, inference latency SLA, and available compute budget.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: **Full fine-tuning** is like preparing your entire squad for a custom tactical approach—you train batsmen, bowlers, and fielders from scratch for specific opposition weaknesses, maximizing your winning chances but requiring enormous preparation time and resources. **Decoder-only fine-tuning** resembles keeping your opening batting partnership intact (trusted encoder) but rotating middle-order batsmen and bowlers (decoder) based on match conditions—you leverage proven opening partnerships while adapting lower-order strategy. **Few-shot prompting** is comparable to playing with your regular squad without special preparation, relying on players' experience and cricket sense to adapt; it's fastest to deploy but works best against familiar opposition styles. Just as a captain chooses between full squad retooling, selective rotation, and playing as-is based on tournament stage and resources, you select the pattern matching your production constraints and performance requirements.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Freezing encoder but training with wrong learning rates\nfrom transformers import AutoModelForSeq2SeqLM, Trainer, TrainingArguments\n\nmodel = AutoModelForSeq2SeqLM.from_pretrained('google/mt5-small')\n# Naive: freeze encoder but don't adjust learning rates\nfor param in model.encoder.parameters():\n    param.requires_grad = False\n\ntraining_args = TrainingArguments(\n    learning_rate=5e-5,  # ❌ Too high for decoder-only fine-tuning!\n    num_train_epochs=3,\n)\ntrainer = Trainer(model=model, args=training_args, train_dataset=cricket_dataset)\n\n---\n\n# ✅ BEST PRACTICE: Differential learning rates with proper encoder freezing\nfrom torch.optim import AdamW\n\nmodel = AutoModelForSeq2SeqLM.from_pretrained('google/mt5-small')\n\n# Explicitly freeze encoder, optimize decoder parameters\nfor param in model.encoder.parameters():\n    param.requires_grad = False\n\n# Differential learning rates: lower for decoder fine-tuning\noptimizer = AdamW([\n    {'params': model.decoder.parameters(), 'lr': 1e-4},\n    {'params': model.lm_head.parameters(), 'lr': 1e-4}\n])\n\ntraining_args = TrainingArguments(\n    learning_rate=1e-4,  # ✅ Appropriate for partial fine-tuning\n    weight_decay=0.01,\n    warmup_steps=500,\n    num_train_epochs=5,\n    per_device_train_batch_size=16,\n    gradient_accumulation_steps=2,\n)\n\n# Variable naming: cricket-themed\nencoder_state_dict = model.encoder.state_dict()  # bowlers_formation\ndecoder_trainable = model.decoder.parameters()   # batsmen_rotations\n\ntrainer = Trainer(\n    model=model,\n    args=training_args,\n    train_dataset=cricket_dataset,\n    optimizers=(optimizer, None)\n)\ntrainer.train()",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Freezing encoder but using learning rates intended for full model fine-tuning.** Decoder parameters receive excessive gradient updates, causing catastrophic forgetting and training instability. **Fix:** When freezing the encoder, reduce the learning rate by 2-5× (use 1e-4 to 2e-4 instead of 5e-5), implement gradient clipping (max_grad_norm=1.0), and add warmup steps (500-1000) to stabilize decoder adaptation. Monitor validation loss for sudden spikes indicating learning rate miscalibration.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Full fine-tuning maximizes performance but incurs 3-5× higher computational cost; use with 10K+ labeled examples",
+        "Encoder freezing (decoder-only fine-tuning) reduces memory by ~60% and is ideal for related tasks sharing semantic understanding",
+        "Few-shot prompting requires zero fine-tuning but typically underperforms on specialized domains requiring task-specific adaptation",
+        "Differential learning rates (1e-4 for decoder vs 5e-5 for encoder) prevent training instability in partial fine-tuning",
+        "Monitor encoder gradient norms even when frozen to detect unintended training loop updates"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a machine translation system from English cricket commentary to Tamil. You have 5,000 labeled pairs and a single GPU with 12GB VRAM. The encoder is pre-trained on multilingual text. Which pattern should you choose?",
+      "items": [
+        "Full fine-tuning of encoder and decoder",
+        "Freeze encoder, fine-tune decoder only with differential learning rates",
+        "Few-shot prompting without fine-tuning",
+        "Train only the cross-attention layers"
+      ],
+      "answer": 1,
+      "explanation": "Option B (freeze encoder, fine-tune decoder) is optimal here. You have sufficient labeled data (5K examples) for task-specific adaptation, but the 12GB VRAM constraint rules out full fine-tuning. The pre-trained multilingual encoder already understands cricket semantics across languages, so freezing it preserves this knowledge while decoder fine-tuning adapts to Tamil-specific generation patterns. Few-shot prompting (Option C) would underperform on domain-specific terminology, and training only cross-attention (Option D) doesn't leverage the full decoder capacity. Differential learning rates prevent destabilization during decoder-only training."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Encoder-decoder architectures power some of the world's largest AI systems handling billions of requests daily. Google's T5 and BERT models run in production for search ranking, spam detection, and semantic understanding across billions of queries. Meta's multilingual translation systems process over 100 million translation requests daily using encoder-decoder transformers. OpenAI's GPT models and similar decoder-only variants generate content at massive scale. Netflix uses similar architectures for personalized recommendation systems handling millions of user interactions. Uber employs encoder-decoder models for real-time demand prediction and route optimization across thousands of cities. When done wrong—poor tokenization, insufficient context length, or misaligned encoder-decoder dimensions—systems collapse into hallucinations, latency explosions (crossing SLA thresholds), or complete inference failures affecting millions of users simultaneously.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The encoder is your opening batsman analyzing the bowling attack, pitch conditions, and field placement (understanding the problem). The decoder is the middle-order batsman executing shots based on that analysis (generating the solution). The context vector is the match situation they communicate—wickets down, runs needed, bowler's weaknesses. Cross-attention is the batsman watching the bowler's run-up to adjust technique in real-time. When either player fails at their role or miscommunicates (broken attention), the innings collapses.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Encoder-decoder architectures separate input understanding from output generation, enabling specialized optimization for translation, summarization, and question-answering tasks.",
+        "The context vector acts as the information bottleneck between encoder and decoder; insufficient capacity causes information loss and poor generation quality.",
+        "Multi-head attention allows the model to attend to different semantic relationships simultaneously—syntax, meaning, entity references across multiple representation subspaces.",
+        "Cross-attention mechanisms enable decoder to dynamically focus on encoder outputs during generation, preventing hallucinations and grounding responses in source material.",
+        "Production systems require careful dimensionality design, context length management, and attention masking to prevent quadratic complexity scaling and memory exhaustion.",
+        "Pre-trained encoder-decoder models like T5, mT5, and BART achieve strong results through transfer learning, reducing fine-tuning data requirements by 10-100x.",
+        "Common failure modes include gradient vanishing in deep stacks, attention collapse to single tokens, and poor handling of long sequences exceeding training context window."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In production systems handling billions of requests, what typically breaks first when encoder-decoder architecture is poorly designed?",
+      "items": [
+        "Training loss increases slightly but models still perform adequately",
+        "Inference latency explodes due to quadratic attention complexity and memory requirements exceed available VRAM",
+        "The model becomes too accurate and uses excessive computational resources unnecessarily",
+        "Batch normalization layers malfunction in the encoder layers only"
+      ],
+      "answer": 1,
+      "explanation": "Encoder-decoder transformers suffer from O(n²) complexity in attention mechanisms. In production at scale (billions of tokens processed daily), this causes exponential latency growth and memory exhaustion. Insufficient context vector capacity or poor cross-attention design leads to hallucinations and SLA violations. These architectural flaws become catastrophic at scale, affecting millions of users—not minor accuracy dips.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of encoder-decoder architecture with these two knowledge checks. The first quiz focuses on core conceptual mechanisms, while the second applies your knowledge to real-world scenarios you might encounter when building transformer models.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In an encoder-decoder architecture, what is the primary function of the context vector, and how does it differ from the hidden states produced by the encoder?",
+      "items": [
+        "The context vector is a single compressed representation of the entire input sequence that serves as the initial state for the decoder, enabling it to generate output without direct access to encoder hidden states",
+        "The context vector is identical to the final hidden state of the encoder and contains all information from the input sequence without any compression",
+        "The context vector is computed fresh at each decoder timestep and replaces encoder hidden states entirely, making encoder outputs irrelevant",
+        "The context vector is only used during the training phase and is discarded during inference to improve model speed"
+      ],
+      "answer": 0,
+      "explanation": "The context vector functions as a bottleneck—a compressed summary of the entire input sequence that bridges encoder and decoder. Unlike individual encoder hidden states (which capture sequential information at each timestep), the context vector is typically the final encoder hidden state or an attention-weighted combination of all encoder states, providing the decoder with a single starting point for generation. Option 1 is correct because it accurately describes this compression and bridging role. Option 2 is incorrect because while the context may derive from the final hidden state, it's not identical in all architectures—particularly with attention mechanisms. Option 3 is false; the context vector works alongside encoder states in cross-attention, not as a replacement. Option 4 is incorrect; context vectors are essential during both training and inference for generation tasks.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a machine translation model using a Hugging Face encoder-decoder architecture. Your encoder processes cricket commentary in English, but during decoding to Hindi, the model sometimes generates contextually irrelevant words despite correct grammar. Which mechanism would be most effective to diagnose and improve this issue?",
+      "items": [
+        "Increase the number of encoder layers to capture more grammatical nuances from the source language",
+        "Examine the cross-attention weights to see which encoder positions the decoder is attending to when generating problematic tokens, and consider whether the context vector adequately captures semantic content",
+        "Replace multi-head attention with single-head attention to reduce model complexity and force focus on fewer features",
+        "Reduce the embedding dimension to force the model to learn only essential features and eliminate noise"
+      ],
+      "answer": 1,
+      "explanation": "When semantic coherence fails (irrelevant words despite grammar), the issue typically lies in how the decoder attends to encoder information—not in encoding capacity or dimensionality reduction. Cross-attention weights reveal which source positions influence each generated token; if the decoder attends to wrong positions when generating problematic words, this indicates the context vector or attention mechanism isn't properly connecting input semantics to output generation. This is like a cricket commentator who speaks grammatically correct Hindi but discusses the wrong match details—the problem isn't vocabulary (grammar) but what information is being selected. Option 1 increases encoder depth but doesn't address attention issues. Option 3 removes the multi-head advantage that helps attend to different semantic and grammatical aspects simultaneously. Option 4 reduces model capacity, worsening semantic understanding. Option 2 directly diagnoses the cross-attention mechanism that bridges semantic meaning between languages.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

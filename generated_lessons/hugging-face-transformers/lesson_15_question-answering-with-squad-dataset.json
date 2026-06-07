@@ -195,6 +195,200 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production question-answering systems require strategic decisions about model selection, context handling, and inference optimization. The three dominant patterns are: (1) Fine-tuned BERT-based models for latency-critical applications where sub-100ms response times matter—ideal for real-time APIs but requires careful batch processing and model quantization; (2) Large language models (GPT-3.5, LLaMA) with few-shot prompting for out-of-domain generalization and complex reasoning, trading computational cost for flexibility; (3) Hybrid retrieval-augmented generation (RAG) combining sparse retrievers with dense rerankers, optimal for knowledge-intensive domains where answer span extraction alone fails. The first pattern minimizes compute costs (1-2 GPU cores per 1000 QPS) but struggles with paraphrased questions and multi-hop reasoning. The second provides superior answer quality and robustness but costs 10-50x more per inference. RAG systems achieve 15-25% higher F1 scores on open-domain datasets but introduce latency from retrieval stages. Understanding your SLA (answer quality vs response time), domain specificity, and budget constraints determines which pattern fits your cricket_tournament_assistant.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Fine-tuned BERT models are like setting a balanced field with clear fielding positions—predictable, fast, optimized for expected batsman behavior, but vulnerable to surprise shots. Large language models are like declaring an aggressive attacking field with multiple slips—you're preparing for anything the batsman throws at you, but you're exposed to boundaries and it requires experienced captaincy (prompt engineering). RAG systems resemble the DRS (Decision Review System)—your core fielding strategy remains intact, but you consult external information (video replay/retrieval) before making critical decisions, giving you higher confidence at the cost of extra deliberation time. Choosing between them is like a captain deciding whether to bowl fast bowling rotations (compute-heavy LLMs) or spin combinations (retrieval-based systems)—both can win, but the choice depends on pitch conditions (domain), opposition strength (query complexity), and match situation (latency requirements).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Loading entire model for each question (wasteful)\nclass CricketScorekeeper_BadPattern:\n    def answer_question(self, question, passage):\n        # ❌ Reloading 400MB model every single call\n        from transformers import pipeline\n        qa_pipe = pipeline('question-answering', model='deepset/roberta-base-squad2')\n        result = qa_pipe(question=question, context=passage)\n        return result['answer']\n\n# BEST PRACTICE: Load model once, reuse across batches\nclass CricketScorekeeper_BestPattern:\n    def __init__(self):\n        # ✓ Load once in __init__\n        from transformers import AutoTokenizer, AutoModelForQuestionAnswering\n        import torch\n        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'\n        self.tokenizer = AutoTokenizer.from_pretrained('deepset/roberta-base-squad2')\n        self.model = AutoModelForQuestionAnswering.from_pretrained('deepset/roberta-base-squad2').to(self.device)\n    \n    def answer_batch_questions(self, questions, passages):\n        # ✓ Batch process with proper tokenization\n        import torch\n        encodings = self.tokenizer(questions, passages, truncation=True, \n                                   padding=True, return_tensors='pt', \n                                   max_length=512).to(self.device)\n        \n        with torch.no_grad():\n            outputs = self.model(**encodings)\n        \n        # ✓ Extract answer spans efficiently\n        start_logits = outputs.start_logits\n        end_logits = outputs.end_logits\n        \n        answers = []\n        for i in range(len(questions)):\n            start_idx = torch.argmax(start_logits[i])\n            end_idx = torch.argmax(end_logits[i]) + 1\n            answer_tokens = encodings.input_ids[i][start_idx:end_idx]\n            answer_text = self.tokenizer.decode(answer_tokens)\n            answers.append(answer_text)\n        \n        return answers\n\n# BEST PRACTICE: Implement confidence thresholding\ndef answer_with_confidence(question, passage, model, tokenizer, confidence_threshold=0.5):\n    encodings = tokenizer(question, passage, return_tensors='pt', truncation=True)\n    outputs = model(**encodings)\n    \n    start_logits = outputs.start_logits[0]\n    end_logits = outputs.end_logits[0]\n    \n    # ✓ Filter low-confidence predictions\n    start_confidence = torch.softmax(start_logits, dim=-1).max().item()\n    end_confidence = torch.softmax(end_logits, dim=-1).max().item()\n    \n    if min(start_confidence, end_confidence) < confidence_threshold:\n        return {\"answer\": \"Unable to find answer with sufficient confidence\", \n                \"confidence\": min(start_confidence, end_confidence)}\n    \n    start_idx = torch.argmax(start_logits)\n    end_idx = torch.argmax(end_logits) + 1\n    answer = tokenizer.decode(encodings.input_ids[0][start_idx:end_idx])\n    \n    return {\"answer\": answer, \n            \"confidence\": min(start_confidence, end_confidence)}\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is truncating long passages without context awareness. When passages exceed 512 tokens, simply slicing at token 512 cuts off critical context that contains the answer. The question 'Who was the leading run-scorer in the 2019 World Cup final?' cannot be answered if you truncate the passage mid-sentence about the match statistics. FIX: Use a sliding window approach with 50-100 token overlap between windows, run QA on each window separately, and aggregate results by answer span. Alternatively, use hierarchical attention or passage-ranking retrievers to identify the most relevant passages before tokenization. For SQuAD-style data, always validate your truncation doesn't split answer spans across windows using: `assert answer_end_position < 512` before inference.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Fine-tuned BERT models: Fast (20-100ms), cheap, domain-specific. Use for production systems with SLA < 200ms and domain-specific content.",
+        "Large language models: Flexible, robust to paraphrasing, 10-50x more expensive. Reserve for out-of-domain queries or complex multi-hop reasoning.",
+        "RAG systems: Best F1 scores on open-domain data, introduce retrieval latency. Critical for knowledge-intensive applications (medical, legal, technical support).",
+        "Always batch process questions—single inference is 100x slower than batched inference on GPUs due to kernel overhead.",
+        "Implement confidence thresholding to avoid returning low-quality answers; threshold typically 0.5-0.7 for SQuAD-based models.",
+        "Use sliding window for passages > 512 tokens with overlap to prevent answer span loss.",
+        "Profile your model on your actual hardware—theoretical latency differs 3-5x from production environment latency.",
+        "Monitor answer quality degradation on out-of-domain passages; fine-tuned models drop 15-25% F1 on paraphrased questions."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a real-time cricket commentary QA system that needs to answer questions about live match statistics within 50ms. The passage about a player's performance is 2048 tokens long. Which approach is BEST?",
+      "items": [
+        "Use GPT-4 with few-shot prompting for maximum accuracy",
+        "Fine-tune a BERT model, use passage retrieval to identify relevant 512-token chunks, run QA on top-K chunks, return highest-confidence answer",
+        "Implement RAG with dense retrieval and reranking for comprehensive coverage",
+        "Use a simple keyword-matching baseline without neural models"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct because: (1) SLA is 50ms—eliminates GPT-4 (500-2000ms latency) and complex RAG pipelines; (2) BERT fine-tuning hits target latency (15-30ms inference); (3) passage retrieval efficiently narrows 2048 tokens to relevant 512-token windows; (4) top-K ensemble improves robustness on live commentary. Option A fails latency SLA. Option C adds unnecessary retrieval overhead. Option D sacrifices answer quality. This mirrors a cricket captain choosing targeted bowling changes (passage retrieval + fine-tuned execution) over all-out aggression (LLM) or defensive stalemate (keyword matching) when chasing in the final overs."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Question answering systems power production systems at major tech companies handling massive scale. Google integrates extractive QA into Search, processing over 8.5 billion queries daily with latency requirements under 100ms. Meta uses similar architectures for Facebook's AI Assistant, deployed across 3+ billion users. Netflix leverages QA models for customer support automation, reducing response time from hours to seconds. Uber's internal knowledge systems use fine-tuned BERT-based QA to answer driver and rider questions at scale. OpenAI's ChatGPT incorporates QA principles for retrieval-augmented generation. Airbnb uses QA to extract policy information from lengthy host guidelines. When done wrong, systems hallucinate answers (making up facts), miss nuanced context, or timeout under load—causing customer frustration and trust loss. Production failures often stem from domain shift (training on Wikipedia but deploying on medical documents), insufficient passage retrieval, or inadequate handling of unanswerable questions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Your batting partnership (question-passage pair) succeeds when batsman (question) and bowler (passage context) are perfectly synchronized. The batting crease (token positions) determines where the ball lands. Miss the timing (wrong span prediction) and you're out. A great innings (high F1 score) requires reading the pitch (understanding passage nuance) and executing at scale (processing thousands of matches simultaneously without dropping catches).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Extractive QA identifies answer spans via start/end token classification using attention mechanisms across question-passage pairs.",
+        "SQuAD dataset contains 100K+ human-annotated examples enabling supervised fine-tuning of pre-trained transformer models like BERT.",
+        "Self-attention layers enable bidirectional context flow, allowing models to jointly encode questions and passages for improved interaction modeling.",
+        "Token position classification requires careful handling of tokenization, context windows, and boundary conditions to avoid span prediction errors.",
+        "Production systems demand robust unanswerable-question detection, passage retrieval, and latency optimization below 100ms per query.",
+        "Fine-tuning strategies include learning rate scheduling (2e-5 to 5e-5), gradient accumulation, and validation on domain-specific datasets.",
+        "Common failure modes include domain shift, hallucination on out-of-domain queries, and performance degradation on adversarial/unanswerable questions."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Which of the following best describes why production QA systems often fail when deployed to new domains?",
+      "items": [
+        "Transformer models inherently cannot generalize across domains",
+        "Domain shift: training on one distribution (Wikipedia) but deploying on another (medical/legal) causes performance collapse",
+        "Self-attention mechanisms are fundamentally incompatible with new tokenizers",
+        "Fine-tuning is unnecessary; pre-trained models work equally well on all tasks"
+      ],
+      "answer": 1,
+      "explanation": "Domain shift is the primary failure mode in production QA systems. Models trained on Wikipedia learn patterns specific to that domain's language, structure, and answer types. When deployed on medical documents, legal contracts, or technical manuals, performance degrades significantly because the passage vocabulary, question complexity, and answer characteristics differ substantially. This is analogous to cricket: training your batting technique against fast bowlers (Wikipedia's direct answers) doesn't prepare you for spinners (technical documentation's indirect reasoning). The other options misunderstand transformer architecture—self-attention is domain-agnostic, and fine-tuning is essential for domain adaptation.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of Question Answering with Hugging Face Transformers through these targeted quizzes. The first quiz focuses on conceptual mechanisms, while the second applies your knowledge to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In extractive QA, why does the model output two probability distributions (start_logits and end_logits) rather than a single prediction of the answer span?",
+      "items": [
+        "Because it needs to independently identify where the answer begins and where it ends within the passage, allowing flexible span selection across the entire token sequence",
+        "Because one distribution is for training and one is for inference, and they must be kept separate for computational efficiency",
+        "Because the first distribution handles short answers and the second handles long answers, and the model must choose which to use",
+        "Because SQuAD requires two separate predictions to ensure the model doesn't overfit to single-token answers"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is A. The model outputs separate start and end logits because extractive QA must independently determine both the beginning and ending positions of the answer within the passage. This flexibility allows the model to identify answer spans of variable length—it could be a single token or multiple tokens. Options B, C, and D are incorrect: B misunderstands training vs. inference pipelines; C falsely separates answer handling by length; D mischaracterizes SQuAD's design. Just as a cricket commentator must identify both when a batsman enters the crease and when they leave to fully describe their time at bat, the model needs two separate position classifications to fully capture the answer span.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a QA system on a cricket statistics website. Users ask questions like 'How many centuries did Sachin score in ODIs?' Your model sometimes predicts answer spans that start correctly but include extra tokens (e.g., '51 centuries in' instead of '51 centuries'). Which approach would BEST reduce this error?",
+      "items": [
+        "Increase the learning rate during training so the model learns faster and overfits less to token boundaries",
+        "Post-process predictions by extracting only the highest-confidence tokens within the start-end span using token-level confidence scores, or apply stricter constraints on end position relative to start position",
+        "Retrain the model on a larger dataset because the current dataset is too small for accurate boundary detection",
+        "Use a different tokenizer (e.g., WordPiece instead of BPE) because the current tokenizer is splitting tokens incorrectly"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. Post-processing the predictions by examining token-level confidence scores or enforcing stricter constraints on the end position relative to the start position directly addresses the problem of over-extending spans. This is analogous to a cricket umpire confirming both the exact moment a ball crosses the boundary line and when the batter's bat makes contact—precision requires validating both boundaries. Option A is incorrect because increasing learning rate typically increases instability, not precision. Option C assumes the dataset size is the issue when the problem is span boundary precision. Option D incorrectly attributes the issue to tokenization when the actual problem is post-prediction span boundary refinement. In production, token-level confidence analysis and span constraint heuristics are practical, immediate solutions that don't require retraining.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Extractive QA models output independent start and end position logits, enabling flexible span selection across variable-length answers",
+        "Token classification precision is critical: the model must learn exact boundaries, not just approximate answer regions",
+        "Post-processing strategies (confidence thresholding, span constraints) are practical tools for refining predictions without retraining",
+        "Self-attention mechanisms allow the model to weigh passage tokens differently based on the question, creating dynamic context matching",
+        "SQuAD evaluation metrics (EM and F1) measure both exact match and token-level overlap, reflecting real-world accuracy requirements"
+      ],
+      "answer": -1,
+      "explanation": ""
     }
   ]
 }

@@ -195,6 +195,196 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production NER systems employ three dominant patterns, each optimized for different constraints. The **pipeline approach** chains a pre-trained transformer encoder with a lightweight classification head, offering ~94-97% F1 on benchmark datasets with inference latency of 50-150ms per document; use this when throughput matters and you have sufficient labeled data (5K+ examples). The **ensemble strategy** combines 3-5 fine-tuned models with different random seeds or architectures (RoBERTa, DistilBERT, ALBERT), achieving 1-3% F1 gains at 3-5× computational cost; deploy this for high-stakes applications (financial entity extraction, clinical NER) where misses carry significant cost. The **active learning loop** progressively labels uncertain predictions from a base model, reducing annotation burden to 30-50% of fully-supervised requirements; adopt this when annotation budgets are constrained but you control the labeling pipeline. Trade-offs center on latency (ensemble slowest), accuracy (ensemble best), and development velocity (pipeline fastest). Memory footprint scales linearly with model parameters: DistilBERT (~67M) uses 1/3 the memory of RoBERTa (355M) with only 2-4% F1 degradation, critical for mobile/edge deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The **pipeline approach** mirrors selecting a fixed playing XI—you trust your team composition and commit resources to their execution, trading flexibility for consistency. The **ensemble strategy** resembles using DRS (Decision Review System) on critical decisions: you call multiple expert reviews (replays, hawk-eye, stump camera) to validate borderline LBW or caught decisions, catching errors the on-field umpire might miss, but it costs your review quota and adds delay. The **active learning loop** is like a captain's field placement strategy during play: you observe where batsmen are scoring runs (uncertain regions), adjust fielders to those gaps after each ball (label hard examples), and progressively tighten your setup without pre-planning the entire innings. Choosing between them depends on match context—T20 demands speed (pipeline), test cricket permits deliberation (ensemble), and ODIs balance both (active learning).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Pipeline pattern with proper batch processing\nfrom transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline\nimport torch\n\n# Load model and tokenizer once (expensive, reuse across batches)\ntokenizer = AutoTokenizer.from_pretrained(\"dslim/bert-base-NER\")\nmodel = AutoModelForTokenClassification.from_pretrained(\"dslim/bert-base-NER\")\nner_pipeline = pipeline(\n    \"token-classification\",\n    model=model,\n    tokenizer=tokenizer,\n    aggregation_strategy=\"simple\",  # Combine subword tokens\n    device=0  # GPU inference\n)\n\n# Batch inference (efficient)\ncricket_documents = [\n    \"Virat Kohli scored 143 runs in Mumbai against Australia.\",\n    \"Jasprit Bumrah took 5 wickets at Lords in London.\"\n]\nresults = ner_pipeline(cricket_documents)\nprint(results)\n\n# ANTI-PATTERN: Reloading model per document (memory leak, 10-100× slower)\ndef slow_ner_function(text):\n    from transformers import pipeline\n    # ❌ WRONG: Loading model inside function, called repeatedly\n    ner = pipeline(\"token-classification\", model=\"dslim/bert-base-NER\")\n    return ner(text)\n\n# This leaks VRAM: each call allocates 400MB+ without releasing\n# After 10 documents on 8GB GPU → OOM crash\nfor doc in cricket_documents:\n    result = slow_ner_function(doc)  # Models loaded 2 times unnecessarily\n\n# BEST PRACTICE: Batch with dynamic padding\nfrom transformers import DataCollatorForTokenClassification\n\ndata_collator = DataCollatorForTokenClassification(\n    tokenizer,\n    padding=True,\n    max_length=512\n)\n\n# Process 32 documents together (amortize overhead)\nbatched_results = []\nfor i in range(0, len(cricket_documents), 32):\n    batch = cricket_documents[i:i+32]\n    batch_results = ner_pipeline(batch)\n    batched_results.extend(batch_results)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Reloading tokenizer/model inside loops or request handlers causes silent memory leaks and 10-100× performance degradation.** Every call to `AutoTokenizer.from_pretrained()` or `AutoModelForTokenClassification.from_pretrained()` allocates 200-800MB of GPU/CPU memory without automatic cleanup. In production (Flask/FastAPI servers), this fills VRAM within 10-50 requests, triggering OOM kills. **Fix:** Instantiate tokenizer and model **once** at module import time (outside request handlers), store in global variables, and reuse across all inference calls. For Flask: `global ner_pipeline` in `__init__.py`. For FastAPI: use `@lru_cache(maxsize=1)` decorator or initialize in `lifespan` context manager. Test by monitoring GPU memory with `nvidia-smi` during batch inference—it should remain flat, not climb linearly with requests.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Pipeline pattern: pre-trained encoder + classification head, 94-97% F1, use for throughput-critical systems",
+        "Ensemble strategy: 3-5 models combined, +1-3% F1 gains, deploy for high-stakes entity extraction",
+        "Active learning: progressive labeling of uncertain predictions, reduces annotation by 30-50%, adopt for budget-constrained teams",
+        "Load models once at startup; reuse across all requests to prevent memory leaks",
+        "Batch inference amortizes tokenization overhead; 32-64 documents per batch typical sweet spot",
+        "DistilBERT trades 2-4% F1 for 67% memory reduction; vital for mobile/edge deployment",
+        "Aggregation strategy (simple/first/average) must match your label scheme alignment approach"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying an NER system to extract player names and teams from cricket commentary. Your GPU has 8GB VRAM, you receive 100 requests/second, and each request contains 1-3 documents. Which pattern minimizes latency AND prevents OOM crashes?",
+      "items": [
+        "Load model inside the request handler for isolation, batch 5 documents per request",
+        "Load model once at startup (global), implement request queue with batch size 32, use async inference",
+        "Ensemble 5 models, reload each per request for reproducibility",
+        "Use CPU inference only to avoid GPU memory issues"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct because: (1) Loading once prevents 100 redundant allocations/deallocations per second (~80GB wasted VRAM), (2) batching 32 documents amortizes tokenization overhead—critical at 100 req/s scale, (3) async processing queues requests instead of blocking threads, enabling throughput scaling. Option A fails under load (OOM after 10-15 requests). Option C is functionally worse and memory-hungrier. Option D sacrifices 30-50× latency for imaginary memory safety—8GB GPU easily handles a single model. This mirrors cricket strategy: you wouldn't reload your entire XI for every delivery (Option A) or swap all 11 players + coach between overs (Option C). Instead, you strategically position your fixed team (load once) and rotate bowlers intelligently (batch processing)."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Named Entity Recognition powers critical production systems at scale across major tech companies. Google uses NER in Search to extract entities from billions of queries daily, improving semantic understanding and featured snippets. Meta deploys transformer-based NER across Facebook and Instagram to detect harmful entities, brand mentions, and product references in multi-lingual content streams. Netflix leverages NER to catalog actors, directors, and shows from user-generated reviews and social mentions. OpenAI integrates NER in ChatGPT to ground responses with accurate entity references and prevent hallucinations. Uber uses NER for mapping driver reviews to vehicle models, locations, and service issues at scale. Airbnb applies NER to guest reviews to extract location names, amenities, and sentiment targets. These systems process millions of documents hourly. When NER fails—missing entities or misclassifying them—it cascades: Google returns irrelevant results, Meta misses safety violations, Netflix's recommendation engine deteriorates, and Uber cannot route complaints correctly. Production systems require 95%+ F1 scores, handle domain drift, multi-lingual input, and must respond in <100ms.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: NER at scale is like a cricket commentator identifying every player, team, ground, and stat in real-time across 1000 simultaneous matches. You can't afford mistakes—miscalling a batsman's name breaks the broadcast. You need to handle different commentary styles (TV vs radio vs social media), multiple languages (Hindi vs English vs Tamil), and still deliver perfect recognition in under 2 seconds per ball. If your system fails, viewers lose trust instantly.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "from transformers import pipeline, AutoTokenizer, AutoModelForTokenClassification\nimport time\nfrom statistics import mean\n\n# Production-grade NER pipeline with performance monitoring\nner_pipeline = pipeline(\n    \"token-classification\",\n    model=\"dbmdz/bert-large-cased-finetuned-conll03-english\",\n    aggregation_strategy=\"simple\"\n)\n\n# Cricket commentary batch\ncommentaries = [\n    \"Virat Kohli smashes a six at the MCG against Mitchell Starc!\",\n    \"Jasprit Bumrah bowled brilliantly at Lord's, taking 4 wickets.\",\n    \"The IPL 2024 final between Mumbai Indians and Chennai Super Kings.\"\n]\n\n# Benchmark latency (production requirement: <100ms per sample)\nlatencies = []\nfor commentary in commentaries:\n    start = time.time()\n    entities = ner_pipeline(commentary)\n    latency = (time.time() - start) * 1000\n    latencies.append(latency)\n    \n    print(f\"Input: {commentary}\")\n    print(f\"Latency: {latency:.2f}ms\")\n    for entity in entities:\n        print(f\"  - {entity['word']}: {entity['entity_group']}\")\n    print()\n\nprint(f\"Average latency: {mean(latencies):.2f}ms\")\nprint(f\"Meets SLA (100ms): {mean(latencies) < 100}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "This code demonstrates production monitoring: tracking latency per request, batch processing, and verifying SLA compliance. Real systems log this data to monitoring dashboards (Datadog, New Relic) and alert when latency exceeds thresholds."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Production NER systems fail silently. A model trained on news articles will hallucinate entities when deployed on social media slang or technical cricket commentary. Always implement: (1) confidence thresholds—reject predictions <0.85 confidence, (2) entity consistency checks—flag contradictions (same player with 2 teams in 1 game), (3) A/B testing—roll out model changes to 5% of traffic first, (4) human-in-the-loop review for edge cases, (5) retrain monthly on production failures. Skipping these costs millions in bad recommendations or safety violations.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Transformers dominate NER by capturing context; BERT outperforms traditional CRF+LSTM by 3-5% F1 on benchmark datasets.",
+        "Subword tokenization enables multilingual NER but requires alignment to map predictions back to original tokens accurately.",
+        "BIO tagging standardizes label schemes; O tags dominate training data (80-90%), requiring careful class weighting to prevent bias.",
+        "Fine-tuning pre-trained models achieves 90%+ F1 with <1000 labeled examples; training from scratch needs 100K+ samples.",
+        "Production systems demand <100ms latency, 95%+ F1 score, confidence thresholds, and continuous retraining on distribution drift.",
+        "Multi-lingual NER requires XLM-RoBERTa or mBERT; cross-lingual transfer reduces annotation cost but drops accuracy 2-4%.",
+        "Entity linking (NER → knowledge base) is the next step: identify *which* Virat Kohli (disambiguation) using DBpedia or Wikidata."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You deploy an NER model to extract team names from social media cricket posts. It works perfectly on your test set (96% F1) but in production, it misses 40% of team mentions because users write 'RCB', 'Royal Challengers', and 'Bangalore' interchangeably. What's the primary issue?",
+      "items": [
+        "The model is overfitting to formal cricket commentary data.",
+        "The test set doesn't represent production distribution (domain drift); you need retraining on social media slang variants.",
+        "You should use a larger model (RoBERTa instead of BERT).",
+        "The tokenizer is too aggressive in splitting subwords."
+      ],
+      "answer": 1,
+      "explanation": "Domain drift is the #1 cause of production NER failures. Your model learned to recognize 'Royal Challengers Bangalore' but not its abbreviations or colloquial forms. Fix: collect production failures, retrain quarterly, and use confidence thresholds to flag low-confidence predictions for human review. Scaling model size (option C) helps but doesn't solve the fundamental data mismatch."
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of Named Entity Recognition with Transformers through these two knowledge checks. Quiz 1 focuses on conceptual understanding of core mechanisms, while Quiz 2 applies these concepts to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "When fine-tuning a transformer model for NER on cricket player names and team entities, you notice that subword tokens (like ##patra from Rohit Sharma's name) are being classified independently. Which BIO tagging approach best handles this alignment issue?",
+      "items": [
+        "Apply the B-tag to the first subword token and I-tag to all continuation tokens (##tokens) of the same entity",
+        "Apply the same entity tag to all subword tokens regardless of their position in the original word",
+        "Skip all subword tokens during evaluation and only score complete word tokens",
+        "Use separate classification heads for subword tokens and full tokens"
+      ],
+      "answer": 0,
+      "explanation": "The correct approach is to use B-tag (Beginning) for the first subword token and I-tag (Inside) for continuation tokens (##tokens). This maintains proper entity boundaries across word pieces while respecting the tokenization scheme. Option B is incorrect because it ignores positional importance—the first subword should be marked as Beginning to distinguish new entity starts. Option C loses information by ignoring subword tokens, which is wasteful since modern tokenizers already handle them. Option D is unnecessarily complex; transformers naturally align subword tokens through their pooling and labeling strategy without needing separate heads."
+    },
+    {
+      "type": "quiz",
+      "content": "You're building an NER system to extract cricket match statistics: player names (PLAYER), teams (TEAM), venues (VENUE), and performance metrics (METRIC). Your training data contains 500 examples, but METRIC entities appear in only 15 examples. During evaluation, the model achieves 94% overall accuracy but fails on METRIC entities. What is the most effective strategy to address this class imbalance?",
+      "items": [
+        "Increase the loss weight for METRIC entities during training and consider data augmentation for underrepresented classes",
+        "Remove METRIC entities from the task since they're too rare and use only PLAYER, TEAM, and VENUE",
+        "Retrain the entire transformer model from scratch with a balanced dataset of equal examples per entity type",
+        "Use a post-processing rule-based system to label METRIC entities after the neural model completes inference"
+      ],
+      "answer": 0,
+      "explanation": "Increasing loss weights for minority classes (METRIC) and applying data augmentation is the standard and effective approach for handling class imbalance in NER. By assigning higher loss weights, the model learns to be more careful with rare entities. Data augmentation (generating synthetic examples or paraphrasing) increases minority class representation. Option B is incorrect because it removes valuable information rather than solving the imbalance problem. Option C is inefficient—fine-tuning already-trained transformers is far more effective than retraining from scratch, and forcing perfectly balanced data may not reflect real-world distributions. Option D using rules is brittle; neural approaches are more generalizable and can learn contextual patterns that simple rules miss."
     }
   ]
 }
