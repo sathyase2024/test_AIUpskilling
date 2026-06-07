@@ -618,6 +618,7 @@ export default function TopicsPage() {
 
         const res = await fetch(`${API_URL}/topics?${params.toString()}`, {
           signal: controller.signal,
+          cache: 'no-store',
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const json: ApiTopicsResponse = await res.json()

@@ -129,7 +129,7 @@ export class TopicsService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap() {
     const count = await this.topicRepo.count();
-    if (count === 0) await this.seed();
+    if (count === 0) await this.seedMissing();
     // Idempotent — only inserts slugs that don't already exist.
     await this.seedGeneratedLessons();
   }

@@ -87,6 +87,7 @@ export async function register(payload: {
 export async function apiGet<T>(path: string): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
+    cache: 'no-store',
     headers: {
       'Authorization': token ? `Bearer ${token}` : '',
       'Content-Type': 'application/json',

@@ -248,7 +248,7 @@ export default function TopicDetailPage() {
 
     async function fetchTopic() {
       try {
-        const res = await fetch(`${API_URL}/topics/${slug}`)
+        const res = await fetch(`${API_URL}/topics/${slug}`, { cache: 'no-store' })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const raw = await res.json()
         setTopic(transformApiTopicDetail(raw))
