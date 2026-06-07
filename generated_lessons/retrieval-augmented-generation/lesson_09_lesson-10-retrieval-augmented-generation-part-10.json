@@ -342,6 +342,78 @@
       ],
       "answer": 1,
       "explanation": "Option B identifies and fixes the root cause: 15 documents × 250 avg tokens = 3,750 tokens needed, exceeding your 2000-token window by 87%. This forces the LLM to either truncate documents (losing context) or compress them poorly (causing contradictions). Smaller chunks (100 tokens) reduce token waste, and extractive summarization distills the 15 documents into the 2-3 most critical ones, guaranteeing they fit and remain coherent. Option A wastes resources on window expansion without addressing chunk efficiency. Option C uses reranking but doesn't solve the fundamental token overflow—5 large documents still overflow. Option D ignores that hallucination often stems from insufficient or conflicting context, which proper chunking directly solves."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems follow three dominant patterns, each optimizing for different constraints. The **Dense Retrieval Pattern** uses learned embeddings and vector databases (e.g., FAISS, Pinecone) for sub-millisecond retrieval at scale—ideal when you have 10M+ documents and need real-time latency under 200ms. Trade-off: requires continuous embedding computation and periodic index rebuilding, costing 30-40% more infrastructure than keyword search. The **Hybrid Retrieval Pattern** combines BM25 lexical search with semantic embeddings, yielding superior recall (typically 15-25% higher F1) by capturing both exact-match and conceptual relevance; use this when document diversity and domain-specific terminology matter. The **Adaptive Routing Pattern** selectively activates different retrievers based on query classification—routing simple factual questions to fast keyword indexing while complex reasoning queries hit expensive dense retrieval. This pattern reduces average latency by 45-60% in production systems but introduces complexity: you need a query classifier (adds 50-100ms) and must maintain multiple indices. Cost-wise, dense retrieval scales logarithmically with corpus size, while hybrid scales linearly but offers better recall-precision trade-offs. Choose dense for commodity search, hybrid for balanced performance, and adaptive routing only after profiling identifies clear query clustering patterns.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Dense retrieval is like setting an aggressive all-pace bowling attack with a short fine leg—highly specialized and fast, but works best on specific pitches (large uniform datasets). Hybrid retrieval mirrors a balanced XI with both spinners and pacers, adjusting to conditions; it's more adaptable but requires managing two skill-sets. Adaptive routing resembles a captain's DRS strategy: you don't challenge every decision (that'd waste reviews), but reserve your tech for high-stakes moments. Simple LBW decisions go to the on-field umpire instantly (keyword search), while marginal catches get the full technology review (dense vectors). The captain must learn which situations warrant which tool—use DRS too freely and you're wasting resources; never use it and you miss crucial calls. This classification overhead (knowing when to challenge) is like your query router's computational cost, but it prevents expensive mistakes downstream.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Naive single-retriever RAG\nfrom langchain.vectorstores import FAISS\nfrom langchain.embeddings import OpenAIEmbeddings\n\n# ❌ Problem: Always uses dense retrieval, ignores exact matches\nembeddings = OpenAIEmbeddings()\nvector_store = FAISS.from_documents(cricket_docs, embeddings)\n\n# Query: \"What is the DRS timeout rule?\"\n# Dense retrieval may miss exact \"DRS timeout\" if phrased differently\nresults = vector_store.similarity_search(\"DRS timeout rule\", k=5)\n\n# BEST PRACTICE: Hybrid retrieval with routing\nfrom langchain.retrievers import BM25Retriever, EnsembleRetriever\nfrom langchain.embeddings import OpenAIEmbeddings\n\n# ✅ Solution: Combine lexical + semantic\nbm25_retriever = BM25Retriever.from_documents(cricket_docs)\nvector_retriever = FAISS.from_documents(cricket_docs, OpenAIEmbeddings()).as_retriever()\n\n# Ensemble weights: 40% BM25, 60% dense (tuned via validation)\nensemble_retriever = EnsembleRetriever(\n    retrievers=[bm25_retriever, vector_retriever],\n    weights=[0.4, 0.6]\n)\n\n# Query: \"What is the DRS timeout rule?\"\n# BM25 catches exact \"DRS timeout\" match (high precision)\n# Vectors catch semantic variations (high recall)\nresults = ensemble_retriever.get_relevant_documents(\"DRS timeout rule\")\n\n# ADVANCED: Adaptive routing based on query type\ndef classify_query(query: str) -> str:\n    \"\"\"Route queries: 'factual', 'analytical', or 'reasoning'\"\"\"\n    if any(word in query.lower() for word in [\"what\", \"how many\", \"who\"]):\n        return \"factual\"\n    elif any(word in query.lower() for word in [\"explain\", \"why\", \"compare\"]):\n        return \"analytical\"\n    return \"reasoning\"\n\ndef adaptive_retrieve(query: str, k: int = 5):\n    query_type = classify_query(query)\n    \n    if query_type == \"factual\":\n        # Fast path: keyword-only for factual questions\n        return bm25_retriever.get_relevant_documents(query)\n    elif query_type == \"analytical\":\n        # Balanced path: hybrid\n        return ensemble_retriever.get_relevant_documents(query)\n    else:\n        # Expensive path: dense vectors for reasoning\n        return vector_retriever.get_relevant_documents(query)\n\n# Usage\nquery = \"Explain the impact of DRS on match outcomes\"\nrelevant_docs = adaptive_retrieve(query)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is **over-relying on similarity_search() without validating embedding quality against your domain**. Cricket-specific terminology like \"LBW,\" \"Mankading,\" \"short leg,\" and \"toss\" may be poorly represented in general-purpose embeddings (trained on generic web text). This silently fails—you get low-ranked results, assume your RAG is broken, and blame the LLM. \n\n**Exact fix**: (1) Manually test 20-30 queries on your actual documents and measure retrieval accuracy (not just perplexity) using metrics like NDCG@5 or MRR. (2) If domain terms rank poorly, switch to BM25 for those terms or fine-tune embeddings on cricket corpus (100-500 labeled query-document pairs). (3) Log all \"zero relevant documents returned\" cases—these expose vocabulary gaps. (4) Use hybrid retrieval (BM25 + embeddings) as your default; it's only 15% slower but catches 90% of these failures. Don't assume a pre-trained embedding model works for your domain—verify empirically first.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Dense retrieval excels at scale and semantic understanding but costs more; use when corpus >1M documents or latency <100ms critical",
+        "Hybrid (BM25 + embeddings) balances recall/precision and handles domain jargon better; default choice for most production systems",
+        "Adaptive routing via query classification cuts costs 45-60% by routing simple queries to fast paths, complex queries to expensive dense retrieval",
+        "Always validate retrieval quality empirically (NDCG@5, MRR, precision@k) on domain-specific test sets before deployment",
+        "BM25 catches exact terminology misses that embeddings overlook; never skip it, especially in specialized fields like cricket analytics"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You have a cricket statistics database with 500K match records. Your current RAG using dense retrieval alone returns poor results for queries like 'How many times did Virat Kohli get out LBW?' You notice BM25 keyword search would catch this term perfectly. What is the best production approach?",
+      "items": [
+        "Abandon dense retrieval, switch to BM25-only to save costs",
+        "Implement hybrid retrieval (EnsembleRetriever with BM25 + embeddings weighted ~0.4/0.6) to capture both exact term matches and semantic variations",
+        "Use adaptive routing: BM25 for factual questions, dense vectors only for complex analytical queries",
+        "Fine-tune embeddings on cricket corpus; the issue is model quality, not architecture"
+      ],
+      "answer": 1,
+      "explanation": "While option 3 (adaptive routing) is valid for advanced optimization, option 1 is the most practical production step: hybrid retrieval solves the immediate problem (LBW terminology) with minimal complexity. You catch exact matches (BM25) and semantic variations (dense) simultaneously. Option 0 sacrifices recall on complex questions. Option 3 adds classifier overhead without addressing the underlying term-mismatch issue. Option 4 is expensive without proof that embeddings are the bottleneck—LBW failure is likely due to sparse domain terminology, not model quality. Hybrid retrieval is the industry default because it balances simplicity and effectiveness for cricket statistics and similar specialized domains."
     }
   ]
 }

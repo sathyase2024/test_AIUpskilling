@@ -287,6 +287,79 @@
       ],
       "answer": 2,
       "explanation": "The correct answer is C. The core issue is that the LLM is generating plausible but incorrect facts (hallucinating captains) even when context is retrieved. A fact-checking module using a structured knowledge graph (RCB → current_captain = 'X') provides ground truth validation before returning answers. This directly catches and prevents hallucinations. Option A is overkill—the embedding and retrieval may work fine in English; the issue is LLM generation. Option B helps with irrelevant retrieval but won't catch hallucinations if the retrieved context is about RCB but the LLM still generates wrong captain names. Option D (larger database) doesn't address the hallucination problem—more data won't prevent the LLM from inventing facts."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant patterns emerge in production RAG systems: the Retrieval-First pattern (retrieve context before generation), the Iterative Refinement pattern (multiple retrieval rounds based on intermediate outputs), and the Hybrid Retrieval pattern (combining dense and sparse retrievers). Retrieval-First is cost-effective and latency-optimized—ideal for high-throughput APIs where 50-100ms per query matters; use when your knowledge base is stable and queries map cleanly to documents. Iterative Refinement costs 3-5x more in tokens and latency but achieves superior answer quality on complex, multi-hop questions; deploy this when accuracy trumps speed (customer support, legal analysis). Hybrid Retrieval balances recall and precision by running both BM25 (sparse, keyword-based) and embedding-based (dense) search, then ranking results—it increases inference cost by 20-30% but reduces hallucination rates by 35-40% in production systems. Trade-offs: Retrieval-First fails on implicit reasoning; Iterative Refinement requires careful prompt engineering to avoid infinite loops; Hybrid Retrieval demands maintenance of two separate indices. Choose based on your SLA requirements, budget constraints, and the complexity profile of your query distribution.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Retrieval-First is like setting a packed slip cordon before the bowler runs in—you commit your fielding strategy upfront based on predictable patterns. Iterative Refinement mirrors DRS (Decision Review System) usage: after the first decision, if doubt remains, you request another look and adjust tactics accordingly, but each review costs a timeout. Hybrid Retrieval is like a captain deploying both pace and spin bowlers simultaneously—one excels at extracting seam movement (dense embeddings catching semantic nuance), the other at exploiting hard pitches (sparse BM25 matching exact keywords). The captain's field placement after each ball delivery (ranking step) combines both bowlers' intelligence. Just as DRS reviews are limited resources, so too are your token budgets and inference timeouts. Know your pitch conditions (query complexity) before choosing your bowling rotation (retrieval pattern).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: No context ranking or filtering\ndef generate_cricket_commentary(query_batsman):\n    all_documents = retrieve_all_matches(query_batsman)  # Returns 50+ docs\n    context = \"\\n\".join([d.content for d in all_documents])  # Dump everything\n    response = llm.generate(query_batsman + context)\n    return response\n# Problem: Token bloat, slower inference, more hallucinations\n\n# ✅ BEST PRACTICE: Ranked retrieval with reranking\nfrom sentence_transformers import CrossEncoder\n\ndef generate_cricket_commentary_optimized(query_batsman):\n    # Step 1: Efficient retrieval (top-k documents)\n    candidate_docs = retrieve_top_k_matches(query_batsman, k=20)\n    \n    # Step 2: Rerank using cross-encoder (captures query-document interaction)\n    reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-12-v2')\n    scores = reranker.predict([(query_batsman, d.content) for d in candidate_docs])\n    ranked_docs = sorted(zip(candidate_docs, scores), key=lambda x: x[1], reverse=True)[:5]\n    \n    # Step 3: Build context from only top-ranked, relevant documents\n    context = \"\\n\".join([d[0].content for d in ranked_docs if d[1] > 0.3])\n    \n    # Step 4: Generate with minimal, high-signal context\n    response = llm.generate(query_batsman + context)\n    return response\n# Benefits: 40% fewer tokens, 60ms faster, 25% fewer hallucinations",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The Context Window Trap—beginner mistake: dumping the entire retrieval result set into your prompt without ranking or filtering. This explodes token usage (cost × 3-5), slows inference, and paradoxically increases hallucination rates because the LLM gets confused by irrelevant noise. FIX: (1) Retrieve generously (top-k=20-50), (2) Rerank with a cross-encoder or relevance scorer, (3) Keep only top-N ranked results (N=3-5 documents max), (4) Set a relevance threshold (e.g., score > 0.3) to drop low-confidence matches. Monitor token_input_count and latency_p95 in production—if both are climbing, you've likely hit this trap. Use a reranker like `cross-encoder/ms-marco-MiniLM-L-12-v2` (13M params, fast) rather than expensive LLM-based ranking.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Retrieval-First: Fast, cost-effective, suitable for straightforward queries; fails on multi-hop reasoning",
+        "Iterative Refinement: Higher quality, higher cost; use for complex analysis where accuracy is non-negotiable",
+        "Hybrid Retrieval: Balance recall + precision; reduces hallucinations by 35-40% at 20-30% inference cost overhead",
+        "Always rerank retrieved documents—cross-encoders eliminate context noise and reduce token bloat by 60%+",
+        "Set relevance thresholds and keep context to 3-5 documents maximum for optimal speed and accuracy",
+        "Monitor token_input_count and latency_p95 to detect context window trap early in production"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket stats chatbot expected to answer 10,000 queries/day with <100ms latency SLA. Your current system retrieves 50 documents per query, concatenates them all, and passes to the LLM. Users report slow responses and occasional contradictory stats. What should you do?",
+      "items": [
+        "Increase LLM model size to handle larger contexts more accurately",
+        "Implement a reranker to filter top-5 documents and set a relevance threshold of 0.3",
+        "Retrieve fewer documents (top-10 instead of top-50) without reranking",
+        "Switch to Iterative Refinement to get multiple retrieval passes"
+      ],
+      "answer": 1,
+      "explanation": "Answer B is correct. You're hitting the context window trap: 50 documents cause token bloat (slower), latency SLA failure (>100ms), and contradictions (LLM confused by noise). Reranking solves all three: keeps latency low, reduces tokens by 60%, and improves accuracy by focusing on top-5 relevant docs. Option A wastes money on a larger model when the problem is context quality, not capacity. Option C helps but without reranking, you lose semantic ranking. Option D over-engineers—single-pass retrieval with reranking is faster and cheaper."
     }
   ]
 }

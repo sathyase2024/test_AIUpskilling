@@ -21,7 +21,7 @@ REPO_ROOT     = SCRIPT_DIR.parent
 GENERATED_DIR = REPO_ROOT / "generated_lessons"
 
 MODEL       = "claude-haiku-4-5-20251001"
-MAX_TOKENS  = 4500   # ~2 full sections fit safely; we call twice when >2 missing
+MAX_TOKENS  = 6000   # 1 full section fits well within this; call once per section
 HOBBY       = "cricket"
 CONCURRENCY = 3
 
@@ -221,8 +221,8 @@ async def patch_one(
         if not missing:
             return {"skipped": True}
 
-        # Split into batches of ≤2 so JSON always fits within MAX_TOKENS
-        batches = [missing[i:i+2] for i in range(0, len(missing), 2)]
+        # One section per call — guarantees JSON completion within MAX_TOKENS
+        batches = [[m] for m in missing]
 
         total_added  = 0
         total_in     = 0

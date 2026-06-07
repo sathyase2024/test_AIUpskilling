@@ -312,6 +312,80 @@
       ],
       "answer": 0,
       "explanation": "This is a textbook example of data drift—a common production ML problem where real-world data distribution changes over time. In cricket, batting conditions evolve (new equipment, pitch preparations, rule tweaks, player fitness levels), so 2023 patterns don't apply to 2024. The solution is to retrain on recent data and implement monitoring dashboards tracking prediction confidence and error rates. Option B is incorrect because memory issues would cause crashes, not accuracy degradation. Option C is wrong—loss function choice wouldn't cause year-to-year performance collapse. Option D is backwards; you need recent data, not old data from before 2020. Production systems must continuously retrain and monitor for drift to maintain accuracy."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production PyTorch systems, three patterns dominate: (1) **Checkpoint & Resume** — save model state_dict() at regular intervals to recover from failures and track performance across epochs. Use this when training runs exceed 24 hours or GPU memory is constrained. Trade-off: storage overhead (~100MB-2GB per checkpoint) vs guaranteed recovery. (2) **Gradient Accumulation** — batch gradients across multiple forward passes before backpropagating, effectively increasing batch size without GPU memory increase. Essential for training large models (ResNets, Transformers) on consumer GPUs. Trade-off: 3-4x slower per step but enables larger effective batch sizes. (3) **Mixed Precision Training** — use torch.cuda.amp.autocast() to compute gradients in float16 while maintaining float32 weights. Reduces memory by ~50% and accelerates computation 1.5-2x on modern GPUs. Trade-off: numerical instability risk if loss scaling isn't configured correctly. Choose checkpointing for reliability-critical pipelines, gradient accumulation when memory is bottleneck, mixed precision when speed and memory both matter.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: **Checkpointing** is like reviewing your innings scorecard every 10 overs—if you get out unexpectedly, you know exactly where your batting strategy worked and where it failed. **Gradient Accumulation** is like building a bowling rotation strategy where you don't exhaust your fast bowlers in one spell; instead, you accumulate tactical pressure over multiple overs with controlled intensity, achieving the same impact with less individual strain. **Mixed Precision Training** mirrors fielding strategy: you use specialist fielders (float16 precision) for aggressive close-in catching to save time and energy, while your main batsmen (float32 weights) remain positioned at full strength, combining speed with stability. Each pattern solves a different constraint—just as a captain chooses different strategies based on pitch condition (GPU memory), match situation (training time), and opposition strength (model complexity).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: No checkpointing, unbounded memory usage\nclass BattingPractice:\n    def train_innings(self, epochs=100):\n        for epoch in range(epochs):\n            for batch_idx, (balls, runs) in enumerate(self.batsman_loader):\n                outputs = self.model(balls)\n                loss = self.criterion(outputs, runs)\n                self.optimizer.zero_grad()\n                loss.backward()  # GPU memory grows unbounded\n                self.optimizer.step()\n                if epoch % 50 == 0:  # Loss check too infrequent\n                    print(f\"Epoch {epoch}, Loss: {loss.item()}\")\n\n# BEST PRACTICE: Checkpointing + mixed precision + gradient accumulation\nclass BattingPractice:\n    def train_innings(self, epochs=100, accumulation_steps=4):\n        scaler = torch.cuda.amp.GradScaler()\n        \n        for epoch in range(epochs):\n            epoch_loss = 0\n            for batch_idx, (balls, runs) in enumerate(self.batsman_loader):\n                # Mixed precision forward pass\n                with torch.cuda.amp.autocast():\n                    outputs = self.model(balls)\n                    loss = self.criterion(outputs, runs) / accumulation_steps\n                \n                # Gradient accumulation\n                scaler.scale(loss).backward()\n                \n                if (batch_idx + 1) % accumulation_steps == 0:\n                    scaler.step(self.optimizer)\n                    scaler.update()\n                    self.optimizer.zero_grad()\n                \n                epoch_loss += loss.item() * accumulation_steps\n            \n            # Checkpoint every epoch\n            if (epoch + 1) % 10 == 0:\n                torch.save({\n                    'epoch': epoch,\n                    'model_state': self.model.state_dict(),\n                    'optimizer_state': self.optimizer.state_dict(),\n                    'loss': epoch_loss / len(self.batsman_loader)\n                }, f'batting_checkpoint_epoch_{epoch}.pt')\n                print(f\"Epoch {epoch}: Loss {epoch_loss / len(self.batsman_loader):.4f} [SAVED]\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Forgetting to set model.eval() before validation/inference.** In training mode, BatchNorm layers use running batch statistics and Dropout remains active, causing inconsistent predictions. Fix: Always call `model.eval()` and `torch.no_grad()` before validation loops. Example: `with torch.no_grad(): model.eval(); predictions = model(test_balls)`. This prevents gradient computation (saves memory) and uses population statistics for BatchNorm, matching real deployment behavior.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Checkpoint model state_dict() every N epochs to recover from failures and track best performance",
+        "Gradient accumulation increases effective batch size without proportional GPU memory cost—divide loss by accumulation steps",
+        "Mixed precision (autocast + GradScaler) reduces memory 50% and accelerates training 1.5-2x with minimal code changes",
+        "Always use model.eval() and torch.no_grad() during validation to disable dropout and use population BatchNorm statistics",
+        "Monitor both training and validation loss; divergence signals overfitting—use checkpointing to recover best validation state"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket match outcome predictor for 200 epochs on a GPU with 8GB memory. Your full batch size needs 10GB. Which pattern should you apply?",
+      "items": [
+        "Checkpoint every epoch",
+        "Gradient accumulation with 2 accumulation steps",
+        "Mixed precision training alone",
+        "Reduce dataset size instead"
+      ],
+      "answer": 1,
+      "explanation": "Gradient accumulation lets you split the 10GB batch into 2×5GB passes, accumulating gradients before backpropagation. This effectively maintains the large batch size semantics while fitting in GPU memory. Mixed precision alone won't solve the immediate memory issue (saves ~50%, but you still need 5GB). Checkpointing helps with recovery, not memory. Reducing data hurts model quality unnecessarily.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

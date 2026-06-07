@@ -355,6 +355,81 @@
       ],
       "answer": 0,
       "explanation": "The issue is that the vector index hasn't been refreshed to exclude outdated records, or metadata filtering isn't enforcing temporal boundaries. Timestamp-based filtering ensures only recent records are retrieved—this is a standard production pattern used by Netflix and Google Search. Weekly reindexing keeps embeddings fresh and prevents semantic drift. Option B (increasing embedding dimension) doesn't address stale data. Option C (larger LLM) doesn't fix retrieval quality. Option D (network speed) is unrelated to temporal filtering. In production RAG systems, maintaining index freshness and implementing metadata filtering is critical for domains like sports analytics where recency directly impacts quality."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three established production patterns dominate RAG deployments: (1) **Dense Vector Retrieval with Semantic Caching** — pre-compute embeddings for static document collections and cache frequent query results. Use this when documents change infrequently and query patterns are predictable; trade-off is higher upfront compute cost but dramatically reduced latency and API calls. (2) **Hybrid Retrieval with BM25 + Vector Search** — combine lexical matching with semantic embeddings to retrieve top-k candidates, then rank. This pattern excels when you need both keyword precision (financial documents, code) and semantic understanding; cost overhead is modest (2-3x retrieval time) but recall improves 15-30% over pure vector search. (3) **Adaptive Chunking with Sliding Windows** — split documents using semantic boundaries rather than fixed sizes, overlap context windows by 20-50%. Optimal for domain-specific content (medical records, legal contracts) where context windows must preserve meaning; complexity increases but hallucination rates drop significantly because retrieved chunks maintain semantic coherence.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Dense vector caching is like a captain studying detailed opposition statistics before the match—expensive preparation but enables instant tactical decisions. Hybrid retrieval mirrors the fielding captain's dual strategy: keep a slip cordon (keyword matching for sharp catches) while positioning fielders deep (semantic embeddings for boundary prevention). Adaptive chunking resembles choosing bowling rotations based on pitch conditions—a fast bowler's spell length adjusts based on current match state, not fixed overs. Using fixed-size document chunks is like a batsman ignoring pitch conditions and playing the same shots regardless—technically cheaper but leaves you vulnerable to getting bowled. The DRS review system (Dynamic Ranking System) combines video evidence (semantic search) with on-field observations (keywords) to make accurate decisions, just as hybrid retrieval combines multiple signals for better retrieval accuracy.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Fixed-size chunks, no caching, naive retrieval\nclass NaiveRAG:\n    def retrieve_for_query(self, query_batsman):\n        # Every query recomputes embeddings—expensive\n        query_embedding = embedding_model.embed(query_batsman)\n        # Fixed 512-token chunks ignore semantic boundaries\n        chunks = simple_split(documents, chunk_size=512)\n        scores = cosine_similarity(query_embedding, chunk_embeddings)\n        return top_k(scores, k=5)\n\n# BEST PRACTICE: Hybrid retrieval with caching and adaptive chunking\nclass ProductionRAG:\n    def __init__(self):\n        self.retrieval_cache = LRUCache(max_size=10000)\n        self.bm25_index = build_bm25(documents)\n        self.adaptive_chunks = semantic_chunk(documents, \n                                               boundary_tokens=['innings', 'wicket', 'boundary'])\n        self.chunk_embeddings = embed_batch(self.adaptive_chunks)\n    \n    def retrieve_for_query(self, query_batsman):\n        # Check cache first (cricket team roster)\n        cache_key = hash(query_batsman)\n        if cache_key in self.retrieval_cache:\n            return self.retrieval_cache[cache_key]  # Instant retrieval\n        \n        # Hybrid retrieval: keywords + semantics\n        bm25_candidates = self.bm25_index.search(query_batsman, top_k=20)\n        query_embedding = embedding_model.embed(query_batsman)\n        semantic_candidates = cosine_similarity(query_embedding, \n                                                self.chunk_embeddings).top_k(20)\n        \n        # Merge and re-rank (captain decides playing XI)\n        merged = reciprocal_rank_fusion(bm25_candidates, semantic_candidates)\n        final_results = merged[:5]\n        \n        # Cache for next time\n        self.retrieval_cache[cache_key] = final_results\n        return final_results",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Embedding staleness causes phantom answers.** Beginner mistake: updating source documents but not re-embedding the vector store. Your RAG system retrieves outdated chunks, leading to hallucinations where the LLM confidently states \"false current information.\" Fix: (1) Implement versioning—tag embeddings with document_version and document_hash. (2) Set up automated re-embedding pipelines triggered by document changes (watch for file modification timestamps or database changelog streams). (3) Use selective re-embedding: only re-compute embeddings for modified chunks, not the entire corpus (saves 80-90% compute). (4) Add a staleness checker in your retrieval function that warns if embeddings are >7 days old. Example: `if (time.now() - chunk.embedding_timestamp) > timedelta(days=7): log_warning('stale_embeddings')`",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Semantic caching reduces API costs by 40-60% for repeated queries—profile your query patterns first before implementing",
+        "Hybrid retrieval (BM25 + vectors) consistently outperforms pure semantic search; use reciprocal rank fusion to merge results",
+        "Adaptive chunking based on domain-specific boundaries prevents semantic fragmentation and reduces hallucination rates by 25-35%",
+        "Monitor embedding staleness—outdated vectors are invisible bugs that cause confident false answers",
+        "Chunking strategy should match your domain: legal documents need longer context windows than news articles",
+        "Cache hit rates above 60% indicate well-tuned retrieval; below 40% suggests query distribution is too diverse"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your RAG system retrieves cricket match statistics from a vector store. Documents are updated daily with new match results, but embeddings are recomputed weekly. What problem will users likely experience?",
+      "items": [
+        "Slow retrieval latency due to disk I/O",
+        "Hallucinations about recent matches that aren't in the vector store yet",
+        "Vector dimension mismatch errors",
+        "Out-of-memory errors during inference"
+      ],
+      "answer": 1,
+      "explanation": "When source documents update but embeddings don't, the vector store becomes stale. New match results exist in the source documents but aren't embedded, so retrieval can't find them. The LLM then generates plausible-sounding but false information (hallucination) because it has no grounding in retrieved context. This is the classic embedding staleness problem. Options A (latency) would manifest as slow response times, not incorrect answers. Option C (dimension mismatch) would cause errors, not hallucinations. Option D (OOM) would crash the system. The insidious nature of stale embeddings is that everything works—no errors—but answers become increasingly wrong.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

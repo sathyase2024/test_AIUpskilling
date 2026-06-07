@@ -321,6 +321,81 @@
       ],
       "answer": 1,
       "explanation": "Option B (hierarchical summarization) is production-grade token budgeting. It maximizes signal within constraints: top-5 documents receive full detail (you'll likely find the answer in them), middle-tier documents are summarized to catch edge cases (e.g., a lesser-known brand that's excellent for beginners), and tail documents are discarded (low relevance). This balances depth and breadth. Option A loses nuance in all docs. Option C unnecessarily shrinks scope—better to rank first, then budget. Option D is infeasible in production (token limits are hard SLA constraints, not suggestions). The lesson taught context window management and token budgeting; hierarchical approaches are the canonical solution."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns have emerged in RAG systems: the Retrieve-Then-Generate (RTG) pattern prioritizes recall by fetching top-k documents before generation, ideal for open-domain QA and knowledge-intensive tasks where missing context is catastrophic; the Iterative Refinement pattern uses relevance feedback loops to progressively narrow retrieval scope, best for complex multi-hop reasoning where initial queries may be imprecise; and the Hybrid Retrieval pattern combines dense vectors with sparse BM25 and metadata filters, offering robustness across diverse document types and query patterns. RTG minimizes latency (single retrieval pass) but risks context pollution if irrelevant documents rank highly. Iterative Refinement reduces false positives through query reformulation but incurs 2-4x retrieval overhead and higher latency. Hybrid Retrieval requires maintaining multiple index types and careful weighting strategies (typically 0.6 dense + 0.4 sparse), adding operational complexity but delivering 15-25% accuracy improvements on heterogeneous corpora. Choose RTG for speed-critical systems with high-quality indexed content, Iterative Refinement for reasoning-heavy applications with ambiguous queries, and Hybrid for production systems handling varied query types where accuracy trumps latency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Retrieve-Then-Generate mirrors setting a balanced field at the start of an innings—you commit to a fixed strategy upfront (fetch your top documents) and hope your bowlers (generator) exploit the gaps you've created. Iterative Refinement is like adjusting field placements after each over, gathering feedback on batsman patterns (query results) and repositioning fielders (reformulating queries) to tighten the noose—this works brilliantly against unpredictable batsmen but costs you time and energy. Hybrid Retrieval is your DRS (Decision Review System): you verify decisions through multiple angles (dense + sparse + filters) before committing, ensuring you catch both the obvious edges and the subtle LBW appeals, but the review process itself consumes your limited challenges (computational budget). Elite teams know when to trust their initial formation, when to adapt dynamically, and when to hedge their bets with multi-layered verification.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Single-pass retrieval without feedback (like a fixed field all match)\nclass NaiveRAGPipeline:\n    def __call__(self, batsman_query: str) -> str:\n        # Fetch once, generate once—no adaptation\n        docs = self.retriever.fetch_top_k(batsman_query, k=5)\n        return self.generator.generate(batsman_query, docs)\n        # ❌ PROBLEM: If initial query is poorly formulated (e.g., \"fast bowler\"\n        # when you meant \"pace bowling variation\"), retrieval misses context\n\n# BEST PRACTICE: Iterative refinement with quality gates\nclass ProductionRAGPipeline:\n    def __call__(self, batsman_query: str, max_iterations: int = 3) -> str:\n        current_query = batsman_query\n        all_docs = []\n        relevance_threshold = 0.65\n        \n        for iteration in range(max_iterations):\n            docs = self.retriever.fetch_top_k(current_query, k=5)\n            # Filter by relevance confidence\n            high_confidence_docs = [\n                d for d in docs if d['relevance_score'] > relevance_threshold\n            ]\n            all_docs.extend(high_confidence_docs)\n            \n            if len(high_confidence_docs) >= 3:  # Quality threshold met\n                break\n            \n            # Reformulate query based on what we learned\n            current_query = self.query_reformulator.reformulate(\n                original=batsman_query,\n                retrieved_docs=docs,\n                iteration=iteration\n            )\n        \n        # Rank all accumulated docs by cross-encoder before generation\n        ranked_docs = self.cross_encoder.rerank(all_docs, batsman_query)[:5]\n        return self.generator.generate(batsman_query, ranked_docs)\n        # ✅ BENEFIT: Adapts to poor initial formulation; uses multi-stage ranking;\n        # gates on relevance quality; avoids token waste on low-confidence context\n\n# HYBRID PATTERN: Ensemble retrieval (like multi-format verification in DRS)\nfrom rank_bm25 import BM25Okapi\n\nclass HybridRetriever:\n    def fetch_top_k(self, batsman_query: str, k: int = 5):\n        # Dense retrieval (semantic understanding)\n        dense_results = self.vector_index.search(\n            self.embed_model.embed(batsman_query), k=k\n        )\n        dense_scores = [r['score'] for r in dense_results]\n        \n        # Sparse retrieval (exact term matching)\n        sparse_results = self.bm25_index.get_top_documents(\n            batsman_query.split(), k=k\n        )\n        sparse_scores = [r['score'] for r in sparse_results]\n        \n        # Metadata filtering (tournament context)\n        filtered_by_meta = [\n            d for d in dense_results \n            if d['metadata']['tournament'] in ['ODI', 'T20', 'Test']\n        ]\n        \n        # Normalize and combine\n        dense_norm = normalize(dense_scores)\n        sparse_norm = normalize(sparse_scores)\n        combined_scores = {\n            doc_id: 0.6 * dense_norm[i] + 0.4 * sparse_norm[i]\n            for i, doc_id in enumerate([r['id'] for r in dense_results])\n        }\n        \n        return sorted(\n            combined_scores.items(),\n            key=lambda x: x[1],\n            reverse=True\n        )[:k]\n        # ✅ BENEFIT: Catches both semantic synonyms (\"pace bowler\" ≈ \"fast bowler\")\n        # and exact matches (\"DLS method\"); filters noise by domain metadata",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is treating retrieved context as ground truth without relevance validation. Developers fetch top-5 documents and pass all of them to the generator, assuming high retrieval rank equals high relevance. This causes hallucination when the retriever confidently returns off-topic documents (e.g., retrieving \"swing bowling\" when querying about \"DRS technology\"). The fix: Always implement a relevance threshold gate using either (1) retriever confidence scores (only use docs with score > 0.65), (2) a cross-encoder reranker that reorders and filters before generation (keep only top-3 cross-encoder scores > 0.7), or (3) explicit relevance classification (binary classifier: \"relevant to query?\" before passing to generator). For production systems, combine thresholds: retrieve top-10 by dense similarity, rerank to top-5 by cross-encoder, filter to docs above 0.65 cross-encoder score. This prevents the generator from wasting tokens on noisy context that can seed hallucinations.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Retrieve-Then-Generate (RTG) is fastest for well-indexed domains; Iterative Refinement is most accurate for ambiguous queries; Hybrid Retrieval balances both",
+        "Always implement relevance filtering (threshold gates) between retrieval and generation to prevent hallucination from noisy context",
+        "Cross-encoder reranking dramatically improves precision over raw dense retrieval similarity scores alone",
+        "Dense + Sparse weighting (0.6/0.4 is typical) should be tuned per domain; tournament-specific metadata filtering reduces off-topic noise in specialized corpora",
+        "Production systems need explicit cost tracking: dense retrieval is cheap (~$0.001 per 1k queries), cross-encoder reranking is moderate (~$0.01), iterative refinement multiplies retrieval cost by iteration count",
+        "Token budget discipline is critical: set max_retrieved_tokens based on generator's context window minus answer tokens needed (e.g., 4k context window → 2k for retrieval, 1k for buffer, 1k for generation)"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for cricket statistics. Your dense retriever returns top-5 documents with similarity scores [0.92, 0.88, 0.71, 0.58, 0.42]. A cross-encoder reranks them to scores [0.89, 0.85, 0.68, 0.55, 0.40] with a different ordering. Your relevance threshold is 0.65. How many documents should you pass to the generator?",
+      "items": [
+        "2 documents (cross-encoder scores 0.89 and 0.85 above threshold)",
+        "3 documents (cross-encoder scores 0.89, 0.85, and 0.68 above threshold)",
+        "4 documents (all but the lowest cross-encoder score)",
+        "5 documents (all retrieved documents have retriever scores > 0.4)"
+      ],
+      "answer": 1,
+      "explanation": "Correct. Use the cross-encoder scores (the reranker) as ground truth, not the retriever scores. Cross-encoder scores [0.89, 0.85, 0.68] all exceed the 0.65 threshold; [0.55, 0.40] fall below. Always prioritize cross-encoder reranking over raw retriever similarity when available. This prevents the generator from hallucinating based on noisy context. Option A (2 documents) is too conservative; Option C/D ignore the threshold gate entirely.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

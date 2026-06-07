@@ -271,6 +271,115 @@
       "explanation": "Option 0 correctly identifies that semantic similarity alone (vector distance) is insufficient for RAG in time-sensitive domains. Historical matches semantically resemble modern ones, but context has changed: players retire, playing styles evolve, tournament formats shift. Filtering retrieval by metadata (current tournament, year range, active rosters) ensures retrieved context is not just semantically similar but contextually valid. This is a core RAG pattern in production systems like Netflix (filtering by current catalog) and Google Search (filtering by recency). Option 1 assumes the LLM is the problem when retrieval is the failure point. Option 2 is expensive and doesn't address temporal drift. Option 3 (temperature tuning) does not prevent irrelevant retrieval—lower temperature makes the LLM follow bad retrieved context more closely, worsening the error.",
       "level": 2,
       "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RAG systems operate through a multi-stage pipeline: query encoding transforms user input into dense vector embeddings using transformer models; similarity search executes approximate nearest neighbor lookups against indexed document embeddings using FAISS or similar engines, retrieving top-k candidates in O(log n) time; context fusion concatenates retrieved passages into a prompt prefix, managing token budgets through dynamic truncation strategies; generation then conditions a language model on this augmented context. Memory models employ semantic caching—storing embeddings of previous queries to avoid redundant retrievals—and implement sliding-window attention over concatenated retrieval results. Execution flow follows request batching at scale, with async retrieval happening parallel to encoding. Performance characteristics involve retrieval latency (typically 5-50ms for vector search), generation latency proportional to output tokens, and memory overhead scaling with index size and batch concurrency. Token efficiency is critical: retrieved context competes with generation tokens within fixed context windows, requiring careful passage ranking and summarization.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma is at the crease and needs to decide his batting strategy for the next over bowled by Jasprit Bumrah. First, the system encodes Rohit's current situation (score, wickets down, overs remaining) into a numerical representation—this is query encoding, like converting match state into actionable metrics. Next, the system searches through Bumrah's bowling patterns from previous matches stored in memory (similarity search), retrieving his top 5 most relevant deliveries from similar situations—these are the \"retrieved passages,\" historical precedents. Virat Kohli in the commentary box provides context: \"In 2019, Bumrah bowled yorkers 60% of the time here; Rohit scored by leaving balls outside off stump.\" This commentary is context fusion—merging retrieved historical data with current match situation. Finally, Rohit executes his response (generation): he positions himself to leave the yorker and go after the short ball, a decision informed by both retrieved history and present conditions. The token budget constraint is Rohit's mental attention span—he can only remember so much data before deciding, forcing the system to prioritize the most relevant historical innings over exhaustive match records.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom typing import List, Dict\nfrom datetime import datetime\n\nclass CricketRAGMemoryModel:\n    \"\"\"Internal execution engine for cricket RAG with memory optimization.\"\"\"\n    \n    def __init__(self, context_window: int = 2048, cache_size: int = 1000):\n        self.context_window = context_window\n        self.semantic_cache: Dict[str, np.ndarray] = {}  # query_hash -> embedding\n        self.cache_size = cache_size\n        self.retrieval_latencies: List[float] = []\n        \n    def encode_match_query(self, \n                          batsman_name: str,\n                          bowler_name: str,\n                          overs_remaining: int,\n                          runs_needed: int) -> np.ndarray:\n        \"\"\"Encode cricket context into dense vector with caching.\"\"\"\n        query_key = f\"{batsman_name}_{bowler_name}_{overs_remaining}_{runs_needed}\"\n        \n        if query_key in self.semantic_cache:\n            return self.semantic_cache[query_key]\n        \n        # Simulate transformer encoding\n        query_embedding = np.random.randn(768)  # 768-dim embedding\n        query_embedding = query_embedding / np.linalg.norm(query_embedding)\n        \n        if len(self.semantic_cache) < self.cache_size:\n            self.semantic_cache[query_key] = query_embedding\n        \n        return query_embedding\n    \n    def retrieve_historical_performances(self,\n                                        query_embedding: np.ndarray,\n                                        indexed_innings: List[Dict],\n                                        k: int = 5) -> List[Dict]:\n        \"\"\"Approximate nearest neighbor search with latency tracking.\"\"\"\n        import time\n        start = time.time()\n        \n        scores = []\n        for innings in indexed_innings:\n            innings_embedding = np.array(innings['embedding'])\n            innings_embedding = innings_embedding / np.linalg.norm(innings_embedding)\n            similarity = np.dot(query_embedding, innings_embedding)\n            scores.append((similarity, innings))\n        \n        scores.sort(reverse=True, key=lambda x: x[0])\n        retrieved = [item[1] for item in scores[:k]]\n        \n        latency = (time.time() - start) * 1000\n        self.retrieval_latencies.append(latency)\n        \n        return retrieved\n    \n    def fuse_context_with_budget(self,\n                                 retrieved_passages: List[Dict],\n                                 current_match_state: Dict,\n                                 tokens_available: int) -> str:\n        \"\"\"Dynamically truncate context to fit token budget.\"\"\"\n        prompt_prefix = f\"Match State: {current_match_state['venue']}, Batsman: {current_match_state['batsman']}\\n\\n\"\n        tokens_used = len(prompt_prefix.split())\n        \n        augmented_context = prompt_prefix\n        for passage in retrieved_passages:\n            passage_text = f\"Historical: {passage['description']} (Runs: {passage['runs']})\\n\"\n            passage_tokens = len(passage_text.split())\n            \n            if tokens_used + passage_tokens <= tokens_available:\n                augmented_context += passage_text\n                tokens_used += passage_tokens\n            else:\n                # Truncate when budget exceeded\n                augmented_context += \"[Context truncated due to token limits]\\n\"\n                break\n        \n        return augmented_context\n    \n    def measure_pipeline_performance(self) -> Dict:\n        \"\"\"Track end-to-end performance characteristics.\"\"\"\n        return {\n            \"avg_retrieval_latency_ms\": np.mean(self.retrieval_latencies),\n            \"max_retrieval_latency_ms\": np.max(self.retrieval_latencies),\n            \"cache_hit_rate\": len(self.semantic_cache) / self.cache_size,\n            \"timestamp\": datetime.now().isoformat()\n        }\n\n# Usage example\nrag_engine = CricketRAGMemoryModel(context_window=2048)\n\nmatches = [\n    {\"batsman\": \"Virat Kohli\", \"runs\": 120, \n     \"embedding\": np.random.randn(768).tolist(), \n     \"description\": \"Played aggressive against pace in 2022 ODI\"},\n    {\"batsman\": \"Virat Kohli\", \"runs\": 89, \n     \"embedding\": np.random.randn(768).tolist(), \n     \"description\": \"Steady innings against spinners in 2021\"}\n]\n\nquery_vec = rag_engine.encode_match_query(\n    batsman_name=\"Virat Kohli\",\n    bowler_name=\"Jasprit Bumrah\",\n    overs_remaining=15,\n    runs_needed=60\n)\n\nretrieved = rag_engine.retrieve_historical_performances(query_vec, matches, k=2)\nfinal_context = rag_engine.fuse_context_with_budget(retrieved, \n                                                      {\"venue\": \"Eden Gardens\", \"batsman\": \"Virat Kohli\"}, \n                                                      tokens_available=256)\n\nprint(final_context)\nprint(rag_engine.measure_pipeline_performance())",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge in RAG systems: Dense-First Retrieval uses embedding-based search as primary filter, prioritizing recall speed over precision—ideal when serving real-time queries where 50ms latency is critical, though it risks retrieving off-topic but superficially similar documents. Hybrid Retrieval combines dense and sparse (BM25) search, reranking results using cross-encoders; this costs 2-3x compute but recovers ~15% precision on technical/domain queries where keywords matter. Iterative Refinement loops retrieval based on model feedback—if initial context produces low confidence, the system retrieves again with modified queries—improving accuracy at exponential latency cost. Trade-offs are severe: Dense-First is fastest but prone to semantic drift; Hybrid doubles latency; Iterative can timeout on slow networks. Choose Dense-First for user-facing dashboards (sports stats, score predictions), Hybrid for cricket analytics requiring technical precision, Iterative only for offline batch analysis where latency is unconstrained.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Dense-First Retrieval is like a captain placing aggressive fielders (slips, point) first based on batsman tendency data—fast decision-making optimized for catching edges, even if occasionally a ball squirts through gaps. Hybrid Retrieval is like deploying both aggressive fielders AND a deep cover, then using field adjustments (cross-checks with captain's reading of pitch conditions) to finalize placement—slower to set, but balanced attack. Iterative Refinement is the decision review system (DRS): after an initial field placement fails (batsman scores), the captain uses video to understand what went wrong, retrieves updated bowling plans, and adjusts for the next over—most accurate but only practical between overs, not mid-delivery. Real-world deployment mirrors match evolution: early powerplay requires Dense-First speed; middle overs demand Hybrid balance; post-match reviews benefit from Iterative depth.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Naive retrieval without ranking\nclass BowlingAnalyzerAntiPattern:\n    def analyze_batsman(self, batsman_name: str, indexed_matches: List[Dict]):\n        \"\"\"Retrieves all matches, passes unranked context to LLM.\"\"\"\n        raw_results = [m for m in indexed_matches if batsman_name in m['players']]\n        \n        # Problem: No reranking, low precision\n        # Token overflow: passes 50 matches (10,000+ tokens) to model\n        # Result: Model drowns in noise, slower + costlier inference\n        context = \"\\n\".join([str(m) for m in raw_results[:50]])\n        return context\n\n# BEST PRACTICE: Hybrid retrieval with reranking\nfrom sentence_transformers import CrossEncoder\n\nclass BowlingAnalyzerBestPractice:\n    def __init__(self):\n        self.dense_retriever = None  # FAISS index\n        self.sparse_retriever = None  # BM25 index\n        self.reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')\n    \n    def analyze_batsman(self, \n                       batsman_name: str,\n                       innings_context: Dict,\n                       top_k: int = 5) -> str:\n        \"\"\"Hybrid retrieval with intelligent reranking.\"\"\"\n        # Stage 1: Dense retrieval (fast, recall-focused)\n        query_embedding = self._encode_query(batsman_name, innings_context)\n        dense_results = self.dense_retriever.search(query_embedding, k=20)\n        \n        # Stage 2: Sparse retrieval (keyword-based)\n        sparse_results = self.sparse_retriever.search(\n            f\"{batsman_name} {innings_context['venue']} {innings_context['opposition']}\",\n            k=20\n        )\n        \n        # Stage 3: Merge and deduplicate\n        merged = list(set(dense_results + sparse_results))[:30]\n        \n        # Stage 4: Rerank with cross-encoder\n        pairs = [(batsman_name + \" \" + innings_context['venue'], m['description']) \n                 for m in merged]\n        scores = self.reranker.predict(pairs)\n        \n        ranked_results = sorted(\n            zip(merged, scores), \n            key=lambda x: x[1], \n            reverse=True\n        )[:top_k]\n        \n        # Result: Top 5 highly relevant matches, ~800 tokens max\n        context = \"\\n\".join([r[0]['description'] for r in ranked_results])\n        return context\n    \n    def _encode_query(self, batsman: str, context: Dict) -> list:\n        \"\"\"Encode query with domain context for better retrieval.\"\"\"\n        query_text = f\"How does {batsman} perform at {context['venue']} vs {context['opposition']}?\"\n        return self.dense_retriever.encode(query_text)\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is passing unranked retrieval results directly to the LLM without reranking. This causes token waste (model reads 50 low-relevance documents), slower inference (more tokens = more generation time), and degraded answer quality (noise overwhelms signal). Fix: Always add a reranking stage. Use a lightweight cross-encoder (6-12ms per 30 candidates) to score retrieved passages against your query. Truncate to top-5 results. Example: instead of passing all 50 BM25 hits, retrieve top-20 with dense search + top-20 with sparse search, deduplicate to 30, rerank with CrossEncoder, and keep only top-5. This costs 15ms extra but reduces token usage by 80% and improves accuracy by 25-40%.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "RAG execution involves query encoding → similarity search → context fusion → generation, with semantic caching and sliding-window attention optimizing memory",
+        "Retrieval latency scales logarithmically with index size; generation latency dominates, making passage quality more critical than retrieval speed",
+        "Dense-First, Hybrid, and Iterative Refinement patterns trade off speed (10-50ms), precision (80-95% relevance), and cost (1x to 10x compute)",
+        "Hybrid retrieval (dense + sparse + reranking) achieves production-grade precision (~90%) while staying under 100ms latency budget",
+        "Always rerank retrieved results with cross-encoders; unranked passages waste 70-80% of context window on noise",
+        "Token budget management is critical—truncate aggressively rather than passing exhaustive context; 5 highly relevant passages outperform 50 mediocre ones"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the Cricket Intelligence Platform, you're querying 50,000 historical cricket matches to predict the next bowler's strategy against Virat Kohli. Your system retrieves 50 candidate matches using dense embeddings but the LLM is slow and produces generic answers. What is the root cause and best fix?",
+      "items": [
+        "Increase the embedding dimension from 768 to 1024 for better precision",
+        "Add a reranking stage (cross-encoder) to filter 50 matches down to top-5, reducing token load and noise",
+        "Switch from dense retrieval to BM25 sparse retrieval only",
+        "Retrieve fewer results (e.g., k=10 instead of k=50) without any quality improvement mechanism"
+      ],
+      "answer": 1,
+      "explanation": "The root cause is token waste and noise. Passing 50 unranked matches floods the LLM's context window with low-relevance documents, slowing inference and degrading answer quality. The fix is to add reranking: use a cross-encoder to score all 50 candidates against your query (Kohli + bowler strategy context), then keep only top-5. This reduces token usage by 80%, improves relevance, and keeps latency under 100ms. Options A and C change the retrieval method but don't address the fusion problem. Option D reduces results without improving quality—you'd still get mediocre matches."
     }
   ]
 }

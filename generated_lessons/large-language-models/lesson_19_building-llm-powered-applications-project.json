@@ -305,6 +305,78 @@
       ],
       "answer": 0,
       "explanation": "This is a classic prompt injection attack. The user's malicious instruction is embedded in natural language and the LLM treats it as legitimate system directive, potentially overriding safety constraints. Consequences: unauthorized account access, data breach, brand damage, regulatory fines. Defenses include input validation (block 'ignore', 'override', 'instructions'), output validation (flag responses that reference unauthorized operations), and using a separate LLM as a safety classifier before returning responses. Temperature, embeddings, and token limits are irrelevant here—the vulnerability is at the input layer. Always treat user input as untrusted data."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three production-grade patterns dominate LLM application architecture: (1) Prompt Caching — storing expensive computed embeddings and context windows to reduce redundant API calls and latency by 60-80%, ideal when serving repeated queries over stable knowledge bases, though requires careful cache invalidation strategy; (2) Chain-of-Thought with Fallback Routing — decomposing complex tasks into sequential reasoning steps with conditional branching to cheaper models for simple queries, reducing costs 40-50% while maintaining accuracy, but introducing orchestration complexity and potential failure points in multi-step pipelines; (3) Retrieval-Augmented Generation (RAG) with Vector Indexing — anchoring LLM outputs to external knowledge sources via semantic search, eliminating hallucinations and enabling real-time data updates, though requiring careful embedding model selection, index maintenance overhead, and latency trade-offs between retrieval precision and generation speed. Production systems typically blend all three: cache prompts aggressively, route complex reasoning through longer chains while falling back to cached responses, and ground everything in RAG when accuracy is critical. The cost-quality-speed triangle shapes every choice—optimize for your specific SLA requirements.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Prompt Caching mirrors keeping your best fielders in their positions all match—once positioned optimally, they stay put to avoid wasted repositioning time. Chain-of-Thought with Fallback Routing is like your captain's bowling rotation strategy: use your premium fast bowlers (expensive models) only for crucial overs (complex queries), deploy spinners (lightweight models) for simpler phases. RAG is your DRS (Decision Review System)—before committing to a decision (LLM output), you review the replay (vector search) of similar situations to verify accuracy. Just as a captain doesn't use DRS on obvious calls, you don't RAG for creative tasks where hallucination is acceptable. Your batting order (prompt engineering) determines everything downstream: poor opening decisions cascade through innings, just as bad prompt design breaks your entire pipeline. The best teams balance aggressive strategy (model capability) with risk management (fallbacks and validation).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Redundant API calls, no caching, brittle error handling\nclass BattingAnalyzerAntiPattern:\n    def __init__(self, api_key):\n        self.client = OpenAI(api_key=api_key)\n    \n    def analyze_batsman(self, batsman_name, stats):\n        # Calls API every time, even for same query\n        response = self.client.chat.completions.create(\n            model=\"gpt-4\",\n            messages=[{\n                \"role\": \"user\",\n                \"content\": f\"Analyze {batsman_name} batting stats: {stats}\"\n            }]\n        )\n        return response.choices[0].message.content\n\n# BEST PRACTICE: Caching, routing, fallback patterns\nclass BattingAnalyzerBestPractice:\n    def __init__(self, api_key):\n        self.client = OpenAI(api_key=api_key)\n        self.cache = {}  # Simple cache; use Redis in production\n        self.embedding_model = \"text-embedding-3-small\"\n    \n    def analyze_batsman(self, batsman_name, stats, use_rag=True):\n        # Check cache first\n        cache_key = f\"{batsman_name}_{hash(str(stats))}\"\n        if cache_key in self.cache:\n            return self.cache[cache_key]\n        \n        # Route based on query complexity\n        complexity = self._estimate_complexity(stats)\n        model = \"gpt-4\" if complexity > 0.7 else \"gpt-3.5-turbo\"\n        \n        # Build context with RAG if enabled\n        context = \"\"\n        if use_rag:\n            context = self._retrieve_similar_batsmen(batsman_name, stats)\n        \n        try:\n            response = self.client.chat.completions.create(\n                model=model,\n                messages=[{\n                    \"role\": \"system\",\n                    \"content\": \"You are a cricket statistics expert. Use the provided context.\",\n                }, {\n                    \"role\": \"user\",\n                    \"content\": f\"Context:\\n{context}\\n\\nAnalyze {batsman_name}: {stats}\"\n                }],\n                temperature=0.3,\n                max_tokens=500\n            )\n            result = response.choices[0].message.content\n            self.cache[cache_key] = result  # Store result\n            return result\n        except RateLimitError:\n            return self._fallback_cached_analysis(batsman_name)\n    \n    def _estimate_complexity(self, stats):\n        # Return 0-1 complexity score\n        return min(len(str(stats)) / 1000, 1.0)\n    \n    def _retrieve_similar_batsmen(self, batsman_name, stats):\n        # Placeholder: embed and search vector DB\n        return f\"Similar batsmen context for {batsman_name}\"\n    \n    def _fallback_cached_analysis(self, batsman_name):\n        # Graceful degradation with cached insights\n        return f\"Using cached historical analysis for {batsman_name}\"\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is treating LLM API calls as free—calling the same prompt repeatedly without caching. A cricket analytics app querying player stats 100 times/day burns $50+/month on identical API calls costing $0.001 each. FIX: Implement a 24-hour cache layer before your API client. Hash your prompts (model + messages) and store responses in Redis or simple dict. Check cache before every API call with: `cache_key = hashlib.md5(json.dumps({\"model\": model, \"messages\": messages}).encode()).hexdigest()`. Add a 1-line conditional: `if cache_key in cache: return cache[cache_key]` before your API call. Second-order fix: Use prompt compression libraries like LLMLingua to reduce token counts 40-50%, or batch similar queries into single API calls using system-level batching. This transforms your $50/month cost into $2-5/month.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Prompt Caching reduces API costs and latency by 60-80% for repeated contexts—essential for production reliability",
+        "Chain-of-Thought with Fallback Routing optimizes cost-quality trade-offs by routing complex queries to expensive models and simple queries to cheaper ones",
+        "RAG anchors LLM outputs to verified knowledge, eliminating hallucinations but requiring vector index maintenance and semantic search infrastructure",
+        "Always implement graceful fallbacks (cached responses, simpler models) for production robustness against rate limits and API failures",
+        "Hash-based caching is the single highest-impact optimization for cost reduction—implement before scaling"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket commentary app that generates real-time match analysis. Queries arrive at 50/minute with high variance. Which pattern combination is most cost-effective while maintaining <2sec latency?",
+      "items": [
+        "Use gpt-4 for every query with aggressive prompt caching",
+        "Route simple queries to gpt-3.5-turbo via complexity estimation, cache aggressively, use RAG only for detailed analysis requests",
+        "Use only gpt-3.5-turbo without caching to minimize complexity",
+        "Stream all responses without caching to ensure real-time freshness"
+      ],
+      "answer": 1,
+      "explanation": "Answer B is optimal: complexity-based routing cuts costs by 60-70% (gpt-3.5-turbo for simple queries), aggressive caching eliminates redundant calls (50/minute has high repetition), and selective RAG (detailed analysis only) balances accuracy with latency. Option A over-uses expensive models. Option C sacrifices cost savings. Option D sacrifices both performance and cost efficiency. This three-pattern blend is production-standard for variable workloads."
     }
   ]
 }

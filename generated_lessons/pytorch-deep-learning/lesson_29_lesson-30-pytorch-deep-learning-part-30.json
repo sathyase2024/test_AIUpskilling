@@ -307,6 +307,80 @@
       ],
       "answer": 1,
       "explanation": "Model quantization combined with TorchScript compilation is the production-grade solution for latency bottlenecks. Quantizing weights from FP32 to INT8 reduces memory by 4x and accelerates matrix multiplications via specialized hardware (INT8 cores), typically achieving 3-4x speedup with <1% accuracy loss. TorchScript compilation removes Python overhead by converting to optimized intermediate representation. Request batching amortizes I/O costs, allowing you to hit 200ms within 16-prediction batches (~12ms per prediction). Option A is naive—reducing hidden dimensions to 32 destroys temporal modeling capacity, likely dropping accuracy 5-10% to save only 200ms. Option C abandons the deep learning advantage entirely; linear models fundamentally can't capture non-linear patterns in cricket (e.g., momentum, form streaks). Option D is counterproductive: inference time is determined by architecture, not training hyperparameters. The answer demonstrates real production optimization: preserve model quality while cutting latency through engineering (quantization, compilation, batching), not architecture degradation."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production cricket performance prediction systems, three dominant patterns emerge: the Stateful Accumulator Pattern for tracking rolling performance metrics across matches, the Ensemble Validation Pattern for combining multiple model predictions to reduce individual model bias, and the Feature Pipeline Caching Pattern for avoiding redundant computation of expensive statistics. The Stateful Accumulator Pattern maintains rolling averages, form indices, and momentum scores efficiently—use this when real-time prediction must incorporate recent performance without reprocessing entire historical datasets. The trade-off is increased memory footprint and complexity in state management, but the latency improvement justifies this for live match prediction. The Ensemble Validation Pattern trains multiple architectures (LSTM, GRU, Transformer) and averages their outputs; use this when individual model confidence is moderate or when different models capture different performance dimensions. The cost is 3-5x computational overhead during inference, but prediction accuracy typically improves 4-7% and uncertainty quantification becomes possible. The Feature Pipeline Caching Pattern pre-computes expensive features (rolling statistics, opposition strength indices) and stores them in memory or disk—essential when serving thousands of prediction requests per match. The trade-off is stale feature risk if player performance dramatically shifts mid-series, mitigated by implementing cache invalidation thresholds. Choose these patterns based on your latency requirements (< 100ms), accuracy targets (> 92%), and computational budget.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The Stateful Accumulator Pattern mirrors a captain's mental model of current form—they track the last 5 innings batting average rather than recalculating from career statistics before each decision. The Ensemble Validation Pattern is like consulting multiple match analysts with different expertise (batting coach, bowling coach, fielding coach) before deciding on team strategy, rather than trusting a single voice. The Feature Pipeline Caching Pattern resembles pre-analyzing opposition data during the pre-match meeting rather than computing it on-field—you've already identified their weakness to short balls or tendency to play late cuts, so you don't waste cognitive energy recomputing during the match. A captain who recalculates every player's form from scratch at every innings boundary is inefficient (stateless), just as a captain who ignores live form and only consults pre-series data risks missing crucial momentum shifts (stale cache). The best captains blend these patterns: they trust pre-match analysis, update mentally with live performance, and consult multiple opinions before critical decisions—this mirrors production system architecture.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Recomputing features from scratch for every prediction\nclass PoorCricketPredictor:\n    def predict_runs(self, player_id, upcoming_match):\n        # Fetches entire career history every time\n        all_innings = database.fetch_all_innings(player_id)\n        avg_runs = sum(all_innings) / len(all_innings)  # Inefficient!\n        return model.forward(avg_runs)\n\n# ✅ BEST PRACTICE: Stateful accumulator with cached features\nclass OptimalCricketPredictor:\n    def __init__(self):\n        self.player_stats_cache = {}  # Rolling stats\n        self.cache_timestamp = {}\n    \n    def update_player_form(self, player_id, latest_innings_score):\n        \"\"\"Update rolling statistics efficiently\"\"\"\n        if player_id not in self.player_stats_cache:\n            self.player_stats_cache[player_id] = {\n                'form_index': 0,  # Last 5 innings weighted avg\n                'momentum': 0,    # Trend indicator\n                'consistency': 0  # Standard deviation of recent scores\n            }\n        \n        stats = self.player_stats_cache[player_id]\n        # Exponential moving average (recent matches weighted higher)\n        stats['form_index'] = 0.7 * stats['form_index'] + 0.3 * latest_innings_score\n        stats['momentum'] = latest_innings_score - stats['form_index']\n        self.cache_timestamp[player_id] = time.time()\n    \n    def predict_runs(self, player_id, upcoming_match):\n        \"\"\"Use cached features for fast prediction\"\"\"\n        # Check cache freshness (invalidate if > 24 hours old)\n        if time.time() - self.cache_timestamp.get(player_id, 0) > 86400:\n            self.update_player_form(player_id, self._fetch_latest_score(player_id))\n        \n        stats = self.player_stats_cache[player_id]\n        prediction_input = torch.tensor([\n            stats['form_index'],\n            stats['momentum'],\n            stats['consistency'],\n            upcoming_match.opposition_strength\n        ])\n        return self.model.forward(prediction_input)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "The anti-pattern recomputes entire career statistics for every prediction (O(n) complexity). The best practice maintains cached rolling statistics updated incrementally and invalidates cache based on freshness thresholds, reducing lookup from O(career_length) to O(1) while preventing stale predictions."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Cache Invalidation Logic Failure — Beginners often implement feature caching without proper invalidation, leading to stale predictions. For example, if a player scores 200 runs in a match but the cache timestamp hasn't updated, subsequent predictions still use pre-200 form indices. Fix: Always implement explicit cache invalidation triggers based on time elapsed, new data arrival, or performance volatility thresholds. Example: `if latest_score > mean + 2*std_dev: invalidate_cache(player_id)` to detect sudden form changes. Use timestamped cache entries with a maximum age (e.g., 24 hours for cricket) and implement a background refresh job to proactively update high-frequency prediction players.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Stateful Accumulator Pattern reduces redundant computation and maintains efficient O(1) lookups for rolling statistics",
+        "Ensemble Validation Pattern trades 3-5x inference cost for 4-7% accuracy improvement and uncertainty quantification",
+        "Feature Pipeline Caching Pattern is essential for < 100ms latency requirements but requires careful cache invalidation logic",
+        "Always implement cache freshness checks and volatility-based invalidation to prevent stale predictions",
+        "Pre-compute expensive features (opposition strength indices, rolling averages) during off-peak times, not during match inference",
+        "Batch predictions when possible to amortize model loading and feature computation costs",
+        "Monitor cache hit rates and prediction latency distribution to identify bottlenecks in production systems"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're predicting batting performance for a player in real-time during a match. The player suddenly scores 150 runs (unusual for their typical 35-run average). Your system uses a Stateful Accumulator Pattern with a 24-hour cache invalidation. What's the correct approach?",
+      "items": [
+        "Keep using the old form index until the 24-hour mark passes",
+        "Immediately invalidate the cache and recompute statistics from recent form, then adjust prediction model for outlier detection",
+        "Average the 150 runs into the form index regardless of deviation magnitude",
+        "Switch to an ensemble model without updating cached statistics"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct. A 150-run score is a performance volatility outlier (>>2 std deviations from 35-run average) that should trigger immediate cache invalidation rather than waiting for the 24-hour timeout. This prevents subsequent predictions from using stale pre-150 statistics. Option A causes stale predictions. Option C understates the significance of the outlier. Option D avoids the root problem of updating state. Production systems should implement volatility-based invalidation: `if abs(new_score - rolling_avg) > 3*std_dev: invalidate_cache()` for cricket, allowing both time-based and event-based cache refresh."
     }
   ]
 }

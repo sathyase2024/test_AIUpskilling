@@ -262,6 +262,78 @@
       ],
       "answer": 1,
       "explanation": "Hybrid retrieval (combining sparse + dense) is optimal here. BM25 excels at exact-match keywords ('left-handed', 'fast bowling', '45 average'), catching documents with precise terminology that dense embeddings might miss. Dense retrieval captures semantic meaning ('players strong against pace bowlers'). Merging both gives high recall. A cross-encoder then reranks the union by joint query-document score, filtering noise and returning the most relevant results. Option A discards precise keyword matching. Option C adds query expansion complexity without hybrid fusion. Option D inflates retriever latency by forcing higher top-k on BM25, defeating the efficiency gain of staged pipelines."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems typically follow three established patterns based on retrieval scale and latency requirements. The **Cache-First Pattern** pre-computes and caches embeddings for frequently accessed documents (batting statistics, player profiles), reducing retrieval latency from 200ms to 10ms but requiring storage overhead and periodic cache invalidation. Use this when serving high-traffic queries with predictable content. The **Dynamic Chunking Pattern** adapts document segmentation based on query complexity—short queries retrieve smaller chunks (single match statistics), while complex queries fetch larger semantic units (career progression narratives). This requires intelligent chunk-size prediction but reduces token overhead by 30-40% compared to fixed chunking. The **Staged Filtering Pattern** applies progressively expensive filters: sparse retrieval → semantic similarity threshold → cross-encoder reranking → LLM validation. Each stage eliminates 60-80% of candidates before expensive computation, reducing average query cost from $0.05 to $0.008 while maintaining quality. Trade-offs include increased complexity and potential filtering errors that cascade downstream. Choose Cache-First for content-stable domains, Dynamic Chunking for heterogeneous query types, and Staged Filtering for cost-constrained systems serving millions of queries.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The Cache-First Pattern mirrors pre-setting a defensive field before the match begins—you've anticipated the batsman's likely shots and positioned fielders optimally, eliminating the need for reactive adjustments on every ball. The Dynamic Chunking Pattern is like varying your bowling length based on the batter's stance: short deliveries for aggressive openers, fuller lengths for cautious middle-order batsmen. The Staged Filtering Pattern resembles a captain's decision sequence: first, observe the batsman's footwork (sparse filtering), then position close fielders if they're advancing (semantic filtering), then review the previous delivery with DRS if genuinely uncertain (cross-encoder reranking), and only after these checks decide whether to set a unusual field (invoke expensive LLM). Each stage asks 'do we need deeper analysis?' before committing resources, just as a captain doesn't call for DRS review on every delivery—only when genuine doubt exists.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Naive full retrieval on every query\nclass NaiveMatchAnalyzer:\n    def answer_question(self, query: str, all_documents: list):\n        # Embeds ALL documents every request - wasteful!\n        embeddings = [embed_model.encode(doc) for doc in all_documents]\n        query_embedding = embed_model.encode(query)\n        scores = cosine_similarity(query_embedding, embeddings)\n        return top_k_documents(scores, k=5)  # 500ms latency\n\n# BEST PRACTICE: Cached embeddings + staged filtering\nclass OptimizedMatchAnalyzer:\n    def __init__(self, documents: list):\n        # Pre-compute once\n        self.cached_embeddings = {\n            doc_id: embed_model.encode(doc) \n            for doc_id, doc in enumerate(documents)\n        }\n        self.sparse_index = build_bm25_index(documents)\n        self.documents = documents\n        self.cross_encoder = CrossEncoderRanker()\n    \n    def answer_question(self, query: str) -> list:\n        # Stage 1: Sparse retrieval (1ms)\n        sparse_candidates = self.sparse_index.search(query, k=50)\n        \n        # Stage 2: Dense retrieval only on candidates (15ms)\n        query_emb = embed_model.encode(query)\n        candidate_embeddings = [\n            self.cached_embeddings[cand_id] \n            for cand_id in sparse_candidates\n        ]\n        dense_scores = cosine_similarity(query_emb, candidate_embeddings)\n        dense_top = get_top_k(dense_scores, k=10)  # 50/50 reduction\n        \n        # Stage 3: Cross-encoder reranking only on finalists (8ms)\n        reranked = self.cross_encoder.rank(\n            query,\n            [self.documents[idx] for idx in dense_top]\n        )\n        return reranked[:5]  # Total: 24ms latency, 20x faster",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Chunk Size Mismatch** — Using identical chunk sizes across heterogeneous content types is the most common beginner error, causing either context loss (cricket biography summaries chunked into 256 tokens each, losing narrative continuity) or excessive token consumption (match statistics chunked into 2048 tokens, 80% redundant). Fix: Profile your query distribution first—measure average query tokens, calculate optimal chunk size as `query_tokens × 2 to 3`, then implement adaptive chunking with overlap of 10-15% for semantic continuity. Use BM25 to validate: if term frequency drops significantly across chunks, your size is too small; if relevance scores plateau across many documents, your size is too large. Document your chunk-size rationale and revisit monthly as query patterns evolve.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Cache-First Pattern reduces latency 20× by pre-computing embeddings; use for stable, high-traffic content",
+        "Dynamic Chunking adapts segment size to query complexity, reducing token overhead by 30-40%",
+        "Staged Filtering (sparse → dense → rerank → LLM) cuts query costs 6× by eliminating expensive operations on 90%+ of candidates",
+        "Profile your specific retrieval latency/cost trade-off—no pattern fits all domains",
+        "Chunk size mismatch causes either semantic loss or token bloat; validate with BM25 term frequency analysis"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your RAG system answers cricket statistics queries (99% simple lookups like 'Kohli vs pace bowlers') with 3M requests/day. Which pattern minimizes cost?",
+      "items": [
+        "Dynamic Chunking—adapts to query complexity",
+        "Cache-First—pre-computed embeddings for predictable queries",
+        "Staged Filtering—reduces token usage across all stages",
+        "All patterns equally effective for this use case"
+      ],
+      "answer": 1,
+      "explanation": "Cache-First is optimal here. The workload is predictable (cricket stats), content is stable (historical records don't change), and traffic is high. Pre-computing embeddings once eliminates 99% of embedding computation cost. Staged Filtering adds unnecessary complexity for simple lookups. Dynamic Chunking helps when query types vary wildly, but 99% of queries here are identical lookup patterns."
     }
   ]
 }

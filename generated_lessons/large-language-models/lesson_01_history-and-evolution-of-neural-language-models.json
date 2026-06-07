@@ -289,6 +289,79 @@
       ],
       "answer": 1,
       "explanation": "Transfer learning with a pre-trained model is the correct choice. Pre-trained models have already learned linguistic patterns from billions of tokens, so fine-tuning on just 500 cricket commentary examples will work well. The model captures general sentiment language that transfers across domains. Training from scratch (A) would require far more data and compute and would perform poorly—the company would waste computational resources. Option C is incorrect because transfer learning actually excels with small datasets (500 is typical for fine-tuning). Option D underestimates transformer efficiency; even small transformers with transfer learning outperform RNNs given the pre-trained foundation. This demonstrates why transfer learning dominates modern NLP."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production neural language models follow several established patterns, each optimized for different constraints. The batch_processing_strategy pattern prioritizes throughput by grouping multiple inference requests, reducing per-token latency overhead but increasing memory consumption and wall-clock latency for individual requests—ideal for offline batch scoring. The streaming_inference pattern processes tokens incrementally, essential for real-time applications like chatbots where users expect immediate responses, but requires maintaining KV cache memory and introduces complexity in sequence management. The model_quantization pattern reduces precision (float32→int8) to minimize memory footprint and accelerate inference by 2-4x, trading numerical precision and potential accuracy degradation for deployment feasibility on edge devices. The retrieval_augmented_generation (RAG) pattern decouples language generation from knowledge storage by querying external databases, reducing hallucination and enabling up-to-date information without retraining, though adding latency and dependency on retrieval quality. Choose batch processing for batch scoring jobs, streaming for interactive applications, quantization when hardware is constrained, and RAG when factual accuracy and knowledge updates matter more than latency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Batch processing mirrors scheduling multiple matches in sequence—you optimize venue setup once, then run several games efficiently. Streaming inference is like a live Test match commentary feed, where viewers demand real-time updates of each ball; you can't wait to aggregate 10 balls before broadcasting. Model quantization resembles playing with a lighter cricket bat (lower precision) to increase swing speed and reduce fatigue—you sacrifice some traditional power for agility and stamina. RAG is like a captain consulting the weather forecast and field analysis database before each over, rather than relying purely on intuition; you're adding external knowledge to make better decisions. Choosing between patterns is like deciding your playing XI: you'd field more batsmen for a chase (streaming for interactivity), but pick specialist bowlers for conditions (quantization for edge devices). The trade-off between throughput and latency mirrors batting order selection—open with aggressive batsmen for quick scoring or stable accumulators for consistency?",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Processing tokens one-by-one without batching\nclass CricketCommentator_BadPattern:\n    def __init__(self, model):\n        self.model = model\n        self.kv_cache = {}\n    \n    def generate_commentary(self, ball_sequence):\n        \"\"\"Process each ball independently—poor throughput\"\"\"\n        commentary = []\n        for ball_idx, ball in enumerate(ball_sequence):\n            # Creating new batch for every ball wastes GPU\n            output = self.model.forward(\n                input_ids=ball,\n                past_key_values=None  # No cache reuse!\n            )\n            commentary.append(output.logits[0, -1, :])\n        return commentary\n\n# BEST PRACTICE: Batch processing with KV cache\nclass CricketCommentator_BestPattern:\n    def __init__(self, model, batch_size=32):\n        self.model = model\n        self.batch_size = batch_size\n        self.kv_cache = {}\n    \n    def generate_commentary(self, ball_sequences):\n        \"\"\"Process balls in batches with cache reuse—optimal efficiency\"\"\"\n        all_commentary = []\n        \n        for batch_start in range(0, len(ball_sequences), self.batch_size):\n            batch_end = min(batch_start + self.batch_size, len(ball_sequences))\n            batch = ball_sequences[batch_start:batch_end]\n            \n            # Initialize cache for new batch\n            past_key_values = self._init_cache(batch.shape[0])\n            \n            for token_position in range(batch.shape[1]):\n                # Process entire batch in single GPU call\n                output = self.model.forward(\n                    input_ids=batch[:, token_position:token_position+1],\n                    past_key_values=past_key_values,\n                    use_cache=True\n                )\n                # Update cache for next token prediction\n                past_key_values = output.past_key_values\n                all_commentary.append(output.logits[:, -1, :])\n        \n        return all_commentary\n    \n    def _init_cache(self, batch_size):\n        \"\"\"Initialize KV cache structure\"\"\"\n        return None  # Model handles initialization\n\n# PATTERN SELECTION: Match the innings\nclass CricketCommentator_Adaptive:\n    def generate_commentary(\n        self, \n        ball_sequences, \n        match_type=\"test\",  # test (batch) vs t20 (streaming)\n        hardware=\"gpu\"  # gpu vs edge_device\n    ):\n        if match_type == \"test\" and hardware == \"gpu\":\n            return CricketCommentator_BestPattern().generate_commentary(ball_sequences)\n        elif match_type == \"t20\" and hardware == \"gpu\":\n            return self._streaming_generate(ball_sequences)  # Interactive\n        elif hardware == \"edge_device\":\n            return self._quantized_generate(ball_sequences)  # Memory-constrained\n        else:\n            return self._rag_generate(ball_sequences)  # Knowledge-augmented\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Anti-pattern creates new batches per token with no cache reuse, forcing redundant computation of earlier tokens. Best practice batches multiple sequences and reuses KV cache, reducing computation by 80-90%. The adaptive pattern shows how to select based on deployment context—batch processing for offline scoring, streaming for interactive applications, quantization for edge devices, and RAG for knowledge-intensive tasks."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is implementing streaming inference without properly managing KV cache state across batches. When you process multiple independent sequences in streaming mode, cache from sequence_A leaks into sequence_B's computation, causing tokens to 'remember' unrelated context and producing nonsensical outputs. FIX: Always reset the past_key_values to None or reinitialize between sequence boundaries. Use a cache manager that explicitly tracks (sequence_id, layer_idx, head_idx) tuples rather than implicit state. Validate by comparing outputs with cache_enabled=True vs. cache_enabled=False—they must be identical on the same input.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Batch processing maximizes GPU throughput (50-200 tokens/sec) but introduces latency; use for offline applications",
+        "Streaming inference enables real-time response (<100ms) by processing incrementally with KV cache; essential for chatbots",
+        "Quantization (float32→int8) reduces memory by 4x and speeds inference 2-4x with <1% accuracy loss on most tasks",
+        "Retrieval-augmented generation (RAG) reduces hallucinations and enables knowledge updates without retraining",
+        "Always manage KV cache lifecycle explicitly—mixing cache states across sequences causes context leakage",
+        "Profile your specific workload; production patterns have 10-100x performance variance depending on batch size, sequence length, and hardware"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a cricket match commentary system that must provide real-time updates after each ball is bowled. Users will tolerate maximum 200ms latency. Which production pattern is BEST suited, and why?",
+      "items": [
+        "Batch processing (group 32 balls, then generate)—maximizes throughput",
+        "Streaming inference with KV cache—processes tokens incrementally, meets latency SLA",
+        "Model quantization—reduces memory footprint on the server",
+        "Retrieval-augmented generation—queries historical match statistics for accuracy"
+      ],
+      "answer": 1,
+      "explanation": "Streaming inference is correct because it processes tokens as they arrive, keeping latency under 200ms per ball. KV cache reuse ensures efficient incremental generation without recomputing earlier context. Batch processing would accumulate 32 balls (too slow for real-time), quantization reduces inference time but doesn't solve streaming's inherent latency, and RAG adds external query overhead. Streaming is specifically designed for low-latency interactive applications."
     }
   ]
 }

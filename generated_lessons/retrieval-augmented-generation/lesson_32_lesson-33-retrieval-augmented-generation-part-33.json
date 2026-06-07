@@ -262,6 +262,81 @@
       ],
       "answer": 1,
       "explanation": "The correct answer is B. Production RAG for time-sensitive domains must integrate multiple data sources: historical vectors for context and pattern matching, plus live APIs for ground truth. The solution combines retrieval (RAG) with real-time data injection, reranking to prioritize live data over stale vector results, and prompt-level safeguards (freshness flags, disclaimers like 'Based on data from 2 hours ago') to manage user expectations. Option A worsens the problem by bloating context with old data. Option C loses semantic understanding and fails on complex queries like form analysis. Option D abandons structured retrieval and relies on a static knowledge cutoff, guaranteeing stale answers in a live domain. The lesson: RAG in production must be augmented with real-time signals and graceful degradation when retrieval is stale."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems rely on three dominant patterns, each optimizing different trade-offs. The **Naive Retrieval** pattern performs single-pass retrieval using embedded queries against vector stores—lowest latency (50-200ms), minimal infrastructure, but suffers brittleness to query reformulation and limited context diversity. The **Iterative Refinement** pattern chains retrieval across multiple rounds with reranking and query expansion, trading 300-800ms latency for substantially higher recall (15-25% improvement) and relevance precision; cost increases proportionally with retriever calls and reranker invocations. The **Hybrid Dense-Sparse** pattern combines semantic embeddings with BM25 lexical retrieval, requiring dual indexing infrastructure but achieving superior coverage for both synonym-heavy and exact-match queries—ideal when your corpus contains domain jargon or technical specifications. Selection depends on latency SLAs: sub-200ms requirements demand Naive Retrieval; 500ms+ windows enable Iterative Refinement; cost-per-query constraints favor Hybrid approaches with careful weighting. Vector store operational costs (embedding compute, storage scaling) and reranker licensing typically dominate infrastructure expenses.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Naive Retrieval mirrors setting a fixed field placement before understanding the batter's tendencies—fast execution but inflexible. Iterative Refinement is like dynamic field adjustments between overs, reading the game conditions and repositioning fielders (reranking chunks, expanding queries) to tighten bowling; slower but far more adaptive. Hybrid Dense-Sparse mimics having both pace and spin bowlers ready—semantic embeddings catch batters off-guard with unexpected angles (synonyms, paraphrasing), while BM25 lexical search provides consistent line-and-length (exact terminology matches). Choosing your pattern is like a captain deciding bowling rotation: aggressive teams (low-latency APIs) stay with the opening fast bowler; defensive captains (accuracy-critical) rotate multiple bowlers across spells. Reranking acts like DRS reviews—expensive per use, but applied strategically after initial retrieval saves your best challenges for genuinely uncertain decisions. Your context window size is your team selection: cramming 11 all-rounders (oversized chunks) creates bloat; picking 3 genuine match-winners (curated, smaller contexts) wins tournaments.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Single-pass retrieval with no reranking or expansion\nclass NaiveRetriever:\n    def retrieve_batting_stats(self, batsman_query):\n        # ❌ Fixed retrieval, no context refinement\n        results = self.vector_store.search(batsman_query, top_k=5)\n        return results  # Brittleness: \"runs in powerplay\" != \"first 6 overs scoring\"\n\n# BEST PRACTICE: Iterative refinement with expansion and reranking\nclass RobustRetriever:\n    def retrieve_batting_stats(self, batsman_query):\n        # ✅ Step 1: Query expansion (multiple interpretations)\n        expanded_queries = [\n            batsman_query,\n            self.expand_query(batsman_query),  # \"runs in powerplay\" → add \"first overs\", \"initial phase\"\n            self.paraphrase_query(batsman_query)\n        ]\n        \n        # ✅ Step 2: Multi-pass retrieval (diverse results)\n        candidate_chunks = []\n        for q in expanded_queries:\n            candidate_chunks.extend(\n                self.vector_store.search(q, top_k=10)\n            )\n        \n        # ✅ Step 3: Deduplication and reranking\n        unique_chunks = self.deduplicate(candidate_chunks)\n        reranked = self.cross_encoder_reranker.rank(\n            batsman_query, unique_chunks, top_k=5\n        )\n        \n        # ✅ Step 4: Hybrid scoring for robustness\n        final_results = self.hybrid_score(\n            query=batsman_query,\n            dense_results=reranked,\n            sparse_results=self.bm25_search(batsman_query, top_k=5),\n            alpha=0.6  # 60% semantic, 40% lexical\n        )\n        return final_results\n\n# BEST PRACTICE: Chunk size and overlap optimization\nclass OptimalChunking:\n    def chunk_cricket_commentary(self, match_transcript):\n        # ❌ Anti-pattern: chunk_size=100 (too granular, loses context)\n        # ❌ Anti-pattern: chunk_size=2000, overlap=0 (context loss at boundaries)\n        \n        # ✅ Best practice: Balanced size with overlap\n        chunk_size = 512      # ~150-200 tokens, fits typical LLM context windows\n        overlap = 128         # 25% overlap captures boundary semantic continuity\n        stride = chunk_size - overlap  # 384 stride\n        \n        chunks = []\n        for i in range(0, len(match_transcript), stride):\n            chunk = match_transcript[i:i + chunk_size]\n            if len(chunk) > 100:  # Only index meaningful chunks\n                chunks.append({\n                    'text': chunk,\n                    'metadata': {'start_pos': i, 'match_date': self.match_date}\n                })\n        return chunks",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is **over-trusting vector similarity scores without validation**. New practitioners retrieve top-5 chunks purely by cosine similarity to the query embedding, assuming high scores guarantee relevance. This fails spectacularly when: (1) synonyms create false positives ('runs in death overs' retrieved for 'final-phase acceleration' with 0.89 similarity but mismatched stats), (2) paraphrased queries diverge semantically ('How many boundaries did the opener hit?' retrieves general batting statistics with 0.82 similarity, completely missing boundary-specific records). **Exact fix**: Always add a reranking stage using a cross-encoder (e.g., `sentence-transformers/ms-marco-MiniLM-L-12-v2`) that jointly encodes the query *and* each candidate chunk, producing calibrated relevance scores. Reranking adds 50-100ms latency but reduces hallucinations by 40-60% in production systems. Alternatively, implement a minimum relevance threshold + manual spot-checks on top-10 retrieved chunks for the first 100 production queries. Never ship RAG systems relying solely on vector similarity without at least one downstream validation step.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Naive Retrieval prioritizes speed (50-200ms); use for high-volume, low-stakes queries with stable terminology",
+        "Iterative Refinement achieves 15-25% recall improvement through query expansion and reranking; justified when latency budgets allow (500ms+)",
+        "Hybrid Dense-Sparse indexing combines semantic embeddings (synonyms, paraphrasing) with BM25 (exact matches, domain jargon); optimal for technical corpora",
+        "Reranking with cross-encoders acts as the critical validation layer, reducing hallucinations and false-positive retrievals by 40-60%",
+        "Optimal chunk sizes balance context (512 tokens ≈ 128-word cricket commentary segments) with retrieval precision; overlap (25%) preserves semantic continuity",
+        "Never rely solely on vector similarity scores; always validate with reranking or manual review in production systems"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for cricket commentary archives. Your latency SLA is 300ms total, and your test show dense retrieval alone achieves 0.78 precision but misses 30% of exact-terminology queries (e.g., 'leg-before-wicket' vs 'LBW'). Which approach best balances speed and accuracy?",
+      "items": [
+        "Implement Hybrid Dense-Sparse retrieval with BM25, weighted 70% semantic + 30% lexical, to capture both paraphrasing and exact terminology",
+        "Increase vector embedding model size to capture terminology nuances; remove BM25 indexing to reduce latency",
+        "Deploy Iterative Refinement with query expansion and cross-encoder reranking; accept 450ms latency for 90%+ precision",
+        "Use only BM25 lexical retrieval; vector embeddings are overkill for structured cricket data"
+      ],
+      "answer": 0,
+      "explanation": "Option A is correct. Your 300ms latency budget allows Hybrid Dense-Sparse (typically 200-280ms for dual retrieval + lightweight reranking), and the 30% terminology miss directly indicates lexical search weakness. Hybrid indexing solves both: semantic embeddings capture paraphrasing ('runs in death overs' ≈ 'final-phase scoring'), while BM25 catches terminology misses ('LBW' exact match). Option B increases latency unpredictably and abandons structured search (fails terminology). Option C exceeds your SLA. Option D ignores paraphrasing entirely—cricket commentary uses rich synonymy ('dot ball' vs 'maiden over' vs 'runs not conceded'), where dense retrieval excels.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

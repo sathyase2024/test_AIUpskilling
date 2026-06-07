@@ -463,6 +463,78 @@
       "explanation": "Canary deployment is the industry standard for safely rolling out new models in production. It follows the principle of minimizing blast radius: if your new model has a hidden bug, biased predictions, or unexpected behavior in production (distinct from test conditions), only 5-10% of users are affected while you monitor carefully. Netflix, Uber, and Google all use this pattern. After 48-72 hours, you'll have real production data and can make an informed decision to proceed, roll back, or adjust. Option 0 (immediate 100% deployment) is reckless—even high test accuracy doesn't guarantee production performance due to data drift, edge cases, and distributional differences. Option 2 (offline A/B test) is useful but insufficient alone; offline replay doesn't capture real-time conditions, user interactions, or infrastructure effects. Option 3 (collect more data) delays launch unnecessarily and doesn't address deployment risk—you've already validated on holdout data. The 3% accuracy improvement (84% vs 81%) is modest and might not be statistically significant anyway, making staged deployment even more critical to validate real-world gains.",
       "level": 2,
       "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three production-critical patterns emerge when scaling ML systems: Pipeline Orchestration, Model Versioning with Registry, and Monitoring & Observability. Pipeline Orchestration (using Airflow, Prefect, or Dagster) decouples data ingestion, preprocessing, training, and deployment into discrete, reusable stages—essential when pipelines run hourly or involve multiple teams. Trade-off: added infrastructure complexity and latency overhead (~5-10% slower execution) vs. reliability gains and easier debugging. Model Versioning ensures reproducibility; every trained model is tagged with its input data hash, hyperparameters, and evaluation metrics, stored in a central registry (MLflow, Weights & Biases). Without versioning, production failures become impossible to diagnose—you cannot rollback or compare performance across versions. Cost: requires persistent storage and metadata tracking. Monitoring & Observability captures model performance drift in production (input distribution shifts, output anomalies) alongside traditional infrastructure metrics. Naive models degrade silently; proper monitoring alerts you within hours, not months. Implementation requires logging predictions, true labels (when available), and statistical summaries continuously. These patterns compound: orchestration feeds versioned models into monitored deployments, creating a closed-loop ML system.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Pipeline Orchestration mirrors a captain's pre-match planning—each session (batting practice, fielding drills, strategy review) runs in sequence with defined outputs feeding the next, ensuring no step is skipped. Model Versioning is like maintaining detailed match records: every century is logged with conditions (pitch type, opposition bowlers, weather), so if a batter struggles later, you review what worked before. Monitoring & Observability is your in-match DRS strategy—you don't wait for the match to end to check if decisions were wrong; you actively watch for LBW appeals, caught-behind disputes, and ball-tracking anomalies, adjusting field placement instantly. Skipping monitoring is like a captain ignoring the opposition's scoring pattern until they've already hit 400 runs. Pipeline orchestration without versioning is like having a great team strategy but no record of which combinations actually worked, forcing you to re-invent tactics every match.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Monolithic, unversioned pipeline (production nightmare)\nclass CricketPredictorV1:\n    def run(self, match_data):\n        # No versioning, no orchestration, everything inline\n        df = self.load_data(match_data)  # Assumes specific format\n        df = self.preprocess(df)  # Hard-coded transformations\n        model = self.train_model(df)  # No model registry entry\n        predictions = model.predict(df)\n        # Prediction logged nowhere—can't debug if accuracy drops tomorrow\n        return predictions\n\n# BEST PRACTICE: Versioned, orchestrated pipeline with monitoring\nimport json\nfrom datetime import datetime\nimport logging\n\nlogger = logging.getLogger('cricket_ml')\n\nclass CricketPredictorProduction:\n    def __init__(self, registry_uri, model_version):\n        self.registry = ModelRegistry(registry_uri)\n        self.model_version = model_version\n        self.model = self.registry.load_model(model_version)\n        self.monitoring = MonitoringClient()\n        \n    def extract_cricket_features(self, match_data: dict) -> dict:\n        \"\"\"Stage 1: Data extraction with schema validation\"\"\"\n        schema = {\n            'team': str, 'opposition': str, 'venue': str,\n            'weather': str, 'pitch_condition': str\n        }\n        for key, expected_type in schema.items():\n            if key not in match_data:\n                raise ValueError(f'Missing required field: {key}')\n        return match_data\n    \n    def preprocess_features(self, raw_features: dict) -> dict:\n        \"\"\"Stage 2: Transform with versioned transformation rules\"\"\"\n        transform_version = self.registry.get_transform_version(\n            self.model_version\n        )\n        transformations = transform_version.load_rules()\n        processed = apply_transformations(raw_features, transformations)\n        logger.info(f'Preprocessed features: {processed}')\n        return processed\n    \n    def predict_match_outcome(self, processed_features: dict) -> dict:\n        \"\"\"Stage 3: Inference with prediction logging\"\"\"\n        prediction = self.model.predict([processed_features])[0]\n        prediction_record = {\n            'timestamp': datetime.utcnow().isoformat(),\n            'model_version': self.model_version,\n            'input_hash': hash_dict(processed_features),\n            'prediction': float(prediction),\n            'input_features': processed_features\n        }\n        # Log for monitoring and audit trail\n        self.monitoring.log_prediction(prediction_record)\n        logger.info(f'Prediction logged: {prediction_record}')\n        return prediction_record\n    \n    def run_pipeline(self, match_data: dict) -> dict:\n        \"\"\"Orchestrated execution of all stages\"\"\"\n        try:\n            raw = self.extract_cricket_features(match_data)\n            processed = self.preprocess_features(raw)\n            result = self.predict_match_outcome(processed)\n            return result\n        except Exception as e:\n            logger.error(f'Pipeline failed: {e}', exc_info=True)\n            raise\n\n# Usage\npredictor = CricketPredictorProduction(\n    registry_uri='mlflow://production',\n    model_version='cricket-v2.3.1'  # Explicit version\n)\nresult = predictor.run_pipeline({\n    'team': 'India',\n    'opposition': 'Australia',\n    'venue': 'MCG',\n    'weather': 'clear',\n    'pitch_condition': 'hard'\n})",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Not logging predictions in production. Beginners often skip prediction logging, thinking 'we only need the output.' This means when your model's accuracy drops 15% three weeks later, you have zero audit trail to diagnose why. You cannot correlate performance degradation with input distribution changes, data pipeline bugs, or model drift. Fix: Implement mandatory logging of predictions + input features + model version at inference time. Use structured logging (JSON format) to a centralized service (e.g., DataDog, Splunk, CloudWatch). Sample at least 100% of predictions initially, then move to 10-20% after validation. Include metadata: timestamp, model_version, input_hash. This costs ~$50-200/month in storage but prevents $50,000 incidents.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Pipeline Orchestration decouples stages (extract → preprocess → train → deploy), enabling parallel execution, easier debugging, and team collaboration. Essential for production systems running on schedules.",
+        "Model Versioning ties every prediction to its training data, code commit, and hyperparameters. Without it, you cannot reproduce or rollback failures.",
+        "Monitoring & Observability captures performance drift (prediction distribution shift, latency spikes, accuracy decay) in real time. Silent model degradation is more costly than known failures.",
+        "Anti-pattern: Monolithic code where training and inference are entangled. Breaks production, prevents A/B testing, and makes debugging impossible.",
+        "Best practice: Immutable artifacts (versioned models, schemas, transformation rules) stored in a central registry. Enables reproducibility and compliance audits."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You deploy a match-outcome prediction model that achieves 78% accuracy in testing. After two weeks in production, you notice accuracy has dropped to 64%. What is the first step to diagnose the issue?",
+      "items": [
+        "Retrain the model immediately on all available historical data.",
+        "Check prediction logs to compare input feature distributions between test time and production. Analyze if venue, team, or weather patterns have shifted.",
+        "Increase model complexity by adding more features and retraining.",
+        "Roll back to the previous model version without investigating."
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. Silent model degradation is almost always caused by input distribution shift (e.g., new teams entered the league, pitch conditions changed, tournament format shifted). Prediction logs let you detect this within hours. Retraining (A) without understanding the root cause will fail again. Adding complexity (C) without diagnosing root cause makes overfitting worse. Rolling back (D) is defensive but ignores the underlying issue. This is why monitoring is critical—it answers 'what changed?' before you take action."
     }
   ]
 }

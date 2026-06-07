@@ -317,6 +317,79 @@
       ],
       "answer": 1,
       "explanation": "Numeric tokens are a small fraction of the dataset, so equal loss weighting causes the optimizer to ignore errors on numbers—they contribute minimal total loss. Weighted cross-entropy loss forces the optimizer to treat numeric errors as 5x more costly, making the model learn precise number predictions. This is analogous to cricket: if your team's bowling strategy equally weights all batsmen, star players go undefended; you must weight your strategy (loss) toward stopping key batsmen (numeric accuracy). Option A is incorrect because higher learning rates amplify the original problem (ignoring numerics due to low frequency). Option C mistakes the issue—overfitting isn't the problem; underfitting on numerics is. Option D reduces update frequency, worsening the problem of sparse numeric learning signal."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production LLM training, three dominant patterns emerge: (1) **Gradient Accumulation with Mixed Precision** — accumulate gradients over K micro-batches before optimizer steps, reducing memory overhead by 40-60% while maintaining numerical stability through FP16 computation with FP32 master weights. Use this when GPU memory is your bottleneck and you need effective batch sizes >512. Trade-off: 10-15% slower wall-clock time per step due to casting overhead. (2) **Layer-wise Learning Rate Decay (LLRD)** — apply exponentially decreasing learning rates to earlier transformer layers (deeper layers → lower LR). Empirically recovers 2-4% perplexity on large models because early layers learn slower-changing linguistic features. Cost: requires layer identification logic and careful tuning of decay schedules. (3) **Gradient Clipping + Warmup + Exponential Decay** — this conservative triple-stack prevents loss spikes during training instability phases and guarantees convergence on diverse datasets. Most production models (GPT-3, LLaMA) use this combination. Trade-off: converges slightly slower in early epochs but eliminates catastrophic failure modes. Choose LLRD only if you have >1B parameters and can afford per-layer instrumentation; choose gradient accumulation for memory-constrained setups; choose the triple-stack for reproducibility and safety.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Gradient accumulation is like setting a defensive field early in the innings—you're preparing for a long battle, gathering resources (gradients) before committing to aggressive action (optimizer step). Layer-wise learning rate decay mirrors how a bowling captain manages their attack: fast bowlers (early layers) need fresh legs and aggressive settings, but spinners (deeper layers) work best with conservative, measured approach—different parts of your attack need different intensities. The triple-stack pattern (clipping + warmup + decay) is like DRS strategy: you protect yourself early (warmup prevents bad decisions), maintain caution during uncertain phases (gradient clipping), and strategically reduce risk as the match progresses (exponential decay). A batsman wouldn't use the same aggression in the first over as the 20th—similarly, your optimizer shouldn't apply the same learning rate uniformly across training. Mixing these patterns without understanding timing is like rotating your bowlers randomly; you'll lose rhythm and consistency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Layer-wise Learning Rate Decay with Gradient Accumulation\nimport torch\nfrom torch.optim import AdamW\n\nclass CricketModelOptimizer:\n    def __init__(self, model, base_lr=1e-4, num_layers=12, decay_rate=0.9):\n        self.model = model\n        self.base_lr = base_lr\n        self.decay_rate = decay_rate\n        self.num_layers = num_layers\n        \n    def get_optimizer(self):\n        \"\"\"Apply exponentially decreasing LR to transformer layers\"\"\"\n        param_groups = []\n        for layer_idx in range(self.num_layers):\n            # Earlier layers get lower learning rates (like spinners)\n            layer_lr = self.base_lr * (self.decay_rate ** (self.num_layers - layer_idx - 1))\n            layer_params = self.model.transformer.h[layer_idx].parameters()\n            param_groups.append({'params': layer_params, 'lr': layer_lr})\n        \n        return AdamW(param_groups, weight_decay=0.01)\n    \n    def training_step(self, batch, accumulation_steps=4, max_grad_norm=1.0):\n        \"\"\"Gradient accumulation with clipping\"\"\"\n        optimizer = self.get_optimizer()\n        \n        for i, (wickets, batsmen) in enumerate(batch):\n            logits = self.model(wickets)\n            loss = torch.nn.functional.cross_entropy(logits, batsmen)\n            loss = loss / accumulation_steps  # Scale loss\n            loss.backward()\n            \n            if (i + 1) % accumulation_steps == 0:\n                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_grad_norm)\n                optimizer.step()\n                optimizer.zero_grad()\n\n# ANTI-PATTERN: Uniform learning rate across all layers\nclass PoorCricketOptimizer:\n    def __init__(self, model, lr=1e-4):\n        self.model = model\n        self.lr = lr\n    \n    def get_optimizer(self):\n        \"\"\"❌ All layers learn at same rate—fast bowlers and spinners treated equally\"\"\"\n        return AdamW(self.model.parameters(), lr=self.lr)\n    \n    def training_step(self, batch):\n        \"\"\"❌ No gradient clipping, no accumulation—unstable training\"\"\"\n        optimizer = self.get_optimizer()\n        for wickets, batsmen in batch:\n            logits = self.model(wickets)\n            loss = torch.nn.functional.cross_entropy(logits, batsmen)\n            loss.backward()\n            optimizer.step()  # No clipping—exploding gradients possible\n            optimizer.zero_grad()",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is **applying a single global learning rate to all transformer layers, then wondering why loss becomes NaN or training diverges unpredictably**. This happens because deeper layers learn representational features slowly, while shallow layers adapt quickly—using one LR creates a mismatch. Early layers burn out with high LR, or deep layers stagnate with low LR. **Exact fix:** (1) Extract layer indices from your model: `for idx, layer in enumerate(model.transformer.h)`, (2) Compute per-layer LR as `layer_lr = base_lr * (0.9 ** (num_layers - idx))`, (3) Create separate parameter groups for AdamW: `param_groups = [{'params': layer.parameters(), 'lr': layer_lr} for idx, layer in ...]`, (4) Pass `param_groups` to optimizer instead of `model.parameters()`. Test with 100 training steps first—you should see smooth loss curve, not divergence. If loss still spikes, reduce `base_lr` by 50% and check gradient norms with `torch.nn.utils.clip_grad_norm_()` to ensure they stay <10.0.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Gradient accumulation reduces memory by 40-60% without sacrificing effective batch size—essential for models >7B parameters on consumer GPUs",
+        "Layer-wise learning rate decay (LLRD) with decay_rate~0.9 recovers 2-4% perplexity by matching shallow/deep layer learning dynamics",
+        "Always combine gradient clipping (max_norm=1.0), warmup (10% of training steps), and exponential decay scheduling for production stability",
+        "Mixed precision (FP16 + FP32 master) is orthogonal to optimization choice—use both for maximum efficiency",
+        "Monitor gradient norms per-layer; if any layer shows norms >100, reduce learning rate by 2x or increase warmup duration",
+        "Distributed training + gradient accumulation requires synchronization barriers—coordinate all-reduce ops with accumulation schedules to avoid deadlocks"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a 13B parameter LLM on 8 GPUs, each with 40GB memory. Your effective batch size target is 2048, but a single forward/backward pass uses 35GB per GPU. Which pattern do you choose?",
+      "items": [
+        "Layer-wise learning rate decay only—it reduces memory by 40%",
+        "Gradient accumulation (4 accumulation steps) + mixed precision—allows effective batch size 2048 with ~25GB per GPU",
+        "Increase learning rate uniformly across all layers—faster convergence compensates for memory limits",
+        "Use distributed training with gradient synchronization every step—no accumulation needed"
+      ],
+      "answer": 1,
+      "explanation": "Answer B is correct. Gradient accumulation scales effective batch size without increasing peak memory: 4 accumulation steps × 512 batch per step = 2048 effective. Mixed precision FP16 cuts memory ~40% (35GB → 21GB). Layer-wise decay alone doesn't reduce memory. Uniform high LR causes instability. Synchronizing every step with no accumulation defeats the purpose—you'd still hit memory limits. Production solution: accumulate 4 steps (512 per GPU) with FP16 + FP32 master weights, achieving 2048 batch in ~25GB footprint."
     }
   ]
 }
