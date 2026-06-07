@@ -238,6 +238,110 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns exist, each optimized for different constraints. The **in-memory vector store pattern** (Pinecone, Weaviate) prioritizes sub-100ms latency and scales to billions of vectors with managed indexing—ideal for real-time search where freshness matters less than speed. The **hybrid embedding + BM25 pattern** (Elasticsearch, Solr) combines dense vectors with sparse lexical search, maintaining 5-15% higher recall on rare/numeric queries at the cost of dual indexing overhead and 2x storage. The **cached context pattern** (Claude API with long context windows, internal LLM deployments) eliminates retrieval entirely by keeping full document sets in context, trading latency (slower generation) for precision (no ranking errors) and reduced infrastructure complexity. Trade-offs: in-memory requires real-time sync costs; hybrid doubles index maintenance; cached context exhausts token budgets on large corpora. Choose in-memory for user-facing search, hybrid for enterprise recall demands, cached for small, stable knowledge bases under 200K tokens.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: In-memory vector stores are like setting an aggressive field for a spinner—you commit to a specific strategy (tight fielding around the bat) knowing it's fast but risky if the batter breaks it. Hybrid search is like having both fast bowlers and spinners rotating—more balls bowled, more coverage, but higher workload and coordination cost. Cached context is like playing with your entire fielding setup already decided before the batter arrives; no dynamic adjustments needed, but if the field is wrong, you can't adapt mid-over. Your choice depends on match conditions: aggressive pace (user-facing queries) demands in-memory speed; a test series (enterprise analytics) justifies hybrid complexity; a practice session (internal knowledge work) can afford pre-loaded caching.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Hybrid search with metadata filtering and reranking\nfrom batting_retriever import HybridBattingIndex\nfrom cricket_reranker import CrossEncoderBattingRanker\n\nclass ProductionBattingRetriever:\n    def __init__(self):\n        self.batting_index = HybridBattingIndex(\n            dense_model='sentence-transformers/cricket-embeddings',\n            sparse_weight=0.3,\n            dense_weight=0.7\n        )\n        self.reranker = CrossEncoderBattingRanker()\n    \n    def retrieve_batting_stats(self, query, filters=None):\n        # Stage 1: Hybrid retrieval with metadata filters\n        candidates = self.batting_index.search(\n            query=query,\n            top_k=100,  # Over-retrieve for reranking\n            filters={'player_career_start': {'$gte': 2015}},\n            timeout_ms=50\n        )\n        # Stage 2: Cross-encoder reranking\n        ranked = self.reranker.rerank(\n            query=query,\n            docs=candidates,\n            top_k=10\n        )\n        return ranked\n\n# ANTI-PATTERN: Single-stage retrieval without reranking\nclass BadBattingRetriever:\n    def retrieve_batting_stats(self, query):\n        # No metadata filtering, no reranking—precision suffers\n        results = self.batting_index.search(query, top_k=10)\n        return results  # Returns ranked only by BM25 or dense alone",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is retrieving and ranking **after** generating the initial response. Many developers pass a query to the LLM first, wait for a draft answer, then retrieve context to validate it—wasting inference tokens and producing inaccurate outputs. **Fix:** Always retrieve and rank BEFORE generating. Structure your pipeline as: (1) Query → (2) Dense embeddings + BM25 search → (3) Rerank top-20 → (4) Insert top-5 into system prompt → (5) Generate response. This ensures your LLM grounds every token in retrieved facts from the start, reducing hallucination by 40-60% and cutting token usage by 25-35% because the model doesn't waste computation on correcting false premises.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At scale, RAG powers production systems across major tech companies. Google's Search Generative Experience (SGE) combines dense retrieval from their index of billions of documents with multi-stage reranking to ground LLM summaries in fact-checked sources. OpenAI's ChatGPT Plus uses RAG for web search and document analysis, retrieving live data through Bing integration. Netflix uses vector similarity on viewing history embeddings to contextualize recommendation explanations. Meta's LLaMA-based internal assistants retrieve from proprietary knowledge bases containing petabytes of user-generated content. Uber's dispatch systems retrieve spatiotemporal driver/rider embeddings in sub-50ms latencies across distributed clusters. Critical failure points: (1) Stale embeddings cause outdated information retrieval—requiring daily re-indexing pipelines; (2) Context window overflow when corporate documents exceed token limits—necessitating hierarchical chunking; (3) Poisoned retrieval from adversarial queries—demanding retrieval-level filtering. Systems handling 100M+ daily queries must implement caching layers (Redis, Memcached) and async batch reindexing to avoid cascading latency failures.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "RAG retrieval happens BEFORE generation—query expansion + dense search + BM25 + reranking form a retrieval pipeline, not a post-generation patch.",
+        "Dense embeddings capture semantic meaning; BM25 captures exact terms. Hybrid search beats single-method approaches by 8-15% recall on mixed workloads.",
+        "Multi-stage ranking (retrieve 100, rerank to 10) is cheaper than training a perfect retriever; cross-encoders cost 10% of generation but fix 30% of ranking errors.",
+        "Chunk size and overlap tune the retrieval-generation trade-off: smaller chunks (128 tokens) increase precision but risk missing context; larger chunks (512 tokens) reduce ranking noise but waste tokens.",
+        "Query expansion via synonym generation, paraphrasing, or decomposition boosts recall 5-20% by hedging against single-phrasing assumptions.",
+        "Context window management prevents token explosion: calculate budget = LLM_max_tokens − response_length − system_prompt, allocate remainder to retrieved docs.",
+        "Production RAG requires embedding model versioning, retrieval monitoring (hit rates, latency), and reindexing pipelines; skipping instrumentation causes silent accuracy drift."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket player statistics chatbot. The system retrieves player profiles using dense embeddings, but queries like 'who has the most sixes?' consistently rank decade-old players lower than recent ones because the embedding model conflates 'sixes' with 'centuries' semantically. Which approach best fixes this without retraining embeddings?",
+      "items": [
+        "Add BM25 lexical search weighted 0.4, dense search weighted 0.6, and rerank with a cross-encoder trained on cricket-specific relevance labels.",
+        "Increase the dense embedding model's temperature parameter to boost semantic diversity.",
+        "Retrieve 500 documents instead of 100 to ensure rare exact matches surface.",
+        "Replace dense embeddings entirely with keyword-only BM25 search."
+      ],
+      "answer": 0,
+      "explanation": "Option 0 is correct because BM25's exact-term matching captures 'sixes' literally while dense embeddings handle semantic drift; hybrid weighting (0.4 lexical + 0.6 semantic) balances both, and cross-encoder reranking trained on cricket data learns that 'sixes' queries should prioritize recent high-volume hitters over semantic lookalikes. Option 1 is wrong—temperature controls sampling, not ranking. Option 2 wastes compute (500 docs still ranked by broken embeddings). Option 3 removes semantic understanding entirely, hurting queries like 'explosive batsmen' that require semantic search. Hybrid + reranking is the industry-standard fix for semantic-lexical mismatches."
+    },
+    {
+      "type": "quiz",
+      "content": "Your production RAG system for cricket analysis generates responses in 2.5 seconds end-to-end. Metrics show retrieval takes 0.3s, reranking takes 0.2s, and LLM generation takes 1.8s. You need to hit a 1.5-second SLA. Your context budget is 4,000 tokens and the average response is 400 tokens. What's your best optimization move?",
+      "items": [
+        "Increase reranking to top-20 documents to improve precision, accepting slower retrieval latency.",
+        "Reduce context window allocation from 4,000 to 2,000 tokens, enabling faster embedding lookups.",
+        "Switch to a smaller, faster LLM (12B parameters instead of 70B), trading generation quality for sub-1s latency.",
+        "Implement token-level caching in the LLM and pre-compute embeddings for 100 most common query patterns."
+      ],
+      "answer": 3,
+      "explanation": "Option 3 is correct because LLM generation (1.8s) dominates your latency budget at 72% of total time. Token-level caching (e.g., KV-cache reuse across similar queries) can cut generation time by 30-40%, hitting ~1.2s total. Pre-computed embeddings for top queries eliminate embedding computation (a small win, but additive). Option 0 makes reranking slower, deepening the bottleneck. Option 1 doesn't address LLM latency—embedding lookups are already fast. Option 2 sacrifices quality unnecessarily; latency issues are algorithmic, not model-size related. At scale, caching and strategic LLM optimization outperform retrieval tuning when generation dominates the SLA."
     }
   ]
 }

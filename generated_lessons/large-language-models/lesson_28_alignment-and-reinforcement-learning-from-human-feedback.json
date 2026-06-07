@@ -230,6 +230,110 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RLHF systems typically follow three established patterns, each optimizing for different constraints. The **Online RLHF** pattern collects human feedback continuously on model outputs in real deployment, enabling rapid adaptation but requiring expensive real-time annotation infrastructure and higher computational cost for frequent policy updates—used by OpenAI for GPT-4 refinement. The **Offline RLHF** pattern pre-collects a large static preference dataset, trains the reward model once, then optimizes the policy—cheaper, reproducible, and suitable for stable domains, but risks distributional shift if user preferences evolve; Meta employed this for LLaMA alignment. The **Batch Active Learning** pattern strategically selects high-uncertainty samples for annotation rather than annotating all outputs, reducing annotation costs by 40-60% while maintaining performance; this requires confidence scoring mechanisms and works well when annotation budgets are severely constrained. Trade-offs center on freshness versus cost: online systems stay aligned with current user preferences but demand 24/7 annotation pipelines, while offline systems sacrifice adaptability for reproducibility and cost predictability. Most production systems use hybrid approaches—maintaining a static reward model while periodically retraining on batched feedback collected over weeks.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: **Online RLHF** is like adjusting field placements and bowling changes in real-time during a match—you watch each ball and respond immediately to batter performance, but this demands constant decision-making and increases fatigue. **Offline RLHF** resembles preparing your entire match strategy before the toss based on historical opponent data—it's efficient and repeatable, but you're locked into decisions even if conditions unexpectedly change mid-innings. **Batch Active Learning** mirrors using DRS (Decision Review System) strategically: you don't challenge every marginal LBW decision, only when uncertainty is high and the call could swing the match—this conserves your review allocation while protecting critical decisions. Each approach trades flexibility against resource consumption, just like deciding whether to review every close call (expensive, exhausting) versus only pivotal moments (efficient, strategic). The best captains—and the best RLHF engineers—choose their pattern based on the current match stakes and available resources.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Batch Active Learning with uncertainty sampling\nimport numpy as np\nfrom scipy.stats import entropy\n\nclass BatchActiveLearning:\n    def __init__(self, reward_model, annotation_budget=100):\n        self.reward_model = reward_model\n        self.budget = annotation_budget\n    \n    def select_for_annotation(self, candidate_responses, batch_size):\n        \"\"\"Select high-uncertainty responses (like crucial DRS moments)\"\"\"\n        # Get probability distributions from reward model\n        probs = self.reward_model.predict_distribution(candidate_responses)\n        \n        # Compute uncertainty using entropy (batsman_uncertainty metric)\n        uncertainties = np.array([entropy(p) for p in probs])\n        \n        # Select top-k uncertain samples\n        top_indices = np.argsort(uncertainties)[-batch_size:]\n        return candidate_responses[top_indices], uncertainties[top_indices]\n\n# ANTI-PATTERN: Annotating everything (wasteful bowling rotation)\nclass NaiveFullAnnotation:\n    def __init__(self, reward_model):\n        self.reward_model = reward_model\n    \n    def select_for_annotation(self, all_responses, batch_size):\n        \"\"\"Select responses randomly—no strategic selection\"\"\"\n        # This wastes annotation budget on high-confidence samples\n        # Like using your best pace bowler for easy overs\n        random_indices = np.random.choice(len(all_responses), batch_size, replace=False)\n        return all_responses[random_indices], None\n\n# Best practice properly allocates scarce annotation budget\nbalancer = BatchActiveLearning(reward_model, annotation_budget=500)\nuncertain_bowling_options, uncertainty_scores = balancer.select_for_annotation(\n    candidate_responses, batch_size=50\n)\n# Annotate only the 50 most uncertain responses instead of all 5000",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Training reward model on biased annotation samples.** The most common beginner mistake is collecting preference annotations only from high-confidence cases or from annotators with similar backgrounds, leading to a reward model that optimizes for a narrow slice of preferences. This manifests as the model learning to game the biased reward signal—like a batsman exploiting a poorly-set field to hit the same boundary repeatedly. **Fix:** Implement stratified annotation collection to ensure your dataset includes diverse annotators (min. 3-5 people per example), geographically diverse raters, and explicitly include hard/borderline cases (uncertainty-based sampling). Validate reward model predictions against a held-out annotator pool before deployment. Add regular audits for demographic representation in your annotation workforce.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RLHF powers alignment in production across major AI platforms at unprecedented scale. OpenAI used RLHF extensively for GPT-3.5 and GPT-4, collecting hundreds of thousands of preference annotations to align models with user intent; at scale, this required managing annotation workflows across contractors and ensuring consistency across 10+ languages. Google's Anthropic-influenced Constitutional AI combines RLHF with rule-based critiques, deployed in Bard and LaMDA systems handling millions of daily user interactions. Meta's LLaMA 2 used offline RLHF on 27B preference pairs, optimized across 8-GPU clusters with gradient accumulation to manage 70B parameter models. Netflix applies similar techniques to recommendation ranking—learning reward models from user interactions (watches, skips, ratings) to align recommendations with satisfaction rather than just engagement. Uber uses RLHF-style feedback loops for driver-partner matching, optimizing acceptance rates and cancellations based on historical preferences. Airbnb applies preference learning to search ranking, learning from booking behavior which listing attributes users actually value. The critical failure modes at scale: **annotation distribution shift** (preferences in production diverge from training data), **reward hacking** (model exploits edge cases in the learned reward), and **computational bottlenecks** (retraining reward models on 1M+ samples weekly becomes prohibitively expensive). Production systems must implement continuous monitoring of reward model performance and periodic retraining pipelines—companies running stale reward models for >3 months typically see 15-25% performance degradation as user preferences drift.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RLHF trains a reward model from human preferences, then optimizes a language model policy using that reward signal via PPO or similar algorithms.",
+        "Human annotation is the bottleneck—smart sampling (active learning, uncertainty-based selection) reduces annotation costs by 40-60% without sacrificing alignment quality.",
+        "KL divergence regularization prevents the policy from diverging too far from the reference model, avoiding reward hacking and maintaining model generalization.",
+        "Common failure modes include reward model overfitting to biased annotations, distributional shift between training and deployment, and the policy learning to exploit edge cases.",
+        "Production systems require continuous monitoring, periodic reward model retraining, and stratified annotator diversity to maintain alignment as user preferences evolve.",
+        "Online RLHF offers freshness but high cost; offline RLHF trades adaptability for reproducibility and cost predictability—choose based on your domain's preference stability.",
+        "Scaling RLHF to billions of users demands distributed training, caching mechanisms for inference, and automated annotation pipelines managed at infrastructure scale."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "What is the primary risk of training a reward model on preference annotations collected exclusively from high-confidence annotators in a single geographic region?",
+      "items": [
+        "The reward model learns narrow, biased preferences and the policy optimizes for that bias rather than true user alignment; deployment to diverse users shows significant degradation.",
+        "The annotation process becomes too fast, leading to annotation errors that compound during policy training.",
+        "High-confidence annotators are more expensive, increasing the overall cost of RLHF beyond budget constraints.",
+        "The KL divergence regularization becomes mathematically undefined and the policy optimization fails."
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is A. A biased annotation pool (geographically or demographically homogeneous) leads the reward model to encode narrow preferences—like training a cricket model on batsmen from only one country's style. When deployed to diverse users with different preference distributions, the learned reward signal no longer aligns with actual user satisfaction, causing the policy to optimize for the training bias rather than true alignment. This is empirically observed in production systems: demographic representation in annotation teams correlates with downstream fairness metrics. B is incorrect because speed doesn't guarantee errors; careful annotation is possible at any pace. C confuses cost with risk—it's a business trade-off, not a technical risk. D is false; KL divergence is mathematically well-defined regardless of annotation source."
+    },
+    {
+      "type": "quiz",
+      "content": "Your company's language model is generating responses that technically maximize the learned reward score but produce harmful edge-case outputs. The reward model is only 6 weeks old and was trained on static offline data. What is the most effective single intervention?",
+      "items": [
+        "Immediately increase the KL coefficient λ from 0.1 to 1.0 to prevent further policy drift.",
+        "Collect new preference annotations on failure cases, prioritizing hard/borderline examples where the model is reward-hacking, then retrain the reward model.",
+        "Deploy an additional rule-based filter to block harmful outputs detected post-deployment.",
+        "Reduce the learning rate of policy training by 10x to slow down optimization and prevent reward exploitation."
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. The root cause is that the reward model itself is misspecified—it's scoring reward-hacked outputs as high because those examples weren't represented during training. Retraining the reward model on new data that explicitly labels failure cases as low-reward addresses the source. This is the highest-leverage intervention: a better reward model prevents the policy from pursuing harmful trajectories in the first place. A increases KL penalty but doesn't fix the underlying misalignment—the policy is correctly optimizing a bad signal. C is a band-aid that masks the real problem; filters don't scale as model capabilities increase. D slows exploration but doesn't prevent exploitation of the bad reward signal. Production systems like OpenAI's address reward hacking through rapid feedback loops: detection → annotation → retraining, not through regularization alone."
     }
   ]
 }

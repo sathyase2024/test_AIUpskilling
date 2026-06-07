@@ -236,6 +236,110 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems typically follow three established patterns, each optimizing for different trade-offs. The **In-Context Learning (ICL)** pattern retrieves documents and concatenates them directly into the prompt—simple, fast, and low-latency (<500ms), ideal for real-time applications like chatbots or search. However, it's constrained by context window size (typically 4K-128K tokens) and becomes expensive at scale with high token consumption per query. The **Retrieval-then-Rerank** pattern retrieves many candidates (e.g., top-100 via vector similarity) then applies a learned cross-encoder ranker to identify the true top-K before prompting—this improves accuracy significantly but adds 100-300ms latency and requires training a separate ranking model. The **Iterative Refinement** pattern performs initial retrieval, uses the LLM to critique or reformulate the query, then retrieves again—achieving higher precision but multiplying inference costs and latency. Choose ICL for latency-critical systems where 85%+ accuracy suffices; use Retrieval-then-Rerank for knowledge-heavy applications (legal, medical) where accuracy is paramount; deploy Iterative Refinement only when query complexity is high and users tolerate 2-3 second delays.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The In-Context Learning pattern is like a captain setting a fixed field placement before the bowler's run-up—quick decisions, minimal overhead, but inflexible if conditions change. Retrieval-then-Rerank mirrors using multiple slip fielders (retrieving many candidates) then shifting them in real-time based on the batsman's stance (reranking)—more adaptive and accurate, but slower. Iterative Refinement is like using the DRS (Decision Review System) after a contentious LBW decision: you get a second look at the evidence and can adjust your strategy, but it costs you a review and burns time. Fast-paced T20 matches demand ICL's speed; Test cricket's complexity justifies Retrieval-then-Rerank's precision. Choose your pattern like choosing your format.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Retrieval-then-Rerank with batsman_stats documents\nfrom sentence_transformers import CrossEncoder\n\ndef retrieve_then_rerank(query: str, batsman_stats: list[dict], top_k: int = 3):\n    # Step 1: Fast retrieval via vector similarity\n    retriever = BM25Retriever(batsman_stats)\n    candidates = retriever.retrieve(query, top_k=10)  # Get top 10\n    \n    # Step 2: Precise reranking with cross-encoder\n    reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-12-v2')\n    scores = reranker.predict([[query, doc['summary']] for doc in candidates])\n    reranked = sorted(zip(candidates, scores), key=lambda x: x[1], reverse=True)\n    \n    return [doc for doc, _ in reranked[:top_k]]\n\n# ANTI-PATTERN: Naive in-context learning without quality checks\ndef naive_rag(query: str, batsman_stats: list[dict]):\n    # Just concatenate everything—context explosion!\n    all_text = '\\n'.join([s['summary'] for s in batsman_stats])\n    prompt = f\"Query: {query}\\n\\nContext:\\n{all_text}\"\n    # Will hit token limits; loses signal in noise\n    return llm.generate(prompt)",
+      "level": 2,
+      "language": "python",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is **retrieval without relevance validation**—blindly trusting vector similarity scores and passing all top-K results to the LLM. This floods the context with irrelevant documents, degrading answer quality and wasting tokens. Fix it by: (1) setting a similarity threshold (e.g., only docs with cosine score > 0.7), (2) implementing a second-stage reranker to filter noise before prompting, and (3) monitoring retrieval precision metrics (precision@K, NDCG) in production. Always validate your retrieval pipeline independently from the LLM.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At scale, RAG powers production systems across major tech companies. OpenAI's ChatGPT-plus uses retrieval for web search integration; Google leverages RAG in its Vertex AI platform for enterprise Q&A over private documents; Meta deploys retrieval in its recommendation systems to ground reasoning on user behavior graphs. Netflix uses RAG-like patterns to retrieve viewer behavior and content metadata before generating personalized explanations. At Uber's scale (100M+ daily rides), retrieval indexes driver behavior and incident reports, enabling real-time safety decisions. Airbnb retrieves listing features and reviews to ground LLM-generated descriptions. Critical failure modes: (1) Stale embeddings causing drift as documents update, (2) Embedding dimension mismatch during retrieval bottlenecks at 10M+ vectors, (3) Context pollution where irrelevant results contaminate reasoning. Production systems typically maintain separate pipelines for embedding refresh (daily/hourly) and live query serving, use approximate nearest neighbor search (FAISS, Milvus, Weaviate) to scale to billions of vectors, and employ monitoring to detect retrieval degradation before it impacts users.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG combines retrieval and generation: fetch relevant context first, then prompt the LLM—overcomes knowledge cutoffs and hallucination by grounding in facts.",
+        "Vector embeddings are the foundation: semantically similar documents map close in embedding space, enabling fast approximate nearest neighbor search at scale.",
+        "Relevance scoring and reranking are critical: initial retrieval is noisy; use cross-encoders or ranking models to filter before passing context to the LLM.",
+        "Query expansion and reformulation improve coverage: rephrase ambiguous queries or expand with synonyms to retrieve documents initial embeddings might miss.",
+        "Context window size constrains what you can retrieve: prioritize quality over quantity; reranking is cheaper than expanding context for larger context windows.",
+        "Production RAG requires monitoring: track retrieval metrics (precision, NDCG), embedding staleness, and LLM output quality to detect degradation early.",
+        "Choose your pattern wisely: fast in-context learning for real-time systems, retrieval-then-rerank for accuracy, iterative refinement for complex multi-hop reasoning."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket analyst is building a RAG system to answer fan questions about opening batsman performance. The retriever returns 15 documents with vector similarity scores ranging from 0.92 to 0.65. What is the most critical step before passing these documents to the LLM, and why?",
+      "items": [
+        "Apply a cross-encoder reranker to score (query, document) pairs and filter to top-3, ensuring only highest-relevance context reaches the LLM",
+        "Sort the 15 documents by similarity score descending and pass all of them to maximize information available to the LLM",
+        "Expand the query with synonym cricket terms (e.g., 'opening batsman' → 'opener', 'first wicket') to retrieve even more documents",
+        "Increase the embedding dimension from 768 to 1536 to improve similarity scoring accuracy"
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is reranking with a cross-encoder. Raw vector similarity is noisy and doesn't capture true relevance—a document might score 0.92 by embedding similarity but be irrelevant (e.g., about fielding stats when the query asks about batting averages). A cross-encoder directly scores the (query, document) pair semantically, providing much higher precision. Passing all 15 documents (option B) causes context pollution, wasting tokens and introducing noise that degrades LLM reasoning. Option C (query expansion) is helpful *before* initial retrieval, not after. Option D (increasing embedding dimension) doesn't solve the relevance problem—it only adds computational cost. Reranking is the proven production pattern for filtering retrieval noise."
+    },
+    {
+      "type": "quiz",
+      "content": "Your RAG system for cricket injury prediction retrieves 20 medical documents about fast bowler injuries. The vector similarity scores are very high (0.88+), but the LLM's answers are frequently wrong. Monitoring shows the retrieved documents are outdated (6+ months old), and new treatments have become standard. What is the root cause and how do you fix it?",
+      "items": [
+        "The embedding model is overfit to old data; retrain it from scratch on recent medical literature",
+        "The document embeddings are stale and don't reflect recent changes in the underlying medical knowledge; implement a scheduled re-embedding pipeline (weekly or daily) to refresh the vector index with new document versions",
+        "The retriever is using cosine similarity incorrectly; switch to Euclidean distance for medical documents",
+        "The LLM's knowledge cutoff is too early; upgrade to a newer LLM model with a later training date"
+      ],
+      "answer": 1,
+      "explanation": "The root cause is stale embeddings. Vector embeddings are computed *once* at index time; if the underlying documents change (new treatments, updated guidelines), the embeddings don't automatically reflect those changes. The old embeddings still retrieve old documents with high similarity, even though they're now inaccurate. Fixing this requires a scheduled re-embedding pipeline—recompute embeddings for updated documents and reinsert them into the vector store weekly or daily depending on your update cadence. Option A (retraining the embedding model) is expensive and unnecessary—your embedding model is fine; the problem is stale vectors. Option C (changing distance metrics) doesn't address the staleness issue. Option D (upgrading the LLM) only helps with the LLM's own knowledge, not the retrieval pipeline—even a new LLM can't help if it retrieves outdated medical facts. Stale embeddings are a critical production failure mode in long-lived RAG systems."
     }
   ]
 }

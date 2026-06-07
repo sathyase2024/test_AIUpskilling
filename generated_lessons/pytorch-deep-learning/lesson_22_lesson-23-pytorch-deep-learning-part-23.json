@@ -191,6 +191,110 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch systems follow three dominant patterns: (1) Gradient Accumulation with mixed-precision training for memory-constrained GPUs, used when batch sizes exceed VRAM limits—trade-off is slower convergence per wall-clock time but enables larger effective batch sizes. (2) Activation Checkpointing for ultra-large models (175B+ parameters at OpenAI, Meta), selectively recomputing forward passes to reduce peak memory by 60-70%—cost is 20-30% slower training speed due to recomputation. (3) Distributed Data-Parallel with NCCL synchronization across 100+ GPUs, critical for companies like Google and Netflix handling billions of samples—breaks catastrophically if gradient synchronization skips even one step, causing silent convergence failures. Each pattern targets specific bottlenecks: memory saturation, compute density, or communication overhead. Choosing wrongly means either OOM crashes, training instability, or underutilized hardware costing millions in cloud compute annually.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Gradient Accumulation is like a batsman building an innings gradually—taking singles instead of chasing sixes immediately, accumulating runs across multiple deliveries before attempting aggressive shots. Activation Checkpointing mirrors a captain's bowling rotation strategy—you can't keep your fastest bowler on forever (memory), so you rotate (recompute activations) strategically to conserve energy for crucial overs. Distributed Data-Parallel is your entire team playing in perfect synchronization—if one fielder misses his cue during a coordinated catch attempt, the whole play collapses. Just as a captain switches between defensive field placements and aggressive ones based on match situation, you switch between patterns based on your hardware constraints and model size.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Not validating synchronization in distributed training\nclass BatsmanTrainer:\n    def train_step(self, batsman_scores):\n        loss = compute_loss(batsman_scores)\n        loss.backward()\n        # Missing: dist.all_reduce()\n        optimizer.step()  # Some GPUs ahead of others—silent divergence\n        optimizer.zero_grad()\n\n# ✅ BEST PRACTICE: Explicit synchronization with checkpointing\nclass CricketTeamTrainer:\n    def train_step(self, match_stats):\n        # Enable checkpointing for memory efficiency\n        with torch.cuda.amp.autocast():\n            logits = checkpoint(self.bowler_model, match_stats)\n            loss = self.criterion(logits, targets)\n        \n        # Gradient accumulation over 4 steps\n        (loss / 4).backward()\n        \n        if (step + 1) % 4 == 0:\n            # Synchronize all distributed ranks explicitly\n            torch.distributed.all_reduce(optimizer.param_groups[0]['params'][0].grad)\n            optimizer.step()\n            optimizer.zero_grad()\n        \n        return loss.item()\n\n# Usage: Ensures all replicas compute identical gradients\ntrainer = CricketTeamTrainer()\nfor step, (wickets, runs) in enumerate(dataloader):\n    loss = trainer.train_step(torch.cat([wickets, runs], dim=1))",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Forgetting to synchronize gradient updates in distributed training causes silent non-convergence. Different GPUs compute different gradients due to random batch shuffling, leading each replica's model to diverge. FIX: Always wrap gradient updates with torch.distributed.all_reduce() or use DistributedDataParallel's built-in synchronization. Validate by comparing loss curves across all ranks—they should be identical. Add assertions: assert torch.allclose(rank_0_loss, rank_1_loss) after backward() to catch this early.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At scale, these techniques power production systems handling trillions of training tokens. OpenAI's GPT models use activation checkpointing across thousands of TPUs/GPUs to fit 175B parameters in memory. Meta's LLaMA training leverages distributed synchronization across 2,000+ GPUs with custom NCCL kernels. Google's internal systems use mixed-precision training to reduce bandwidth bottlenecks—each gradient sync at 16-bit precision cuts communication time by 50%. Netflix trains recommendation models with gradient accumulation to maintain batch diversity on memory-constrained inference clusters. Uber's ML platform combines all three: checkpointing for model size, distribution for speed, mixed-precision for bandwidth. When done wrong, training crashes silently: distributed runs diverge after 1,000 steps consuming weeks of compute before humans notice; gradient accumulation without synchronization produces garbage predictions; mixed-precision overflow corrupts weights in NaN cascades. Companies lose $100K+ per incident in wasted compute.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Gradient Accumulation trades wall-clock time for memory efficiency—essential when batch size > VRAM divided by parameter count.",
+        "Activation Checkpointing reduces peak memory 60-70% by recomputing forward passes during backward—critical for 100B+ parameter models.",
+        "Distributed synchronization via all_reduce() must occur before optimizer.step() or gradients diverge silently across ranks.",
+        "Mixed-precision training requires loss scaling to prevent gradient underflow—bfloat16 avoids this by matching float32 range.",
+        "Validate distributed training by comparing loss curves across ranks; identical losses confirm synchronization correctness.",
+        "Profile memory and compute separately—gradient checkpointing reduces memory but increases compute by 20-30%.",
+        "Production systems combine all patterns: Meta uses checkpointing + distribution + mixed-precision for trillion-parameter models."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a distributed training setup with 8 GPUs, you implement gradient accumulation across 4 steps and mixed-precision training. During training, GPU rank-0 converges normally but rank-3's loss plateaus after 5,000 steps while other ranks continue improving. What is the most likely cause?",
+      "items": [
+        "Missing torch.distributed.all_reduce() before optimizer.step() on rank-3, causing it to compute stale gradients from its own batch only",
+        "Rank-3's GPU has insufficient VRAM and is swapping to CPU, slowing gradient computation",
+        "The learning rate scheduler is misconfigured and rank-3 got a different learning rate than others",
+        "Rank-3's mixed-precision loss scaler overflowed, forcing it to skip gradient updates"
+      ],
+      "answer": 0,
+      "explanation": "When all_reduce() is missing, each rank's optimizer only updates using that rank's local gradient, not the averaged gradient across all ranks. Rank-3's batches may contain different data distribution (e.g., harder examples), causing its isolated gradient to be incompatible with the global convergence trajectory. Other ranks synchronize properly and converge, but rank-3 diverges. Options B and C are ruled out because VRAM issues or scheduler misconfiguration would affect training speed uniformly, not plateau convergence at a specific rank. Option D is incorrect because loss scale skips are logged and all ranks would plateau, not just one. The fix is wrapping optimizer.param_groups[0]['params'] with all_reduce() before step()."
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a 70B-parameter language model on 128 GPUs with 80GB A100s. Each GPU can fit only 4 samples per batch without checkpointing (OOM otherwise). Current setup: batch_size=512 (4 samples × 128 GPUs), no checkpointing, no gradient accumulation. Training is unstable (loss spikes randomly). What single change would you make first and why?",
+      "items": [
+        "Add activation checkpointing to reduce peak memory by 60%, allowing larger per-GPU batch sizes and more stable gradient estimates",
+        "Reduce global batch size to 256 and implement gradient accumulation across 2 steps to smooth gradient variance",
+        "Switch to bfloat16 mixed-precision training to reduce memory by 50% and increase effective batch size",
+        "Disable distributed synchronization to reduce communication overhead and let each GPU train independently"
+      ],
+      "answer": 0,
+      "explanation": "The core issue is insufficient per-GPU batch size (4 samples) causing high gradient noise and unstable training. Activation checkpointing frees ~60% of peak memory during backward pass, allowing you to increase per-GPU batch to 10-12 samples without OOM. This directly reduces gradient variance and stabilizes training. Option B (gradient accumulation) doesn't solve the underlying problem—you're still computing gradients from 4 samples; you're just accumulating them. Option C (mixed-precision) helps memory but doesn't solve the fundamental batch-size-too-small issue; bfloat16 alone won't prevent loss spikes from noisy gradients. Option D is catastrophically wrong—disabling synchronization causes all ranks to diverge immediately. Checkpointing is the highest-ROI change for this scenario: it addresses the root cause (small batch) and is orthogonal to other optimizations you could layer on afterward."
     }
   ]
 }

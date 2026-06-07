@@ -206,6 +206,123 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production sequence models follow three dominant architectural patterns, each with distinct trade-offs. The **Encoder-Decoder with Attention** pattern excels when input and output lengths differ significantly (translation, summarization); it's computationally expensive but handles variable-length dependencies. The **Teacher Forcing during training vs. Autoregressive inference** pattern accelerates training convergence but risks exposure bias—models trained on ground-truth inputs may fail when fed their own predictions. **Bidirectional encoding + Unidirectional decoding** is standard for tasks requiring full-context understanding (BERT-style models), while pure unidirectional models (GPT-style) are simpler and faster for generation. Choose based on: can you afford batch processing (bidirectional)? Do you need real-time generation (unidirectional)? What's your latency budget? Attention mechanisms add 15-40% computational overhead; gradient checkpointing reduces memory but increases compute time by 20-30%.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Encoder-Decoder with Attention mirrors a captain's pre-match field placement—analyzing the batsman's strengths (encoding), then dynamically adjusting fielders (attention) as each ball is bowled (decoding). Teacher Forcing is like training a fielder with practice catches thrown directly at their hands, but in a match, they must field unpredictable deliveries—the distribution shifts. Bidirectional encoding resembles reviewing match footage before strategizing; you see the full context. Unidirectional decoding is live play-calling: the next decision depends only on past deliveries. Choosing a pattern is like deciding whether to use DRS (expensive but precise): LSTM requires more memory but captures longer dependencies; GRU is faster but may miss distant patterns. The overhead of Attention is like stationing extra fielders—more coverage, but fatigue and coordination costs rise.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Gradient Checkpointing + Mixed Precision for Memory Efficiency\nimport torch\nfrom torch.utils.checkpoint import checkpoint\nimport torch.nn as nn\n\nclass BatsmanSequenceModel(nn.Module):\n    def __init__(self, vocab_size, hidden_dim):\n        super().__init__()\n        self.embed = nn.Embedding(vocab_size, hidden_dim)\n        self.lstm = nn.LSTM(hidden_dim, hidden_dim, batch_first=True, num_layers=2)\n        self.attention = nn.MultiheadAttention(hidden_dim, num_heads=8)\n        self.decoder = nn.Linear(hidden_dim, vocab_size)\n    \n    def forward(self, batsman_sequence):\n        x = self.embed(batsman_sequence)\n        # BEST: Checkpoint LSTM to save memory during backprop\n        x, _ = checkpoint(self.lstm, x, use_reentrant=False)\n        # Attention with proper masking\n        attn_out, _ = self.attention(x, x, x)\n        logits = self.decoder(attn_out)\n        return logits\n\n# ANTI-PATTERN: Storing all activations without checkpointing\nclass PoorBatsmanModel(nn.Module):\n    def __init__(self, vocab_size, hidden_dim):\n        super().__init__()\n        self.embed = nn.Embedding(vocab_size, hidden_dim)\n        self.lstm = nn.LSTM(hidden_dim, hidden_dim, batch_first=True, num_layers=4)\n        self.decoder = nn.Linear(hidden_dim, vocab_size)\n    \n    def forward(self, batsman_sequence):\n        x = self.embed(batsman_sequence)  # All activations stored\n        x, _ = self.lstm(x)  # No checkpointing—OOM on long sequences\n        return self.decoder(x)\n\n# Usage comparison\nbatsman_input = torch.randint(0, 1000, (32, 500))  # batch=32, seq_len=500\nmodel_good = BatsmanSequenceModel(1000, 256)\nmodel_bad = PoorBatsmanModel(1000, 256)\n\noutput_good = model_good(batsman_input)  # Efficient: ~4GB\n# output_bad = model_bad(batsman_input)  # Would crash: >20GB required",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Forgetting to mask padding tokens in attention layers.** When sequences have different lengths, you pad shorter ones with zeros. Attention will compute weights over padding tokens, treating them as meaningful context—this corrupts learned representations. **Fix:** Always pass `key_padding_mask` (shape: batch_size × seq_len with True for padding) to `torch.nn.MultiheadAttention` or manually set attention scores for padding positions to -inf before softmax: `attn_scores[padding_mask] = float('-inf')`. This forces attention weights to zero for padded positions, preventing information leakage.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Sequence models power production systems at scale across major companies. **Google** deploys Transformer attention layers in Search ranking and Bard (LLM inference at billions of queries/day), managing latency via distillation and quantization. **OpenAI** runs GPT models with causal attention masking for ChatGPT, handling millions of concurrent users with batched inference and KV-cache optimization. **Meta** uses bidirectional Transformers (BERT variants) for content recommendation at 2+ billion users, balancing accuracy against sub-100ms latency SLAs. **Netflix** applies LSTMs for viewing sequence prediction, training on terabytes of user history. **Uber** uses attention mechanisms for ETA prediction by modeling driver routes as sequences. Scale breaks systems when: batch processing memory exceeds GPU VRAM (~40-80GB for inference clusters), sequence length explodes (O(n²) attention becomes prohibitive >2048 tokens), or latency budgets clash with model depth (100+ layer Transformers require KV-caching). Companies solve this through model distillation (reducing parameters 5-10x), quantization (FP32→INT8), and hardware acceleration (TPUs, custom ASICs).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "LSTMs and GRUs solve vanishing gradient problems via gating mechanisms; use LSTMs for complex dependencies, GRUs for speed.",
+        "Attention replaces fixed-size hidden states with dynamic, learned focus—O(n²) complexity but interpretable alignment weights.",
+        "Transformer architecture (stacked multi-head attention + feedforward) scales to billions of parameters; foundation of modern LLMs.",
+        "Teacher Forcing accelerates training but causes exposure bias; use scheduled sampling or beam search decoding to mitigate.",
+        "Bidirectional context (BERT) for encoding; unidirectional (GPT) for generation—trade-off between accuracy and inference speed.",
+        "Gradient checkpointing and mixed precision reduce memory 2-4x; critical for sequences >500 tokens on standard GPUs.",
+        "Production requires masking padding, KV-caching, quantization, and distillation—attention overhead and sequence length are primary bottlenecks."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In an LSTM cell, the forget gate output is multiplied with the previous cell state. What does a forget gate value of 0.9 mean?",
+      "items": [
+        "90% of the previous cell state is retained; 10% is discarded.",
+        "90% of the previous cell state is discarded; 10% is retained.",
+        "The gradient flow is reduced by 90%.",
+        "The input gate is activated at 90% strength."
+      ],
+      "answer": 0,
+      "explanation": "The forget gate uses sigmoid activation (output range 0-1), acting as a learned mask on the cell state. A value of 0.9 means 90% of the previous cell state C_{t-1} passes through (via multiplication), effectively 'remembering' 90% and forgetting 10%. This allows the LSTM to selectively preserve long-term dependencies. Option 1 is correct. Option 1 inverts the logic. Option 3 confuses forget gate with gradient flow (though related, the gate value itself directly scales the cell state, not gradients). Option 4 confuses gates—the input gate controls new information, not the forget gate's effect.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a live cricket commentary generation system using an RNN decoder. During training, you feed ground-truth commentary words as input to the next timestep. During inference (live match), the model must generate the next word using its own previous predictions. What problem does this create, and how would you address it?",
+      "items": [
+        "Exposure bias: the model overfits to training data distribution; use scheduled sampling (gradually shift from ground-truth to model predictions during training) to reduce the train-test mismatch.",
+        "Vanishing gradients: early timesteps don't contribute to loss; add skip connections or use attention mechanisms to propagate gradients.",
+        "Padding tokens corrupt attention: the model learns to focus on padding; mask padding positions before softmax to eliminate their influence.",
+        "Sequence length divergence: inference sequences are longer than training sequences; truncate inference outputs to match training length."
+      ],
+      "answer": 0,
+      "explanation": "This scenario describes **exposure bias** (also called training-inference mismatch). During training (teacher forcing), the decoder always sees correct inputs; during inference, it uses its own predictions, which may be erroneous. Errors accumulate: wrong word → wrong next input → cascading failures. Scheduled sampling gradually replaces ground-truth inputs with model predictions during training, exposing the model to realistic error distributions. Option 0 is correct. Option 1 addresses vanishing gradients, a different problem solved by LSTMs/GRUs, not exposure bias. Option 2 discusses padding masking in attention, orthogonal to teacher forcing. Option 3 misidentifies the issue—length divergence is a symptom, not the root cause; truncation doesn't solve exposure bias.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

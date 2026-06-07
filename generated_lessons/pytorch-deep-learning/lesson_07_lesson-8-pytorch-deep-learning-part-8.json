@@ -210,6 +210,114 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch systems employ three dominant patterns: (1) Gradient Accumulation with Distributed Data Parallelism for memory-constrained large-batch training—use when effective batch size exceeds GPU memory but gradients must remain stable across accumulation steps; trade-off is longer training time per epoch for reduced memory footprint. (2) Mixed Precision Training (AMP) combined with loss scaling—mandatory for 16-bit training stability, scaling loss values to prevent gradient underflow in lower precision; cost is negligible compute overhead but requires careful handling of gradient overflow detection. (3) Dynamic Learning Rate Scheduling with warmup integrated into distributed training—critical for convergence when scaling across 100+ GPUs; warmup prevents gradient noise in early epochs while cosine annealing ensures smooth final convergence. The anti-pattern of applying raw distributed training without proper synchronization causes gradient staleness and divergence. Modern production systems (TensorFlow serving, ONNX Runtime) often export PyTorch models after training, requiring exact reproducibility through fixed random seeds and deterministic algorithms—this adds 5-15% latency cost but guarantees A/B test validity.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Gradient Accumulation is like a captain building an over-by-over strategy—you gather multiple deliveries' data before deciding field placement changes, reducing reactive mistakes from single-ball noise. Mixed Precision Training mirrors DRS (Decision Review System) usage: you review uncertain decisions (low-precision gradients) with higher precision checking to catch errors before they cascade. Distributed Data Parallelism across GPUs resembles rotating fast bowlers across spells—each bowler (GPU) handles different batches (pitch sections), but the captain must synchronize their combined bowling attack (gradient updates) at field meetings (synchronization barriers) to maintain consistent strategy. Learning Rate Scheduling with warmup is like gradually introducing spinners into a cricket match: you don't bowl the most deceptive deliveries in the first over when batsmen are fresh and watching closely; instead, you warm them up with predictable pace bowling, then gradually increase complexity as the match progresses.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Gradient Accumulation with Mixed Precision\nfrom torch.cuda.amp import autocast, GradScaler\nimport torch\n\nscaler = GradScaler()\naccumulation_steps = 4\nbatsman_optimizer = torch.optim.AdamW(batsman_model.parameters(), lr=1e-4)\n\nfor epoch in range(num_epochs):\n    for batch_idx, (bowler_input, batsman_target) in enumerate(batsman_dataloader):\n        with autocast():\n            batsman_logits = batsman_model(bowler_input)\n            loss = criterion(batsman_logits, batsman_target) / accumulation_steps\n        \n        scaler.scale(loss).backward()\n        \n        if (batch_idx + 1) % accumulation_steps == 0:\n            scaler.step(batsman_optimizer)\n            scaler.update()\n            batsman_optimizer.zero_grad()\n\n# ANTI-PATTERN: Unsafe gradient accumulation without scaling\nfor epoch in range(num_epochs):\n    for batch_idx, (bowler_input, batsman_target) in enumerate(batsman_dataloader):\n        batsman_logits = batsman_model(bowler_input)  # No autocast!\n        loss = criterion(batsman_logits, batsman_target)\n        loss.backward()  # No scaling, gradients can overflow\n        \n        if (batch_idx + 1) % accumulation_steps == 0:\n            batsman_optimizer.step()\n            batsman_optimizer.zero_grad()",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Forgetting to scale loss before backpropagation in gradient accumulation causes NaN or Inf gradients in mixed precision training. FIX: Always divide accumulated loss by accumulation_steps before backward(), and use GradScaler.scale() to prevent gradient underflow in float16. Check gradients with torch.nn.utils.clip_grad_norm_() to catch divergence early.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At production scale, Google's TPU pods and Meta's PyTorch training infrastructure leverage these patterns to train models with billions of parameters across 1000+ accelerators. OpenAI's GPT training uses gradient checkpointing + distributed data parallelism to fit 175B parameter models within memory budgets; without checkpointing, activation storage alone would exceed available VRAM by 10x. Netflix applies mixed precision training in real-time recommendation models serving 250M users, achieving 40% training speedup on V100 GPUs while maintaining prediction accuracy. Uber scales rider-ETA models using learning rate warmup across 128 GPUs to prevent gradient collapse in first 500 steps—skipping warmup causes 8-12% validation loss divergence. When done wrong: synchronization delays across distributed systems cause stale gradients (model divergence), insufficient loss scaling triggers silent gradient underflow (model stops learning), and missing gradient clipping during accumulation produces exploding gradients (training crash). Companies like Airbnb discovered these issues only after deploying models to production, losing weeks of training compute before diagnosis. Proper monitoring via gradient norms, learning curves, and distributed synchronization checks prevents costly rollbacks.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Gradient Accumulation enables large effective batch sizes on limited VRAM by dividing loss before backward pass.",
+        "Mixed Precision Training (AMP) cuts memory by 50% and speeds training 1.5-2x with proper loss scaling via GradScaler.",
+        "Distributed Data Parallelism synchronizes gradients across GPUs; requires AllReduce operations, adding 10-20% communication overhead.",
+        "Learning Rate Scheduling with linear warmup prevents early-epoch gradient instability; cosine annealing ensures smooth final convergence.",
+        "Gradient Checkpointing trades compute for memory by recomputing activations during backward; enables 2-3x larger models in same VRAM.",
+        "Production systems require deterministic training (fixed seeds, reproducible algorithms) for A/B test validity despite 5-15% latency cost.",
+        "Monitor gradient norms, loss curves, and synchronization delays in distributed training to detect divergence before compute waste."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You are training a 2B-parameter language model on 8 GPUs with batch size 32 per GPU (effective 256). Your gradients overflow to NaN after 500 steps during mixed precision training. Which combination of fixes would most likely resolve this without significantly reducing training speed?",
+      "items": [
+        "Increase GradScaler initial_scale to 2^16, add gradient clipping at 1.0, reduce learning rate by 10x",
+        "Disable mixed precision entirely and train in float32 with batch size 16 per GPU",
+        "Switch from AdamW to SGD with momentum and increase warmup steps to 5000",
+        "Use only gradient accumulation without mixed precision, increase accumulation steps to 8"
+      ],
+      "answer": 0,
+      "explanation": "Option 0 is correct because gradient overflow in mixed precision happens when loss scaling is too low or gradients spike unexpectedly. Increasing GradScaler initial_scale (default 2^16) to 2^16 maintains default, but adding gradient clipping prevents singular large gradients from exploding, and slightly reducing learning rate stabilizes optimization without severe speed loss. Option 1 disables the 1.5-2x speedup benefit of AMP entirely. Option 2 changes optimizer unnecessarily—Adam is more stable with mixed precision than SGD. Option 3 removes mixed precision's memory efficiency and speed gains without solving the root cause (improper gradient scaling or clipping).",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your team deploys a recommendation model trained on 64 GPUs using distributed data parallelism. In production, the model accuracy drops 3% compared to validation metrics. Investigation reveals the training process lacked proper AllReduce synchronization and used different random seeds across GPU processes. What is the most likely root cause and how would you verify it?",
+      "items": [
+        "Data leakage during preprocessing; rerun training with train/val/test split validation",
+        "Stale gradients from asynchronous AllReduce causing divergent weight updates per GPU; verify by logging per-GPU gradient norms and checking synchronization barriers",
+        "Overfitting from insufficient regularization; add L2 penalty and increase dropout",
+        "Batch normalization running statistics computed separately per GPU; disable BatchNorm and use LayerNorm instead"
+      ],
+      "answer": 1,
+      "explanation": "Option 1 is correct because distributed training without proper synchronization (AllReduce) causes each GPU to update weights differently based on its local batch gradients, resulting in model divergence at inference time. Different random seeds per GPU amplify this by introducing non-deterministic data shuffling. To verify: log gradient norms per GPU using torch.distributed.all_gather() and confirm they diverge after each synchronization barrier; also check AllReduce timing to detect communication delays. Option 0 (data leakage) would cause validation/train gap, not sudden accuracy drop at deployment. Option 2 (overfitting) wouldn't explain the production-only drop if validation was unaffected. Option 3 is incorrect—BatchNorm statistics are properly synchronized across GPUs with PyTorch's default behavior; LayerNorm has different properties and wouldn't fix synchronization issues.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

@@ -203,6 +203,119 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch deployments rely on three dominant patterns: eager execution for research and prototyping (maximum flexibility, slower inference), graph-mode compilation via torch.jit.script for latency-critical services (10-40% speedup, requires static shapes), and distributed data-parallel training for scaling across GPUs/TPUs (linear throughput gains with communication overhead). Eager execution trades inference speed for debugging simplicity and dynamic control flow—ideal when model architecture varies per input. Graph compilation requires static tensor shapes and no Python control flow but delivers consistent sub-millisecond latency required by real-time systems. Distributed patterns introduce synchronization bottlenecks: AllReduce collective operations can consume 30-50% of training time on multi-node clusters if batch size doesn't scale proportionally. When to use: eager for research, torch.jit for serving, distributed for datasets >100GB or >8 GPU training. Cost trade-off is memory overhead: distributed training duplicates model weights across all devices, so a 7B parameter model consumes 28GB on 4 GPUs (7B × 4B per param × 4 GPUs), limiting batch size.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Eager execution is like captaincy in T20 cricket—you make real-time decisions based on current play, field adjustments between each ball, dynamic bowling rotations responding to batter form. You can pivot strategy instantly but require constant active management. Graph compilation is like pre-planned Test match field setups with fixed bowling rotations decided before day one—rigid but optimized for endurance and predictable outcomes over five days. Distributed training mirrors a international tournament with multiple simultaneous matches: each ground (GPU) plays independently but must sync scores via central authority (AllReduce). The cost? Communication overhead when coordinating across venues increases with distance (latency between nodes). You'd use eager for a local domestic T20 match (quick feedback), graph-mode for a structured Test series (sustained performance), and distributed only when tournament scale demands it.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Creating new computation graph per iteration (causes memory bloat)\nclass BatterPerformanceNet(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.runs_encoder = nn.Linear(5, 64)  # 5 cricket stats -> encoding\n        self.wicket_decoder = nn.Linear(64, 1)  # predict dismissal\n    \n    def forward(self, stats):\n        return self.wicket_decoder(self.runs_encoder(stats))\n\n# ❌ BAD: Rebuilding optimizer per batch\nfor epoch in range(epochs):\n    for batch_stats in cricket_loader:\n        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  # WRONG!\n        output = model(batch_stats)\n        loss = criterion(output, labels)\n        loss.backward()\n        optimizer.step()\n        optimizer.zero_grad()  # Never called from previous optimizer\n\n# ✅ CORRECT: Optimizer created once, reused across training\nmodel = BatterPerformanceNet()\noptimizer = torch.optim.Adam(model.parameters(), lr=0.001)  # Create ONCE\ncriterion = nn.BCEWithLogitsLoss()\n\nfor epoch in range(epochs):\n    for batch_stats in cricket_loader:\n        optimizer.zero_grad()  # Reset gradients from previous step\n        output = model(batch_stats)\n        loss = criterion(output, labels)\n        loss.backward()  # Compute gradients\n        optimizer.step()  # Update parameters using same optimizer instance\n        print(f\"Epoch {epoch}, Loss: {loss.item():.4f}\")\n\n# ✅ BEST PRACTICE: Learning rate scheduling + gradient clipping\nscheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)\n\nfor epoch in range(epochs):\n    for batch_stats in cricket_loader:\n        optimizer.zero_grad()\n        output = model(batch_stats)\n        loss = criterion(output, labels)\n        loss.backward()\n        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # Prevent exploding gradients\n        optimizer.step()\n    scheduler.step()  # Decay learning rate each epoch",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Forgetting to call optimizer.zero_grad() before loss.backward() causes gradient accumulation—old gradients from previous batches add to new gradients, poisoning parameter updates. Symptoms: loss stays constant or increases despite correct code. Fix: Always call optimizer.zero_grad() at the START of each iteration loop, before forward pass. Verify by printing model.parameters()[0].grad before/after backward()—it should be None or zeros before backward, populated after. Use torch.nn.utils.clip_grad_norm_() if gradients exceed 1.0 during backward().",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "PyTorch powers production systems at scale across major tech companies. Google's Kaggle competitions use PyTorch for model development, while Meta's recommendation engine processes billions of user interactions daily through PyTorch distributed training. Netflix trains personalization models using PyTorch on GPU clusters serving recommendations in <100ms latency. OpenAI's GPT models are built on PyTorch with distributed training across thousands of GPUs—torch.distributed enables synchronization of gradients across TPU pods. Uber's ETA prediction and surge pricing models run PyTorch inference on edge devices and cloud servers handling millions of requests/second. Airbnb scales PyTorch models across 100+ GPUs for search ranking. When done wrong, systems break catastrophically: gradient explosions cause NaN losses and training collapse; missing gradient clipping in RNNs leads to vanishing/exploding gradients over 50+ timesteps; distributed training without proper synchronization causes model divergence across nodes, wasting weeks of compute. Scale amplifies mistakes: a memory leak in single-GPU training wastes hours; the same bug in 256-GPU training wastes months and costs $100K+.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Tensors are multi-dimensional arrays with GPU acceleration; autograd tracks operations for automatic differentiation without manual calculus.",
+        "nn.Module encapsulates model layers and parameters; always inherit from it and implement forward() for custom architectures.",
+        "Loss functions measure prediction error; optimizers (SGD, Adam) update weights using gradients computed via backpropagation.",
+        "Eager execution maximizes flexibility for research; torch.jit.script compiles models for 10-40% inference speedup in production.",
+        "Gradient clipping prevents exploding gradients in RNNs; learning rate scheduling (CosineAnnealing, StepLR) improves convergence.",
+        "Distributed training scales across GPUs via AllReduce synchronization; batch size must scale with device count to amortize communication overhead.",
+        "Always call optimizer.zero_grad() before loss.backward() to prevent gradient accumulation and training divergence."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "A cricket analytics model uses an LSTM to predict batter performance over 50 timesteps. Training becomes unstable after 15 epochs—loss spikes to NaN. Gradients printed during backpropagation show values like 1e8, 1e9, 1e15. What is the root cause and primary fix?",
+      "items": [
+        "Exploding gradients in RNN; apply torch.nn.utils.clip_grad_norm_() with max_norm=1.0",
+        "Learning rate too high; reduce by 10x to 0.00001",
+        "Batch size mismatch; double the batch size from 32 to 64",
+        "Model has too many parameters; reduce hidden units from 256 to 128"
+      ],
+      "answer": 0,
+      "explanation": "Exploding gradients are a classic RNN failure mode: over 50 timesteps, gradients multiply via chain rule (∂L/∂w₀ = ∂L/∂h₅₀ × ∂h₅₀/∂h₄₉ × ... × ∂h₁/∂w₀), producing exponential growth. NaN loss and 1e15 gradient magnitudes are diagnostic signatures. torch.nn.utils.clip_grad_norm_() rescales all gradients if their L2 norm exceeds max_norm, preventing overflow. Option B (learning rate reduction) slows convergence but doesn't fix NaN. Option C (larger batch) actually makes gradients larger per update. Option D (fewer parameters) changes model capacity but doesn't address gradient explosion—architectural change, not fix."
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket match outcome predictor on 500 GPUs across 10 data centers. Each GPU processes 256 batter statistics per batch. AllReduce communication consumes 45% of training time. Your colleague suggests doubling the batch size to 512 per GPU. Will this improve wall-clock training time? Why or why not?",
+      "items": [
+        "Yes, because more samples per batch reduce relative communication overhead (512 vs 256 samples, same AllReduce cost)",
+        "No, because doubling batch size doubles compute time, nullifying any communication savings",
+        "Yes, because larger batches use more GPU memory, triggering automatic optimization",
+        "No, because AllReduce time increases quadratically with GPU count, making batch size irrelevant"
+      ],
+      "answer": 0,
+      "explanation": "Distributed training has two costs: compute (forward/backward passes) and communication (AllReduce gradient synchronization). AllReduce time is roughly constant regardless of batch size—it syncs the same parameter count. Doubling batch size doubles compute cost linearly but keeps communication constant, so relative communication overhead drops from 45% to ~23%. Overall speedup ≈ 1.8x (faster per example, same communication tax). Option B incorrectly assumes communication scales with batch size. Option C conflates memory usage with training speed. Option D is wrong: AllReduce is O(log N) for tree-based algorithms, not quadratic. This is the core principle of distributed training: amortize fixed communication cost across more computation."
     }
   ]
 }

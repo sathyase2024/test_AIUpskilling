@@ -203,6 +203,110 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production pipelines employ three dominant patterns: (1) **Eager Augmentation** — applying transformations in-memory before training, offering simplicity and immediate validation but consuming storage and RAM; best for small datasets (<10GB) where reproducibility matters. (2) **On-the-fly Augmentation via tf.data** — generating variations during batch creation, trading compute cost for storage efficiency and unbounded augmentation variety; essential for ImageNet-scale datasets (>100GB). (3) **Hybrid Caching** — pre-computing expensive operations (resizing, normalization) while deferring stochastic augmentation (rotation, mixup) to pipeline stage; balances I/O and CPU overhead. Google uses pattern 2 for TPU training where I/O dominates; Netflix applies pattern 3 for real-time personalization pipelines where latency is critical. Pattern 1 breaks under distributed training (data inconsistency across workers). Pattern 2 risks bottleneck when augmentation complexity exceeds GPU saturation. Pattern 3 requires careful cache invalidation. Choose based on: dataset size (eager if <5GB), hardware (on-the-fly for TPUs/multi-GPU), and reproducibility requirements (eager for research, hybrid for production).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Eager augmentation mirrors selecting your XI before the toss—you've prepared every batter and bowler, so you know exactly what you have, but you can't adapt if conditions change. On-the-fly augmentation is like dynamic field placement: you adjust your slip cordon and deep fielders based on each ball bowled, maximizing your options but requiring live decision-making. Hybrid caching resembles DRS strategy: pre-compute whether you'll challenge (expensive operation done once), then decide review timing in real-time (stochastic augmentation). A Test series (small dataset) demands the certainty of eager selection; a T20 tournament (massive data) requires on-the-fly fluidity. Your venue (hardware) and match format (batch size) determine which pattern wins.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Hybrid pattern with prefetching and caching\nimport tensorflow as tf\n\n# Pre-compute expensive static operations (cache)\ndef preprocess_cricket_stats(image, label):\n    image = tf.image.resize(image, [224, 224])  # Fixed resize\n    image = image / 255.0  # Normalize once\n    return image, label\n\n# Defer stochastic augmentation to pipeline\ndef augment_batting_data(image, label):\n    image = tf.image.random_flip_left_right(image)  # Randomized\n    image = tf.image.random_brightness(image, 0.2)  # Randomized\n    return image, label\n\n# Pipeline construction\nbatsmen_dataset = tf.data.Dataset.from_tensor_slices(cricket_images)\nbatsmen_dataset = batsmen_dataset.map(preprocess_cricket_stats, num_parallel_calls=tf.data.AUTOTUNE)\nbatsmen_dataset = batsmen_dataset.cache()  # Cache after static ops\nbatsmen_dataset = batsmen_dataset.shuffle(buffer_size=1000)\nbatsmen_dataset = batsmen_dataset.map(augment_batting_data, num_parallel_calls=tf.data.AUTOTUNE)  # Augment after cache\nbatsmen_dataset = batsmen_dataset.batch(32)\nbatsmen_dataset = batsmen_dataset.prefetch(tf.data.AUTOTUNE)  # Prefetch for GPU\n\n# ANTI-PATTERN: Eager augmentation (all-in-memory)\naugmented_images = []\nfor img in cricket_images:\n    img = tf.image.resize(img, [224, 224])\n    img = tf.image.random_flip_left_right(img)  # Randomized in loop\n    augmented_images.append(img)  # Bloats memory; loses benefits of tf.data\naugmented_dataset = tf.data.Dataset.from_tensor_slices(augmented_images)  # Too late for optimization",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Augmentation Applied Before Caching**. The most common beginner mistake is calling .map(augment_function) before .cache(), which caches augmented data—defeating the purpose of augmentation by repeating identical augmented samples across epochs. Fix: Always structure your pipeline as: raw_data → .map(static_preprocess) → .cache() → .shuffle() → .map(stochastic_augment) → .batch() → .prefetch(). This ensures cache stores preprocessed originals, not augmented variants, so each epoch generates fresh augmentations while reusing expensive resize/decode operations.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At production scale, data pipelines process terabytes daily across distributed infrastructure. Google's TPUv4 clusters (used for Gemini training) employ on-the-fly augmentation via tf.data because static augmentation would require petabyte-scale storage and lose semantic diversity. Netflix applies preprocessing normalization in real-time recommendation pipelines (handling 600M+ user interactions/day) where stale cached embeddings degrade within hours. Meta's computer vision systems (Instagram photo ranking) use hybrid caching: images are pre-normalized and resized once, stored in distributed caches (hundreds of terabytes across multiple regions), then augmented per-batch for fairness (preventing overfit to specific orientations). Airbnb's listing image pipeline processes 500M+ photos through tf.data prefetching to minimize latency—incorrect pipeline ordering caused a 40% training slowdown. When done wrong: eager augmentation crashes on datasets >1TB, on-the-fly augmentation becomes CPU-bottlenecked (GPU waits for batch creation), and improper prefetch settings waste 20-30% computational capacity. The economics demand: minimize I/O (cache aggressively), parallelize augmentation (num_parallel_calls=AUTOTUNE), and tune prefetch buffers to hardware (VRAM and cache hierarchy).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Order pipeline operations strategically: static preprocessing → cache → shuffle → stochastic augmentation → batch → prefetch.",
+        "Choose augmentation pattern based on dataset size: eager (<5GB), hybrid (5-100GB), on-the-fly (>100GB).",
+        "Use tf.data.AUTOTUNE for num_parallel_calls and prefetch to adapt to hardware without manual tuning.",
+        "Cache only preprocessed originals, never augmented data; augmentation must generate fresh samples each epoch.",
+        "Normalization (z-score, min-max) prevents feature dominance and accelerates convergence across distributed training.",
+        "Prefetch buffers must match hardware capacity; too small causes GPU stall, too large wastes memory.",
+        "Distributed training requires stateless augmentation; DDS or tf.data automatically handles epoch synchronization."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a bowling velocity classifier on 50GB of video frames across 8 GPUs. Your tf.data pipeline currently runs: dataset.map(resize_224x224).cache().map(random_rotation).batch(32).prefetch(10). After 3 epochs, accuracy plateaus at 78%. What's the core issue and how do you fix it?",
+      "items": [
+        "You're caching rotated frames; rotation should happen after cache. Move .map(random_rotation) after .cache() and before .batch(). This ensures each epoch generates fresh rotations from original cached images, increasing augmentation diversity.",
+        "Your prefetch buffer (10) is too small for 8 GPUs. Increase to prefetch(tf.data.AUTOTUNE) so TensorFlow optimizes buffer size dynamically based on GPU utilization and memory.",
+        "You need more aggressive augmentation (add brightness, flip). The plateau is due to insufficient augmentation variety, not pipeline ordering.",
+        "Your batch size (32) is too small for 8 GPUs. Use batch(256) to maximize GPU throughput and reduce overfitting."
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is reordering augmentation after cache. Caching before stochastic augmentation means cached data contains the same rotated frames repeated across epochs, eliminating augmentation's benefit (generating diverse samples per epoch). By moving .map(random_rotation) after .cache(), the pipeline caches original 224x224 frames once (expensive I/O saved), then applies fresh random rotations each epoch (diversity maximized). Options B and D address throughput/optimization but don't solve the plateau (which stems from diminishing augmentation diversity). Option C suggests more augmentation types, but the real issue is that existing augmentation isn't working because frames are pre-rotated and cached—adding more pre-rotated augmentation compounds the problem."
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket match prediction model uses a preprocessing pipeline with normalization (z-score, mean=μ, std=σ). You train on 2020-2022 match data, achieving 91% validation accuracy. When you deploy to production (2024 matches with higher average scores), accuracy drops to 74%. Which preprocessing choice caused this and why?",
+      "items": [
+        "You computed μ and σ once during training on 2020-2022 data, then hardcoded those statistics into production. 2024 matches have different score distributions. Fix: recompute μ and σ on a recent rolling window of production data, or use online normalization (exponential moving average) to adapt.",
+        "Z-score normalization is too aggressive; switch to min-max normalization [0,1] which handles outliers better.",
+        "You applied normalization before augmentation in the pipeline. Normalization should happen after augmentation to preserve semantic meaning of rotations and flips.",
+        "Your batch size during training (64) differs from production batch size (32). Normalization statistics should be recomputed per batch size."
+      ],
+      "answer": 0,
+      "explanation": "The correct answer identifies dataset shift (distribution mismatch between training and deployment). Preprocessing statistics (μ, σ) computed from 2020-2022 data assume that distribution, but 2024 matches violate that assumption (higher scores shift the distribution). Deploying with stale statistics causes severe mispredictions because inputs are normalized incorrectly relative to model weights. The fix is recomputing statistics on production data or using adaptive normalization. Option B (min-max) doesn't address the root cause—any fixed normalization fails under distribution shift. Option C confuses pipeline ordering (which affects stochasticity, not distribution shift). Option D is incorrect; batch-wise normalization doesn't impact inference. This is a critical lesson: preprocessing statistics must be production-aware and ideally updated regularly in live systems."
     }
   ]
 }

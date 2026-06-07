@@ -246,6 +246,119 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns have emerged for deploying emerging LLM architectures at scale. First, the **Sparse Attention + MoE hybrid** pattern is used when you need maximum throughput on fixed hardware budgets—Google's PaLM 2 and Meta's internal models employ this for balancing computation across tokens and parameters. This pattern trades inference latency (sparse routing adds overhead) for 2-3x efficiency gains on long sequences. Second, the **Linear Attention for latency-critical paths** pattern applies to real-time systems: OpenAI uses linear variants in token streaming, Anthropic in Claude's context processing. You sacrifice some expressiveness (linear attention approximates quadratic) but gain O(n) instead of O(n²) complexity. Finally, **Recurrent architectures with hybrid skip-connections** are emerging for mobile and edge deployment—companies like Airbnb use state-space models for recommendation ranking where memory footprint matters more than absolute accuracy. Each trades accuracy margins (1-2% on benchmarks) for deployment feasibility. The critical decision: measure your actual bottleneck first (compute? memory? latency?) before committing to a pattern.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Choosing between patterns is like deciding field placement and bowling strategy before an innings. The Sparse Attention + MoE hybrid resembles an aggressive field with both slips and deep fielders—you're covering all bases (long balls and singles) efficiently. Linear Attention is like bowling shorter lengths consistently: slightly less threatening than yorkers (quadratic attention), but sustainable across 20 overs without wearing out your bowlers (GPU memory). The Recurrent hybrid approach mirrors a spinner's variation strategy—using arm-ball mixed with leg-spin on turning pitches, you get reasonable success with less explosive effort. Just as a captain reviews DRS when uncertainty is high, you should profile your actual bottleneck (is it boundary-hitting rate or dot-ball efficiency?) before settling on your strategy. The worst mistake is choosing an aggressive field (full Sparse MoE) when you actually need death-overs containment (Linear Attention for real-time systems).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Applying Sparse Attention everywhere without profiling\nclass CricketScorer_BadApproach:\n    def process_match(self, innings_data):\n        # Always use sparse attention, even for short sequences\n        batting_context = sparse_attention(innings_data)  # Overhead not worth it for n=50\n        bowling_stats = sparse_attention(innings_data)    # Overkill\n        return batting_context, bowling_stats\n\n# BEST PRACTICE: Adaptive routing based on sequence length\nclass CricketScorer_BestApproach:\n    def process_match(self, innings_data):\n        sequence_length = len(innings_data)\n        \n        if sequence_length < 200:  # Short sequences (up to 50 overs)\n            # Use dense attention—overhead minimal, accuracy crucial\n            batting_context = dense_attention(innings_data)\n        else:\n            # Long tournament data—use sparse for efficiency\n            batting_context = sparse_attention(innings_data)\n        \n        # Always profile the bottleneck first\n        bowling_stats = linear_attention(innings_data)  # O(n) proven faster for streaming\n        return batting_context, bowling_stats\n\n# BEST PRACTICE: MoE with explicit load balancing\nclass BowlerRotation_BestApproach:\n    def __init__(self, num_experts=8):\n        self.bowlers = [LinearBowler() for _ in range(num_experts)]  # Expert pool\n        self.load_monitor = LoadBalancer()  # Prevent all overs to one bowler\n    \n    def select_bowler(self, match_state):\n        # Route to least-loaded expert, not always the \"best\" one\n        selected = self.load_monitor.route(match_state, self.bowlers)\n        return selected",
+      "level": 2,
+      "language": "python",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is **applying sparse attention to sequences shorter than ~500 tokens**. Sparse routing overhead (gating network, token selection, reorganization) consumes more compute than the savings from skipped attention operations. This is catastrophic for real-time inference. **How to fix it:** Always profile with actual data. Use dense attention for sequences under 256 tokens, measure your P50/P99 latency, and only switch to sparse if you save >30% end-to-end wall-clock time. Rule of thumb: sequence_length must exceed (sparse_overhead / attention_savings_ratio), typically ~300 tokens for modern GPUs. Add an automatic fallback: `if len(sequence) < 256: use_dense_attention() else: use_sparse_attention()`.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At production scale, these architectures power critical systems across industry giants. Google uses Sparse Attention + MoE in PaLM models for search ranking and Bard, processing billions of tokens daily across thousands of TPUs—when MoE load balancing fails (uneven expert utilization), latency spikes by 40-60% and costs multiply. OpenAI deploys linear attention variants in ChatGPT's token streaming pipeline, reducing first-token latency from 800ms to 120ms on long contexts. Meta's research models use hybrid recurrent-attention for efficiency, critical for Meta Llama deployment on consumer-grade hardware. Netflix uses Mixture of Experts for personalized ranking—their recommendation towers route user context through specialized experts (genre, watch-time, social), and incorrect load balancing causes cache misses that degrade recommendation quality by 3-5%. Uber's ETA models employ linear attention for real-time trip estimation at 100K requests/second. Airbnb scales search ranking with state-space models, replacing attention entirely on embeddings under 512 dimensions. The breaking point: without proper load balancing in MoE, you hit compute skew where 20% of experts handle 80% of traffic, making 80% of your hardware idle while others saturate.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Sparse Attention excels at sequences >500 tokens but incurs routing overhead; profile before deploying to avoid latency regression on short inputs.",
+        "Mixture of Experts achieves 2-3x compute efficiency by conditional computation, but requires careful load balancing or expert utilization collapses.",
+        "Linear Attention provides O(n) scaling versus O(n²), ideal for streaming and real-time systems, trading 1-2% accuracy for dramatic latency gains.",
+        "Hybrid architectures (recurrent + attention) reduce memory footprint for edge/mobile deployment, enabling billion-parameter models on consumer GPUs.",
+        "Production decision: always measure your actual bottleneck (compute, memory, or latency) and choose based on empirical trade-offs, not theoretical efficiency.",
+        "Load balancing in MoE systems is critical—uneven expert utilization causes compute waste, cache misses, and 40-60% latency spikes in production.",
+        "Adaptive routing patterns (dense for short, sparse for long sequences) outperform single-pattern approaches and prevent unnecessary overhead on small inputs."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're implementing a real-time cricket commentary generation system that processes live ball-by-ball data in streams of 50-100 tokens per update. Which attention mechanism would you choose and why?",
+      "items": [
+        "Linear Attention, because O(n) complexity prevents memory blowup and latency stays <100ms per ball update regardless of prior context length.",
+        "Sparse Attention, because it's more efficient and modern papers show it's always better than dense attention.",
+        "Dense Quadratic Attention, because 50-100 tokens is too short for sparse routing overhead to be worth it.",
+        "Mixture of Experts, because you need the highest accuracy for commentary quality."
+      ],
+      "answer": 0,
+      "explanation": "Linear Attention is correct because your sequences are short (50-100 tokens per ball) and latency-critical. Sparse Attention (option B) incurs overhead that exceeds savings on sequences this short—routing, sorting, and reorganizing tokens wastes more compute than you save. Option C (dense attention) is suboptimal because while it works, linear attention still provides better scaling if context grows. Option D (MoE) solves the wrong problem—you need speed, not conditional computation. At this scale, Linear Attention's O(n) scaling and minimal overhead make it the production choice for real-time systems, as used by OpenAI in ChatGPT streaming."
+    },
+    {
+      "type": "quiz",
+      "content": "Your team deployed a Mixture of Experts model across 8 expert networks for predicting cricket match outcomes. After production launch, you observe that 6 out of 8 experts handle 85% of the traffic while 2 experts are nearly idle. What is the primary issue and how should you address it?",
+      "items": [
+        "Expert collapse due to poor load balancing; add auxiliary loss terms to the gating network that penalize load imbalance and encourage more uniform expert utilization.",
+        "The model architecture is fundamentally broken and you should switch to dense attention instead of MoE.",
+        "This is normal behavior and nothing to worry about; sparse routing naturally concentrates load on better experts.",
+        "Increase the number of experts to 16 so idle experts don't matter as much."
+      ],
+      "answer": 0,
+      "explanation": "Option A is correct. This is 'expert collapse'—a known MoE training failure mode where the gating network routes all inputs to a few high-performing experts, leaving others unused. You lose the compute efficiency benefit (80% of your hardware is wasted) and risk overfitting to the heavily-used experts. Solution: add auxiliary load-balancing loss (e.g., importance-weighted loss) that explicitly encourages uniform expert utilization. Option B is wrong—MoE is still the right choice, but needs better training. Option C is dangerously incorrect; this concentration wastes hardware and degrades generalization. Option D doesn't solve the root cause; you'd still have the same imbalance with 16 experts. The fix is training-time, not architectural."
     }
   ]
 }

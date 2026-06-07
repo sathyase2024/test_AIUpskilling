@@ -212,6 +212,114 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In production systems, three dominant patterns emerge for embedding deployment: (1) **Pre-trained frozen embeddings** — load static word2vec or GloVe vectors, freeze weights during training. Use when computational budget is tight, training data is small, or transfer learning across domains is the priority. Trade-off: limited task-specific optimization but 10-100x faster inference and negligible memory overhead. (2) **Fine-tuned embeddings** — initialize from pre-trained weights but allow gradient updates during model training. Apply when you have sufficient labeled data (10k+ examples) and domain-specific vocabulary divergence (medical records, legal documents, cricket statistics). Cost: 2-5x slower training, larger model checkpoints, risk of catastrophic forgetting on rare words. (3) **Contextual embeddings (BERT, RoBERTa)** — use transformer-based dynamic embeddings for maximum expressiveness. Reserve for high-stakes applications (search ranking, recommendation systems) where semantic precision directly impacts revenue, and where inference latency budgets allow 50-500ms per request. The anti-pattern is applying contextual embeddings uniformly: they're overkill for synonym detection but essential for disambiguating homonyms and capturing polysemy across contexts.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Frozen embeddings are like a fixed field placement—you set your slips, covers, and mid-wicket at the start and never move them, regardless of the batter. It's cheap and consistent but inflexible against left-handers. Fine-tuned embeddings are like adjusting fielding positions between overs based on the batter's scoring patterns—you invest extra effort mid-match to optimize, and it works brilliantly if you have enough overs left. Contextual embeddings are like using DRS on every delivery: you get maximum information (ball trajectory, hotspot, snicko-graph) but it's expensive, time-consuming, and unnecessary for obvious LBW shouts. Choose based on match duration (data size), opposition strength (task complexity), and remaining reviews (computational budget).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Frozen embeddings with proper normalization\nimport numpy as np\nfrom sklearn.preprocessing import normalize\n\n# Load pre-trained cricket commentary embeddings\nembedding_matrix = np.load('pretrained_cricket_embeddings.npy')\nbatsman_embedding = embedding_matrix[word_to_idx['Virat']]\nbowler_embedding = embedding_matrix[word_to_idx['Bumrah']]\n\n# Normalize for stability (cosine similarity)\nbatsman_norm = normalize([batsman_embedding])[0]\nbowler_norm = normalize([bowler_embedding])[0]\nsimilarity = np.dot(batsman_norm, bowler_norm)\n\n# Freeze weights during training\nembedding_layer = tf.keras.layers.Embedding(\n    input_dim=vocab_size,\n    output_dim=300,\n    weights=embedding_matrix,\n    trainable=False  # KEY: prevent gradient updates\n)\n\n---\n\n# ANTI-PATTERN: Unvalidated fine-tuning without safeguards\nbatsman_embedding = embedding_matrix[word_to_idx['Virat']]\nbowler_embedding = embedding_matrix[word_to_idx['Bumrah']]\n\n# Unbounded gradient updates destroy pre-trained structure\nembedding_layer = tf.keras.layers.Embedding(\n    input_dim=vocab_size,\n    output_dim=300,\n    weights=embedding_matrix,\n    trainable=True  # DANGER: all embeddings updated equally\n)\n\n# No regularization = rare words shift drastically\n# No validation on frozen subset = semantic drift undetected\n# High learning rate = catastrophic forgetting of common words\nmodel.fit(train_data, epochs=100, lr=0.01)  # TOO aggressive",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Unnormalized embedding arithmetic produces meaningless vectors.** Most beginners compute king_embedding - man_embedding + woman_embedding without normalizing intermediate results. This causes magnitude explosion: the result vector has norm 3-4x larger than actual embeddings, making downstream cosine similarity calculations unreliable. The vector points vaguely in the right semantic direction but with inflated confidence. **Fix:** Always normalize embeddings before and after arithmetic operations using L2 normalization: `normalized = embedding / np.linalg.norm(embedding)`. Verify with test cases: (king_vec - man_vec + woman_vec) normalized should have similarity ~0.7-0.8 to queen_vec, not 0.4. Add unit tests checking that embedding_norm stays in range [0.99, 1.01] after operations.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Word embeddings power production systems at massive scale across major tech companies. **Google Search** uses contextual embeddings (BERT variants) to rerank search results and understand query intent at billions of queries/day; switching from static to dynamic embeddings improved click-through rates by 2-3%. **Meta's recommendation engine** embeds user comments and post text using proprietary models derived from fastText to cluster similar engagement patterns, processing 500M+ posts daily. **Netflix** encodes movie titles, genres, and user review text into embedding space to seed collaborative filtering, reducing cold-start recommendation latency from 800ms to 120ms. **Uber** embeds restaurant names, cuisine types, and user reviews in real-time to match requests with listings across 70+ countries. **OpenAI** and other LLM providers invest heavily in learned embeddings as the input layer to transformers—embeddings must capture both syntax and semantic information because the entire 175B-parameter model's quality depends on representation quality. What breaks when done wrong: using raw one-hot encoding instead of embeddings creates 500k-dimensional sparse vectors (memory catastrophe), unscaled embeddings cause gradient vanishing in deep networks, and static embeddings fail on homonym-heavy domains (bank as financial institution vs. river bank get identical vectors). Scale considerations: production systems handle 10M-1B unique tokens, embeddings are cached in Redis/Memcached for <5ms lookup, and model serving requires GPU/TPU clusters costing $100k-$1M annually.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Word embeddings map discrete tokens to continuous vectors preserving semantic relationships; cosine similarity measures semantic closeness with interpretable 0-1 scale.",
+        "Skip-gram and CBOW train embeddings by predicting context from words or vice versa; negative sampling makes training computationally feasible for large vocabularies.",
+        "Vector arithmetic works because embeddings encode compositional meaning: king - man + woman ≈ queen reveals learned gender and leadership dimensions.",
+        "Contextual embeddings (BERT, GPT) generate different vectors for same word in different sentences, capturing polysemy and disambiguation impossible with static methods.",
+        "Production systems choose frozen embeddings for speed/cost, fine-tuned for moderate data, or contextual for high-precision tasks; pick based on latency/accuracy/compute trade-offs.",
+        "Always normalize embeddings before arithmetic to prevent magnitude explosion; validate with unit tests that results stay in expected similarity ranges.",
+        "Real-world deployment at Google, Meta, Netflix, Uber scales to billions of tokens daily using GPU caching, batch processing, and distributed vector lookup systems."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the Skip-Gram model with negative sampling, why do we use negative samples (random words) instead of training on all vocabulary words as false negatives?",
+      "items": [
+        "Negative sampling reduces computational cost from O(V) to O(k) per training example, where k is the number of negative samples (typically 5-20), making training feasible for million-word vocabularies.",
+        "Negative samples guarantee that common words and rare words receive equal gradient updates, preventing bias toward frequent tokens.",
+        "All vocabulary words are too similar to the target word, so they wouldn't provide useful contrastive learning signal for the model.",
+        "Negative sampling forces the embedding space to be exactly orthogonal, ensuring perfect linear separability of word meanings."
+      ],
+      "answer": 0,
+      "explanation": "Negative sampling is a critical optimization technique. Training on all V vocabulary words as negatives creates a softmax with V outputs—for million-word vocabularies this is computationally prohibitive. By sampling only k negative examples (say, 10), we reduce per-example cost from O(V) to O(k), making word2vec practical. Options B and D are incorrect: sampling doesn't equalize gradient flow for rare/common words, and orthogonality isn't the goal (semantically related words should have high cosine similarity, not be orthogonal). Option C misunderstands the purpose—random negatives are deliberately dissimilar to provide contrastive signal, not similar.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket commentary recommendation system. Your training data has 50k examples. You've pre-computed GloVe embeddings trained on 2B-word Wikipedia corpus. Should you freeze these embeddings or fine-tune them during training? Why?",
+      "items": [
+        "Fine-tune the embeddings with learning rate 0.001 because 50k examples is enough data and cricket-specific terminology (yorker, DRS, maiden) needs specialized vectors.",
+        "Freeze the embeddings because 50k examples is relatively small, GloVe vectors already encode rich semantic structure, and cricket vocabulary has substantial overlap with general English; fine-tuning risks catastrophic forgetting on common words and overfitting.",
+        "Use contextual embeddings (BERT) instead because they're universally better than static embeddings regardless of task or compute budget.",
+        "Freeze embeddings for common words (player, ball, runs) but fine-tune sport-specific terms (yorker, googly, DRS) selectively using layer-wise learning rates."
+      ],
+      "answer": 1,
+      "explanation": "With 50k training examples, you're below the threshold (~100k+) where fine-tuning consistently outperforms frozen embeddings. GloVe vectors from a 2B-word corpus already encode rich semantic structure and word relationships. Cricket terminology, while specialized, heavily overlaps with general English (players, strategy, numbers). Freezing prevents overfitting and catastrophic forgetting of general semantic knowledge. Option A overestimates data sufficiency—fine-tuning 50k examples against 2B pre-training creates high variance in updates. Option C ignores compute/latency trade-offs; contextual embeddings add 50-100x inference cost and are overkill for recommendation. Option D (selective fine-tuning) is advanced but requires careful validation and isn't the best first approach for this problem.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

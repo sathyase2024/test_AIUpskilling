@@ -244,6 +244,110 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns have emerged for RAG systems. The **In-Context Learning (ICL)** pattern retrieves k documents and concatenates them directly into the prompt—optimal for LLMs with large context windows (Claude 3, GPT-4 Turbo), low latency requirements, and scenarios where retrieval precision is high. Trade-off: higher token costs and slower inference with verbose context. The **Retrieval-Augmented Generation with Re-ranking** pattern uses fast sparse/dense retrieval first, then applies cross-encoder reranking before passing top-N results to the LLM—best for cost-sensitive applications (smaller context budgets), lower retrieval quality datasets, and when latency overhead is acceptable. The **Adaptive Retrieval** pattern conditionally fetches documents only when the LLM's confidence is low (Self-RAG, LLaMA-2 patterns)—ideal for reducing token consumption, mixed-difficulty query distributions, and systems where 70% of queries don't need external knowledge. Cost scales inversely with retrieval quality; poor chunking forces over-fetching, while aggressive reranking adds inference overhead but dramatically improves answer quality.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: **In-Context Learning** is like keeping your best 11 players on the field for all 50 overs—maximum capability but expensive energy. **Retrieval with Re-ranking** mirrors your captain using only specialist batsmen and bowlers per situation; you scout (retrieve) six candidates, watch their warm-up performance (rerank), then select the three best—slightly slower team assembly but optimal resource allocation. **Adaptive Retrieval** resembles DRS usage: you only challenge umpire decisions (fetch external context) when confidence is genuinely low, not reflexively. A team with poor field intelligence (weak retrieval) burns DRS reviews frantically; a team with sharp scouts (strong vector DB) uses exactly what they need. Your bowling rotation (chunk strategy) determines whether you need frequent substitutions (over-retrieval) or can maintain continuity with minimal changes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Adaptive retrieval with confidence-based augmentation\nclass CricketMatchAnalyzer:\n    def __init__(self, llm, retriever, confidence_threshold=0.7):\n        self.llm = llm\n        self.retriever = retriever\n        self.threshold = confidence_threshold\n\n    def analyze_match_strategy(self, query):\n        # First attempt: direct LLM reasoning\n        initial_response = self.llm.generate(query)\n        confidence = self._extract_confidence(initial_response)\n        \n        # Conditional retrieval: only fetch if uncertain\n        if confidence < self.threshold:\n            documents = self.retriever.retrieve(query, top_k=5)\n            reranked = self._rerank_documents(documents, query)\n            augmented_prompt = f\"{query}\\n\\nContext: {reranked}\"\n            final_response = self.llm.generate(augmented_prompt)\n            return final_response\n        return initial_response\n\n# ANTI-PATTERN: Unconditional, aggressive retrieval\nclass PoorBowlingRotation:\n    def analyze_match_strategy(self, query):\n        # Always fetch 20 documents, pass all to LLM (wasteful)\n        documents = self.retriever.retrieve(query, top_k=20)\n        all_docs_concat = \"\\n\".join([d.text for d in documents])\n        # High token cost, noisy context, slower inference\n        response = self.llm.generate(f\"{query}\\n{all_docs_concat}\")\n        return response",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Ignoring chunk boundary semantics in retrieval**—Beginners often use fixed chunk sizes (512 tokens) without checking if semantic boundaries (paragraphs, sections) align, causing retrieved chunks to end mid-sentence or split concepts. This degrades similarity search quality and forces the LLM to infer missing context. **Fix:** Analyze your documents for natural boundaries (headers, blank lines, sentence endings) and use semantic-aware chunking (split_documents with overlap_size=50, or leverage tools like LangChain's RecursiveCharacterTextSplitter). Validate: manually inspect 10 random chunks—each should contain a complete thought. If chunks routinely cut off topics, reduce chunk_size or implement document-structure-aware splitting.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RAG powers production systems at massive scale: **Google's Search Generative Experience (SGE)** retrieves billions of web pages daily, filtering through dense embeddings before ranking. **OpenAI's GPT-4 with plugins** uses RAG for real-time data (financial markets, sports scores—including live cricket statistics). **Netflix** applies RAG internally to match user queries against massive show metadata and recommendations. **Uber** uses retrieval-augmented routing for driver-query disambiguation (ambiguous locations, historical trip data). **Meta** deploys RAG in content moderation, matching suspicious posts against violation patterns at billions-per-day throughput. **Airbnb** retrieves guest reviews and property features to generate personalized descriptions. Systems break when retrieval latency exceeds 200ms (user-facing), when embedding spaces become stale (outdated document indexes), or when reranking overhead outweighs quality gains. At this scale, approximate nearest neighbor indexes (Faiss, Qdrant) and batch reranking become essential. A single poorly-chosen chunk_size forces re-indexing of petabyte-scale corpuses—months of downtime and millions in infrastructure cost.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "RAG combines retrieval and generation: dense/sparse vectors find candidates, rerankers filter, LLMs synthesize—not a pipeline but an integrated reasoning loop.",
+        "Chunk size and overlap directly impact quality: smaller chunks reduce noise but increase retrieval count; overlap preserves semantic continuity across boundaries.",
+        "Hybrid retrieval (BM25 + embeddings) outperforms single modality; sparse catches exact keywords, dense captures semantic intent—combine via RRF or learned weights.",
+        "Cross-encoder reranking is computationally expensive but dramatically improves top-k precision; use only on candidate sets (<100 docs), not the entire corpus.",
+        "Embedding staleness and vector space drift degrade performance over months; implement re-embedding cycles and monitor cosine similarity distribution shifts.",
+        "Adaptive retrieval reduces token costs by conditionally augmenting only low-confidence LLM outputs; requires confidence calibration, not raw probability estimates.",
+        "Production RAG requires monitoring: retrieval recall, reranking NDCG, end-to-end latency, and LLM hallucination rates—set SLOs and alert on degradation."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a RAG system processing cricket match commentaries, you retrieve 10 documents using dense embeddings, but the reranker promotes a document ranked 8th to position 1. Which mechanism explains this ranking flip, and what does it tell you about retrieval quality?",
+      "items": [
+        "The cross-encoder reranker has a different semantic understanding than the embedding model; this signals weak embedding quality or domain mismatch.",
+        "The dense retriever prioritizes recency; reranking corrects for temporal bias automatically.",
+        "The reranker uses sparse BM25 scores to break ties; this is expected behavior and indicates the system is working correctly.",
+        "The documents were poorly chunked; reranking cannot fix upstream retrieval errors and this flip should be ignored."
+      ],
+      "answer": 0,
+      "explanation": "Cross-encoders compute relevance differently than bi-encoders: they jointly encode the query and document, capturing fine-grained interaction patterns that embedding similarity alone misses. A large rank flip (8th → 1st) suggests the dense retriever and reranker operate in different semantic spaces—either your embedding model is poorly fine-tuned for your domain (cricket commentaries may need sport-specific training), or your query-document pairs don't align with the embedding model's training distribution. Option B is incorrect because dense retrievers don't inherently prioritize recency. Option C misunderstands the role of reranking—it's applied to top-k candidates, not to break ties. Option D is too dismissive; reranking cannot fix poor upstream retrieval (if all relevant docs are outside top-10), but a single rank flip indicates the candidate set was diverse enough—reranking simply re-ordered them correctly. This signals you should audit your embedding fine-tuning or consider domain-adapted models."
+    },
+    {
+      "type": "quiz",
+      "content": "Your RAG system processes player statistics documents chunked at 768 tokens with 128-token overlap. Users complain that queries about 'Virat Kohli's batting average in ODIs' return irrelevant chunks mixing his Test stats and other players' ODI data. What is the most likely root cause and how would you fix it?",
+      "items": [
+        "The chunk size is too large and crosses document boundaries; reduce to 256 tokens and re-index.",
+        "The embedding model wasn't fine-tuned on cricket data; retrain the embedding model on cricket corpus.",
+        "Chunks are splitting semantic units (player profiles, match formats); implement document-structure-aware chunking that respects 'Player > Format > Metric' hierarchy.",
+        "The retriever is using BM25 instead of dense embeddings; switch to pure dense retrieval and increase top_k from 10 to 50."
+      ],
+      "answer": 2,
+      "explanation": "The problem described is classic semantic boundary misalignment: 'Virat Kohli ODI stats' and 'Other player ODI stats' or 'Virat Kohli Test stats' are conceptually distinct, but naive token-based chunking (768 tokens) doesn't respect these logical separations. A 768-token chunk might start mid-player-profile and end mid-format, mixing entities and contexts. Reducing chunk size (Option A) helps partially but doesn't solve the root issue—you'd still need to align boundaries. Fine-tuning embeddings (Option B) improves but doesn't eliminate poorly-chunked input; garbage in, garbage out. Increasing retrieval scope (Option D) is a band-aid masking poor chunking. **The fix:** Parse document structure (e.g., regex or XML tags for Player/Format/Metric), chunk along these boundaries, then set chunk_size as a fallback only if a section exceeds it. This ensures 'Virat Kohli + ODI' chunks stay together, and similarity search correctly distinguishes format-specific stats. Re-index with structured chunking, and recall will improve dramatically."
     }
   ]
 }

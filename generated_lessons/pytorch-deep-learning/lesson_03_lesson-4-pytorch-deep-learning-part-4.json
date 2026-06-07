@@ -203,6 +203,114 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge in deep learning workflows: (1) **Checkpoint-Resume Loops** — save model state at regular intervals, enabling recovery from hardware failures and experimental branching without retraining from scratch. Used when training spans days/weeks on large datasets. Trade-off: storage overhead (100GB+ for large models) versus time savings (restart in seconds). (2) **Gradient Accumulation** — accumulate gradients over multiple forward passes before updating weights, simulating larger batch sizes when GPU memory is limited. Critical for fine-tuning large language models where true batch size 256 requires 8× accumulation steps on consumer hardware. Cost: 8× slower per epoch but enables training impossible otherwise. (3) **Mixed-Precision with Automatic Loss Scaling** — cast forward passes to float16 for speed/memory, keep gradients in float32, dynamically scale loss to prevent underflow. Adopted by OpenAI, Meta, Google for transformer training. Trade-off: 2× speedup, 50% memory savings versus subtle numerical instability if scaling poorly tuned. When wrong: NaN gradients halt training entirely.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: **Checkpoint-Resume Loops** are like saving match footage at each over — if rain stops play mid-innings, you resume exactly where you left off rather than replaying the entire first day. **Gradient Accumulation** mirrors a batting partnership where a batsman accumulates 30 runs across 6 deliveries before rotating strike — each run (gradient) builds toward a decisive moment (weight update), allowing smaller bats (GPUs) to face deliveries meant for larger grounds. **Mixed-Precision Training** parallels using a lighter bat (float16 calculations) for boundaries but reverting to traditional technique (float32) for precise placement — you gain speed and agility while maintaining accuracy where it matters most, but miscalibrate and you'll edge to slip fielders (NaN gradients).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: No checkpointing, loses all progress on crash\nfor epoch in range(100):\n    for batch in train_loader:\n        optimizer.zero_grad()\n        outputs = model(batch['wickets'])\n        loss = criterion(outputs, batch['runs'])\n        loss.backward()\n        optimizer.step()\n    # Training halts on hardware failure at epoch 47 — restart from epoch 0\n\n# BEST PRACTICE: Checkpoint with resume logic\nimport torch\n\ncheckpoint_path = 'cricket_model_checkpoint.pt'\nstart_epoch = 0\n\n# Load checkpoint if exists\nif os.path.exists(checkpoint_path):\n    checkpoint = torch.load(checkpoint_path)\n    model.load_state_dict(checkpoint['model_state'])\n    optimizer.load_state_dict(checkpoint['optimizer_state'])\n    start_epoch = checkpoint['epoch']\n    print(f\"Resumed from epoch {start_epoch}\")\n\nfor epoch in range(start_epoch, 100):\n    for batch in train_loader:\n        optimizer.zero_grad()\n        outputs = model(batch['wickets'])\n        loss = criterion(outputs, batch['runs'])\n        loss.backward()\n        optimizer.step()\n    \n    # Save checkpoint every epoch\n    torch.save({\n        'epoch': epoch + 1,\n        'model_state': model.state_dict(),\n        'optimizer_state': optimizer.state_dict(),\n        'loss': loss.item()\n    }, checkpoint_path)\n    print(f\"Checkpoint saved at epoch {epoch + 1}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Forgetting to call optimizer.zero_grad() or using inplace operations on leaf tensors requires_grad=True.** Beginners often accumulate gradients unintentionally across loop iterations, causing explosion or unexpected weight updates. FIX: Always call `optimizer.zero_grad()` at the START of each training step. For inplace operations (e.g., `tensor += 5`), use out-of-place alternatives: `tensor = tensor + 5`. Verify with: `print(param.grad)` — should be None or properly shaped, never accumulated.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At scale, these patterns are non-negotiable. **Google** trains models like PaLM (540B parameters) on TPU pods using gradient accumulation and checkpointing every 15 minutes — failure recovery saves weeks. **Meta** (formerly Facebook) uses mixed-precision training in production recommendation systems serving billions of daily users, reducing inference latency by 40% while maintaining ranking quality. **OpenAI** relies on checkpoint-resume loops and distributed gradient computation across clusters of GPUs for GPT training, where retraining costs exceed $10M per failed run. **Uber** applies these in real-time demand prediction, where stale models cost revenue; checkpointing enables A/B testing new architectures without production outage. **Netflix** uses mixed-precision for personalization models on millions of user interactions, balancing memory constraints with recommendation freshness. What breaks when done wrong: (1) losing days of training progress, (2) OOM errors forcing smaller batches and unstable gradients, (3) numerical underflow producing NaN loss — entire training pipeline halts. Production teams maintain 2-3 redundant checkpoints and test recovery protocols monthly.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Checkpoint-resume loops prevent loss of training progress; save model+optimizer state every epoch in production systems.",
+        "Gradient accumulation enables large effective batch sizes on memory-constrained hardware without architectural changes.",
+        "Mixed-precision training (float16 forward, float32 backward) delivers 2× speedup and 50% memory reduction with careful loss scaling.",
+        "Distributed training requires synchronized gradient updates across devices; use torch.nn.parallel or torch.distributed for multi-GPU/multi-node setups.",
+        "Learning rate scheduling (cosine annealing, warm restarts) stabilizes convergence; tune schedule alongside batch size for reproducibility.",
+        "Hyperparameter tuning via grid search or Bayesian optimization requires proper train/val/test splits; avoid data leakage across splits.",
+        "Monitor gradient norms, loss curves, and validation metrics continuously; NaN/Inf gradients indicate learning rate too high or numerical instability."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You are training a cricket match outcome prediction model (128M parameters) on a single GPU with 12GB VRAM. Your batch size of 64 causes OOM errors. Which approach is MOST appropriate and WHY?",
+      "items": [
+        "Use gradient accumulation with accumulation steps=4, batch_size=16. Accumulate 4 forward passes before optimizer.step(), simulating batch_size=64 without exceeding GPU memory.",
+        "Immediately switch to a smaller model (32M parameters). Smaller models always train faster and use less memory.",
+        "Use mixed-precision training only. Float16 activations alone will solve the OOM problem without changing batch dynamics.",
+        "Reduce learning rate and train with batch_size=8. Lower learning rate compensates for smaller batches without GPU modifications."
+      ],
+      "answer": 0,
+      "explanation": "Option 0 is correct: gradient accumulation with smaller batches simulates the effective batch size of 64 while keeping peak GPU memory low. With accumulation_steps=4 and batch_size=16, you forward-pass 4× 16-sample batches, accumulate gradients without zeroing, then step — equivalent to batch_size=64 gradient updates without OOM. This preserves training dynamics (noise level, learning rate schedule assumptions). Option 1 (smaller model) changes architecture and may reduce accuracy unacceptably. Option 2 (mixed-precision only) helps memory but doesn't fully solve OOM for 128M params at batch_size=64. Option 3 (lower LR) is a learning rate adjustment, not a memory solution—batch_size=8 introduces high gradient noise requiring extensive tuning.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You notice your cricket model's validation loss stops improving after epoch 30, but training loss continues decreasing. You have access to distributed training (4 GPUs) and suspect the learning rate schedule is too aggressive. What is your FIRST diagnostic action?",
+      "items": [
+        "Immediately increase batch size 4× (use all 4 GPUs), lower learning rate to 0.0001, and restart training. Larger batches reduce gradient noise.",
+        "Plot gradient norms during training and check if they are exploding (>1.0) or vanishing (<1e-5). Use gradient clipping if exploding, and verify the learning rate schedule matches your batch size.",
+        "Add L2 regularization (weight decay) to reduce overfitting, reduce learning rate by 10×, and save checkpoints every 5 epochs.",
+        "Switch to a different optimizer (Adam instead of SGD) and enable mixed-precision training to stabilize gradients."
+      ],
+      "answer": 1,
+      "explanation": "Option 1 (gradient norm diagnostics) is the correct first step: it directly reveals whether your learning rate is misaligned with batch size and gradient magnitudes. Exploding gradients (norm >1.0) indicate need for gradient clipping or lower LR; vanishing gradients (<1e-5) suggest LR too low or poor initialization. This diagnoses the ROOT CAUSE before making changes. Option 0 (4× batch size + lower LR) is premature—larger batches reduce gradient noise but may require different schedule entirely; lowering LR arbitrarily masks the underlying issue. Option 2 (L2 regularization) addresses overfitting symptoms, not learning rate schedule problems. Option 3 (optimizer/mixed-precision switch) doesn't diagnose or fix schedule misalignment; these are separate optimizations after diagnosis.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

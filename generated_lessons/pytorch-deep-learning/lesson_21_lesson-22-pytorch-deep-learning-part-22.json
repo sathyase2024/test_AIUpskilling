@@ -203,6 +203,110 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant patterns govern custom autograd production deployments: (1) **Stateless Mathematical Functions** — pure computations with no side effects, ideal for loss functions, activation transformations, and normalizations. Trade-off: maximum composability and gradient stability, but requires precomputing all intermediate states in forward. Cost: memory overhead for large batches. (2) **Stateful Gradient Caching** — storing intermediate activations explicitly to avoid recomputation during backward. Used in attention mechanisms (Flash-Attention), memory-efficient training. Trade-off: trades compute for memory; fails catastrophically if cache invalidation is mishandled. Cost: debugging complexity. (3) **Numerical Stability Wrappers** — custom functions that enforce dtype conversions, clipping, or log-space arithmetic to prevent NaN/Inf propagation. Essential for transformer backprops, GAN training, reinforcement learning. Trade-off: adds 3-5% compute overhead but prevents silent gradient collapse. Cost: requires domain knowledge to implement correctly. Choose stateless for research, stateful for production inference-critical paths, stability wrappers universally for numerical edge cases.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: **Stateless Mathematical Functions** are like attacking shots—pure, repeatable, no memory needed. **Stateful Gradient Caching** is like field placement in death overs: you *must* pre-position fielders (cache activations) before the bowler runs in (backward pass), because repositioning mid-delivery costs time and momentum. **Numerical Stability Wrappers** are like DRS (Decision Review System)—you add a verification layer before committing to a critical decision (gradient update). Just as a captain chooses different strategies against spin vs. pace, you select patterns based on whether you're optimizing for speed (stateless), memory efficiency (stateful), or safety (stability wrappers). Mixing patterns without clear logic is like changing field placements randomly—it confuses your team and breaks momentum.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Stateless mathematical function with clear contracts\nimport torch\nimport torch.nn as nn\nfrom torch.autograd import Function\n\nclass CricketBattingScore(Function):\n    \"\"\"Custom autograd for computing weighted batting average.\n    Pure function: no side effects, all state from inputs.\"\"\"\n    \n    @staticmethod\n    def forward(ctx, runs, balls, confidence_weight):\n        # Compute batting average (runs/balls)\n        avg = runs / (balls + 1e-8)\n        weighted_score = avg * confidence_weight\n        \n        # Cache only what's necessary for backward\n        ctx.save_for_backward(runs, balls, confidence_weight)\n        return weighted_score\n    \n    @staticmethod\n    def backward(ctx, grad_output):\n        runs, balls, confidence_weight = ctx.saved_tensors\n        \n        grad_runs = grad_output * confidence_weight / (balls + 1e-8)\n        grad_balls = -grad_output * confidence_weight * runs / ((balls + 1e-8) ** 2)\n        grad_weight = grad_output * (runs / (balls + 1e-8))\n        \n        return grad_runs, grad_balls, grad_weight\n\n# ❌ ANTI-PATTERN: Stateful with implicit dependencies\nclass BadBowlingAnalysis(Function):\n    \"\"\"Danger: global state leaked into autograd.\"\"\"\n    \n    cache = {}  # Global state—NEVER DO THIS\n    \n    @staticmethod\n    def forward(ctx, wickets, economy):\n        # Modifying global cache breaks gradient computation\n        # in parallel/distributed scenarios\n        BadBowlingAnalysis.cache['wickets'] = wickets\n        result = wickets * economy\n        ctx.save_for_backward(economy)\n        return result\n    \n    @staticmethod\n    def backward(ctx, grad_output):\n        # Cache may be overwritten by concurrent forward calls\n        economy, = ctx.saved_tensors\n        return grad_output * economy, grad_output * 0\n\n# USAGE: Best practice\nruns = torch.tensor([45.0], requires_grad=True)\nballs = torch.tensor([60.0], requires_grad=True)\nconfidence = torch.tensor([0.95], requires_grad=True)\n\nscore = CricketBattingScore.apply(runs, balls, confidence)\nloss = score.sum()\nloss.backward()\n\nprint(f\"Gradient for runs: {runs.grad}\")\nprint(f\"Gradient for balls: {balls.grad}\")\nprint(f\"Gradient for confidence: {confidence.grad}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Forgetting to save tensors in forward() that backward() needs.** This is the #1 source of silent NaN gradients in custom autograd. If you reference `ctx.saved_tensors` in backward but never called `ctx.save_for_backward()`, you get an empty tuple. The gradient computation silently fails or uses stale values. **Fix:** Use a checklist—every tensor used in backward() must be explicitly saved in forward(). Example: if backward uses `runs` and `balls`, MUST call `ctx.save_for_backward(runs, balls)` before returning. Use pytest with `torch.autograd.gradcheck()` to catch this automatically: `gradcheck(CricketBattingScore.apply, (runs, balls, confidence), eps=1e-6, atol=1e-4)` will fail if saved tensors are missing.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Custom autograd functions power production ML systems at scale. **Google** uses them in TPU-optimized attention kernels (Transformer-XL, PaLM) to fuse gradient computations, reducing memory by 40% at billion-parameter scale. **Meta's** PyTorch team embedded custom autograd in `torch.cuda.nccl` for distributed training, enabling trillion-parameter models like LLaMA without gradient accumulation overflow. **OpenAI** leverages stateful gradient caching in GPT training pipelines—recomputing activations would cost 2x wall-clock time at 1.7T parameters. **Netflix** uses numerical stability wrappers in recommendation ranking functions processing 5B+ user interactions daily; without them, gradient underflow crashes gradient descent after ~100 steps. **Uber** implements custom functions in motion prediction models handling 50K+ concurrent inference requests. **Airbnb** applies pattern matching optimization for price prediction models spanning 100+ feature transformations. Scale breaks when: (1) global state in custom functions causes race conditions in multi-GPU training (2) missing tensor saves cause NaN propagation silently affecting 10% of batches (3) backward-incompatible dtype assumptions cause silent precision loss. Production systems require automatic gradient checking on every deploy.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Custom autograd functions enable algorithmic differentiation at the lowest level by implementing forward/backward contracts explicitly.",
+        "Use torch.autograd.Function for operations where PyTorch's automatic differentiation is inefficient, numerically unstable, or architecturally incompatible.",
+        "Always save necessary tensors in forward() for use in backward(); missing saves cause silent NaN gradient propagation in production.",
+        "Stateless mathematical functions maximize composability and debugging; stateful caching trades memory for compute efficiency in inference-critical paths.",
+        "Numerical stability wrappers (log-space arithmetic, dtype management) prevent gradient collapse in transformer, GAN, and RL workloads at scale.",
+        "Validate custom autograd with torch.autograd.gradcheck() before deployment to catch derivative implementation errors automatically.",
+        "Production systems require context isolation to prevent race conditions in distributed training—never use global state in custom function implementations."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a custom autograd function, you compute an intermediate value `intermediate_activation` in the forward pass that is essential for the backward pass gradient computation. Which of the following is the CORRECT approach?",
+      "items": [
+        "Save intermediate_activation using ctx.save_for_backward(intermediate_activation) in forward(), then retrieve it in backward() via ctx.saved_tensors",
+        "Store intermediate_activation as a class attribute and access it directly in backward() without using ctx.save_for_backward()",
+        "Recompute intermediate_activation from scratch in backward() using the input tensors saved in forward()",
+        "Use a global dictionary to cache intermediate_activation, keyed by tensor id, and access it in backward()"
+      ],
+      "answer": 0,
+      "explanation": "Option A is correct because ctx.save_for_backward() is the official PyTorch mechanism for preserving tensor state across forward/backward boundaries. It handles device placement, autograd tracking, and memory safety automatically. Option B fails in distributed/multi-GPU scenarios where class attributes can be overwritten by concurrent forward calls. Option C wastes compute by recomputing activations (defeats the purpose of caching). Option D is dangerous and will cause race conditions, silent state corruption in parallel training, and makes debugging impossible—it violates PyTorch's autograd contract entirely. The ctx object is thread-safe and designed specifically for this use case."
+    },
+    {
+      "type": "quiz",
+      "content": "Your team deployed a custom autograd function for a ranking loss in production. After 48 hours, you observe that gradients become NaN for ~5% of batches, and the model stops learning. You suspect the custom backward() implementation is missing a gradient computation for one of the inputs. What is the BEST way to detect and fix this issue BEFORE production?",
+      "items": [
+        "Add try-catch blocks around backward() to log NaN occurrences and manually inspect loss values",
+        "Use torch.autograd.gradcheck() on a small batch with the same inputs to verify all gradients are computed correctly",
+        "Increase the learning rate to overwhelm the NaN effect and retrain from scratch",
+        "Deploy a monitoring alert that triggers when >1% of gradients are NaN, then investigate in production"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct because torch.autograd.gradcheck() uses finite differences to automatically verify that your backward() implementation matches numerical gradient approximation. It catches missing gradient terms, wrong formulas, and shape mismatches before deployment. Running it as a unit test prevents the NaN cascade entirely. Option A is reactive and post-hoc—NaN data is already corrupted by then. Option C masks the root cause and wastes compute. Option D catches the problem only after user impact, costing money and trust. torch.autograd.gradcheck() takes <1 second on small tensors and should be part of your CI/CD pipeline for any custom Function before merging to main."
     }
   ]
 }

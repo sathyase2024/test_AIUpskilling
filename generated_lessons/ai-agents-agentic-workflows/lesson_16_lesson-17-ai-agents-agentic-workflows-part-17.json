@@ -250,6 +250,110 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production agentic workflows follow three dominant patterns: Sequential Pipeline (agents execute in fixed order with explicit handoffs), Hierarchical Tree (parent agents decompose tasks and supervise child agents), and Peer-to-Peer Network (agents negotiate task allocation via consensus protocols). Sequential Pipeline minimizes coordination overhead and is deterministic—ideal for well-defined workflows like data ingestion→validation→transformation→storage, but brittle when task dependencies are unknown. Hierarchical Tree excels at complex decomposition with clear ownership levels (like multi-stage ML pipelines), but introduces latency at each level and potential bottlenecks at parent nodes. Peer-to-Peer Networks provide fault tolerance and adaptive load balancing (agents self-organize around capacity), but require sophisticated consensus mechanisms and struggle with deadlock scenarios. Cost trade-offs: Sequential is cheapest (minimal inter-agent calls) but slowest; Hierarchical balances latency and control; P2P is fastest for dynamic workloads but incurs 3-5x communication overhead. Choose Sequential for deterministic batch operations, Hierarchical for ML/data systems with clear task structure, and P2P for real-time systems requiring resilience.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Sequential Pipeline is like a predetermined bowling attack—your opening bowlers, middle-order pace, and spinners bowl in fixed rotation regardless of match conditions; reliable but inflexible. Hierarchical Tree mirrors team captaincy: the captain (parent) analyzes match state, assigns bowlers, positions fielders, and oversees strategy, with clear delegation to vice-captain and senior players; adds control but slows decision-making. Peer-to-Peer Network is like a dynamic field placement where all fielders communicate equally, suggesting repositioning in real-time based on batter behavior and ball movement; highly adaptive but risks miscommunication if a fielder suddenly switches zones without consensus. Sequential works for T20 powerplay (fixed aggressive strategy); Hierarchical for Test cricket (complex multi-day plans with captain oversight); P2P for crisis moments (everyone adjusting on the fly).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Hierarchical with explicit supervision and timeout guards\nclass CricketMatchOrchestrator(ParentAgent):\n    async def decompose_innings_strategy(self, match_state: MatchState) -> List[Task]:\n        \"\"\"Parent agent breaks complex match into supervised subtasks\"\"\"\n        tasks = [\n            Task(agent='opening_bowler', job='analyze_batter_weakness', timeout=30),\n            Task(agent='field_manager', job='optimize_field_placement', timeout=20),\n            Task(agent='spinners_coordinator', job='plan_bowling_rotation', timeout=25)\n        ]\n        return tasks\n    \n    async def execute_with_fallback(self, task: Task):\n        try:\n            result = await asyncio.wait_for(\n                self.child_agents[task.agent].execute(task),\n                timeout=task.timeout\n            )\n            return result\n        except asyncio.TimeoutError:\n            return self.fallback_strategy(task)  # Use cached plan\n\n# ANTI-PATTERN: Flat peer network with no coordination, causing task duplication\nclass BadCricketMatchManager:\n    def __init__(self):\n        self.agents = [BowlerAgent(), BowlerAgent(), BowlerAgent()]  # No hierarchy\n    \n    async def execute_all_agents_freely(self, match_state):\n        # Each bowler independently decides when to bowl—no coordination!\n        # Result: 3 bowlers bowling simultaneously, missing gaps, wasting balls\n        tasks = await asyncio.gather(*[\n            agent.decide_next_bowl(match_state) for agent in self.agents\n        ])\n        return tasks  # Chaos—duplicate decisions, no supervision",
+      "level": 2,
+      "language": "python",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Agents Executing Without Explicit Task Ownership—the most common beginner mistake. Symptom: Multiple agents process the same task independently (e.g., two validation agents both check the same data batch), causing duplicate computation, conflicting state updates, and silent failures. Fix: Implement explicit task leasing—before an agent executes, it must acquire a distributed lock (Redis, Consul, Zookeeper) with a TTL. If task_id='validate_batch_42', only ONE agent holds the lock; others skip. Use a central task queue (Kafka, RabbitMQ, SQS) where each task is consumed exactly once. Add ownership metadata: {'task_id': '42', 'owner_agent': 'validator_3', 'lease_expiry': 1699564800}. Monitor lock contention in your observability layer—if >2 agents frequently compete for the same task, your task decomposition is too coarse.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At scale, agentic workflows power production systems at Google (using Agents in Vertex AI for multi-step document processing and recommendation ranking), Netflix (autonomous agents manage encoding pipelines—decomposing video transcoding into parallel bitrate agents), Uber (dispatch orchestration agents coordinate driver-matching, routing, and payment—all hierarchical with fallback to rule-based systems), OpenAI (internal agents handle prompt routing, safety classification, and model selection), Meta (ads optimization uses peer-agent networks to bid allocation and budget forecasting), and Airbnb (booking confirmation involves sequential agents for payment verification, host notification, and traveler sync). Typical scale: 1000s of concurrent agents processing millions of tasks/day. What breaks: Lack of determinism—agents non-deterministically retry, causing duplicate bookings (solved via idempotency tokens). Message loss in inter-agent comms—task assigned but never executed (solved via persistent task queues and acknowledgments). Cascading failures—one slow agent blocks parent, cascading timeout (solved via per-agent SLOs and async decomposition). Cost at scale: Communication overhead becomes 40-60% of total latency if agents don't batch requests. Organizations often move from Hierarchical to P2P when task dependencies become too dynamic (Netflix video encoding learns runtime characteristics and rebalances).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Agents are autonomous reasoning units that observe state, plan actions, and execute—not static pipelines; they require explicit failure detection and recovery mechanisms.",
+        "Hierarchical agent orchestration scales better than flat peer networks; parent agents decompose tasks with bounded depth to minimize latency and coordination overhead.",
+        "Dynamic task decomposition adapts to runtime conditions—use it when task dependencies are discovered at execution time, not planned in advance.",
+        "Inter-agent communication must be asynchronous, logged, and idempotent to prevent lost messages, duplicate work, and race conditions in distributed settings.",
+        "Failure detection relies on heartbeats, timeouts, and checksums; recovery uses cached fallbacks, task re-delegation, or circuit breakers to prevent cascading failures.",
+        "Common patterns: Sequential (deterministic, cheap), Hierarchical (balanced), Peer-to-Peer (resilient)—choose based on task structure and latency requirements.",
+        "Production systems fail when agents lack explicit task ownership—use distributed locks and immutable task queues to ensure exactly-once execution semantics."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're designing an agent system for a cricket match analysis platform. Incoming matches must be analyzed in this sequence: fetch_match_data → validate_data → compute_statistics → generate_insights → publish_report. Each step depends on the previous one. The workload is predictable and comes in batch jobs (1000s of matches/night). Which orchestration pattern is BEST and why?",
+      "items": [
+        "Sequential Pipeline—deterministic order, no coordination overhead, cheaper than alternatives",
+        "Peer-to-Peer Network—allows all agents to negotiate work simultaneously, maximizing throughput",
+        "Hierarchical Tree with parent supervision—most flexible for future feature expansion",
+        "Dynamic multi-agent consensus—enables agents to vote on the next step collectively"
+      ],
+      "answer": 0,
+      "explanation": "Sequential Pipeline is correct because the task dependencies are explicit and fixed (fetch→validate→compute→publish with no branching or conditionals). P2P Networks add unnecessary coordination overhead when execution order is already known—you'd waste time on consensus negotiations that achieve nothing. Hierarchical Tree adds latency with parent-child round-trips when a simple chain suffices. Dynamic consensus is overkill for deterministic workflows. Sequential is cheapest (minimal inter-agent calls, minimal state management) and fastest (agents execute immediately when upstream completes). For batch workloads with predictable dependencies, flat orchestration beats hierarchical. The cost savings scale at 1000s of matches/night—Hierarchical might add 500ms per match, costing hours in aggregate runtime."
+    },
+    {
+      "type": "quiz",
+      "content": "During a cricket match simulation, your validation_agent detects corrupted player stats but fails to notify the compute_statistics_agent before timing out. The compute_statistics_agent proceeds with stale data, and your report is published with errors. Your monitoring shows no explicit task ownership or acknowledgment protocol. What's the ROOT CAUSE and the ONE-STEP FIX?",
+      "items": [
+        "Agents need longer timeouts; increase validation_agent timeout from 30s to 60s to allow more time",
+        "Implement distributed task locking—validation_agent must acquire an exclusive lock on the match_id before starting, and compute_statistics_agent checks the lock status before proceeding",
+        "Add retry logic to validation_agent so it re-attempts if the compute_statistics_agent doesn't acknowledge within 5 seconds",
+        "Validation and compute agents should run in parallel, not sequentially, to avoid blocking delays"
+      ],
+      "answer": 1,
+      "explanation": "The root cause is lack of explicit task ownership and synchronization. Without distributed locking, validation_agent and compute_statistics_agent operate independently—validation_agent may fail silently while compute_statistics_agent proceeds unaware. Simply increasing timeouts (Option A) masks the problem; the compute agent will still process corrupt data if validation fails. Option C (retry logic) assumes the compute agent checks for failures, but if there's no acknowledgment protocol, it won't. Option D (parallel execution) would make the problem worse by removing the sequential dependency. The correct fix is distributed task locking (Option B)—validation_agent must acquire an exclusive lock on match_id='cricket_sim_42' before validating. If it fails, it releases the lock without marking completion. Compute_statistics_agent checks the lock: if no valid completion marker exists, it either waits or falls back. This ensures exactly-once execution and prevents processing of invalid data. This is the pattern used at Netflix and Uber for critical workflows."
     }
   ]
 }

@@ -203,6 +203,51 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production TensorFlow systems typically follow three established patterns: (1) **Graph Mode for inference pipelines** — use tf.function with fixed input signatures to serialize models across distributed serving infrastructure (TensorFlow Serving, TFLite). This trades flexibility for 30-50% latency reduction and enables mobile/edge deployment. (2) **Eager Mode for research and training loops** — leverage dynamic control flow, imperative debugging, and Pythonic iteration during model development. Cost: 2-3x slower execution, but drastically faster iteration cycles. (3) **Mixed execution** — use eager mode during training with @tf.function only on the training step, keeping the validation/eval loop dynamic for flexible metrics. This balances development velocity against production optimization. The key trade-off: Graph mode requires static shapes and control flow known at trace time; eager mode has full Python flexibility but cannot be serialized or cross-platform deployed. Choose graph mode when serving latency and deployment portability matter; choose eager when experimentation speed and debugging clarity are critical.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Graph Mode is like a pre-planned field placement and bowling strategy locked in before the match starts—you commit to your slip cordon, mid-field, and pace-spinner rotation in advance. Once the match begins, you cannot dynamically adjust. It's rigid but maximally efficient because every player knows their exact role. Eager Mode is like a captain making real-time field adjustments after each over—moving fielders based on the batter's stance, changing bowlers mid-spell, calling for DRS reviews on the fly. It's flexible and responsive but slower because decisions are made on-the-fly. Mixed execution is like your pre-planned strategy (graph) for the death overs, but dynamic field placements (eager) during the middle overs. In production, you lock your inference strategy like a pre-planned field, but keep training dynamic like captaincy adjustments.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Mixed execution pattern for training\nimport tensorflow as tf\n\nclass BatsmanPerformanceModel(tf.keras.Model):\n    def __init__(self):\n        super().__init__()\n        self.dense1 = tf.keras.layers.Dense(128, activation='relu')\n        self.dense2 = tf.keras.layers.Dense(64, activation='relu')\n        self.output_layer = tf.keras.layers.Dense(1)\n    \n    def call(self, inputs, training=False):\n        x = self.dense1(inputs)\n        x = self.dense2(x)\n        return self.output_layer(x)\n\nmodel = BatsmanPerformanceModel()\noptimizer = tf.keras.optimizers.Adam()\n\n# Wrap ONLY the training step in tf.function (graph mode)\n@tf.function\ndef train_step(batsman_stats, run_target):\n    with tf.GradientTape() as tape:\n        predictions = model(batsman_stats, training=True)\n        loss = tf.reduce_mean(tf.square(predictions - run_target))\n    gradients = tape.gradient(loss, model.trainable_variables)\n    optimizer.apply_gradients(zip(gradients, model.trainable_variables))\n    return loss\n\n# Keep validation in eager mode for flexible metric computation\ndef validate_step(batsman_stats, run_target):\n    predictions = model(batsman_stats, training=False)\n    loss = tf.reduce_mean(tf.square(predictions - run_target))\n    mae = tf.reduce_mean(tf.abs(predictions - run_target))\n    return loss, mae  # Can compute arbitrary metrics dynamically\n\n# ANTI-PATTERN: Wrapping everything in tf.function without understanding shape constraints\n@tf.function\ndef bad_training_loop(batsman_stats, run_target):\n    # This will retrace if batsman_stats shape changes—performance disaster\n    predictions = model(batsman_stats)\n    loss = tf.reduce_mean(tf.square(predictions - run_target))\n    return loss\n\n# Better: Use input_signature to avoid retracing\n@tf.function(input_signature=[\n    tf.TensorSpec(shape=[None, 10], dtype=tf.float32),\n    tf.TensorSpec(shape=[None, 1], dtype=tf.float32)\n])\ndef good_training_loop(batsman_stats, run_target):\n    with tf.GradientTape() as tape:\n        predictions = model(batsman_stats, training=True)\n        loss = tf.reduce_mean(tf.square(predictions - run_target))\n    gradients = tape.gradient(loss, model.trainable_variables)\n    optimizer.apply_gradients(zip(gradients, model.trainable_variables))\n    return loss",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Shape retracing in tf.function — If you wrap a function in @tf.function without specifying input_signature, TensorFlow will retrace the entire computational graph every time input shapes change. This causes 10-100x slowdowns. For example, if your batches vary (32, 64, 128 samples), the function retraces 3 times, rebuilding the graph each time. Fix: Always use @tf.function(input_signature=[...]) with fixed batch dimension (None for variable batch size, but fixed feature dimensions). Example: @tf.function(input_signature=[tf.TensorSpec(shape=[None, 10], dtype=tf.float32)]) ensures only batch size varies, preventing retracing.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
     }
   ]
 }
