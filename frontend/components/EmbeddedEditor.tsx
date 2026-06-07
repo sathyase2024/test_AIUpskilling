@@ -29,7 +29,7 @@ interface PistonLang {
 
 const LANGUAGES: Record<Language, PistonLang> = {
   python: {
-    id: 'python', version: '3.10.0', monacoId: 'python', label: 'Python',
+    id: 'python', version: '*', monacoId: 'python', label: 'Python',
     starter: `# Write your Python code here
 print("Hello, World!")
 
@@ -39,7 +39,7 @@ print(f"Sum: {sum(nums)}")
 `,
   },
   javascript: {
-    id: 'javascript', version: '18.15.0', monacoId: 'javascript', label: 'JavaScript',
+    id: 'javascript', version: '*', monacoId: 'javascript', label: 'JavaScript',
     starter: `// Write your JavaScript code here
 console.log("Hello, World!");
 
@@ -49,7 +49,7 @@ console.log("Sum:", nums.reduce((a, b) => a + b, 0));
 `,
   },
   typescript: {
-    id: 'typescript', version: '5.0.3', monacoId: 'typescript', label: 'TypeScript',
+    id: 'typescript', version: '*', monacoId: 'typescript', label: 'TypeScript',
     starter: `// Write your TypeScript code here
 const greet = (name: string): string => \`Hello, \${name}!\`;
 console.log(greet("World"));
@@ -59,7 +59,7 @@ console.log("Sum:", nums.reduce((a, b) => a + b, 0));
 `,
   },
   java: {
-    id: 'java', version: '15.0.2', monacoId: 'java', label: 'Java',
+    id: 'java', version: '*', monacoId: 'java', label: 'Java',
     starter: `public class Main {
     public static void main(String[] args) {
         System.out.println("Hello, World!");
@@ -73,7 +73,7 @@ console.log("Sum:", nums.reduce((a, b) => a + b, 0));
 `,
   },
   go: {
-    id: 'go', version: '1.16.2', monacoId: 'go', label: 'Go',
+    id: 'go', version: '*', monacoId: 'go', label: 'Go',
     starter: `package main
 
 import "fmt"
@@ -91,7 +91,7 @@ func main() {
 `,
   },
   cpp: {
-    id: 'c++', version: '10.2.0', monacoId: 'cpp', label: 'C++',
+    id: 'c++', version: '*', monacoId: 'cpp', label: 'C++',
     starter: `#include <iostream>
 #include <vector>
 #include <numeric>
@@ -149,7 +149,7 @@ interface Props {
 }
 
 export default function EmbeddedEditor({ topicSlug }: Props) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const [lang, setLang] = useState<Language>(() => detectLanguage(topicSlug))
   const [code, setCode] = useState<string>(() => LANGUAGES[detectLanguage(topicSlug)].starter)
   const [running, setRunning] = useState(false)
@@ -192,19 +192,27 @@ export default function EmbeddedEditor({ topicSlug }: Props) {
   const failed = output && (output.exitCode !== 0 || !!output.stderr)
 
   return (
-    <div className="mt-10 rounded-2xl border border-white/10 overflow-hidden bg-[#0d0d18]">
+    <div className="mt-10 rounded-2xl overflow-hidden bg-[#0d0d18]"
+      style={{ border: '1px solid transparent', backgroundClip: 'padding-box', boxShadow: '0 0 0 1px rgba(139,92,246,0.35), 0 4px 24px rgba(139,92,246,0.12)' }}
+    >
 
       {/* ── Header / toggle ── */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/5 transition-colors text-left"
+        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-white/5 transition-colors text-left bg-gradient-to-r from-purple-900/30 to-cyan-900/10"
       >
-        <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-600 to-cyan-500 shrink-0">
+        <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-600 to-cyan-500 shrink-0 shadow-lg shadow-purple-500/30">
           <Code2 className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold text-white">Code Playground</p>
-          <p className="text-[11px] text-white/40">Practice what you just learned — runs in the browser</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-bold text-white">Code Playground</p>
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/30 text-[10px] font-semibold text-green-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+              Live
+            </span>
+          </div>
+          <p className="text-[11px] text-white/50 mt-0.5">Write and run code right here — no sign-in needed</p>
         </div>
         {open ? (
           <ChevronUp className="w-4 h-4 text-white/30" />
