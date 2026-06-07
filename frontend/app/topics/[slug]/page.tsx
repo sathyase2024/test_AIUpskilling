@@ -177,6 +177,61 @@ function PageSkeleton() {
   )
 }
 
+// ─── API transform ────────────────────────────────────────────────────────────
+
+const SLUG_ICON: Record<string, string> = {
+  'large-language-models': '🧠',
+  'ai-agents-agentic-workflows': '🤖',
+  'retrieval-augmented-generation': '🔍',
+  'pytorch-deep-learning': '🔥',
+  'tensorflow-keras': '⚡',
+  'python-for-ai-ml': 'PY',
+  'hugging-face-transformers': '🤗',
+}
+
+const DIFF_TITLE: Record<string, Difficulty> = {
+  beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced',
+}
+
+function fmtEnrolled(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`
+  return String(n)
+}
+
+function transformApiLesson(raw: any, idx: number): Lesson {
+  return {
+    id: raw.id ?? String(idx),
+    title: raw.title ?? `Lesson ${idx + 1}`,
+    duration: raw.durationMinutes ? `${raw.durationMinutes} min` : '—',
+    type: raw.type ?? 'reading',
+    xp: raw.xpReward ?? 50,
+    locked: false,
+  }
+}
+
+function transformApiTopicDetail(raw: any): TopicDetail {
+  const slug = raw.slug ?? ''
+  const lessons: Lesson[] = Array.isArray(raw.lessons)
+    ? raw.lessons.map(transformApiLesson)
+    : []
+  const rating = typeof raw.rating === 'number' ? raw.rating.toFixed(1) : (raw.rating ?? '4.8')
+  return {
+    id: raw.id,
+    slug,
+    name: raw.name ?? slug,
+    category: raw.category ?? 'AI/ML',
+    difficulty: DIFF_TITLE[raw.difficulty] ?? raw.difficulty ?? 'Intermediate',
+    description: raw.description ?? '',
+    hours: raw.durationHours ?? 0,
+    rating,
+    enrolled: fmtEnrolled(raw.enrolledCount ?? 0),
+    reviews: Math.floor((raw.enrolledCount ?? 0) / 8),
+    icon: SLUG_ICON[slug] ?? '📚',
+    gradient: raw.imageGradient ?? 'from-purple-600 to-cyan-500',
+    lessons,
+  }
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TopicDetailPage() {
@@ -195,8 +250,8 @@ export default function TopicDetailPage() {
       try {
         const res = await fetch(`${API_URL}/topics/${slug}`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data: TopicDetail = await res.json()
-        setTopic(data)
+        const raw = await res.json()
+        setTopic(transformApiTopicDetail(raw))
       } catch {
         // API unavailable — use fallback mock data
         setTopic(buildFallbackTopic(slug))
@@ -283,7 +338,7 @@ export default function TopicDetailPage() {
                 <div className="flex items-center gap-1.5">
                   <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
                   <span className="text-white/80 font-semibold">{topic.rating}</span>
-                  <span className="text-white/30">({topic.reviews.toLocaleString()} reviews)</span>
+                  <span className="text-white/30">({(topic.reviews ?? 0).toLocaleString()} reviews)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Users className="w-4 h-4 text-purple-400" />
