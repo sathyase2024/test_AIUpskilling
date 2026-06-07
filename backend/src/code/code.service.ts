@@ -1,71 +1,65 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import { exec } from 'child_process';
+import { writeFile, unlink } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { promisify } from 'util';
 
-// Wandbox compiler IDs for each language
-// No API key required — free community service (wandbox.org)
-const LANG_MAP: Record<string, { compiler: string; filename: string }> = {
-  python:     { compiler: 'cpython-3.12.1',     filename: 'main.py'  },
-  javascript: { compiler: 'nodejs-18.15.0',     filename: 'main.js'  },
-  typescript: { compiler: 'typescript-5.1.6',   filename: 'main.ts'  },
-  java:       { compiler: 'openjdk-head',        filename: 'Main.java' },
-  go:         { compiler: 'go-1.20.7',          filename: 'main.go'  },
-  cpp:        { compiler: 'gcc-13.1.0',         filename: 'main.cpp' },
-};
+const execAsync = promisify(exec);
 
-interface WandboxResponse {
-  status: string;           // exit code as string
-  program_output?: string;
-  program_error?: string;
-  compiler_error?: string;
-  compiler_message?: string;
+interface ExecResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
 }
+
+// Language → temp file extension + shell command
+const RUNNERS: Record<string, { ext: string; cmd: (f: string) => string }> = {
+  python:     { ext: 'py',  cmd: (f) => `python3 ${f}` },
+  javascript: { ext: 'js',  cmd: (f) => `node ${f}` },
+  typescript: { ext: 'ts',  cmd: (f) => `node --input-type=module < ${f}` },
+};
 
 @Injectable()
 export class CodeService {
   private readonly logger = new Logger(CodeService.name);
 
-  constructor(private readonly httpService: HttpService) {}
+  async execute(language: string, code: string): Promise<ExecResult> {
+    const runner = RUNNERS[language];
 
-  async execute(language: string, code: string) {
-    const lang = LANG_MAP[language];
-    if (!lang) {
-      throw new HttpException(`Unsupported language: ${language}`, HttpStatus.BAD_REQUEST);
+    if (!runner) {
+      // Java, Go, C++ not installed on the server — return a clear message
+      return {
+        stdout: '',
+        stderr: `${language.toUpperCase()} server-side execution is not available in this environment. Switch to Python or JavaScript to run code here.`,
+        exitCode: 1,
+      };
     }
 
+    const tmpFile = join(tmpdir(), `exec_${Date.now()}_${Math.random().toString(36).slice(2)}.${runner.ext}`);
+
     try {
-      const { data } = await firstValueFrom(
-        this.httpService.post<WandboxResponse>(
-          'https://wandbox.org/api/compile.json',
-          {
-            compiler: lang.compiler,
-            code,
-            'compiler-option-raw': language === 'cpp' ? '-std=c++17' : '',
-          },
-          { timeout: 20_000 },
-        ),
-      );
+      await writeFile(tmpFile, code, 'utf8');
 
-      const exitCode = parseInt(data.status ?? '0', 10);
-      const stderr = [data.compiler_error, data.compiler_message, data.program_error]
-        .filter(Boolean)
-        .join('\n')
-        .trim();
+      const { stdout, stderr } = await execAsync(runner.cmd(tmpFile), {
+        timeout: 10_000,   // 10 s hard limit
+        maxBuffer: 512 * 1024,  // 512 KB output cap
+        env: { PATH: process.env.PATH },  // minimal env — no secrets leaked
+      });
 
-      return {
-        stdout:   data.program_output ?? '',
-        stderr,
-        exitCode: isNaN(exitCode) ? 0 : exitCode,
-      };
+      return { stdout, stderr, exitCode: 0 };
     } catch (err: any) {
-      this.logger.error(`Wandbox execution failed: ${err.message}`);
-      if (err.response?.status === 400) {
-        throw new HttpException('Invalid code or language submitted', HttpStatus.BAD_REQUEST);
+      if (err.killed || err.signal === 'SIGTERM') {
+        return { stdout: '', stderr: 'Execution timed out (10s limit).', exitCode: 124 };
       }
-      throw new HttpException(
-        'Code execution service is temporarily unavailable. Please try again in a moment.',
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
+      // child_process throws when exit code != 0; stdout/stderr are still available
+      return {
+        stdout: err.stdout ?? '',
+        stderr: err.stderr ?? err.message,
+        exitCode: err.code ?? 1,
+      };
+    } finally {
+      unlink(tmpFile).catch(() => {}); // clean up temp file
     }
   }
 }

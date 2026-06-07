@@ -121,8 +121,6 @@ function detectLanguage(slug: string): Language {
   return 'javascript'
 }
 
-// ─── Code execution via backend proxy → self-hosted Piston ───────────────────
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
 
 interface ExecResult {
@@ -131,15 +129,51 @@ interface ExecResult {
   exitCode: number
 }
 
-async function runCode(lang: PistonLang, code: string): Promise<ExecResult> {
+// ─── JavaScript/TypeScript: run directly in the browser ──────────────────────
+// No server call — captures console.log/error output from the user's code.
+
+function runInBrowser(code: string): ExecResult {
+  const logs: string[] = []
+  const errs: string[] = []
+
+  const origLog   = console.log
+  const origError = console.error
+  const origWarn  = console.warn
+  const origInfo  = console.info
+
+  const fmt = (...args: unknown[]) =>
+    args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ')
+
+  console.log   = (...a) => { logs.push(fmt(...a)) }
+  console.error = (...a) => { errs.push(fmt(...a)) }
+  console.warn  = (...a) => { logs.push('[warn] ' + fmt(...a)) }
+  console.info  = (...a) => { logs.push(fmt(...a)) }
+
+  try {
+    // eslint-disable-next-line no-new-func
+    new Function(code)()
+    return { stdout: logs.join('\n'), stderr: errs.join('\n'), exitCode: 0 }
+  } catch (e: any) {
+    return { stdout: logs.join('\n'), stderr: e.message, exitCode: 1 }
+  } finally {
+    console.log   = origLog
+    console.error = origError
+    console.warn  = origWarn
+    console.info  = origInfo
+  }
+}
+
+// ─── Python / other languages: backend subprocess ────────────────────────────
+
+async function runOnBackend(language: string, code: string): Promise<ExecResult> {
   const res = await fetch(`${API_URL}/code/execute`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ language: lang.id, code }),
+    body: JSON.stringify({ language, code }),
   })
   if (!res.ok) {
-    const msg = await res.text().catch(() => `Error ${res.status}`)
-    throw new Error(msg || `Execution service error: ${res.status}`)
+    const msg = await res.text().catch(() => `Server error ${res.status}`)
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -171,7 +205,14 @@ export default function EmbeddedEditor({ topicSlug }: Props) {
     setOutput(null)
     setExecError(null)
     try {
-      const result = await runCode(LANGUAGES[lang], code)
+      let result: ExecResult
+      if (lang === 'javascript' || lang === 'typescript') {
+        // Run instantly in the browser — no server round-trip
+        result = runInBrowser(code)
+      } else {
+        // Python and others run via backend subprocess
+        result = await runOnBackend(lang, code)
+      }
       setOutput(result)
     } catch (e) {
       setExecError(e instanceof Error ? e.message : 'Unknown error')
