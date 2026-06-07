@@ -12,6 +12,7 @@ import { LessonsModule } from './lessons/lessons.module';
 import { ProgressModule } from './progress/progress.module';
 import { LearningPathsModule } from './learning-paths/learning-paths.module';
 import { AiModule } from './ai/ai.module';
+import { CodeModule } from './code/code.module';
 import { User } from './entities/user.entity';
 import { Topic } from './entities/topic.entity';
 import { Lesson } from './entities/lesson.entity';
@@ -54,6 +55,7 @@ import { CodingSubmission } from './entities/coding-submission.entity';
     ProgressModule,
     LearningPathsModule,
     AiModule,
+    CodeModule,
   ],
   controllers: [AppController],
   providers: [

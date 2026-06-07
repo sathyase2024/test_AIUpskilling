@@ -121,24 +121,26 @@ function detectLanguage(slug: string): Language {
   return 'javascript'
 }
 
-// ─── Piston execution ─────────────────────────────────────────────────────────
+// ─── Code execution via backend proxy → self-hosted Piston ───────────────────
 
-interface PistonResult {
-  run: { stdout: string; stderr: string; code: number; signal: string | null }
-  compile?: { stdout: string; stderr: string; code: number }
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+
+interface ExecResult {
+  stdout: string
+  stderr: string
+  exitCode: number
 }
 
-async function runOnPiston(lang: PistonLang, code: string): Promise<PistonResult> {
-  const res = await fetch('https://emkc.org/api/v2/piston/execute', {
+async function runCode(lang: PistonLang, code: string): Promise<ExecResult> {
+  const res = await fetch(`${API_URL}/code/execute`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      language: lang.id,
-      version: lang.version,
-      files: [{ content: code }],
-    }),
+    body: JSON.stringify({ language: lang.id, code }),
   })
-  if (!res.ok) throw new Error(`Execution service error: ${res.status}`)
+  if (!res.ok) {
+    const msg = await res.text().catch(() => `Error ${res.status}`)
+    throw new Error(msg || `Execution service error: ${res.status}`)
+  }
   return res.json()
 }
 
@@ -169,12 +171,8 @@ export default function EmbeddedEditor({ topicSlug }: Props) {
     setOutput(null)
     setExecError(null)
     try {
-      const result = await runOnPiston(LANGUAGES[lang], code)
-      setOutput({
-        stdout: result.run.stdout,
-        stderr: (result.compile?.stderr ?? '') + result.run.stderr,
-        exitCode: result.run.code ?? 0,
-      })
+      const result = await runCode(LANGUAGES[lang], code)
+      setOutput(result)
     } catch (e) {
       setExecError(e instanceof Error ? e.message : 'Unknown error')
     } finally {
