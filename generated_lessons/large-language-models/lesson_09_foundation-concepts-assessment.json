@@ -125,16 +125,6 @@
       "explanation": ""
     },
     {
-      "text": "str) -> List[int]:\n        \"\"\"\n        Convert text to token IDs.\n        \n        Args:\n            text: Raw commentary string\n            \n        Returns:\n            List of integer token IDs\n        \"\"\"\n        tokens = self._preprocess_text(text)\n        token_ids = []\n        \n        for token in tokens:\n            if token in self.vocab:\n                token_ids.append(self.vocab[token])\n            else:\n                # Out-of-vocabulary words map to UNK token\n                token_ids.append(self.vocab[self.UNK_TOKEN])\n        \n        return token_ids\n    \n    def decode(self",
-      "token_ids": "List[int]) -> str:\n        \"\"\"\n        Convert token IDs back to text.\n        \n        Args:\n            token_ids: List of integer token IDs\n            \n        Returns:\n            Reconstructed text string\n        \"\"\"\n        tokens = []\n        for token_id in token_ids:\n            if token_id in self.reverse_vocab:\n                token = self.reverse_vocab[token_id]\n                # Skip special tokens in output\n                if token not in [self.PAD_TOKEN, self.START_TOKEN, self.END_TOKEN]:\n                    tokens.append(token)\n        \n        return \" \".join(tokens)\n    \n    def get_vocab_size(self) -> int:\n        \"\"\"Return total vocabulary size including special tokens.\"\"\"\n        return len(self.vocab)\n    \n    def get_token_id(self",
-      "token": "str) -> int:\n        \"\"\"Get ID for a specific token, or UNK if not in vocab.\"\"\"\n        return self.vocab.get(token, self.vocab[self.UNK_TOKEN])\n\n\n# Example usage and testing\nif __name__ == \"__main__\":\n    # Sample cricket commentary\n    cricket_commentary = [\n        \"Rohit Sharma takes a single to mid wicket. Virat Kohli on strike.\",\n        \"Jasprit Bumrah bowls a yorker. Sharma plays back foot defense.\",\n        \"Short pitched delivery outside off stump. Caught at slip by Bumrah.\",\n        \"Powerplay wicket! Root departs caught in the deep.\",\n        \"Maiden over from Shami. Excellent bowling spell.\",\n        \"DRS review requested. Hawk eye shows three reds. Bowled!\",\n        \"Bumrah to Bairstow. Bouncer on leg stump. Handled confidently.\"\n    ]\n    \n    # Initialize and build tokenizer\n    tokenizer = CricketTokenizer(vocab_size=5000, min_frequency=1)\n    tokenizer.build_vocab(cricket_commentary)\n    \n    print(f\"Vocabulary size: {tokenizer.get_vocab_size()}\")\n    print(f\"Sample vocabulary: {list(tokenizer.vocab.items())[:10]}\")\n    \n    # Test encoding and decoding\n    test_text = \"Rohit Sharma hits a boundary off Bumrah\"\n    encoded = tokenizer.encode(test_text)\n    decoded = tokenizer.decode(encoded)\n    \n    print(f\"\\nOriginal: {test_text}\")\n    print(f\"Encoded: {encoded}\")\n    print(f\"Decoded: {decoded}\")",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "heading",
       "content": "Step 2 — Core Logic",
       "level": 2,
@@ -175,46 +165,6 @@
       "explanation": ""
     },
     {
-      "embedding_dim": "int",
-      "dropout": "float = 0.1):\n        \"\"\"\n        Initialize attention mechanism.\n        \n        Args:\n            embedding_dim: Dimension of key/query/value vectors\n            dropout: Dropout rate for attention weights\n        \"\"\"\n        super().__init__()\n        self.embedding_dim = embedding_dim\n        self.dropout = nn.Dropout(dropout)\n        self.scale = math.sqrt(embedding_dim)\n    \n    def forward(self",
-      "query": "torch.Tensor",
-      "key": "torch.Tensor, \n                value: torch.Tensor",
-      "mask": "torch.Tensor = None) -> tuple:\n        \"\"\"\n        Compute scaled dot-product attention.\n        \n        Args:\n            query: Tensor of shape (batch_size, ..., seq_length_q, embedding_dim)\n            key: Tensor of shape (batch_size, ..., seq_length_k, embedding_dim)\n            value: Tensor of shape (batch_size, ..., seq_length_v, embedding_dim)\n            mask: Optional mask to prevent attention to certain positions\n            \n        Returns:\n            Tuple of (output, attention_weights)\n        \"\"\"\n        # Compute attention scores: Q * K^T\n        scores = torch.matmul(query, key.transpose(-2, -1)) / self.scale\n        \n        # Apply mask if provided (prevent attending to future positions)\n        if mask is not None:\n            scores = scores.masked_fill(mask == 0, float('-inf'))\n        \n        # Convert scores to attention weights via softmax\n        attention_weights = torch.softmax(scores, dim=-1)\n        attention_weights = self.dropout(attention_weights)\n        \n        # Aggregate values using attention weights\n        output = torch.matmul(attention_weights, value)\n        \n        return output, attention_weights\n\n\nclass CricketAttentionHead(nn.Module):\n    \"\"\"\n    Single attention head that learns one type of context relationship.\n    Multiple heads capture different semantic aspects of cricket terminology.\n    \"\"\"\n    \n    def __init__(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "embedding_dim": "int",
-      "head_dim": "int",
-      "dropout": "float = 0.1):\n        \"\"\"\n        Initialize attention head.\n        \n        Args:\n            embedding_dim: Full embedding dimension\n            head_dim: Dimension for this head (embedding_dim / num_heads)\n            dropout: Dropout rate\n        \"\"\"\n        super().__init__()\n        self.head_dim = head_dim\n        \n        # Linear projections for query, key, value\n        self.query_proj = nn.Linear(embedding_dim, head_dim)\n        self.key_proj = nn.Linear(embedding_dim, head_dim)\n        self.value_proj = nn.Linear(embedding_dim, head_dim)\n        \n        # Attention mechanism\n        self.attention = ScaledDotProductAttention(head_dim, dropout)\n        \n        self.dropout = nn.Dropout(dropout)\n    \n    def forward(self",
-      "query": "torch.Tensor",
-      "key": "torch.Tensor, \n                value: torch.Tensor",
-      "mask": "torch.Tensor = None) -> tuple:\n        \"\"\"\n        Apply attention head.\n        \n        Args:\n            query, key",
-      "value": "Input tensors\n            mask: Attention mask\n            \n        Returns:\n            Tuple of (head_output, attention_weights)\n        \"\"\"\n        # Project inputs\n        Q = self.query_proj(query)\n        K = self.key_proj(key)\n        V = self.value_proj(value)\n        \n        # Apply attention\n        output, weights = self.attention(Q, K, V, mask)\n        \n        return output, weights\n\n\nclass MultiHeadAttention(nn.Module):\n    \"\"\"\n    Multi-head attention: multiple attention heads attending in parallel.\n    Each head learns different contextual relationships in cricket commentary.\n    Example: one head might focus on player relationships, another on delivery types.\n    \"\"\"\n    \n    def __init__(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "embedding_dim": "int",
-      "num_heads": "int = 8",
-      "dropout": "float = 0.1):\n        \"\"\"\n        Initialize multi-head attention.\n        \n        Args:\n            embedding_dim: Full embedding dimension\n            num_heads: Number of parallel attention heads\n            dropout: Dropout rate\n        \"\"\"\n        super().__init__()\n        assert embedding_dim % num_heads == 0, \"embedding_dim must be divisible by num_heads\"\n        \n        self.embedding_dim = embedding_dim\n        self.num_heads = num_heads\n        self.head_dim = embedding_dim // num_heads\n        \n        # Create multiple attention heads\n        self.heads = nn.ModuleList([\n            CricketAttentionHead(embedding_dim, self.head_dim, dropout)\n            for _ in range(num_heads)\n        ])\n        \n        # Output projection to combine all heads\n        self.output_proj = nn.Linear(embedding_dim, embedding_dim)\n        self.dropout = nn.Dropout(dropout)\n    \n    def forward(self",
-      "query": "torch.Tensor",
-      "key": "torch.Tensor, \n                value: torch.Tensor",
-      "mask": "torch.Tensor = None) -> tuple:\n        \"\"\"\n        Apply multi-head attention.\n        \n        Args:\n            query, key",
-      "value": "Input tensors\n            mask: Attention mask\n            \n        Returns:\n            Tuple of (output, attention_weights)\n        \"\"\"\n        # Collect outputs from all heads\n        head_outputs = []\n        all_attention_weights = []\n        \n        for head in self.heads:\n            output, weights = head(query, key, value, mask)\n            head_outputs.append(output)\n            all_attention_weights.append(weights)\n        \n        # Concatenate all head outputs\n        combined = torch.cat(head_outputs, dim=-1)\n        \n        # Project combined output\n        output = self.output_proj(combined)\n        output = self.dropout(output)\n        \n        # Average attention weights across heads for visualization\n        avg_weights = torch.stack(all_attention_weights, dim=0).mean(dim=0)\n        \n        return output, avg_weights\n\n\n# Example usage\nif __name__ == \"__main__\":\n    # Configuration\n    vocab_size = 1000\n    embedding_dim = 256\n    num_heads = 8\n    seq_length = 10\n    batch_size = 2\n    \n    # Initialize modules\n    embedding_layer = CricketEmbedding(vocab_size, embedding_dim)\n    attention_layer = MultiHeadAttention(embedding_dim, num_heads)\n    \n    # Create sample token IDs (cricket player names, bowling deliveries)\n    token_ids = torch.randint(0, vocab_size, (batch_size, seq_length))\n    \n    # Forward pass\n    embeddings = embedding_layer(token_ids)\n    print(f\"Embedding shape: {embeddings.shape}\")\n    \n    # Self-attention: query=key=value=embeddings\n    output, attention_weights = attention_layer(embeddings, embeddings, embeddings)\n    print(f\"Attention output shape: {output.shape}\")\n    print(f\"Attention weights shape: {attention_weights.shape}\")\n    print(f\"\\nSample attention weights (first batch, first position):\")\n    print(attention_weights[0, 0, :].detach().numpy())",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "heading",
       "content": "Step 3 — Integration & Enhancement",
       "level": 2,
@@ -236,14 +186,6 @@
       "type": "analogy",
       "content": "🏏 Think of it like cricket: Assembling the complete LLM is like orchestrating a full cricket team. The tokenizer is your opening partnership—it establishes the foundation, converts chaos (raw match flow) into meaningful units (scorecard entries). The embeddings are your middle-order batters—they add depth and context, representing each element richly. The attention mechanism is your bowling attack—it strategically focuses on relevant weaknesses and opportunities, adapting to match conditions. Positional encoding is the field captain's tactical awareness—knowing that the 10th over of the powerplay is different from the 40th over, or that a wicket-down situation changes everything. The feed-forward networks are your fielders—applying judgment and strategy based on what they observe. Layer normalization is your physio—ensuring steady, stable performance without erratic swings. Residual connections are your team's bench strength—allowing alternative paths of communication if the primary strategy gets blocked. When you integrate all these, you create a team that can watch a live match situation (input tokens), reason about what's tactically sound next (attention + feed-forward), and articulate that reasoning in natural language (decode back to commentary). Just as a strong team beats an assembly of talented individuals, integrating all components creates emergent capability—the system can handle novel match situations never seen in training.",
       "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "code",
-      "language": "python",
       "level": 2,
       "items": [],
       "answer": -1,

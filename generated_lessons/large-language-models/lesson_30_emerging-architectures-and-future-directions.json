@@ -164,64 +164,6 @@
       "explanation": ""
     },
     {
-      "d_model": "int",
-      "num_heads": "int = 8",
-      "window_size": "int = 64):\n        super().__init__()\n        self.d_model = d_model\n        self.num_heads = num_heads\n        self.window_size = window_size\n        self.head_dim = d_model // num_heads\n        \n        self.W_q = nn.Linear(d_model, d_model)\n        self.W_k = nn.Linear(d_model, d_model)\n        self.W_v = nn.Linear(d_model, d_model)\n        self.W_o = nn.Linear(d_model, d_model)\n    \n    def forward(self",
-      "x": "torch.Tensor",
-      "mask": "Optional[torch.Tensor] = None) -> torch.Tensor:\n        batch_size, seq_len, d_model = x.shape\n        \n        Q = self.W_q(x).view(batch_size, seq_len, self.num_heads, self.head_dim)\n        K = self.W_k(x).view(batch_size, seq_len, self.num_heads, self.head_dim)\n        V = self.W_v(x).view(batch_size, seq_len, self.num_heads, self.head_dim)\n        \n        # Create sparse attention mask: each position attends to window around it\n        attention_scores = torch.zeros(batch_size, self.num_heads, seq_len, seq_len, device=x.device)\n        \n        for i in range(seq_len):\n            # Window attention: position i attends to [max(0, i-window_size)...i]\n            start = max(0, i - self.window_size)\n            end = i + 1\n            \n            q_i = Q[:",
-      "i": "i+1, :, :]  # (batch_size, 1, num_heads, head_dim)\n            k_window = K[:",
-      "start": "end, :, :]  # (batch_size, window_len, num_heads, head_dim)\n            \n            # Compute attention for this window\n            scores = torch.matmul(q_i, k_window.transpose(-2, -1)) / math.sqrt(self.head_dim)\n            attention_scores[:, :, i",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "start": "end] = scores.squeeze(2)\n        \n        # Apply softmax\n        attention_weights = torch.softmax(attention_scores + (mask if mask is not None else 0), dim=-1)\n        \n        # Apply attention to values\n        context = torch.matmul(attention_weights, V.transpose(1, 2).unsqueeze(0).expand(batch_size, -1, -1, -1, -1)).squeeze(0)\n        output = self.W_o(context.view(batch_size, seq_len, d_model))\n        \n        return output\n\n\nclass LinearAttentionExpert(nn.Module):\n    \"\"\"Linear attention expert (efficient for long context)\"\"\"\n    def __init__(self",
-      "d_model": "int",
-      "d_state": "int = 256):\n        super().__init__()\n        self.d_model = d_model\n        self.d_state = d_state\n        \n        # Project to state dimension\n        self.proj_in = nn.Linear(d_model, d_state)\n        self.proj_out = nn.Linear(d_state, d_model)\n        \n        # Gating mechanism\n        self.gate = nn.Sequential(\n            nn.Linear(d_model, d_state),\n            nn.Sigmoid()\n        )\n    \n    def forward(self",
-      "x": "torch.Tensor) -> torch.Tensor:\n        batch_size, seq_len, d_model = x.shape\n        \n        # Project input to state space\n        state_proj = self.proj_in(x)  # (batch_size, seq_len, d_state)\n        \n        # Efficient linear scan: compute cumulative sum of states\n        # This is O(n) instead of O(n²)\n        cumsum = torch.cumsum(state_proj, dim=1)\n        \n        # Gate the output based on input\n        gates = self.gate(x)\n        gated = state_proj * gates\n        \n        # Output projection\n        output = self.proj_out(gated + cumsum)\n        \n        return output\n\n\nclass CricketMixtureOfExpertsLayer(nn.Module):\n    \"\"\"MoE layer with multiple specialized attention experts\"\"\"\n    def __init__(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "d_model": "int",
-      "num_experts": "int = 4",
-      "top_k": "int = 2):\n        super().__init__()\n        self.d_model = d_model\n        self.num_experts = num_experts\n        self.top_k = top_k\n        \n        # Router network\n        self.router = CricketAttentionRouter(d_model, num_experts)\n        \n        # Create diverse expert types\n        self.local_attention_experts = nn.ModuleList([\n            SparseLocalAttention(d_model, window_size=32) for _ in range(num_experts // 2)\n        ])\n        self.linear_attention_experts = nn.ModuleList([\n            LinearAttentionExpert(d_model) for _ in range(num_experts // 2)\n        ])\n        \n        self.experts = self.local_attention_experts + self.linear_attention_experts\n    \n    def forward(self",
-      "x": "torch.Tensor) -> torch.Tensor:\n        batch_size, seq_len, d_model = x.shape\n        \n        # Get routing weights\n        routing_weights = self.router(x)  # (batch_size, seq_len, num_experts)\n        \n        # Get top-k experts for each token\n        top_k_weights, top_k_indices = torch.topk(routing_weights, self.top_k, dim=-1)\n        # Normalize top-k weights\n        top_k_weights = top_k_weights / (top_k_weights.sum(dim=-1, keepdim=True) + 1e-6)\n        \n        # Process through experts\n        expert_outputs = torch.zeros_like(x)\n        \n        for token_idx in range(seq_len):\n            token_expert_outputs = torch.zeros_like(x[:",
-      "token_idx": "token_idx+1, :])\n            \n            for k in range(self.top_k):\n                expert_idx = top_k_indices[:, token_idx, k]\n                weight = top_k_weights[:, token_idx, k]\n                \n                # Apply selected expert\n                for b in range(batch_size):\n                    expert = self.experts[expert_idx[b].item()]\n                    expert_out = expert(x[b:b+1",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "token_idx": "token_idx+1, :])\n                    token_expert_outputs[b] += weight[b] * expert_out[b]\n            \n            expert_outputs[:",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "token_idx": "token_idx+1, :] = token_expert_outputs\n        \n        return expert_outputs\n\n\nclass HybridLLMLayer(nn.Module):\n    \"\"\"Hybrid layer combining MoE + sparse/linear attention + feed-forward\"\"\"\n    def __init__(self",
-      "d_model": "int",
-      "d_ff": "int = 2048",
-      "num_experts": "int = 4):\n        super().__init__()\n        self.d_model = d_model\n        \n        # Attention component (MoE)\n        self.attention_moe = CricketMixtureOfExpertsLayer(d_model, num_experts)\n        \n        # Feed-forward component\n        self.ffn = nn.Sequential(\n            nn.Linear(d_model, d_ff),\n            nn.GELU(),\n            nn.Linear(d_ff, d_model)\n        )\n        \n        # Layer normalization and residual connections\n        self.ln1 = nn.LayerNorm(d_model)\n        self.ln2 = nn.LayerNorm(d_model)\n    \n    def forward(self",
-      "x": "torch.Tensor) -> torch.Tensor:\n        # Residual connection + layer norm + MoE attention\n        attn_output = self.attention_moe(self.ln1(x))\n        x = x + attn_output\n        \n        # Residual connection + layer norm + feed-forward\n        ffn_output = self.ffn(self.ln2(x))\n        x = x + ffn_output\n        \n        return x\n\n\nclass EmergingLLMArchitecture(nn.Module):\n    \"\"\"Complete model using emerging architectures\"\"\"\n    def __init__(\n        self,\n        vocab_size: int = 10000,\n        d_model: int = 512,\n        num_layers: int = 4,\n        num_experts: int = 4,\n        max_seq_len: int = 2048\n    ):\n        super().__init__()\n        self.d_model = d_model\n        \n        self.embedding = nn.Embedding(vocab_size, d_model)\n        self.pos_embedding = nn.Embedding(max_seq_len, d_model)\n        \n        self.layers = nn.ModuleList([\n            HybridLLMLayer(d_model, d_ff=2048, num_experts=num_experts)\n            for _ in range(num_layers)\n        ])\n        \n        self.final_ln = nn.LayerNorm(d_model)\n        self.output_projection = nn.Linear(d_model, vocab_size)\n    \n    def forward(self",
-      "input_ids": "torch.Tensor) -> torch.Tensor:\n        batch_size, seq_len = input_ids.shape\n        \n        # Embeddings\n        x = self.embedding(input_ids)\n        positions = torch.arange(seq_len, device=input_ids.device).unsqueeze(0).expand(batch_size, -1)\n        x = x + self.pos_embedding(positions)\n        \n        # Process through hybrid layers\n        for layer in self.layers:\n            x = layer(x)\n        \n        # Output projection\n        x = self.final_ln(x)\n        logits = self.output_projection(x)\n        \n        return logits\n\n\n# Example usage with cricket-themed data\nif __name__ == \"__main__\":\n    # Initialize model\n    model = EmergingLLMArchitecture(\n        vocab_size=10000,\n        d_model=256,\n        num_layers=3,\n        num_experts=4,\n        max_seq_len=2048\n    )\n    \n    # Cricket-themed token sequences (example: tokenized match commentary)\n    batch_size = 2\n    seq_len = 512\n    input_ids = torch.randint(0, 10000, (batch_size, seq_len))\n    \n    # Forward pass\n    output = model(input_ids)\n    print(f\"Input shape: {input_ids.shape}\")\n    print(f\"Output shape: {output.shape}\")\n    print(f\"Model has {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M parameters\")\n    \n    # Test individual components\n    print(\"\\n--- Component Testing ---\")\n    \n    # Sparse attention\n    sparse_attn = SparseLocalAttention(d_model=256, window_size=64)\n    test_input = torch.randn(2, 256, 256)\n    sparse_out = sparse_attn(test_input)\n    print(f\"Sparse attention output: {sparse_out.shape}\")\n    \n    # Linear attention expert\n    linear_expert = LinearAttentionExpert(d_model=256)\n    linear_out = linear_expert(test_input)\n    print(f\"Linear attention expert output: {linear_out.shape}\")\n    \n    # MoE layer\n    moe_layer = CricketMixtureOfExpertsLayer(d_model=256, num_experts=4)\n    moe_out = moe_layer(test_input)\n    print(f\"MoE layer output: {moe_out.shape}\")\n    \n    print(\"\\n✓ Emerging architectures initialized successfully!\")",
-      "language": "python",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "paragraph",
       "content": "This code demonstrates how emerging architectures integrate into a practical system. The EmergingLLMArchitecture model combines three core innovations: first, the CricketMixtureOfExpertsLayer routes each token to top-k specialized experts (sparse expert selection), where experts are either SparseLocalAttention (attending only to nearby tokens in a sliding window, like focusing on recent cricket overs) or LinearAttentionExpert (using cumulative state aggregation for O(n) complexity rather than O(n²)). The router network learns semantic-aware routing—tokens corresponding to entity mentions or special positions naturally route to different experts than tokens in routine sequences. Second, the SparseLocalAttention mechanism explicitly constructs attention only between tokens within a window (position i attends to positions max(0, i-window_size) through i), reducing the attention matrix from dense to sparse. Third, the LinearAttentionExpert replaces quadratic softmax attention with a linear scan (torch.cumsum), maintaining a running state that captures cumulative context. The HybridLLMLayer wraps these components with standard residual connections and layer normalization, showing how emerging architectures integrate into conventional layer structures. At initialization, the model creates 4 experts (split between local and linear variants) and uses top-k=2 routing—each token activates exactly 2 experts weighted by the router's learned probabilities. During forward pass on a 512-token sequence, the MoE layer routes tokens to experts, each expert processes tokens through either sparse local patterns (O(seq_len × window_size) compute) or linear state aggregation (O(seq_len × state_dim) compute), avoiding the O(seq_len²) cost of dense attention. This architecture achieves the efficiency of distributed parameter activation (MoE) with the expressiveness of diverse attention patterns (sparse + linear), demonstrating how production LLM systems might combine multiple emerging innovations to scale to longer contexts and faster inference.",
       "language": "text",
@@ -235,14 +177,6 @@
       "content": "How It Works Under the Hood",
       "level": 2,
       "language": "",
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "paragraph",
-      "language": "",
-      "level": 2,
       "items": [],
       "answer": -1,
       "explanation": ""

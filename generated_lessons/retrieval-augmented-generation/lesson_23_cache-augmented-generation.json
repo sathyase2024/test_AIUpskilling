@@ -165,27 +165,6 @@
       "explanation": ""
     },
     {
-      "query": "str",
-      "top_k": "int = 10) -> List[Tuple[str, float]]:\n        \"\"\"Dense retrieval using semantic embeddings (Core Concept: Dense Retrieval).\"\"\"\n        query_embedding = self.retriever_model.encode(query)\n        \n        # Compute similarity to all chunk embeddings\n        similarities = []\n        for chunk_id, chunk_embedding in self.document_embeddings.items():\n            # Cosine similarity\n            similarity = np.dot(query_embedding, chunk_embedding) / (\n                np.linalg.norm(query_embedding) * np.linalg.norm(chunk_embedding) + 1e-8\n            )\n            similarities.append((chunk_id, similarity))\n        \n        # Sort by similarity and return top-k\n        similarities.sort(key=lambda x: x[1], reverse=True)\n        return similarities[:top_k]\n    \n    def retrieve(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "str",
-      "top_k": "int = 5) -> List[dict]:\n        \"\"\"Complete retrieval pipeline with expansion and re-ranking.\"\"\"\n        # Step 1: Expand query\n        expanded_queries = self._expand_query(query)\n        \n        # Step 2: Dense retrieval with all expanded queries\n        all_retrieved = {}\n        for exp_query in expanded_queries:\n            results = self._retrieve_dense(exp_query, top_k=10)\n            for chunk_id, score in results:\n                if chunk_id not in all_retrieved:\n                    all_retrieved[chunk_id] = score\n                else:\n                    # Take max score if chunk appears in multiple expansions\n                    all_retrieved[chunk_id] = max(all_retrieved[chunk_id], score)\n        \n        # Get top candidates for re-ranking\n        candidates = sorted(all_retrieved.items(), key=lambda x: x[1], reverse=True)[:20]\n        \n        # Step 3: Re-ranking (Core Concept: Ranking and Re-ranking)\n        rerank_scores = []\n        for chunk_id, initial_score in candidates:\n            # Find the actual chunk text\n            chunk_text = None\n            for doc_chunks in self.document_chunks.values():\n                for chunk in doc_chunks:\n                    if chunk['id'] == chunk_id:\n                        chunk_text = chunk['text']\n                        break\n            \n            if chunk_text:\n                # Cross-encoder re-ranking score\n                rerank_score = self.reranker_model.predict([query, chunk_text])[0]\n                rerank_scores.append((chunk_id, rerank_score, chunk_text))\n        \n        # Sort by re-rank score\n        rerank_scores.sort(key=lambda x: x[1], reverse=True)\n        \n        # Return top-k re-ranked results with metadata\n        results = []\n        for chunk_id, rerank_score, chunk_text in rerank_scores[:top_k]:\n            # Find source document\n            source_doc = None\n            for doc in self.cricket_documents:\n                for chunk in self.document_chunks[doc['id']]:\n                    if chunk['id'] == chunk_id:\n                        source_doc = doc\n                        break\n            \n            results.append({\n                'chunk_id': chunk_id",
-      "text": "chunk_text",
-      "relevance_score": "float(rerank_score)",
-      "source": "source_doc['source'] if source_doc else 'Unknown'\n            })\n        \n        return results\n\n# Example usage\nif __name__ == \"__main__\":\n    rag = CricketRAGSystem()\n    \n    # Test query\n    query = \"How should a batsman handle Jasprit Bumrah's bowling?\"\n    print(f\"Query: {query}\\n\")\n    \n    # Retrieve relevant documents\n    results = rag.retrieve(query, top_k=3)\n    \n    print(\"Retrieved and Re-ranked Results:\")\n    print(json.dumps(results, indent=2))\n    \n    # Show context management: all results fit in context window\n    total_tokens = sum(len(r['text'].split()) for r in results) + len(query.split())\n    print(f\"\\nTotal tokens (estimated): {total_tokens}\")\n    print(f\"Fits in 4K context window: {total_tokens < 4000}\")",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "paragraph",
       "content": "The code above implements a complete RAG system with all four core concepts working together. First, documents are ingested and chunked into semantic units. The chunking process (lines 37-52) respects semantic boundaries by splitting on sentence boundaries, ensuring each chunk contains complete ideas. When a user query arrives (\"How should a batsman handle Jasprit Bumrah's bowling?\"), the system expands it into multiple reformulations (lines 54-66): if the query contains \"bowling,\" expansions are created to include \"pace tactics\" and \"line and length.\" Each expanded query is then passed to the dense retriever, which encodes the query into an embedding and computes cosine similarity against all document chunk embeddings (lines 68-82). This is efficient: the 5 documents expand to ~20 chunks, and similarity computation is a single vector operation per chunk, completing in milliseconds. The retriever returns the top-20 candidates by dense similarity. Finally, these candidates are re-ranked using a cross-encoder (lines 95-107), which evaluates each (query, document) pair jointly. The cross-encoder is more expressive than the dense bi-encoder—it can reason about fine-grained relevance—but is computationally expensive, so it's only applied to the top-20 candidates, not all documents. The final top-5 results are returned with relevance scores and source attribution. The context window check (line 122) verifies that all retrieved chunks fit within the model's context window, preventing overflow. This pipeline combines all four concepts: chunking ensures focused context, query expansion increases recall, dense retrieval provides speed, and re-ranking ensures precision—a balanced production RAG system.",
       "language": "text",
@@ -247,19 +226,6 @@
     },
     {
       "query_id": "str",
-      "context": "dict, \n                              output_length: int = 100) -> dict:\n        \"\"\"Simulate generation model inference with retrieved context.\"\"\"\n        start_time = time.time()\n        \n        # Simulate token-by-token generation\n        # Each token attends to context and all previous tokens\n        simulated_generation_time = output_length * 0.02  # 20ms per token\n        time.sleep(min(simulated_generation_time, 0.1))  # Cap simulation time\n        \n        generation_time = time.time() - start_time\n        \n        return {\n            'query_id': query_id",
-      "output_tokens": "output_length",
-      "generation_time_seconds": "generation_time",
-      "context_utilized": "len(context['context_chunks'])",
-      "total_pipeline_tokens": "context['total_tokens'] + output_length\n        }\n    \n    def run_pipeline(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query_id": "str",
       "query_embedding": "np.ndarray) -> dict:\n        \"\"\"Execute full RAG pipeline with timing breakdown.\"\"\"\n        pipeline_start = time.time()\n        \n        # Stage 1: Fast ANN retrieval\n        ann_results, retrieval_time = self.retrieve_ann(query_embedding, top_k=100, \n                                                        query_id=query_id)\n        \n        # Stage 2: Expensive re-ranking on top-100\n        reranked_results, rerank_time = self.rerank_batch(query_id, ann_results)\n        \n        # Stage 3: Context window packing\n        context = self.context_window_packing(reranked_results)\n        \n        # Stage 4: Generation\n        generation_result = self.generate_with_context(query_id, context, \n                                                       output_length=100)\n        \n        total_time = time.time() - pipeline_start\n        \n        return {\n            'query_id': query_id",
       "timing": {
         "ann_retrieval_ms": "retrieval_time * 1000",
@@ -314,51 +280,6 @@
       "level": 2,
       "items": [],
       "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "str) -> Dict[str, any]:\n        \"\"\"Pattern 1: Hierarchical retrieval—documents > sections > paragraphs > sentences.\"\"\"\n        results = []\n        \n        # Step 1: Document-level retrieval (fast)\n        candidate_docs = [\"cricket_batting_guide\", \"icc_cricket_laws_2024\"]\n        print(f\"Step 1: Document-level candidates: {len(candidate_docs)} documents\")\n        \n        # Step 2: Section-level retrieval (filter to relevant sections)\n        candidate_sections = []\n        for doc in candidate_docs:\n            for section in self.documents[doc][\"sections\"].keys():\n                if \"pace\" in query.lower() and section == \"against_pace\":\n                    candidate_sections.append(section)\n        print(f\"Step 2: Section-level candidates: {len(candidate_sections)} sections\")\n        \n        # Step 3: Paragraph-level with metadata filtering\n        candidate_paragraphs = []\n        for doc, sections in self.documents.items():\n            for section in sections[\"sections\"].values():\n                candidate_paragraphs.extend([p[\"id\"] for p in section[\"paragraphs\"]])\n        \n        filtered_paragraphs = self.apply_metadata_filtering(candidate_paragraphs, query)\n        print(f\"Step 3: Paragraph-level candidates (post-metadata-filter): {len(filtered_paragraphs)}\")\n        \n        # Step 4: Final retrieval with citations\n        for para_id in filtered_paragraphs:\n            meta = self.metadata[para_id]\n            results.append({\n                'chunk_id': para_id",
-      "text": "f\"[{meta.doc_id}] Text content here\"",
-      "metadata": {
-        "doc_id": "meta.doc_id",
-        "chunk_id": "meta.chunk_id",
-        "domain": "meta.domain",
-        "confidence": "meta.confidence",
-        "version": "meta.version",
-        "citation": "f\"{meta.doc_id} ({meta.version}), chunk {meta.chunk_id}\"\n                }\n            })\n        \n        return {\n            'query': query",
-        "query_type": "self.classify_query(query)",
-        "results": "results",
-        "retrieval_strategy": "hierarchical with metadata filtering and citations"
-      },
-      "AntiPatternCricketRAG": "n    \"\"\"Anti-pattern example: what NOT to do in RAG.\"\"\"\n    \n    def flat_retrieval(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "str) -> List[str]:\n        \"\"\"Anti-pattern 1: Flatten all documents, retrieve from one giant corpus.\"\"\"\n        # This leads to: slow retrieval on large corpora, no hierarchy benefits,\n        # hard to debug which documents are relevant\n        all_chunks = [\"chunk_1\", \"chunk_2\", \"chunk_3\", ...]  # Millions of chunks\n        # Compute similarity to ALL chunks (extremely slow)\n        return all_chunks[:10]  # Return first 10\n    \n    def no_metadata_filtering(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "str) -> List[str]:\n        \"\"\"Anti-pattern 2: Don't filter by metadata, retrieve old/low-confidence sources.\"\"\"\n        # Query: \"What is the current Cricket World Champion?\"\n        # Returns 2015 data because metadata wasn't checked\n        return [\"outdated_chunk_1\", \"unreliable_chunk_2\"]  # Wrong answers\n    \n    def no_query_classification(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "str) -> List[str]:\n        \"\"\"Anti-pattern 3: Use same retrieval strategy for all query types.\"\"\"\n        # A definition query (\"What is a Yorker?\") and a factual query\n        # (\"Who won the 2023 World Cup?\") need different retrieval—but treating them\n        # the same means both get suboptimal results\n        return [\"generic_result\"]  # Neither great for definitions nor facts\n    \n    def no_citations(self",
-      "answer": "str) -> str:\n        \"\"\"Anti-pattern 4: Generate answers without citing sources.\"\"\"\n        return answer  # User can't verify where the answer came from\n        # Result: hallucinations go unchecked, trust eroded\n\n# Example usage\nif __name__ == \"__main__\":\n    # BEST PRACTICE\n    print(\"=\" * 60)\n    print(\"BEST PRACTICE: Production RAG with Patterns\")\n    print(\"=\" * 60)\n    \n    rag_best = BestPracticeCricketRAG()\n    \n    queries = [\n        \"What is a Yorker?\",  # Definition query\n        \"Who is the current World Champion?\",  # Factual query\n        \"Against pace bowling like Bumrah, what should a batsman do?\",  # Advice query\n    ]\n    \n    for query in queries:\n        result = rag_best.hierarchical_retrieve(query)\n        print(f\"\\nQuery: {query}\")\n        print(f\"Query Type: {result['query_type'].value}\")\n        print(f\"Strategy: {result['retrieval_strategy']}\")\n        print(f\"Results with Citations:\")\n        for r in result['results']:\n            print(f\"  - {r['metadata']['citation']}\")\n            print(f\"    Confidence: {r['metadata']['confidence']}\")\n    \n    print(\"\\n\" + \"=\" * 60)\n    print(\"ANTI-PATTERN: What NOT to do\")\n    print(\"=\" * 60)\n    rag_bad = AntiPatternCricketRAG()\n    print(\"\\nFlat retrieval from millions of chunks (slow, no structure)\")\n    print(\"No metadata filtering (gets outdated or unreliable sources)\")\n    print(\"Same strategy for all query types (suboptimal for each)\")\n    print(\"No citations (unverifiable, promotes hallucinations)\")",
-      "language": "",
-      "level": 2,
-      "items": [],
       "explanation": ""
     },
     {

@@ -136,28 +136,6 @@
       "explanation": ""
     },
     {
-      "filename": "str) -> pd.DataFrame:\n        \"\"\"Load cricket player data from CSV.\"\"\"\n        filepath = os.path.join(self.data_dir, filename)\n        self.raw_data = pd.read_csv(filepath)\n        logger.info(f\"Loaded {len(self.raw_data)} records from {filename}\")\n        logger.info(f\"Features: {list(self.raw_data.columns)}\")\n        return self.raw_data\n    \n    def exploratory_analysis(self) -> Dict:\n        \"\"\"Perform EDA on cricket dataset.\"\"\"\n        if self.raw_data is None:\n            raise ValueError(\"Load data first using load_data()\")\n        \n        eda_results = {\n            'shape': self.raw_data.shape",
-      "missing_values": "self.raw_data.isnull().sum().to_dict()",
-      "class_distribution": "self.raw_data['performance_label'].value_counts().to_dict()",
-      "numeric_stats": "self.raw_data.describe().to_dict()\n        }\n        \n        logger.info(f\"Dataset shape: {eda_results['shape']}\")\n        logger.info(f\"Missing values:\\n{pd.Series(eda_results['missing_values'])}\")\n        logger.info(f\"Class distribution:\\n{pd.Series(eda_results['class_distribution'])}\")\n        \n        return eda_results\n    \n    def handle_missing_values(self",
-      "strategy": "str = 'mean') -> pd.DataFrame:\n        \"\"\"Handle missing values in cricket dataset.\"\"\"\n        if self.raw_data is None:\n            raise ValueError(\"Load data first\")\n        \n        data = self.raw_data.copy()\n        \n        # For numeric columns, use strategy (mean/median)\n        numeric_cols = data.select_dtypes(include=[np.number]).columns\n        for col in numeric_cols:\n            if data[col].isnull().any():\n                if strategy == 'mean':\n                    fill_value = data[col].mean()\n                else:  # median\n                    fill_value = data[col].median()\n                data[col].fillna(fill_value, inplace=True)\n                logger.info(f\"Filled missing values in '{col}' with {strategy}: {fill_value:.2f}\")\n        \n        return data\n    \n    def detect_outliers_iqr(self",
-      "data": "pd.DataFrame",
-      "columns": "list = None) -> pd.DataFrame:\n        \"\"\"Detect and flag outliers using IQR method.\"\"\"\n        if columns is None:\n            columns = data.select_dtypes(include=[np.number]).columns.tolist()\n            # Remove target and ID columns\n            columns = [c for c in columns if c not in ['player_id', 'performance_label']]\n        \n        outlier_flags = pd.DataFrame(False, index=data.index, columns=columns)\n        \n        for col in columns:\n            Q1 = data[col].quantile(0.25)\n            Q3 = data[col].quantile(0.75)\n            IQR = Q3 - Q1\n            lower_bound = Q1 - 1.5 * IQR\n            upper_bound = Q3 + 1.5 * IQR\n            \n            outliers = (data[col] < lower_bound) | (data[col] > upper_bound)\n            outlier_flags[col] = outliers\n            logger.info(f\"Detected {outliers.sum()} outliers in '{col}'\")\n        \n        return outlier_flags\n    \n    def create_train_val_test_split(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "data": "pd.DataFrame, \n                                   test_size: float = 0.2,\n                                   val_size: float = 0.2) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:\n        \"\"\"Create stratified train/validation/test splits.\"\"\"\n        # First split: train+val vs test (stratified by performance_label)\n        train_val, test = train_test_split(\n            data, \n            test_size=test_size,\n            random_state=42,\n            stratify=data['performance_label']\n        )\n        \n        # Second split: train vs val (stratified)\n        train, val = train_test_split(\n            train_val,\n            test_size=val_size / (1 - test_size),\n            random_state=42,\n            stratify=train_val['performance_label']\n        )\n        \n        logger.info(f\"Train set: {len(train)} samples ({len(train)/len(data)*100:.1f}%)\")\n        logger.info(f\"Validation set: {len(val)} samples ({len(val)/len(data)*100:.1f}%)\")\n        logger.info(f\"Test set: {len(test)} samples ({len(test)/len(data)*100:.1f}%)\")\n        logger.info(f\"Train class distribution:\\n{train['performance_label'].value_counts()}\")\n        logger.info(f\"Val class distribution:\\n{val['performance_label'].value_counts()}\")\n        logger.info(f\"Test class distribution:\\n{test['performance_label'].value_counts()}\")\n        \n        return train, val, test\n\n\n# Main execution\nif __name__ == \"__main__\":\n    logger.info(\"=\" * 60)\n    logger.info(\"STEP 1: Cricket Performance Data Foundation\")\n    logger.info(\"=\" * 60)\n    \n    # Initialize data loader\n    loader = CricketDataLoader()\n    \n    # Create sample dataset\n    logger.info(\"\\n[1] Creating sample cricket dataset...\")\n    csv_path = loader.create_sample_dataset()\n    \n    # Load data\n    logger.info(\"\\n[2] Loading cricket player data...\")\n    raw_data = loader.load_data('cricket_players.csv')\n    \n    # Exploratory analysis\n    logger.info(\"\\n[3] Performing exploratory data analysis...\")\n    eda = loader.exploratory_analysis()\n    \n    # Handle missing values\n    logger.info(\"\\n[4] Handling missing values...\")\n    clean_data = loader.handle_missing_values(strategy='median')\n    \n    # Detect outliers\n    logger.info(\"\\n[5] Detecting outliers using IQR method...\")\n    outlier_flags = loader.detect_outliers_iqr(clean_data)\n    outlier_count = outlier_flags.any(axis=1).sum()\n    logger.info(f\"Total records with outliers: {outlier_count}\")\n    \n    # Create train/val/test splits\n    logger.info(\"\\n[6] Creating stratified train/validation/test splits...\")\n    train_data, val_data, test_data = loader.create_train_val_test_split(clean_data)\n    \n    # Save processed datasets\n    os.makedirs('data/processed', exist_ok=True)\n    train_data.to_csv('data/processed/train_data.csv', index=False)\n    val_data.to_csv('data/processed/val_data.csv', index=False)\n    test_data.to_csv('data/processed/test_data.csv', index=False)\n    logger.info(\"\\nProcessed datasets saved to data/processed/\")\n    \n    logger.info(\"\\n\" + \"=\" * 60)\n    logger.info(\"STEP 1 COMPLETE: Data foundation ready for model building\")\n    logger.info(\"=\" * 60)",
-      "level": 2,
-      "language": "",
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "heading",
       "content": "Step 2 — Core Logic",
       "level": 2,
@@ -180,14 +158,6 @@
       "content": "🏏 Think of it like cricket: Building your neural network architecture is exactly like Rahul Dravid selecting the ideal batting order for different match situations—you're not using the same eleven for T20 powerplay that you'd use for Test match day-4 grind. Your Keras functional model is the batting order itself: opening batsmen (input layers) handle initial aggressive scoring, middle-order batsmen (hidden Dense layers) stabilize and build partnerships, and tail-enders (final layers) specialize in specific situations (all-rounders contribute to both batting and bowling). Just as Hardik Pandya might bowl fewer overs and focus on death-overs hittability when the team has strong bowlers elsewhere, your Dropout layers randomly 'rest' neurons during training to prevent any single pathway from becoming too dominant—this prevents 'overreliance' on one player's form. Your custom loss function mirrors how a coach weighs different performance dimensions: is it more critical to identify elite players (precision in the \"1\" class) or to avoid incorrectly ranking average performers as below-average (recall)? The learning rate schedule acts like match-day field placements: aggressive initial setup (high learning rate) early when the model needs foundational learning, then gradually defensive positioning (reduced learning rate) later to fine-tune and hold established advantages. Understanding this architectural thinking reveals that model structure isn't mathematical abstraction but strategic composition—each component serves deliberate performance objectives.",
       "level": 2,
       "language": "",
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "code",
-      "language": "python",
-      "level": 2,
       "items": [],
       "answer": -1,
       "explanation": ""

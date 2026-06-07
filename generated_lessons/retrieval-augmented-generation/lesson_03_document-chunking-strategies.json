@@ -166,30 +166,6 @@
       "explanation": ""
     },
     {
-      "candidates": "List[Tuple[str, int, float, float, float, float]],\n                             recency_weight: float = 0.1) -> List[RetrievalResult]:\n        \"\"\"\n        Stage 3: Apply temporal decay and freshness boosting.\n        Newer documents get boosted unless explicitly marked as superseded.\n        \"\"\"\n        now = datetime.now()\n        results = []\n        \n        for match_id, emb_rank, emb_sim, kw_sim, mmr_score, _ in candidates:\n            doc = self.documents[match_id]\n            \n            # Temporal decay: documents older than 30 days get linearly reduced weight\n            age_days = (now - doc.timestamp).days\n            freshness_factor = max(0.5, 1.0 - (age_days / 30.0) * recency_weight)\n            freshness_boost = freshness_factor - 1.0  # Boost is delta from 1.0\n            \n            # Apply RRF (Reciprocal Rank Fusion) combining embedding and keyword rankings\n            rrf_score = (1.0 / (60 + emb_rank)) + (1.0 / (60 + int(emb_rank)))  # Simulate keyword rank\n            final_score = rrf_score * freshness_factor\n            \n            # Check if this is a hard negative from feedback (learning signal)\n            is_hard_negative = any(match_id == neg[1] for neg in self.learned_hard_negatives)\n            if is_hard_negative:\n                final_score *= 0.3  # Penalize hard negatives learned from feedback\n            \n            results.append(RetrievalResult(\n                match_id=match_id,\n                title=doc.title,\n                embedding_rank=emb_rank,\n                keyword_rank=emb_rank,  # Simplified\n                reranked_score=final_score,\n                freshness_boost=freshness_boost,\n                final_rank=0\n            ))\n        \n        # Sort by final score\n        results.sort(key=lambda x: x.reranked_score, reverse=True)\n        for i, result in enumerate(results):\n            result.final_rank = i + 1\n        \n        return results\n    \n    def record_feedback(self",
-      "query": "str",
-      "retrieved_match_id": "str",
-      "user_accepted": "bool,\n                       dwell_time_seconds: float):\n        \"\"\"\n        Record implicit feedback from user interactions.\n        Used to train hard negatives and improve future retrieval.\n        \"\"\"\n        feedback = {\n            'timestamp': datetime.now()",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "query",
-      "retrieved_match_id": "retrieved_match_id",
-      "accepted": "user_accepted",
-      "dwell_time": "dwell_time_seconds\n        }\n        self.feedback_log.append(feedback)\n        \n        # Learn hard negatives: if user rejected quickly, mark as hard negative\n        if not user_accepted and dwell_time_seconds < 3:\n            self.learned_hard_negatives.append((query, retrieved_match_id))\n            print(f\"[LEARNING] Hard negative learned: query='{query}' != doc={retrieved_match_id}\")\n    \n    def retrieve_with_exploration(self",
-      "query_embedding": "np.ndarray,\n                                 keyword_query: str",
-      "top_k": "int = 5) -> List[RetrievalResult]:\n        \"\"\"\n        Thompson sampling: balance exploitation (retrieve what works) with exploration\n        (retrieve uncertain candidates to learn more).\n        \"\"\"\n        # Stage 1: Initial retrieval\n        candidates = self.retrieve_initial_candidates(query_embedding, keyword_query, top_k * 3)\n        \n        # Stage 2: Diversity reranking\n        diverse_candidates = self.rerank_with_diversity(candidates, top_k * 2)\n        \n        # Stage 3: Freshness and feedback integration\n        final_results = self.apply_freshness_boost(diverse_candidates, recency_weight=0.1)\n        \n        # Thompson sampling: occasionally replace top result with uncertain candidate\n        if np.random.random() < self.exploration_rate and len(final_results) > 1:\n            # Swap top result with random other result for exploration\n            exploration_idx = np.random.randint(1, len(final_results))\n            final_results[0], final_results[exploration_idx] = final_results[exploration_idx], final_results[0]\n            print(f\"[EXPLORATION] Thompson sampling triggered, exploring alternative result\")\n        \n        return final_results[:top_k]\n\n\n# Example usage demonstrating the full RAG pipeline\ndef main():\n    rag = DynamicCricketRAGSystem(embedding_dim=768)\n    \n    # Create sample cricket match documents with synthetic embeddings\n    matches = [\n        CricketMatch(\n            match_id=\"ind_aus_test_2023_01\",\n            title=\"India vs Australia Test 2023 - Bumrah Bowling Analysis\",\n            content=\"Jasprit Bumrah's exceptional bowling performance with 7 wickets for 45 runs\",\n            embedding=np.random.randn(768),\n            timestamp=datetime.now() - timedelta(days=5),\n            match_type=\"Test\",\n            teams=(\"India\", \"Australia\")\n        ),\n        CricketMatch(\n            match_id=\"ipl_2024_rr_vs_csk\",\n            title=\"IPL 2024 - Rajasthan Royals vs CSK Powerplay Tactics\",\n            content=\"Aggressive powerplay strategy with emphasis on pace bowling variations\",\n            embedding=np.random.randn(768),\n            timestamp=datetime.now() - timedelta(days=2),\n            match_type=\"T20\",\n            teams=(\"Rajasthan Royals\", \"Chennai Super Kings\")\n        ),\n        CricketMatch(\n            match_id=\"wc_2023_final_analysis\",\n            title=\"World Cup 2023 Final - Kohli's Match-Winning Innings\",\n            content=\"Detailed analysis of Virat Kohli's 120-run innings that secured victory\",\n            embedding=np.random.randn(768),\n            timestamp=datetime.now() - timedelta(days=45),\n            match_type=\"ODI\",\n            teams=(\"India\", \"Pakistan\")\n        ),\n        CricketMatch(\n            match_id=\"psl_2024_pace_bowling\",\n            title=\"PSL 2024 - Death Bowling and Economy Analysis\",\n            content=\"Death bowling strategies across six teams in PSL season\",\n            embedding=np.random.randn(768),\n            timestamp=datetime.now() - timedelta(days=1),\n            match_type=\"T20\",\n            teams=(\"Multiple\", \"Multiple\")\n        )\n    ]\n    \n    # Dynamic indexing: add documents\n    for match in matches:\n        rag.add_or_update_document(match)\n    \n    # Simulate a query about Bumrah's recent performance\n    query_embedding = np.random.randn(768)\n    keyword_query = \"Bumrah bowling performance recent\"\n    \n    print(\"\\n[RETRIEVAL PIPELINE] Starting multi-stage retrieval...\")\n    results = rag.retrieve_with_exploration(query_embedding, keyword_query, top_k=3)\n    \n    print(\"\\n[RESULTS] Top 3 reranked matches:\")\n    for result in results:\n        print(f\"  Rank {result.final_rank}: {result.title}\")\n        print(f\"    - Reranked Score: {result.reranked_score:.4f}\")\n        print(f\"    - Freshness Boost: {result.freshness_boost:.4f}\")\n    \n    # Simulate user feedback (implicit learning)\n    print(\"\\n[FEEDBACK] Recording user interactions...\")\n    rag.record_feedback(keyword_query, results[0].match_id, user_accepted=True, dwell_time_seconds=12.5)\n    rag.record_feedback(keyword_query, \"wc_2023_final_analysis\", user_accepted=False, dwell_time_seconds=1.2)\n    \n    print(f\"\\nFeedback logged: {len(rag.feedback_log)} interactions\")\n    print(f\"Hard negatives learned: {len(rag.learned_hard_negatives)} pairs\")\n\nif __name__ == \"__main__\":\n    main()",
-      "language": "python",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "paragraph",
       "content": "The code demonstrates all four advanced RAG concepts working together. The `DynamicCricketRAGSystem` class models a production RAG pipeline: `add_or_update_document()` handles incremental indexing without rebuilding indexes from scratch—each match document is added with its timestamp preserved, enabling temporal queries and freshness boosting later. `retrieve_initial_candidates()` demonstrates the first retrieval stage using approximate nearest neighbor logic on embeddings and keyword filtering, achieving O(k log N) complexity rather than O(N). The `rerank_with_diversity()` method implements Maximal Marginal Relevance: as each document is selected, its similarity to already-selected documents is computed, penalizing redundant results—notice how the best result isn't selected first if a more diverse alternative exists. The `apply_freshness_boost()` method shows temporal decay: documents older than 30 days receive lower scores unless they're landmarks (World Cup final). The Reciprocal Rank Fusion formula combines embedding-based and keyword-based rankings, preventing either signal from dominating. Most importantly, `record_feedback()` and `retrieve_with_exploration()` demonstrate feedback loops and Thompson sampling: user rejections are recorded as hard negatives that permanently penalize those documents, and exploration probability allows the system to occasionally try uncertain candidates to improve future decisions. When you call `retrieve_with_exploration()`, the system chains all stages: retrieval → diversity reranking → freshness boosting → Thompson sampling exploration. This mirrors production systems like Pinecone + Qdrant where retrieval is delegated to specialized vector databases optimized for HNSW-like structures.",
       "level": 2,
@@ -247,18 +223,6 @@
       "explanation": ""
     },
     {
-      "query_id": "str",
-      "doc_id": "str",
-      "label": "bool",
-      "dwell_time": "float):\n        \"\"\"\n        Add training signal from user interaction.\n        label: True if user accepted, False if rejected.\n        dwell_time: seconds user spent with result.\n        \"\"\"\n        strength = min(dwell_time / 30.0, 1.0)  # Normalize dwell time to [0, 1]\n        \n        self.feedback_buffer.append({\n            'query': query_id",
-      "doc": "doc_id",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "label": "label",
       "dwell_time": "dwell_time",
       "weight": "strength if label else -strength * 0.5",
@@ -307,14 +271,6 @@
       "content": "🏏 Think of it like cricket: The Indian cricket team's selection committee uses multi-stage decision-making for squad selection that mirrors RAG best practices. First, the broad filter: scouts watch all state-level cricket across India (128 teams, 1,000+ players), but don't evaluate each player deeply—they quickly identify 200 players worthy of deeper analysis using basic metrics (batting average > 35, bowling economy < 7). This is the cheap retriever stage. Second, the committee watches intensive video analysis of these 200 players, assessing technique against pace bowling, spin bowling, bouncy pitches, and slow pitches—deep but expensive evaluation. Third, they apply freshness weighting: a brilliant recent performance in the domestic T20 league counts more than a stellar performance from 18 months ago, but not to the point of completely ignoring a player with one bad series and strong historical form (temporal decay). Fourth, they use hybrid evaluation: they consider both quantitative metrics (runs per innings, economy rate) and qualitative factors (ability to handle DRS situations, experience in high-pressure matches). Fifth, they continuously learn from feedback: if a selected player consistently fails in the squad but excels in domestic cricket (distribution mismatch signal), they downweight future nominations from that state's domestic competitions. Finally, they separate concerns: squad selection is independent of captain selection; you can improve the squad composition without overloading the captain with selection decisions. This multi-stage, fresh-weighted, hybrid evaluation with continuous learning mirrors sophisticated RAG systems far better than a single ranking mechanism.",
       "level": 2,
       "language": "",
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "code",
-      "language": "",
-      "level": 2,
       "items": [],
       "answer": -1,
       "explanation": ""

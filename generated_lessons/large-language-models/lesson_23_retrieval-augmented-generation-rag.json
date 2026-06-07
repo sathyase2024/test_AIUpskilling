@@ -168,50 +168,6 @@
       "explanation": ""
     },
     {
-      "query": "str",
-      "top_k": "int = 3) -> List[Tuple[CricketMatch, float]]:\n        \"\"\"First-stage retrieval + second-stage reranking.\n        \n        Args:\n            query: User's question\n            top_k: Number of documents to return\n        \n        Returns:\n            Reranked top-k matches\n        \"\"\"\n        # Stage 1: Dense retrieval by semantic similarity\n        query_embedding = self.embedding_model.embed_text(query)\n        retrieved = self.vector_db.retrieve(query_embedding, top_k=top_k)\n        print(f\"\\n[Retrieval Stage 1] Retrieved {len(retrieved)} matches by semantic similarity\")\n        for match, score in retrieved:\n            print(f\"  - {match.team_a} vs {match.team_b} @ {match.venue} (similarity: {score:.3f})\")\n        \n        # Stage 2: Reranking with task-specific signals\n        reranked = self.reranker.rerank(query, retrieved)\n        print(f\"[Retrieval Stage 2] Reranked matches by relevance\")\n        for match, score in reranked:\n            print(f\"  - {match.team_a} vs {match.team_b} @ {match.venue} (rerank score: {score:.3f})\")\n        \n        return reranked\n    \n    def build_prompt(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "str",
-      "context_matches": "List[Tuple[CricketMatch, float]]) -> str:\n        \"\"\"Engineer prompt: system instructions + context + query.\n        \n        This step integrates retrieved documents into the LLM's input.\n        \"\"\"\n        system_instructions = (\n            \"You are a cricket expert. Answer questions using ONLY the provided match context. \"\n            \"If the context doesn't contain relevant information, say 'I don't have information about this.'\"\n        )\n        \n        context = \"\\n\\n\".join([\n            f\"Match {i+1}: {match.team_a} vs {match.team_b}\\nVenue: {match.venue}\\nSummary: {match.match_summary}\"\n            for i, (match, _) in enumerate(context_matches)\n        ])\n        \n        prompt = f\"\"\"System Instructions: {system_instructions}\n\nContext (retrieved cricket match information):\n{context}\n\nQuestion: {query}\n\nAnswer:\"\"\"\n        return prompt\n    \n    def generate_answer(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "str) -> dict:\n        \"\"\"Complete RAG pipeline: retrieve → rerank → build prompt → generate.\n        \n        In production, the 'generate' step calls an actual LLM (OpenAI, Claude, etc.).\n        Here we simulate generation.\n        \"\"\"\n        print(f\"\\n{'='*70}\")\n        print(f\"Query: {query}\")\n        print(f\"{'='*70}\")\n        \n        # Retrieve and rerank\n        context_matches = self.retrieve_and_rerank(query, top_k=3)\n        \n        # Build prompt for LLM\n        prompt = self.build_prompt(query, context_matches)\n        print(f\"\\n[Prompt Engineering] Built prompt with {len(context_matches)} documents:\")\n        print(f\"Prompt preview:\\n{prompt[:300]}...\")\n        \n        # Simulate LLM generation (in production: call actual LLM API)\n        simulated_answer = (\n            f\"Based on the retrieved cricket matches, \"\n            f\"{context_matches[0][0].team_a} demonstrated strong performance against {context_matches[0][0].team_b} \"\n            f\"at {context_matches[0][0].venue}. The key insight from the context is that \"\n            f\"match preparation and venue-specific tactics are critical success factors.\"\n        )\n        \n        return {\n            \"query\": query,\n            \"retrieved_matches\": [(m.match_id, f\"{m.team_a} vs {m.team_b}\") for m, _ in context_matches],\n            \"answer\": simulated_answer,\n            \"prompt_used\": prompt\n        }\n\n\n# ============================================================================\n# Example Usage\n# ============================================================================\n\nif __name__ == \"__main__\":\n    # Create vector database with cricket matches\n    matches = [\n        CricketMatch(\n            match_id=\"ind_vs_aus_mcg_2023\",\n            team_a=\"India\",\n            team_b=\"Australia\",\n            venue=\"Melbourne Cricket Ground\",\n            match_summary=\"India toured Australia for Test series. Virat Kohli scored 150 runs. \"\n                          \"Jasprit Bumrah took 5 wickets. India won by 6 wickets. \"\n                          \"Key factor: fast bowling and batting against short-pitch deliveries.\"\n        ),\n        CricketMatch(\n            match_id=\"ind_vs_eng_lords_2023\",\n            team_a=\"India\",\n            team_b=\"England\",\n            venue=\"Lord's, London\",\n            match_summary=\"India vs England Test at Lord's. Rohit Sharma led India to victory. \"\n                          \"England struggled against Indian spin bowlers. Match was decided by \"\n                          \"effective field placement and disciplined bowling spells.\"\n        ),\n        CricketMatch(\n            match_id=\"ind_vs_pak_t20_2023\",\n            team_a=\"India\",\n            team_b=\"Pakistan\",\n            venue=\"Arun Jaitley Stadium, Delhi\",\n            match_summary=\"India vs Pakistan T20 match. High-scoring encounter. Bumrah's yorkers \"\n                          \"were decisive in the death overs. India's powerplay batting set the tone. \"\n                          \"Pakistan couldn't recover from early wicket losses.\"\n        ),\n        CricketMatch(\n            match_id=\"aus_vs_nz_perth_2023\",\n            team_a=\"Australia\",\n            team_b=\"New Zealand\",\n            venue=\"Perth, Western Australia\",\n            match_summary=\"Australia vs New Zealand Test at Perth. Fast, bouncy pitch favored \"\n                          \"Australian fast bowlers. New Zealand's batting lineup struggled. \"\n                          \"Australia's pace attack of Cummins and Starc dominated.\"\n        )\n    ]\n    \n    # Initialize RAG system and index documents\n    rag = RAGSystem()\n    rag.add_documents(matches)\n    \n    # Query 1: Specific question about India's performance in Australia\n    result1 = rag.generate_answer(\n        \"How did India perform against Australia at MCG? What were key success factors?\"\n    )\n    print(f\"\\n[Generation Result]\")\n    print(f\"Answer: {result1['answer']}\")\n    print(f\"Retrieved matches: {result1['retrieved_matches']}\")\n    \n    # Query 2: Question about fast bowling\n    print(\"\\n\" + \"=\"*70 + \"\\n\")\n    result2 = rag.generate_answer(\n        \"What role did fast bowling play in recent India matches?\"\n    )\n    print(f\"\\n[Generation Result]\")\n    print(f\"Answer: {result2['answer']}\")\n    print(f\"Retrieved matches: {result2['retrieved_matches']}\")",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "language",
-      "content": "python",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "level",
-      "content": 2,
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "paragraph",
       "content": "The code above implements a complete RAG pipeline using cricket match data as domain context. Execution flow follows these stages: (1) Indexing — the `RAGSystem` is initialized with four cricket match documents (India vs Australia at MCG, India vs England at Lord's, etc.). Each match summary is embedded using a semantic embedding simulator (in production, this would use a real embedding model like sentence-transformers). The embeddings are stored in the `VectorDatabase` with match metadata. (2) Retrieval — when a user queries 'How did India perform against Australia at MCG?', the query is embedded and compared against all indexed match embeddings using cosine similarity. The vector database returns the top-3 most similar matches (e.g., the India-Australia MCG match ranks highest because the query mentions both teams and venue). (3) Reranking — the `SimpleReranker` applies task-specific heuristics; matches involving Australia receive a relevance boost, refining the rankings further. (4) Prompt Engineering — the top-ranked matches are formatted into a structured prompt with system instructions ('Answer only using provided context'), retrieved context (match summaries), and the user's query. This prompt construction ensures the LLM will ground its answer in actual data. (5) Generation — in production, this prompt is sent to an LLM (GPT-4, Claude, Llama). Here we simulate the generation step with a hardcoded answer. The key insight is that each pipeline stage (retrieval, reranking, prompt engineering) directly impacts answer quality—poor retrieval returns irrelevant documents, degrading generation regardless of LLM capability. The modular design allows each component (embedding model, reranker, prompt template) to be upgraded independently without retraining the entire system.",
       "level": 2,
@@ -225,14 +181,6 @@
       "content": "How It Works Under the Hood",
       "level": 2,
       "language": "",
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "paragraph",
-      "language": "",
-      "level": 2,
       "items": [],
       "answer": -1,
       "explanation": ""

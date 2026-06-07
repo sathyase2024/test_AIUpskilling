@@ -165,43 +165,6 @@
       "explanation": ""
     },
     {
-      "d_model": "int",
-      "num_experts": "int):\n        super().__init__()\n        self.router_linear = nn.Linear(d_model, num_experts)\n        self.num_experts = num_experts\n    \n    def forward(self",
-      "x": "torch.Tensor",
-      "top_k": "int = 2) -> Tuple[torch.Tensor, torch.Tensor]:\n        \"\"\"\n        Route tokens to top-k experts.\n        Returns: (gating_weights, expert_indices)\n        \"\"\"\n        # Compute routing logits (soft scores for each expert)\n        logits = self.router_linear(x)  # Shape: [batch_size, seq_len, num_experts]\n        \n        # Soft-max for probability distribution\n        routing_probs = F.softmax(logits, dim=-1)  # [batch_size, seq_len, num_experts]\n        \n        # Select top-k experts (hard sparsity)\n        top_k_probs, top_k_indices = torch.topk(routing_probs, k=top_k, dim=-1)\n        \n        # Renormalize top-k probabilities\n        top_k_probs = top_k_probs / (top_k_probs.sum(dim=-1, keepdim=True) + 1e-10)\n        \n        return top_k_probs, top_k_indices\n\nclass CricketMixtureOfExports(nn.Module):\n    \"\"\"Mixture of Experts layer (cricket team routing logic).\"\"\"\n    def __init__(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "d_model": "int",
-      "d_ff": "int",
-      "num_experts": "int",
-      "top_k": "int = 2):\n        super().__init__()\n        self.num_experts = num_experts\n        self.top_k = top_k\n        self.d_model = d_model\n        \n        # Initialize experts (like player roster)\n        self.experts = nn.ModuleList([\n            CricketExpert(d_model, d_ff) for _ in range(num_experts)\n        ])\n        \n        # Router (captain's decision-maker)\n        self.router = CricketRouter(d_model, num_experts)\n        \n        # Track expert utilization for load-balancing loss\n        self.register_buffer('expert_load', torch.zeros(num_experts))\n    \n    def forward(self",
-      "x": "torch.Tensor",
-      "return_load_loss": "bool = False) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:\n        \"\"\"\n        Forward pass with sparse expert routing.\n        x: [batch_size, seq_len, d_model]\n        Returns: output [batch_size, seq_len, d_model], load_loss (optional)\n        \"\"\"\n        batch_size, seq_len, d_model = x.shape\n        \n        # Route tokens to top-k experts\n        top_k_probs, top_k_indices = self.router(x, top_k=self.top_k)\n        # Shape: probs [batch_size, seq_len, top_k], indices [batch_size, seq_len, top_k]\n        \n        # Initialize output\n        output = torch.zeros_like(x)\n        \n        # Process each token through its routed experts\n        for expert_idx in range(self.num_experts):\n            # Find all positions where this expert was selected\n            mask = (top_k_indices == expert_idx).any(dim=-1)  # [batch_size, seq_len]\n            \n            if mask.sum() > 0:\n                # Get gating weights for this expert\n                expert_gate_weights = top_k_probs[\n                    mask.unsqueeze(-1).expand(-1, -1, self.top_k)\n                ]\n                expert_gate_mask = (top_k_indices == expert_idx)[mask]\n                \n                # Apply expert to selected tokens\n                expert_out = self.experts[expert_idx](x[mask])  # [num_selected, d_model]\n                \n                # Weight by gating probability\n                weighted_out = expert_out * expert_gate_weights.sum(dim=-1, keepdim=True)\n                \n                # Accumulate in output\n                output[mask] += weighted_out\n                \n                # Track utilization for load balancing\n                self.expert_load[expert_idx] = mask.float().mean().item()\n        \n        load_loss = None\n        if return_load_loss:\n            # Compute load-balancing loss to encourage balanced utilization\n            # P_i: fraction of tokens routed to expert i\n            expert_utilization = self.expert_load / (self.expert_load.sum() + 1e-10)\n            \n            # F_i: fraction of gating probability assigned to expert i\n            router_output = F.softmax(self.router.router_linear(x), dim=-1)  # [batch_size, seq_len, num_experts]\n            expert_probability = router_output.mean(dim=(0, 1))  # [num_experts]\n            \n            # Load balancing loss: minimize difference between utilization and probability\n            load_loss = self.num_experts * torch.sum(\n                expert_utilization * expert_probability\n            ) * 0.01  # Small weight for auxiliary loss\n        \n        return output, load_loss\n\nclass CricketTransformerFFNLayer(nn.Module):\n    \"\"\"Transformer FFN layer replaced with MoE (cricket team dynamics).\"\"\"\n    def __init__(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "d_model": "int",
-      "num_experts": "int = 8",
-      "d_ff": "int = 2048",
-      "top_k": "int = 2):\n        super().__init__()\n        self.moe = CricketMixtureOfExports(d_model, d_ff, num_experts, top_k)\n        self.norm = nn.LayerNorm(d_model)\n    \n    def forward(self",
-      "x": "torch.Tensor",
-      "return_load_loss": "bool = False):\n        \"\"\"Apply MoE with residual connection and layer norm.\"\"\"\n        moe_out, load_loss = self.moe(x, return_load_loss=return_load_loss)\n        output = self.norm(x + moe_out)  # Residual + LayerNorm\n        return output, load_loss\n\n# Example usage\nif __name__ == \"__main__\":\n    # Simulate cricket commentary tokens\n    batch_size, seq_len, d_model = 2, 10, 512\n    num_experts = 8\n    \n    # Create MoE layer (like assembling a cricket squad with 8 specialists)\n    moe_layer = CricketTransformerFFNLayer(d_model, num_experts=num_experts, top_k=2)\n    \n    # Simulate token embeddings (like batting statistics)\n    x = torch.randn(batch_size, seq_len, d_model)\n    \n    # Forward pass (routing tokens like captain sends batters to face bowlers)\n    output, load_loss = moe_layer(x, return_load_loss=True)\n    \n    print(f\"Input shape: {x.shape}\")\n    print(f\"Output shape: {output.shape}\")\n    print(f\"Load balancing loss: {load_loss.item():.6f}\")\n    print(f\"Expert utilization: {moe_layer.moe.expert_load}\")\n    print(f\"\\nMoE reduces active compute: {num_experts} experts, top_k=2 active per token = {2/num_experts:.1%} sparsity\")",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "paragraph",
       "content": "The code above demonstrates a complete MoE implementation with cricket-themed naming. The CricketMoE architecture uses 8 expert networks (like 8 specialist players in a squad), each an independent feedforward network. The CricketRouter is the gating function that learns to route each token (like each ball in an innings) to the top-2 most relevant experts. The forward pass processes tokens through their routed experts: for each token, the router computes a probability distribution over experts, selects the top-2, applies those experts to the token embedding, and weights their outputs by the routing probability. The sparse activation is visible: although 8 experts exist, only 2 activate per token, reducing active parameters to 2/8 = 25% of the expert capacity. The load_loss auxiliary term encourages balanced expert utilization: it compares the fraction of tokens routed to each expert (P_i, utilization) with the gating probability assigned to each expert (F_i) and penalizes imbalance. During training, this loss guides the router to avoid routing collapse. The residual connection and layer normalization preserve gradients and stabilize training. This simple yet complete example shows why MoE enables scaling: 8 experts × 2048 hidden units × 512 model dimensions ≈ 8.4M expert parameters, but only ~1.05M parameters activate per token—a 8x reduction in active compute compared to a dense FFN with the same capacity.",
       "language": "markdown",
@@ -232,14 +195,6 @@
       "type": "analogy",
       "content": "🏏 Think of it like cricket: The runtime mechanics of MoE resemble managing a cricket team across multiple cities (distributed teams). Before a match starts, the coach (router) decides which players go to which roles (forward pass routing). A player assigned to open batting travels to the crease (token dispatched to expert). During the match (forward pass), if Rohit Sharma is at the crease and Bumrah is bowling, Rohit's defensive technique activates; simultaneously, at another crease in a different stadium, Pant activates his aggressive shots against Lyon. This parallelization (multiple tokens processed simultaneously through different experts) is the core efficiency. However, grouping is critical: if the coach sends Rohit to one stadium to play spin and Pant to another to play pace, then tries to combine their contributions without reorganizing, coordination fails—hence the all-to-all shuffle: reorganize players by assigned role, compute their role contributions, then gather results back to original locations. Backward pass (training) involves analyzing what worked: the coach reviews which batsmen's techniques reduced runs against which bowlers, updating coaching strategy (router gradients). If a specialist bowler is rarely routed (rarely selected to bowl), that bowler's training stalls—the load-balancing loss is the coaching mandate to rotate all players, ensuring every specialist develops expertise. Understanding these mechanics reveals why distributed MoE communication matters: just as transporting players across multiple grounds adds overhead, all-to-all communication in distributed MoE is expensive but necessary for correct routing.",
       "language": "markdown",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "code",
-      "language": "python",
       "level": 2,
       "items": [],
       "answer": -1,

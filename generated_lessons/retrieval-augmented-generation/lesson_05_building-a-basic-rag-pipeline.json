@@ -218,52 +218,6 @@
       "explanation": ""
     },
     {
-      "embedding": "np.ndarray",
-      "k": "int) -> List[tuple]:\n        \"\"\"Find k nearest existing nodes.\"\"\"\n        distances = [\n            (doc_id, self._cosine_distance(embedding, node.embedding))\n            for doc_id, node in self.nodes.items()\n        ]\n        distances.sort(key=lambda x: x[1])\n        return distances[:k]\n\nclass BM25Retriever:\n    \"\"\"BM25 sparse keyword-based retrieval (hybrid with dense search).\"\"\"\n    \n    def __init__(self):\n        self.documents: Dict[str, str] = {}\n        self.doc_freq: Dict[str, int] = defaultdict(int)\n        self.collection_size = 0\n    \n    def index(self",
-      "doc_id": "str",
-      "text": "str) -> None:\n        \"\"\"Index document text for keyword matching.\"\"\"\n        self.documents[doc_id] = text\n        tokens = text.lower().split()\n        unique_tokens = set(tokens)\n        for token in unique_tokens:\n            self.doc_freq[token] += 1\n        self.collection_size += 1\n    \n    def search(self",
-      "query": "str",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "k": "int = 5) -> List[tuple]:\n        \"\"\"BM25 retrieval: returns (doc_id, score) tuples.\"\"\"\n        query_tokens = query.lower().split()\n        scores = defaultdict(float)\n        \n        for token in query_tokens:\n            idf = np.log((self.collection_size - self.doc_freq[token] + 0.5) / \n                         (self.doc_freq[token] + 0.5) + 1.0)\n            \n            for doc_id, text in self.documents.items():\n                doc_tokens = text.lower().split()\n                tf = doc_tokens.count(token)\n                scores[doc_id] += idf * tf\n        \n        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)\n        return ranked[:k]\n\nclass HybridRAGRetriever:\n    \"\"\"Hybrid retrieval combining dense (HNSW) and sparse (BM25) methods.\"\"\"\n    \n    def __init__(self",
-      "embedding_dim": "int = 384",
-      "fusion_weight": "float = 0.7):\n        self.hnsw = SimpleHNSW(embedding_dim=embedding_dim)\n        self.bm25 = BM25Retriever()\n        self.fusion_weight = fusion_weight  # Weight for dense vs sparse\n        self.embeddings: Dict[str, np.ndarray] = {}\n    \n    def index_document(self",
-      "doc_id": "str",
-      "text": "str",
-      "embedding": "np.ndarray) -> None:\n        \"\"\"Index document with both dense embedding and sparse keywords.\"\"\"\n        self.hnsw.insert(doc_id, embedding)\n        self.bm25.index(doc_id, text)\n        self.embeddings[doc_id] = embedding\n    \n    def retrieve_hybrid(self",
-      "query": "str",
-      "query_embedding": "np.ndarray",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "k": "int = 5) -> List[tuple]:\n        \"\"\"\n        Hybrid retrieval using both dense and sparse methods.\n        Returns top-k results combined using late fusion.\n        \"\"\"\n        # Dense retrieval (HNSW)\n        dense_results = self.hnsw.search(query_embedding, k=k*2)\n        dense_scores = {doc_id: 1.0 - dist for doc_id, dist in dense_results}\n        \n        # Sparse retrieval (BM25)\n        sparse_results = self.bm25.search(query, k=k*2)\n        sparse_scores = {doc_id: score for doc_id, score in sparse_results}\n        max_sparse = max(sparse_scores.values()) if sparse_scores else 1.0\n        sparse_scores = {doc_id: score / max_sparse for doc_id, score in sparse_scores.items()}\n        \n        # Late fusion: combine scores\n        all_docs = set(dense_scores.keys()) | set(sparse_scores.keys())\n        fused_scores = {}\n        for doc_id in all_docs:\n            dense_score = dense_scores.get(doc_id, 0.0)\n            sparse_score = sparse_scores.get(doc_id, 0.0)\n            fused_scores[doc_id] = (\n                self.fusion_weight * dense_score + \n                (1.0 - self.fusion_weight) * sparse_score\n            )\n        \n        ranked = sorted(fused_scores.items(), key=lambda x: x[1], reverse=True)\n        return ranked[:k]\n\nclass QueryCache:\n    \"\"\"Semantic query caching to avoid redundant retrievals.\"\"\"\n    \n    def __init__(self",
-      "similarity_threshold": "float = 0.95):\n        self.cache: List[tuple] = []  # (query_embedding, results, timestamp)\n        self.threshold = similarity_threshold\n    \n    def get(self",
-      "query_embedding": "np.ndarray) -> tuple:\n        \"\"\"Check cache for semantically similar queries.\"\"\"\n        for cached_embedding, results, timestamp in self.cache:\n            similarity = np.dot(query_embedding, cached_embedding) / (\n                np.linalg.norm(query_embedding) * np.linalg.norm(cached_embedding) + 1e-8\n            )\n            if similarity > self.threshold:\n                return results  # Cache hit\n        return None  # Cache miss\n    \n    def put(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query_embedding": "np.ndarray",
-      "results": "List[tuple]) -> None:\n        \"\"\"Store query embedding and results in cache.\"\"\"\n        self.cache.append((query_embedding, results, time.time()))\n        if len(self.cache) > 1000:\n            # LRU eviction: remove oldest\n            self.cache.pop(0)\n\n\n# Example: Advanced RAG with hybrid search and caching\nif __name__ == \"__main__\":\n    # Initialize hybrid retriever\n    hybrid = HybridRAGRetriever(fusion_weight=0.7)\n    cache = QueryCache(similarity_threshold=0.92)\n    \n    # Index cricket knowledge base\n    documents = {\n        \"bumrah_yorker\": \"Jasprit Bumrah is a master of yorker bowling. His economy rate at death overs is 5.2 in T20s. He targets batsmen's feet with pinpoint accuracy.\",\n        \"kohli_form\": \"Virat Kohli's recent form in Test cricket shows 3 centuries in last 5 matches. His average against fast bowling has improved from 38 to 45 in the last season.\",\n        \"rohit_power\": \"Rohit Sharma is explosive in powerplay overs. His strike rate in first 6 overs of T20 matches is 180+. He has 12 T20I centuries.\",\n        \"pitch_analysis\": \"MCG pitch in January typically offers pace and bounce. Fast bowlers dominate with economy rates under 6 in powerplay. Spinners struggle in first 10 overs.\"\n    }\n    \n    def mock_embed(text: str) -> np.ndarray:\n        \"\"\"Generate deterministic embedding for demo.\"\"\"\n        np.random.seed(hash(text) % (2**32))\n        return np.random.randn(384)\n    \n    # Index all documents\n    for doc_id, text in documents.items():\n        embedding = mock_embed(text)\n        hybrid.index_document(doc_id, text, embedding)\n    \n    # Query 1: Test hybrid retrieval\n    query1 = \"Bumrah yorker economy rate death overs T20\"\n    query1_embedding = mock_embed(query1)\n    \n    print(\"Query 1:\", query1)\n    print(\"Checking semantic cache...\", end=\" \")\n    cached = cache.get(query1_embedding)\n    if cached:\n        print(\"HIT! Using cached results.\")\n        results = cached\n    else:\n        print(\"MISS. Performing hybrid retrieval...\")\n        results = hybrid.retrieve_hybrid(query1, query1_embedding, k=2)\n        cache.put(query1_embedding, results)\n    \n    print(\"\\nTop results:\")\n    for doc_id, score in results:\n        print(f\"  {doc_id}: {score:.3f}\")\n    \n    # Query 2: Semantically similar to Query 1 (should hit cache)\n    print(\"\\n\" + \"=\"*60)\n    query2 = \"Bumrah's death bowling economy in T20 matches\"\n    query2_embedding = mock_embed(query2)\n    \n    print(\"Query 2:\", query2)\n    print(\"Checking semantic cache...\", end=\" \")\n    cached = cache.get(query2_embedding)\n    if cached:\n        print(\"HIT! Using cached results (semantic similarity).\")\n        results = cached\n    else:\n        print(\"MISS. Performing hybrid retrieval...\")\n        results = hybrid.retrieve_hybrid(query2, query2_embedding, k=2)\n        cache.put(query2_embedding, results)\n    \n    print(\"\\nTop results:\")\n    for doc_id, score in results:\n        print(f\"  {doc_id}: {score:.3f}\")\n    \n    # Query 3: Different query\n    print(\"\\n\" + \"=\"*60)\n    query3 = \"Rohit Sharma powerplay century T20\"\n    query3_embedding = mock_embed(query3)\n    \n    print(\"Query 3:\", query3)\n    print(\"Checking semantic cache...\", end=\" \")\n    cached = cache.get(query3_embedding)\n    if cached:\n        print(\"HIT!\")\n        results = cached\n    else:\n        print(\"MISS. Performing hybrid retrieval...\")\n        results = hybrid.retrieve_hybrid(query3, query3_embedding, k=2)\n        cache.put(query3_embedding, results)\n    \n    print(\"\\nTop results:\")\n    for doc_id, score in results:\n        print(f\"  {doc_id}: {score:.3f}\")\n    \n    print(f\"\\nCache size: {len(cache.cache)} queries cached\")",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "info_box",
       "content": "Pro Tip: In production RAG systems, hybrid search (combining dense embeddings with BM25 sparse retrieval) consistently outperforms pure dense retrieval by 5–15% in relevance metrics. Dense search excels at semantic understanding but misses exact keyword matches; BM25 catches exact phrases but fails on synonyms and paraphrases. Late fusion of both methods (weighted combination of scores) captures both signal types. Additionally, semantic query caching (storing query embeddings and results, then reusing them for similar queries with >95% similarity) can reduce retrieval latency by 50–70% for production workloads with repeated or similar questions. This is especially valuable for FAQ-heavy applications (customer support, documentation search) where the same question is asked thousands of times in slightly different wording.",
       "language": "",
@@ -295,14 +249,6 @@
       "content": "🏏 Think of it like cricket: Imagine a cricket team preparing strategy for a series against a new opponent. The coaching staff doesn't rely on a single scouting report; instead, they follow these three patterns. **Pattern 1** mirrors the scouting process: (1) First-pass reconnaissance: Watch all match videos of the opposition's last 20 matches to identify general patterns—fast, broad sampling to find candidate weaknesses. (2) Deep dive: Identify 5–10 most critical vulnerabilities (soft-handed batsmen against short balls, bowlers who struggle on green pitches). (3) Specialist analysis: Rerank weaknesses by relevance to THIS series' conditions (if the venue has green pitches, suddenly the green-pitch vulnerability ranks higher). (4) Remove redundancy: If three sources all say 'left-arm spinner struggles against left-hand bats,' synthesize into one actionable insight. **Pattern 2** reflects adaptive focus allocation: The team has limited time before the series, so they budget attention: 'We have 5 training days; focus deep analysis on the opposition's top 3 batsmen and our weakness against their spinner, allocate 1 day to contingency preparation.' They don't spend equal time on every weakness—they choose strategically based on likely impact and available time. **Pattern 3** embodies iterative refinement: After initial preparation, the team watches the opposition's first warm-up match. This reveals NEW information (a batsman's form dip, a bowler's recent injury) that initial scouting missed. The team generates follow-up questions: 'With their fast bowler injured, who replaces him? What's his track record?' and retrieves new data. The team iterates: initial plan → watch first match → refine → update strategy → watch second match → refine again. Each retrieval cycle improves the plan. This reveals why RAG systems that perform multi-stage retrieval and iteration beat single-pass systems: coaching (and LLM reasoning) improve with layered information gathering, not with processing one big batch of data upfront.",
       "level": 2,
       "language": "",
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "code",
-      "language": "python",
-      "level": 2,
       "items": [],
       "answer": -1,
       "explanation": ""

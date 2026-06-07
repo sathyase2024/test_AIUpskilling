@@ -164,44 +164,6 @@
       "explanation": ""
     },
     {
-      "query": "str",
-      "top_k": "int = 5) -> List[Tuple[str, float]]:\n        \"\"\"\n        Sparse retrieval using exact term matching (keyword-based BM25-like scoring).\n        Handles domain-specific terminology and exact phrases.\n        \"\"\"\n        query_terms = set(query.lower().split())\n        scores = []\n        \n        for doc in self.documents:\n            doc_terms = set(doc.lower().split())\n            # Simple overlap score: number of matching terms / document length\n            overlap = len(query_terms & doc_terms)\n            score = overlap / (len(doc_terms) + 1e-6) if overlap > 0 else 0.0\n            scores.append(score)\n        \n        top_indices = np.argsort(scores)[::-1][:top_k]\n        results = [(self.documents[idx], float(scores[idx])) for idx in top_indices]\n        \n        # Filter out zero-score results\n        results = [(doc, score) for doc, score in results if score > 0]\n        \n        return results\n    \n    def hybrid_retrieval(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "str",
-      "top_k": "int = 5) -> List[Tuple[str, float]]:\n        \"\"\"\n        Hybrid retrieval combining dense and sparse methods.\n        Merges results from both retrieval strategies and removes duplicates.\n        \"\"\"\n        dense_results = self.dense_retrieval(query, top_k=top_k * 2)\n        sparse_results = self.sparse_retrieval(query, top_k=top_k * 2)\n        \n        # Merge and deduplicate\n        merged = {}\n        for doc, score in dense_results + sparse_results:\n            if doc not in merged:\n                merged[doc] = []\n            merged[doc].append(score)\n        \n        # Average scores for duplicate documents\n        combined = [(doc, np.mean(scores)) for doc, scores in merged.items()]\n        combined.sort(key=lambda x: x[1], reverse=True)\n        \n        return combined[:top_k]\n    \n    def rerank_results(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "str",
-      "candidates": "List[Tuple[str, float]]",
-      "top_k": "int = 3) -> List[Tuple[str, float]]:\n        \"\"\"\n        Rerank candidate documents using cross-encoder model.\n        Cross-encoders evaluate query-document pairs jointly, improving ranking quality.\n        \"\"\"\n        if not self.reranker:\n            return candidates[:top_k]\n        \n        # Prepare query-document pairs for cross-encoder\n        doc_texts = [doc for doc, _ in candidates]\n        pairs = [[query, doc] for doc in doc_texts]\n        \n        # Score each pair; higher score = better match\n        rerank_scores = self.reranker.predict(pairs)\n        \n        # Resort candidates by cross-encoder scores\n        reranked = list(zip(doc_texts, rerank_scores))\n        reranked.sort(key=lambda x: x[1], reverse=True)\n        \n        return reranked[:top_k]\n    \n    def retrieve_for_generation(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "query": "str",
-      "use_hybrid": "bool = True",
-      "use_reranking": "bool = True) -> List[str]:\n        \"\"\"\n        Full retrieval pipeline for RAG: dense/hybrid retrieval → optional reranking → return contexts.\n        \"\"\"\n        # Stage 1: Initial retrieval\n        if use_hybrid:\n            candidates = self.hybrid_retrieval(query, top_k=5)\n        else:\n            candidates = self.dense_retrieval(query, top_k=5)\n        \n        # Stage 2: Reranking (improves precision for generation)\n        if use_reranking and self.reranker:\n            reranked = self.rerank_results(query, candidates, top_k=3)\n            contexts = [doc for doc, _ in reranked]\n        else:\n            contexts = [doc for doc, _ in candidates[:3]]\n        \n        return contexts\n\n# Example usage: RAG retrieval for cricket domain queries\nif __name__ == \"__main__\":\n    retriever = CricketRAGRetriever(use_reranking=True)\n    \n    # Test queries\n    queries = [\n        \"How does Jasprit Bumrah bowl in death overs?\",\n        \"What is Virat Kohli's strategy against left-arm bowlers?\",\n        \"MS Dhoni captaincy field placement strategy\"\n    ]\n    \n    for query in queries:\n        print(f\"\\n=== Query: {query} ===\")\n        \n        # Dense retrieval\n        print(\"\\nDense Retrieval (Semantic):\")\n        dense = retriever.dense_retrieval(query, top_k=3)\n        for i, (doc, score) in enumerate(dense, 1):\n            print(f\"  {i}. [{score:.3f}] {doc[:80]}...\")\n        \n        # Sparse retrieval\n        print(\"\\nSparse Retrieval (Keyword):\")\n        sparse = retriever.sparse_retrieval(query, top_k=3)\n        for i, (doc, score) in enumerate(sparse, 1):\n            print(f\"  {i}. [{score:.3f}] {doc[:80]}...\")\n        \n        # Hybrid retrieval\n        print(\"\\nHybrid Retrieval (Combined):\")\n        hybrid = retriever.hybrid_retrieval(query, top_k=3)\n        for i, (doc, score) in enumerate(hybrid, 1):\n            print(f\"  {i}. [{score:.3f}] {doc[:80]}...\")\n        \n        # Full RAG pipeline with reranking\n        print(\"\\nFull RAG Pipeline (with Reranking):\")\n        contexts = retriever.retrieve_for_generation(query, use_hybrid=True, use_reranking=True)\n        for i, context in enumerate(contexts, 1):\n            print(f\"  {i}. {context[:100]}...\")",
-      "language": "python",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "paragraph",
       "content": "The code implements a complete multi-stage RAG retriever following production patterns. The CricketRAGRetriever class combines three retrieval strategies: dense_retrieval uses sentence-transformers to encode both query and documents into embedding space, computing cosine similarity to rank documents by semantic relevance; sparse_retrieval implements keyword overlap scoring, capturing exact terminology matches that dense embeddings might miss; hybrid_retrieval merges both strategies, averaging scores for documents appearing in both result sets to balance semantic and keyword-based matching. The critical stage is retrieve_for_generation, which orchestrates the full pipeline: it performs initial retrieval (dense or hybrid), then optionally applies rerank_results using a cross-encoder model that re-scores candidate documents by their joint fit to the query, improving ranking quality before documents reach the generation stage. For the example queries, dense retrieval finds 'Jasprit Bumrah' documents through semantic understanding of 'death bowling', sparse retrieval finds them through exact keyword matching, and the cross-encoder reranker ensures the most contextually relevant documents (e.g., ones mentioning both Bumrah and death overs specifically) rank highest. The chunking strategy here uses full documents (the documents field contains cricket facts at the paragraph level), and in production, these would be pre-chunked with overlap before embedding. The class demonstrates why RAG requires layered retrieval: a single retrieval method would fail on specialized queries—dense-only would miss exact acronyms or technical terms, sparse-only would miss paraphrased content, and neither would rank documents optimally without reranking based on the query-document relationship.",
       "level": 2,
@@ -233,14 +195,6 @@
       "content": "🏏 Think of it like cricket: Consider the process of a cricket analyst preparing tactical recommendations for Virat Kohli during an India vs Pakistan ODI match, happening in real-time during the match. When Kohli's team faces a new opposition bowler (incoming query), the analyst must quickly (200–800ms, equivalent to between deliveries) retrieve and synthesize relevant tactical intelligence. The analyst first consults the embedding-indexed database of bowler profiles (vector index stored in FAISS)—a hierarchically organized system that clusters bowlers by similarities in style, conditions, and batsman matchups, enabling rapid lookup without scanning all 500+ profiles individually. Within milliseconds, the system identifies the top 10 closest bowler profiles to the current opponent (approximate nearest neighbors). Next, the analyst applies specialist knowledge (cross-encoder reranking): a senior bowling coach examines each of these 10 candidates, scoring how well each historical bowler profile matches the specific Pakistan bowler's line, length, and field placement in this match (joint query-document understanding). The coach reranks the candidates based on true relevance: perhaps the 5th-ranked profile by raw similarity (a left-arm bowler with similar pace) is reranked to 1st because that bowler also bowls in similar match conditions (120th over of an ODI), while a highly similar bowler who plays T20 cricket is downranked due to context mismatch (generic similarity vs. contextual fit). The top 3 reranked profiles (retrieved documents) are then synthesized into a tactical recommendation (augmented prompt) delivered to Kohli: 'Consider that Shaheen Afridi uses yorkers against right-handers like you; his economy in powerplay is 5.2 but 7.8 at death.' Kohli uses this synthesized context (LLM generation stage) to decide his batting approach in the next over. This reveals why RAG's internal mechanics matter: poor indexing (like consulting a disorganized bowling database) causes latency spikes and missed recommendations; weak reranking (like a coach who can't distinguish between similar bowlers in different contexts) means Kohli receives irrelevant information; and context window limitations (like time constraints before the next delivery) force the analyst to be selective about which tactical details to include.",
       "level": 2,
       "language": "",
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "code",
-      "language": "",
-      "level": 2,
       "items": [],
       "answer": -1,
       "explanation": ""

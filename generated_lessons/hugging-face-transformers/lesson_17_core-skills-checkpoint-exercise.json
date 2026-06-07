@@ -126,16 +126,6 @@
       "explanation": ""
     },
     {
-      "match_id": "str",
-      "commentary_text": "str) -> None:\n        \"\"\"Add normalized commentary for a specific match.\"\"\"\n        # Text normalization: lowercase, strip whitespace, remove extra spaces\n        normalized = \" \".join(commentary_text.lower().split())\n        \n        if match_id not in self.commentary_cache:\n            self.commentary_cache[match_id] = []\n        \n        self.commentary_cache[match_id].append(normalized)\n    \n    def get_match_commentary_pairs(self) -> List[Tuple[Dict, str]]:\n        \"\"\"Return list of (match_metadata, commentary_text) tuples.\"\"\"\n        pairs = []\n        for match in self.matches:\n            match_id = match[\"match_id\"]\n            if match_id in self.commentary_cache:\n                for commentary in self.commentary_cache[match_id]:\n                    pairs.append((match, commentary))\n        return pairs\n    \n    def export_to_json(self",
-      "filename": "str = \"cricket_dataset.json\") -> None:\n        \"\"\"Save dataset to JSON for checkpoint/versioning.\"\"\"\n        export_data = {\n            \"matches\": self.matches,\n            \"commentary\": self.commentary_cache\n        }\n        output_path = self.data_dir / filename\n        with open(output_path, \"w\") as f:\n            json.dump(export_data, f, indent=2)\n        print(f\"Dataset exported to {output_path}\")\n\n# Example usage\nif __name__ == \"__main__\":\n    dataset = CricketMatchDataset()\n    \n    # Add match metadata\n    dataset.add_match(\n        match_id=\"IND_vs_AUS_2024_01\",\n        team_a=\"India\",\n        team_b=\"Australia\",\n        venue=\"MCG, Melbourne\",\n        date=\"2024-01-15\"\n    )\n    \n    # Add sample commentary (would come from match APIs in production)\n    commentary_samples = [\n        \"Jasprit Bumrah bowls a fantastic delivery! Bouncer outside off, batter unable to connect.\",\n        \"Rohit Sharma plays an elegant drive through covers for a boundary!\",\n        \"Australia losing wickets at regular intervals. The pitch is favoring the Indian bowlers.\",\n        \"Smith is struggling against the short ball. Another maiden over from Bumrah.\",\n        \"Stunning catch by Virat Kohli! The momentum shifts completely in India's favor.\"\n    ]\n    \n    for commentary in commentary_samples:\n        dataset.add_commentary(\"IND_vs_AUS_2024_01\", commentary)\n    \n    # Verify data loading\n    pairs = dataset.get_match_commentary_pairs()\n    print(f\"Loaded {len(pairs)} commentary samples\")\n    print(f\"\\nFirst commentary: {pairs[0][1]}\")\n    \n    # Export for later use\n    dataset.export_to_json()",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "heading",
       "content": "Step 2 — Core Logic",
       "level": 2,
@@ -167,30 +157,6 @@
       "language": "python",
       "content": "from transformers import pipeline\nfrom typing import Dict, List, Any\nimport logging\n\nlogging.basicConfig(level=logging.INFO)\nlogger = logging.getLogger(__name__)\n\nclass TransformerPipelineOrchestrator:\n    \"\"\"Coordinates multiple transformer pipelines for cricket analysis.\"\"\"\n    \n    def __init__(self):\n        \"\"\"Initialize three specialized transformer pipelines.\"\"\"\n        logger.info(\"Loading transformer pipelines...\")\n        \n        # Sentiment analysis: classify match momentum and emotional tone\n        self.sentiment_pipeline = pipeline(\n            \"sentiment-analysis\",\n            model=\"distilbert-base-uncased-finetuned-sst-2-english\",\n            device=-1  # CPU; use 0 for GPU if available\n        )\n        \n        # Named Entity Recognition: extract players, teams, venues\n        self.ner_pipeline = pipeline(\n            \"token-classification\",\n            model=\"dslim/bert-base-NER\",\n            device=-1\n        )\n        \n        # Zero-shot classification: categorize match situations\n        self.zero_shot_pipeline = pipeline(\n            \"zero-shot-classification\",\n            model=\"facebook/bart-large-mnli\",\n            device=-1\n        )\n        \n        # Define match situation categories for zero-shot classification\n        self.match_situations = [\n            \"India dominating\",\n            \"Australia dominating\",\n            \"Balanced match\",\n            \"Collapse\",\n            \"Comeback\",\n            \"Steady performance\"\n        ]\n        \n        logger.info(\"All pipelines loaded successfully.\")\n    \n    def analyze_sentiment(self",
       "commentary": "str) -> Dict[str, Any]:\n        \"\"\"Analyze sentiment of commentary text.\"\"\"\n        result = self.sentiment_pipeline(commentary)\n        return {\n            \"label\": result[0][\"label\"],\n            \"score\": round(result[0][\"score\"], 4),\n            \"text\": commentary[:80] + \"...\" if len(commentary) > 80 else commentary\n        }\n    \n    def extract_entities(self",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "commentary": "str) -> Dict[str, Any]:\n        \"\"\"Extract named entities (players, teams, locations) from commentary.\"\"\"\n        ner_results = self.ner_pipeline(commentary)\n        \n        # Group consecutive tokens to form complete entity spans\n        entities = []\n        current_entity = None\n        \n        for token in ner_results:\n            entity_type = token[\"entity\"].replace(\"B-\", \"\").replace(\"I-\", \"\")\n            \n            if token[\"entity\"].startswith(\"B-\"):\n                if current_entity:\n                    entities.append(current_entity)\n                current_entity = {\n                    \"text\": token[\"word\"],\n                    \"type\": entity_type,\n                    \"score\": round(token[\"score\"], 4)\n                }\n            elif token[\"entity\"].startswith(\"I-\") and current_entity:\n                # Append to existing entity\n                current_entity[\"text\"] += token[\"word\"]\n        \n        if current_entity:\n            entities.append(current_entity)\n        \n        return {\n            \"entities\": entities,\n            \"entity_count\": len(entities),\n            \"unique_entity_types\": list(set(e[\"type\"] for e in entities))\n        }\n    \n    def classify_match_situation(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "commentary": "str) -> Dict[str, Any]:\n        \"\"\"Classify match situation using zero-shot learning.\"\"\"\n        result = self.zero_shot_pipeline(\n            commentary,\n            self.match_situations,\n            multi_class=False\n        )\n        \n        return {\n            \"predicted_situation\": result[\"labels\"][0],\n            \"confidence\": round(result[\"scores\"][0], 4),\n            \"all_scores\": {\n                situation: round(score, 4) \n                for situation, score in zip(result[\"labels\"], result[\"scores\"])\n            }\n        }\n    \n    def analyze_commentary(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "commentary": "str) -> Dict[str, Any]:\n        \"\"\"Run all three pipelines on a single commentary snippet.\"\"\"\n        logger.info(f\"Analyzing: {commentary[:60]}...\")\n        \n        return {\n            \"original_text\": commentary,\n            \"sentiment\": self.analyze_sentiment(commentary),\n            \"entities\": self.extract_entities(commentary),\n            \"situation\": self.classify_match_situation(commentary)\n        }\n\n# Example usage\nif __name__ == \"__main__\":\n    orchestrator = TransformerPipelineOrchestrator()\n    \n    # Test with cricket commentary\n    test_commentary = \"Virat Kohli plays a magnificent cover drive! India gains momentum against Australia.\"\n    \n    result = orchestrator.analyze_commentary(test_commentary)\n    \n    print(\"\\n=== SENTIMENT ANALYSIS ===\")\n    print(f\"Sentiment: {result['sentiment']['label']} ({result['sentiment']['score']})\")\n    \n    print(\"\\n=== ENTITY EXTRACTION ===\")\n    for entity in result['entities']['entities']:\n        print(f\"  {entity['text']}: {entity['type']} (confidence: {entity['score']})\")\n    \n    print(\"\\n=== MATCH SITUATION ===\")\n    print(f\"Predicted: {result['situation']['predicted_situation']}\")\n    print(f\"Confidence: {result['situation']['confidence']}\")",
-      "language": "",
       "level": 2,
       "items": [],
       "answer": -1,
@@ -235,23 +201,6 @@
       "explanation": ""
     },
     {
-      "match_id": "str",
-      "format": "str = \"json\") -> Path:\n        \"\"\"Export analysis results for a match.\"\"\"\n        match_result = None\n        for result in self.results:\n            if result[\"match_id\"] == match_id:\n                match_result = result\n                break\n        \n        if not match_result:\n            raise ValueError(f\"No results found for match {match_id}\")\n        \n        output_dir = Path(\"results\")\n        output_dir.mkdir(exist_ok=True)\n        \n        if format == \"json\":\n            output_path = output_dir / f\"{match_id}_analysis.json\"\n            with open(output_path, \"w\") as f:\n                json.dump(match_result, f, indent=2)\n        \n        elif format == \"csv\":\n            # Convert to DataFrame for CSV export\n            csv_data = []\n            for analysis in match_result[\"analyses\"]:\n                csv_data.append({\n                    \"commentary\": analysis[\"original_text\"][:100],\n                    \"sentiment\": analysis[\"sentiment\"][\"label\"],\n                    \"sentiment_score\": analysis[\"sentiment\"][\"score\"],\n                    \"entity_count\": analysis[\"entities\"][\"entity_count\"],\n                    \"situation\": analysis[\"situation\"][\"predicted_situation\"],\n                    \"situation_confidence\": analysis[\"situation\"][\"confidence\"]\n                })\n            \n            df = pd.DataFrame(csv_data)\n            output_path = output_dir / f\"{match_id}_analysis.csv\"\n            df.to_csv(output_path, index=False)\n        \n        print(f\"Results exported to {output_path}\")\n        return output_path\n    \n    def get_match_summary(self",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "match_id": "str) -> str:\n        \"\"\"Generate human-readable match summary.\"\"\"\n        if match_id not in self.aggregates:\n            raise ValueError(f\"No analysis found for match {match_id}\")\n        \n        agg = self.aggregates[match_id]\n        \n        summary = f\"\"\"\n        MATCH ANALYSIS SUMMARY\n        =====================\n        Match ID: {match_id}\n        \n        Sentiment Trend: {agg['sentiment_distribution']}\n        Average Sentiment Confidence: {agg['average_sentiment_confidence']}\n        \n        Top Players Mentioned:\n        \"\"\"\n        \n        for player, count in list(agg[\"top_players_mentioned\"].items())[:5]:\n            summary += f\"\\n  - {player}: {count} mentions\"\n        \n        summary += f\"\"\"\n        \n        Match Situation Distribution: {agg['situation_distribution']}\n        Total Entities Extracted: {agg['total_entities_extracted']}\n        \"\"\"\n        \n        return summary\n\n# Example usage\nif __name__ == \"__main__\":\n    # Import Step 1 and Step 2 components\n    from src.data_loader import CricketMatchDataset\n    from src.model_orchestrator import TransformerPipelineOrchestrator\n    \n    # Initialize components\n    dataset = CricketMatchDataset()\n    dataset.add_match(\n        match_id=\"IND_vs_PAK_2024\",\n        team_a=\"India\",\n        team_b=\"Pakistan\",\n        venue=\"Narendra Modi Stadium, Ahmedabad\",\n        date=\"2024-02-10\"\n    )\n    \n    # Add comprehensive commentary\n    commentaries = [\n        \"Jasprit Bumrah opens the bowling with a magnificent spell against Pakistan.\",\n        \"Babar Azam plays a defensive shot. Pakistan steady start to their innings.\",\n        \"Virat Kohli takes a brilliant catch at slip! Pakistan loses early wicket.\",\n        \"Mohammad Rizwan counter-attacks with aggressive batting. Pakistan gaining momentum.\",\n        \"India dominates with disciplined bowling. Pakistan collapsing under pressure.\",\n        \"Babar Azam and Rizwan rebuild partnership. The match becomes balanced again.\"\n    ]\n    \n    for commentary in commentaries:\n        dataset.add_commentary(\"IND_vs_PAK_2024\", commentary)\n    \n    # Run full analysis pipeline\n    orchestrator = TransformerPipelineOrchestrator()\n    analyzer = MatchAnalyzer(dataset, orchestrator)\n    \n    # Analyze the match\n    results = analyzer.analyze_match(\"IND_vs_PAK_2024\")\n    \n    # Export and summarize\n    analyzer.export_results(\"IND_vs_PAK_2024\", format=\"json\")\n    analyzer.export_results(\"IND_vs_PAK_2024\", format=\"csv\")\n    print(analyzer.get_match_summary(\"IND_vs_PAK_2024\"))",
-      "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
       "type": "heading",
       "content": "Step 4 — Testing & Verification",
       "level": 2,
@@ -264,14 +213,6 @@
       "type": "paragraph",
       "content": "Verify the complete pipeline by running end-to-end tests with realistic cricket match data. Execute the main script to process multiple matches, check that sentiment analysis correctly identifies positive/negative commentary, validate that NER extracts player names and team references accurately, and confirm that zero-shot classification produces reasonable match situation categories. Examine exported JSON and CSV files to ensure data integrity, verify aggregation calculations, and review the match summary output for logical consistency.",
       "language": "",
-      "level": 2,
-      "items": [],
-      "answer": -1,
-      "explanation": ""
-    },
-    {
-      "type": "code",
-      "language": "bash",
       "level": 2,
       "items": [],
       "answer": -1,
