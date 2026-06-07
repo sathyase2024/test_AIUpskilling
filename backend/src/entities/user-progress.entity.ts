@@ -6,12 +6,16 @@ import {
   ManyToOne,
   JoinColumn,
   Unique,
+  Index,
 } from 'typeorm';
 import { User } from './user.entity';
 import { Lesson } from './lesson.entity';
 
 @Entity('user_progress')
 @Unique(['userId', 'lessonId'])
+@Index(['userId'])
+@Index(['userId', 'completed'])
+@Index(['topicId'])
 export class UserProgress {
   @PrimaryGeneratedColumn('uuid')
   id: string;

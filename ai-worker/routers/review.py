@@ -1,12 +1,15 @@
 import json
+import os
 import subprocess
 import tempfile
-import os
 import time
 import anthropic
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List
+
+# Code execution is disabled in production — requires sandboxed runtime
+_EXECUTE_ENABLED = os.getenv("ENABLE_CODE_EXECUTE", "false").lower() == "true"
 
 from config import MODEL, MAX_TOKENS, get_client
 
@@ -119,7 +122,12 @@ async def review_code(req: CodeReviewRequest):
 
 @router.post("/execute")
 async def execute_code(req: ExecuteRequest):
-    """Execute Python or JavaScript code in a subprocess (no Docker, MVP)."""
+    """Execute code in a subprocess. Only enabled when ENABLE_CODE_EXECUTE=true."""
+    if not _EXECUTE_ENABLED:
+        raise HTTPException(
+            status_code=501,
+            detail="Code execution is disabled. Set ENABLE_CODE_EXECUTE=true to enable (requires sandboxed environment).",
+        )
     language = req.language.lower().strip()
     if language not in ("python", "javascript"):
         raise HTTPException(

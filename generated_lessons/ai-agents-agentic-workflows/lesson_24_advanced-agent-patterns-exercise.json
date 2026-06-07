@@ -1,0 +1,463 @@
+{
+  "lessonId": "ai-agents-agentic-workflows-24",
+  "title": "Advanced Agent Patterns Exercise",
+  "type": "hands-on-exercise",
+  "topicName": "AI Agents & Agentic Workflows",
+  "estimatedMinutes": 55,
+  "xpReward": 100,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "What You'll Build",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "You will construct a multi-agent cricket analytics system that simulates real-time match intelligence gathering and decision-making. This project demonstrates how autonomous agents can collaborate to monitor player performance, detect anomalies in bowling patterns, predict run outcomes, and recommend strategic field placements. The system comprises four specialized agents: a data ingestion agent that parses live match events, a performance analysis agent that calculates metrics like economy rate and strike rotation, a pattern recognition agent that identifies bowling trends and batting weaknesses, and a strategy recommendation agent that synthesizes insights into actionable coaching decisions. You'll implement agent communication protocols, shared memory mechanisms for context persistence, and a coordination layer that orchestrates agent workflows without central control, showcasing true agentic decentralization.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli as India's captain during a T20 match against Australia. He doesn't see everything himself—instead, he has four specialized team members constantly feeding him information: Rohit Sharma watches the opposition's opening pair and reports their batting patterns, Jasprit Bumrah analyzes their powerplay acceleration rates and reports weaknesses, Ravichandran Ashwin studies how they handle spin in the middle overs, and the fielding coach watches their running between wickets. Each expert operates independently but shares their observations with Kohli through the 12th-man runner. Kohli synthesizes this intelligence—if Rohit says the left-hander struggles against short balls, Ashwin detects they're scoring heavily against leg-side bowling, and Bumrah confirms their accelerometers show aggressive intent after the powerplay—Kohli decides to place a long-stop, adjust field placement, and bring on a specific bowler in that over. This is exactly how your multi-agent system works: each agent specializes in one domain of expertise, communicates asynchronously through a shared message bus, and the coordinator agent (Kohli) integrates their findings into a coherent strategic decision. Understanding this parallel reveals why agents must be loosely coupled yet synchronized—just as a captain doesn't micromanage each specialist, your coordinator shouldn't control every agent's internal logic.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Prerequisites",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Understanding of agent architecture: roles, responsibilities, communication protocols, and state management in distributed systems.",
+        "Python 3.9+ with asyncio fundamentals: async/await syntax, event loops, coroutines, and concurrent task management for parallel agent execution.",
+        "Knowledge of pub-sub messaging patterns: message brokers, event queues, topic-based routing, and asynchronous event handling architectures.",
+        "Familiarity with cricket domain: understanding match phases (powerplay, middle overs, death overs), player roles, bowling economy, strike rate, and field positioning strategies.",
+        "JSON data handling: parsing match events, structuring agent messages, serialization/deserialization, and working with nested configuration objects."
+      ],
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Setup & Project Structure",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Create a new Python project directory with a modular structure separating agent implementations, communication infrastructure, and data models. Initialize a virtual environment to isolate dependencies including aiohttp for async HTTP operations, pydantic for data validation, and redis-py if using Redis for agent communication. Establish directories for agents (data_ingestion_agent, performance_analysis_agent, pattern_recognition_agent, strategy_recommendation_agent), a shared models directory for cricket data structures, a messaging module for inter-agent communication, and a coordinator orchestrating the workflow. This separation ensures each agent can be developed, tested, and deployed independently while maintaining clear contracts through message schemas and event definitions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "bash",
+      "content": "# Create project structure for multi-agent cricket analytics\nmkdir -p cricket-agentic-system\ncd cricket-agentic-system\n\n# Initialize Python virtual environment\npython3.9 -m venv venv\nsource venv/bin/activate  # On Windows: venv\\Scripts\\activate\n\n# Create project directories\nmkdir -p agents/data_ingestion_agent\nmkdir -p agents/performance_analysis_agent\nmkdir -p agents/pattern_recognition_agent\nmkdir -p agents/strategy_recommendation_agent\nmkdir -p shared/models\nmkdir -p shared/messaging\nmkdir -p coordinator\nmkdir -p tests\nmkdir -p data/fixtures\n\n# Create main requirements.txt\ncat > requirements.txt << 'EOF'\naiofiles==23.2.1\naiohttp==3.8.5\npydantic==2.0.2\npython-dotenv==1.0.0\npytest==7.4.0\npytest-asyncio==0.21.1\npytest-cov==4.1.0\nEOF\n\n# Install dependencies\npip install -r requirements.txt\n\n# Create main entry point and __init__ files\ntouch main.py\ntouch agents/__init__.py\ntouch shared/__init__.py\ntouch shared/models/__init__.py\ntouch shared/messaging/__init__.py\ntouch coordinator/__init__.py\n\necho \"Project structure created successfully for cricket-agentic-system\"",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 1 — Foundation",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Build the foundational data models and messaging infrastructure that all agents depend on. Define Pydantic models for core cricket domain entities: Match (containing match_id, ground, format), Player (player_id, name, role, statistics), Ball (ball_number, bowler, batter, runs, wicket_status), and Innings (innings_number, runs_scored, wickets_fallen). Create an Event class that represents all inter-agent communication: each event has a source_agent, event_type, timestamp, and payload. Implement a MessageBus class using asyncio that manages pub-sub subscriptions: agents register listeners for specific event types, publish events to the bus, and the bus asynchronously distributes matching events to all subscribers. This decouples agents from knowing each other's existence—they communicate only through the abstraction of typed events, enabling independent scaling and testing.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Before a match begins, the match referee establishes a communication protocol with all stakeholders: commentators, scoreboard operators, boundary fielders, and the umpire. They all speak the same language about what constitutes a boundary, a wicket, a no-ball, and the score. This is your data model—a shared vocabulary. Then, during the match, the boundary fielder (one agent) doesn't shout directly at the scoreboard operator; instead, they signal the umpire at the crease, who announces it to everyone. This is your MessageBus. When Jasprit Bumrah delivers a 140 km/h yorker that misses leg stump, only the immediate umpire hears it, but they broadcast 'no-ball'—and everyone who subscribed to 'bowling_events' gets notified. The scoreboard operator doesn't need to watch the bowler's run-up (that's not their role), they just listen for 'run_scored' events. This separation of concerns and standardized communication is exactly what Step 1 establishes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "# shared/models/__init__.py - Define cricket domain models and events\nfrom enum import Enum\nfrom datetime import datetime\nfrom typing import Optional, Dict, Any, List\nfrom pydantic import BaseModel, Field\nimport uuid\n\nclass PlayerRole(str, Enum):\n    \"\"\"Player roles in cricket.\"\"\"\n    OPENER = \"opener\"\n    MIDDLE_ORDER = \"middle_order\"\n    LOWER_ORDER = \"lower_order\"\n    BOWLER = \"bowler\"\n    ALL_ROUNDER = \"all_rounder\"\n    WICKETKEEPER = \"wicketkeeper\"\n\nclass Player(BaseModel):\n    \"\"\"Represents a cricket player with statistics.\"\"\"\n    player_id: str = Field(default_factory=lambda: str(uuid.uuid4()))\n    name: str\n    role: PlayerRole\n    matches_played: int = 0\n    innings_count: int = 0\n    runs_scored: int = 0\n    strike_rate: float = 0.0\n    bowling_economy: float = 0.0\n    wickets_taken: int = 0\n    average: float = 0.0\n\nclass Match(BaseModel):\n    \"\"\"Represents a cricket match context.\"\"\"\n    match_id: str = Field(default_factory=lambda: str(uuid.uuid4()))\n    ground: str\n    match_format: str  # T20, ODI, Test\n    team_a: str\n    team_b: str\n    toss_winner: str\n    elected_to_bat: str\n    created_at: datetime = Field(default_factory=datetime.utcnow)\n\nclass Ball(BaseModel):\n    \"\"\"Represents a single delivery in cricket.\"\"\"\n    match_id: str\n    innings_number: int\n    over_number: int\n    ball_number: int\n    bowler: str  # Player name\n    batter: str  # Player name\n    runs_off_bat: int\n    extras: int\n    is_wicket: bool = False\n    wicket_type: Optional[str] = None  # bowled, caught, lbw, run_out\n    ball_speed_kmh: float = 0.0\n    ball_type: str = \"other\"  # fast, spin, slower\n    timestamp: datetime = Field(default_factory=datetime.utcnow)\n\nclass Innings(BaseModel):\n    \"\"\"Represents an innings (batting phase).\"\"\"\n    match_id: str\n    innings_number: int\n    batting_team: str\n    bowling_team: str\n    runs_scored: int = 0\n    wickets_fallen: int = 0\n    overs_completed: int = 0\n    balls_played: int = 0\n    target: Optional[int] = None\n    status: str = \"ongoing\"  # ongoing, completed, discontinued\n\nclass EventType(str, Enum):\n    \"\"\"Types of events agents communicate via.\"\"\"\n    MATCH_STARTED = \"match_started\"\n    BALL_DELIVERED = \"ball_delivered\"\n    WICKET_FALLEN = \"wicket_fallen\"\n    OVER_COMPLETED = \"over_completed\"\n    INNINGS_COMPLETED = \"innings_completed\"\n    PERFORMANCE_CALCULATED = \"performance_calculated\"\n    PATTERN_DETECTED = \"pattern_detected\"\n    STRATEGY_RECOMMENDED = \"strategy_recommended\"\n    ANALYSIS_REQUIRED = \"analysis_required\"\n\nclass Event(BaseModel):\n    \"\"\"Inter-agent communication event.\"\"\"\n    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))\n    event_type: EventType\n    source_agent: str  # Name of agent that published\n    timestamp: datetime = Field(default_factory=datetime.utcnow)\n    match_id: str\n    payload: Dict[str, Any]\n\n# shared/messaging/__init__.py - Event bus for agent communication\nimport asyncio\nfrom typing import Callable, List, Dict, Set\n\nclass MessageBus:\n    \"\"\"Pub-Sub message bus for inter-agent communication.\"\"\"\n    \n    def __init__(self):\n        # Dictionary mapping event_type -> list of subscriber coroutines\n        self._subscribers: Dict[EventType, List[Callable]] = {}\n        self._event_history: List[Event] = []\n        self._lock = asyncio.Lock()\n    \n    def subscribe(self, event_type: EventType, handler: Callable) -> None:\n        \"\"\"Register a handler for a specific event type.\n        \n        Args:\n            event_type: Type of event to listen for\n            handler: Async callable that processes the event\n        \"\"\"\n        if event_type not in self._subscribers:\n            self._subscribers[event_type] = []\n        self._subscribers[event_type].append(handler)\n        print(f\"Subscriber registered for {event_type.value}\")\n    \n    async def publish(self, event: Event) -> None:\n        \"\"\"Publish an event to all interested subscribers.\n        \n        Args:\n            event: Event object to publish\n        \"\"\"\n        async with self._lock:\n            self._event_history.append(event)\n        \n        # Get all handlers for this event type\n        handlers = self._subscribers.get(event.event_type, [])\n        \n        if handlers:\n            # Execute all handlers concurrently\n            tasks = [handler(event) for handler in handlers]\n            await asyncio.gather(*tasks, return_exceptions=True)\n        else:\n            print(f\"No subscribers for event type: {event.event_type.value}\")\n    \n    async def get_events_by_type(self, event_type: EventType) -> List[Event]:\n        \"\"\"Retrieve historical events of a specific type.\"\"\"\n        return [e for e in self._event_history if e.event_type == event_type]\n    \n    async def get_recent_events(self, match_id: str, limit: int = 10) -> List[Event]:\n        \"\"\"Get the most recent events for a match.\"\"\"\n        match_events = [e for e in self._event_history if e.match_id == match_id]\n        return match_events[-limit:]\n\nprint(\"✓ Foundation models and messaging infrastructure established\")",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 2 — Core Logic",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Implement the four specialized agents, each with distinct responsibilities and autonomous decision-making. The DataIngestionAgent continuously parses live match events (balls bowled, runs scored, wickets), creates Ball and Innings objects, and publishes raw match data events. The PerformanceAnalysisAgent subscribes to ball_delivered events and maintains running player statistics, calculating strike rate (runs per 100 deliveries), bowling economy (runs conceded per 6 deliveries), and batting averages; it publishes performance_calculated events when thresholds change. The PatternRecognitionAgent subscribes to ball_delivered events and analyzes sequences: detecting if a bowler is consistently bowling yorkers in death overs, if a batter struggles against short-pitched deliveries, or if powerplay acceleration drops against spinners; it publishes pattern_detected events with specific insights. Each agent runs as an async coroutine with its own state management, message queue, and periodic processing cycles, enabling true concurrency and independence.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: During a T20 match, four specialized analysts work in separate boxes at the stadium. The first analyst (DataIngestionAgent) watches every ball live and records raw data: 'Over 5, Ball 3: Bumrah to Kohli, 120 km/h yorker, 1 run, line outside off'. The second analyst (PerformanceAnalysisAgent) takes those raw feeds and calculates statistics: 'Kohli's strike rate this match is now 145 after scoring 29 in 20 balls'. The third analyst (PatternRecognitionAgent) watches the sequence of deliveries and detects trends: 'Bumrah has bowled 7 yorkers in the last 10 deliveries—he's practicing death bowling, likely to bowl yorkers next over'. The fourth analyst (StrategyRecommendationAgent) takes insights from analysts 2 and 3 and recommends action: 'Given Kohli's aggressive strike rate and Bumrah's yorker pattern, recommend a leg-stump line with a short fine-leg fielder.' Each analyst works independently on their own assessment, but all are synced via scoreboard updates. None of them control each other; they just read what they need and publish their findings. This autonomy is what makes the system scalable—if you need more pattern analysts, you add another one without affecting others.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "# agents/data_ingestion_agent/__init__.py\nimport asyncio\nfrom datetime import datetime\nfrom typing import List\nfrom shared.models import Ball, Match, Innings, Event, EventType, Player\nfrom shared.messaging import MessageBus\n\nclass DataIngestionAgent:\n    \"\"\"Ingests live match events and publishes raw ball data.\"\"\"\n    \n    def __init__(self, message_bus: MessageBus):\n        self.message_bus = message_bus\n        self.agent_name = \"data_ingestion_agent\"\n        self.current_match: Match = None\n        self.current_innings: Innings = None\n        self.ball_sequence: List[Ball] = []\n    \n    async def initialize_match(self, match: Match, innings: Innings) -> None:\n        \"\"\"Initialize a new match context.\"\"\"\n        self.current_match = match\n        self.current_innings = innings\n        \n        event = Event(\n            event_type=EventType.MATCH_STARTED,\n            source_agent=self.agent_name,\n            match_id=match.match_id,\n            payload={\n                \"ground\": match.ground,\n                \"teams\": f\"{match.team_a} vs {match.team_b}\",\n                \"format\": match.match_format,\n                \"batting_team\": innings.batting_team\n            }\n        )\n        await self.message_bus.publish(event)\n    \n    async def ingest_ball(self, ball_data: dict) -> Ball:\n        \"\"\"Process a single ball delivery.\n        \n        Args:\n            ball_data: Dictionary with ball details (bowler, batter, runs, wicket, etc.)\n        \n        Returns:\n            Ball object created and published\n        \"\"\"\n        ball = Ball(\n            match_id=self.current_match.match_id,\n            innings_number=self.current_innings.innings_number,\n            over_number=ball_data.get(\"over_number\", 0),\n            ball_number=ball_data.get(\"ball_number\", 0),\n            bowler=ball_data.get(\"bowler\", \"Unknown\"),\n            batter=ball_data.get(\"batter\", \"Unknown\"),\n            runs_off_bat=ball_data.get(\"runs\", 0),\n            extras=ball_data.get(\"extras\", 0),\n            is_wicket=ball_data.get(\"is_wicket\", False),\n            wicket_type=ball_data.get(\"wicket_type\"),\n            ball_speed_kmh=ball_data.get(\"speed\", 0.0),\n            ball_type=ball_data.get(\"type\", \"other\")\n        )\n        \n        self.ball_sequence.append(ball)\n        \n        # Update innings stats\n        self.current_innings.runs_scored += ball.runs_off_bat + ball.extras\n        if ball.is_wicket:\n            self.current_innings.wickets_fallen += 1\n        \n        # Publish ball delivery event\n        event = Event(\n            event_type=EventType.BALL_DELIVERED,\n            source_agent=self.agent_name,\n            match_id=self.current_match.match_id,\n            payload={\n                \"bowler\": ball.bowler,\n                \"batter\": ball.batter,\n                \"runs_total\": ball.runs_off_bat + ball.extras,\n                \"ball_speed\": ball.ball_speed_kmh,\n                \"ball_type\": ball.ball_type,\n                \"is_wicket\": ball.is_wicket,\n                \"over\": ball.over_number,\n                \"ball\": ball.ball_number\n            }\n        )\n        await self.message_bus.publish(event)\n        return ball\n    \n    async def complete_over(self, over_number: int) -> None:\n        \"\"\"Mark completion of an over.\"\"\"\n        event = Event(\n            event_type=EventType.OVER_COMPLETED,\n            source_agent=self.agent_name,\n            match_id=self.current_match.match_id,\n            payload={\n                \"over_number\": over_number,\n                \"runs_in_over\": sum(b.runs_off_bat + b.extras for b in self.ball_sequence\n                                    if b.over_number == over_number),\n                \"wickets_in_over\": sum(1 for b in self.ball_sequence\n                                       if b.over_number == over_number and b.is_wicket)\n            }\n        )\n        await self.message_bus.publish(event)\n\n# agents/performance_analysis_agent/__init__.py\nfrom typing import Dict\nfrom collections import defaultdict\nfrom shared.models import Event, EventType\n\nclass PerformanceAnalysisAgent:\n    \"\"\"Analyzes player performance metrics in real-time.\"\"\"\n    \n    def __init__(self, message_bus: MessageBus):\n        self.message_bus = message_bus\n        self.agent_name = \"performance_analysis_agent\"\n        # Track player stats: {player_name: {runs, balls, dismissals, etc.}}\n        self.player_stats: Dict[str, dict] = defaultdict(lambda: {\n            \"runs\": 0,\n            \"balls_faced\": 0,\n            \"strike_rate\": 0.0,\n            \"dismissals\": 0\n        })\n        self.bowler_stats: Dict[str, dict] = defaultdict(lambda: {\n            \"runs_conceded\": 0,\n            \"balls_bowled\": 0,\n            \"economy_rate\": 0.0,\n            \"wickets\": 0\n        })\n    \n    async def handle_ball_event(self, event: Event) -> None:\n        \"\"\"Process a ball_delivered event and update player stats.\"\"\"\n        payload = event.payload\n        batter = payload[\"batter\"]\n        bowler = payload[\"bowler\"]\n        runs = payload[\"runs_total\"]\n        \n        # Update batter stats\n        self.player_stats[batter][\"runs\"] += runs\n        self.player_stats[batter][\"balls_faced\"] += 1\n        \n        balls = self.player_stats[batter][\"balls_faced\"]\n        runs_scored = self.player_stats[batter][\"runs\"]\n        self.player_stats[batter][\"strike_rate\"] = (runs_scored / balls * 100) if balls > 0 else 0.0\n        \n        # Update bowler stats\n        self.bowler_stats[bowler][\"runs_conceded\"] += runs\n        self.bowler_stats[bowler][\"balls_bowled\"] += 1\n        \n        balls_bowled = self.bowler_stats[bowler][\"balls_bowled\"]\n        runs_conceded = self.bowler_stats[bowler][\"runs_conceded\"]\n        self.bowler_stats[bowler][\"economy_rate\"] = (runs_conceded / (balls_bowled / 6)) if balls_bowled >= 6 else 0.0\n        \n        # Handle wicket\n        if payload[\"is_wicket\"]:\n            self.player_stats[batter][\"dismissals\"] += 1\n            self.bowler_stats[bowler][\"wickets\"] += 1\n        \n        # Publish performance update\n        performance_event = Event(\n            event_type=EventType.PERFORMANCE_CALCULATED,\n            source_agent=self.agent_name,\n            match_id=event.match_id,\n            payload={\n                \"batter\": batter,\n                \"batter_stats\": self.player_stats[batter].copy(),\n                \"bowler\": bowler,\n                \"bowler_stats\": self.bowler_stats[bowler].copy()\n            }\n        )\n        await self.message_bus.publish(performance_event)\n\n# agents/pattern_recognition_agent/__init__.py\nfrom collections import deque\n\nclass PatternRecognitionAgent:\n    \"\"\"Detects patterns in bowling and batting behavior.\"\"\"\n    \n    def __init__(self, message_bus: MessageBus):\n        self.message_bus = message_bus\n        self.agent_name = \"pattern_recognition_agent\"\n        # Store recent balls for each bowler: {bowler: deque of last 10 balls}\n        self.bowler_history: Dict[str, deque] = defaultdict(lambda: deque(maxlen=10))\n        self.batter_weaknesses: Dict[str, list] = defaultdict(list)\n    \n    async def handle_ball_event(self, event: Event) -> None:\n        \"\"\"Analyze ball delivery for patterns.\"\"\"\n        payload = event.payload\n        bowler = payload[\"bowler\"]\n        batter = payload[\"batter\"]\n        ball_type = payload[\"ball_type\"]\n        runs = payload[\"runs_total\"]\n        \n        # Record ball for bowler\n        self.bowler_history[bowler].append({\n            \"type\": ball_type,\n            \"speed\": payload[\"ball_speed\"],\n            \"runs\": runs,\n            \"over\": payload[\"over\"]\n        })\n        \n        # Detect if bowler is specializing in yorkers (death bowling pattern)\n        yorker_count = sum(1 for b in self.bowler_history[bowler] if b[\"type\"] == \"yorker\")\n        if len(self.bowler_history[bowler]) >= 7 and yorker_count >= 5:\n            pattern_event = Event(\n                event_type=EventType.PATTERN_DETECTED,\n                source_agent=self.agent_name,\n                match_id=event.match_id,\n                payload={\n                    \"pattern_type\": \"bowler_specialization\",\n                    \"bowler\": bowler,\n                    \"specialization\": \"death_bowling_yorkers\",\n                    \"confidence\": (yorker_count / len(self.bowler_history[bowler])) * 100,\n                    \"recommendation\": \"Batter should prepare for yorkers; position leg-side fielders accordingly\"\n                }\n            )\n            await self.message_bus.publish(pattern_event)\n        \n        # Track batter weakness against specific ball types\n        if runs == 0 and ball_type == \"yorker\":\n            self.batter_weaknesses[batter].append(\"struggles_against_yorkers\")\n        \n        if len(self.batter_weaknesses[batter]) >= 3:\n            weakness_event = Event(\n                event_type=EventType.PATTERN_DETECTED,\n                source_agent=self.agent_name,\n                match_id=event.match_id,\n                payload={\n                    \"pattern_type\": \"batter_weakness\",\n                    \"batter\": batter,\n                    \"weakness\": \"vulnerable_to_yorkers\",\n                    \"occurrences\": len(self.batter_weaknesses[batter])\n                }\n            )\n            await self.message_bus.publish(weakness_event)\n\nprint(\"✓ Core agent logic implemented with autonomous decision-making\")",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 3 — Integration & Enhancement",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Build the StrategyRecommendationAgent that subscribes to both performance_calculated and pattern_detected events, synthesizing multi-source intelligence into actionable coaching decisions. This agent maintains a decision state machine with phases (powerplay analysis, middle-overs optimization, death bowling preparation) and applies heuristics that combine player performance thresholds with detected patterns. Additionally, implement a Coordinator class that orchestrates the entire workflow: it manages agent lifecycle (startup, event subscription, graceful shutdown), maintains shared match context, and provides an API for injecting simulated match events. The coordinator ensures agents start in dependency order and remain synchronized through event timestamps. Finally, add observability through event logging and a real-time dashboard that tracks agent health, event flow, and emerging strategic recommendations.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: You've got three specialized coaches (performance, pattern recognition, strategy) watching a player like Rohit Sharma. The performance coach says 'Rohit's strike rate jumped to 160 after 30 balls, his powerplay acceleration is excellent'. Simultaneously, the pattern coach observes 'The left-arm spinner is bowling around the wicket and pitching slightly short; Rohit's weakness against short-pitched spin is evident from the last 3 deliveries where he struggled'. Now the strategy coach (StrategyRecommendationAgent) synthesizes: 'Given Rohit's aggressive intent (performance data) and the spinner's weakness detection (pattern data), I recommend bringing in a different bowler type or adjusting field placement—move the deep square leg earlier than planned'. The head coach (Coordinator) ensures these three specialists are hired, work in sync, and their advice flows to the captain in real-time without bottlenecks. The coordinator also keeps detailed records of every recommendation and its outcome (observability), allowing post-match analysis of whether agent recommendations improved team performance. This is exactly how Step 3 integrates autonomous agents into a cohesive, observable system.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "# agents/strategy_recommendation_agent/__init__.py\nfrom enum import Enum\nfrom typing import List, Optional\n\nclass MatchPhase(str, Enum):\n    POWERPLAY = \"powerplay\"\n    MIDDLE_OVERS = \"middle_overs\"\n    DEATH_OVERS = \"death_overs\"\n\nclass StrategyRecommendationAgent:\n    \"\"\"Synthesizes multi-source intelligence into strategic recommendations.\"\"\"\n    \n    def __init__(self, message_bus: MessageBus):\n        self.message_bus = message_bus\n        self.agent_name = \"strategy_recommendation_agent\"\n        self.current_phase = MatchPhase.POWERPLAY\n        self.recent_patterns: List[dict] = []\n        self.recent_performances: List[dict] = []\n    \n    async def handle_performance_event(self, event: Event) -> None:\n        \"\"\"Store performance data for decision-making.\"\"\"\n        self.recent_performances.append(event.payload)\n        if len(self.recent_performances) > 20:\n            self.recent_performances.pop(0)\n    \n    async def handle_pattern_event(self, event: Event) -> None:\n        \"\"\"Store pattern data for decision-making.\"\"\"\n        self.recent_patterns.append(event.payload)\n        if len(self.recent_patterns) > 20:\n            self.recent_patterns.pop(0)\n        \n        # Generate recommendation when pattern is detected\n        await self._generate_recommendation(event)\n    \n    async def _generate_recommendation(self, trigger_event: Event) -> None:\n        \"\"\"Generate a strategic recommendation based on accumulated data.\"\"\"\n        payload = trigger_event.payload\n        recommendation = None\n        reasoning = []\n        \n        if payload.get(\"pattern_type\") == \"bowler_specialization\":\n            bowler = payload[\"bowler\"]\n            specialization = payload[\"specialization\"]\n            \n            # Check if batter is aggressive\n            aggressive_batters = [p for p in self.recent_performances\n                                 if p.get(\"batter_stats\", {}).get(\"strike_rate\", 0) > 140]\n            \n            if specialization == \"death_bowling_yorkers\" and aggressive_batters:\n                recommendation = {\n                    \"action\": \"adjust_field_placement\",\n                    \"details\": f\"{bowler} is specializing in death yorkers. Place deep point and fine-leg to restrict boundaries.\",\n                    \"priority\": \"high\"\n                }\n                reasoning.append(f\"Bowler {bowler} detected practicing yorkers\")\n                reasoning.append(f\"Aggressive batters present with 140+ strike rates\")\n        \n        elif payload.get(\"pattern_type\") == \"batter_weakness\":\n            batter = payload[\"batter\"]\n            weakness = payload[\"weakness\"]\n            \n            if weakness == \"vulnerable_to_yorkers\":\n                recommendation = {\n                    \"action\": \"bowling_recommendation\",\n                    \"details\": f\"{batter} is vulnerable to yorkers. Deploy yorker specialist bowlers.\",\n                    \"priority\": \"high\"\n                }\n                reasoning.append(f\"Batter {batter} weakness detected: {weakness}\")\n                reasoning.append(\"Suggest yorker-specialist bowler for next over\")\n        \n        if recommendation:\n            strategy_event = Event(\n                event_type=EventType.STRATEGY_RECOMMENDED,\n                source_agent=self.agent_name,\n                match_id=trigger_event.match_id,\n                payload={\n                    \"recommendation\": recommendation,\n                    \"reasoning\": reasoning,\n                    \"data_sources\": [\n                        f\"{len(self.recent_performances)} performance updates\",\n                        f\"{len(self.recent_patterns)} pattern detections\"\n                    ],\n                    \"timestamp\": datetime.utcnow().isoformat()\n                }\n            )\n            await self.message_bus.publish(strategy_event)\n\n# coordinator/__init__.py\nimport logging\nfrom typing import Callable\n\nclass AgentCoordinator:\n    \"\"\"Orchestrates multi-agent cricket analytics workflow.\"\"\"\n    \n    def __init__(self):\n        self.message_bus = MessageBus()\n        self.data_ingestion_agent = DataIngestionAgent(self.message_bus)\n        self.performance_agent = PerformanceAnalysisAgent(self.message_bus)\n        self.pattern_agent = PatternRecognitionAgent(self.message_bus)\n        self.strategy_agent = StrategyRecommendationAgent(self.message_bus)\n        \n        self.current_match: Optional[Match] = None\n        self.current_innings: Optional[Innings] = None\n        self.recommendations: List[Event] = []\n        \n        logging.basicConfig(level=logging.INFO)\n        self.logger = logging.getLogger(\"AgentCoordinator\")\n    \n    async def initialize(self) -> None:\n        \"\"\"Set up agent subscriptions and event handlers.\"\"\"\n        # Subscribe agents to relevant events\n        self.message_bus.subscribe(\n            EventType.BALL_DELIVERED,\n            self.performance_agent.handle_ball_event\n        )\n        self.message_bus.subscribe(\n            EventType.BALL_DELIVERED,\n            self.pattern_agent.handle_ball_event\n        )\n        self.message_bus.subscribe(\n            EventType.PERFORMANCE_CALCULATED,\n            self.strategy_agent.handle_performance_event\n        )\n        self.message_bus.subscribe(\n            EventType.PATTERN_DETECTED,\n            self.strategy_agent.handle_pattern_event\n        )\n        self.message_bus.subscribe(\n            EventType.STRATEGY_RECOMMENDED,\n            self._store_recommendation\n        )\n        \n        self.logger.info(\"✓ All agents initialized and subscribed\")\n    \n    async def _store_recommendation(self, event: Event) -> None:\n        \"\"\"Store strategy recommendations for analysis.\"\"\"\n        self.recommendations.append(event)\n        self.logger.info(f\"Recommendation stored: {event.payload['recommendation']['action']}\")\n    \n    async def start_match(\n        self,\n        match: Match,\n        innings: Innings\n    ) -> None:\n        \"\"\"Initialize a new match in the multi-agent system.\"\"\"\n        self.current_match = match\n        self.current_innings = innings\n        await self.data_ingestion_agent.initialize_match(match, innings)\n        self.logger.info(f\"Match started: {match.ground} - {match.team_a} vs {match.team_b}\")\n    \n    async def process_ball(\n        self,\n        ball_data: dict\n    ) -> Ball:\n        \"\"\"Inject a ball delivery into the system.\n        \n        Triggers a cascade of agent processing:\n        1. DataIngestionAgent creates Ball object\n        2. Performance agent updates stats and publishes event\n        3. Pattern agent analyzes delivery\n        4. Strategy agent may generate recommendation\n        \"\"\"\n        ball = await self.data_ingestion_agent.ingest_ball(ball_data)\n        # Small delay to allow async handlers to complete\n        await asyncio.sleep(0.1)\n        return ball\n    \n    async def get_match_dashboard(self) -> dict:\n        \"\"\"Generate a dashboard view of current match state and recommendations.\"\"\"\n        return {\n            \"match\": self.current_match.dict() if self.current_match else None,\n            \"innings\": self.current_innings.dict() if self.current_innings else None,\n            \"batter_stats\": dict(self.performance_agent.player_stats),\n            \"bowler_stats\": dict(self.performance_agent.bowler_stats),\n            \"detected_patterns\": [p for p in self.message_bus._event_history\n                                 if p.event_type == EventType.PATTERN_DETECTED],\n            \"recommendations\": [r.payload for r in self.recommendations[-5:]],\n            \"total_recommendations\": len(self.recommendations)\n        }\n    \n    async def shutdown(self) -> None:\n        \"\"\"Gracefully shutdown the coordinator and agents.\"\"\"\n        self.logger.info(\"Shutting down agent coordinator...\")\n        self.logger.info(f\"Total events processed: {len(self.message_bus._event_history)}\")\n        self.logger.info(f\"Total recommendations generated: {len(self.recommendations)}\")\n\nprint(\"✓ Integration and orchestration layer complete\")",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 4 — Testing & Verification",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Run a complete simulation with realistic cricket match data to verify all agents work correctly and produce valid recommendations. Execute the coordinator with a sequence of ball deliveries from a live T20 match (e.g., Rohit Sharma and Virat Kohli opening for India against Australia). Verify that the performance agent calculates strike rates and economy rates correctly. Confirm the pattern agent detects bowler specializations and batter weaknesses. Validate that the strategy agent synthesizes this data into actionable recommendations. Check that the event bus correctly routes messages and maintains event history. Finally, examine the generated recommendations to ensure they make logical sense given the match context and data.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "bash",
+      "content": "# Run the complete multi-agent cricket system\ncd cricket-agentic-system\n\n# Execute the main workflow\npython3 main.py\n\n# Expected output:\n# ✓ Foundation models and messaging infrastructure established\n# ✓ Core agent logic implemented with autonomous decision-making\n# ✓ Integration and orchestration layer complete\n# Subscriber registered for match_started\n# Subscriber registered for ball_delivered\n# Subscriber registered for ball_delivered\n# Subscriber registered for performance_calculated\n# Subscriber registered for pattern_detected\n# Subscriber registered for strategy_recommended\n# ✓ All agents initialized and subscribed\n# Match started: MCG - India vs Australia\n# \n# === SIMULATING POWERPLAY OVERS ===\n# Over 1, Ball 1: Jasprit Bumrah → Rohit Sharma (120 kmh yorker) - 1 run\n# Over 1, Ball 2: Jasprit Bumrah → Virat Kohli (140 kmh fast) - 4 runs\n# Over 1, Ball 3: Jasprit Bumrah → Virat Kohli (138 kmh fast) - 0 runs\n# Over 1, Ball 4: Jasprit Bumrah → Virat Kohli (125 kmh yorker) - 0 runs\n# Over 1, Ball 5: Jasprit Bumrah → Virat Kohli (135 kmh fast) - 2 runs\n# Over 1, Ball 6: Jasprit Bumrah → Rohit Sharma (122 kmh yorker) - 1 run\n#\n# === PERFORMANCE UPDATES ===\n# Rohit Sharma - Runs: 2, Balls: 3, Strike Rate: 66.67\n# Virat Kohli - Runs: 6, Balls: 3, Strike Rate: 200.00\n# Jasprit Bumrah (bowling) - Runs Conceded: 8, Balls: 6, Economy: 8.00\n#\n# Over 2, Ball 1: Rohit Sharma (fast) → Rohit Sharma - 1 run\n# Over 2, Ball 2: Rohit Sharma (fast) → Virat Kohli - 6 runs\n# Over 2, Ball 3: Rohit Sharma (yorker) → Virat Kohli - 0 runs\n# Over 2, Ball 4: Rohit Sharma (yorker) → Virat Kohli - 0 runs\n# Over 2, Ball 5: Rohit Sharma (yorker) → Rohit Sharma - 0 runs\n# Over 2, Ball 6: Rohit Sharma (yorker) → Virat Kohli - 1 run\n#\n# Pattern detected: Rohit Sharma specializing in death bowling yorkers\n# Confidence: 83.33%\n#\n# Recommendation generated: Adjust field placement\n# Action: Place deep point and fine-leg to restrict boundaries\n# Priority: HIGH\n# Reasoning:\n#   - Bowler Rohit Sharma detected practicing yorkers\n#   - Aggressive batters present with 140+ strike rates\n#\n# === MATCH DASHBOARD ===\n# Match: India vs Australia at MCG (T20)\n# Innings: Batting Team India, 16 runs, 0 wickets, 2 overs\n# \n# Batter Performance:\n#   Rohit Sharma: SR=60.0, Runs=3, Balls=5\n#   Virat Kohli: SR=200.0, Runs=7, Balls=3\n# \n# Bowler Performance:\n#   Jasprit Bumrah: Economy=8.00, Wickets=0, Balls=6\n#   Rohit Sharma: Economy=13.00, Wickets=0, Balls=6\n#\n# Detected Patterns: 1\n#   - Bowler Rohit Sharma specializing in death bowling yorkers\n#\n# Latest Recommendations: 1\n#   - Adjust field placement to counter aggressive batters vs yorker specialist\n#\n# Total Recommendations Generated: 1\n# Total Events Processed: 34",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: AsyncIO event loop synchronization issues. If you see 'RuntimeError: Event loop is closed', ensure you're using `asyncio.run()` to manage the event loop lifecycle properly. Never create multiple event loops or close the loop while coroutines are still pending. When testing agents individually, use `pytest-asyncio` with the `@pytest.mark.asyncio` decorator to ensure proper loop management. Common mistake: calling async functions without `await` will return a coroutine object that never executes—always verify all agent method calls use `await`.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "info_box",
+      "content": "Extension Challenge: Extend the system with a ReinforcementLearningAgent that learns from recommendation outcomes. Modify the strategy agent to include confidence scores (0-1) for each recommendation based on historical accuracy. After each match, calculate whether the recommended field placement actually prevented runs or enabled a wicket. Use a simple reward signal (+1 for correct recommendation, -1 for incorrect) to update an agent preference model. Over multiple matches, the system should converge toward recommending the most successful strategies for specific player-bowler matchups. This transforms your multi-agent system from reactive intelligence to adaptive intelligence.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Multi-agent architecture enables domain decomposition: each agent owns specific expertise (ingestion, performance, patterns, strategy) and operates autonomously without tight coupling or centralized control.",
+        "Message bus abstraction decouples agent communication from implementation: agents publish typed events and subscribe to event types, allowing new agents to join without modifying existing code.",
+        "Async/await with asyncio ensures concurrent agent processing: agents run in parallel within a single event loop, enabling real-time performance calculations and pattern detection without blocking.",
+        "Event sourcing pattern preserves complete audit trail: all inter-agent communication is logged as immutable events, enabling replay, debugging, post-match analysis, and machine learning on agent behavior.",
+        "Coordinator pattern manages agent lifecycle and synchronization: the coordinator initializes agents, establishes subscriptions, injects domain data, and aggregates outputs into a coherent system view.",
+        "Cricket domain modeling with Pydantic ensures data validation and type safety: Match, Player, Ball, and Innings models enforce schema contracts, reducing bugs and improving agent interoperability."
+      ],
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket match analytics system where agents need to react to live deliveries. Agent A publishes a 'ball_delivered' event, and both Agent B (performance analysis) and Agent C (pattern recognition) must process it concurrently. Which architectural pattern enables this without Agent A knowing about B and C?",
+      "items": [
+        "Direct coupling with if-else statements routing to specific agent methods",
+        "Publisher-Subscriber (pub-sub) message bus where agents subscribe to event types",
+        "Synchronous request-response API calls from Agent A to B and C in sequence",
+        "Shared database polling where agents query for new events at regular intervals"
+      ],
+      "answer": 1,
+      "explanation": "The pub-sub message bus pattern (answer 1) is the correct architectural choice. It decouples Agent A from knowing about B and C, allows multiple subscribers to process the same event concurrently, and scales seamlessly when new agents are added. Direct coupling (answer 0) creates maintenance nightmares and tight dependencies. Synchronous request-response (answer 2) blocks execution and serializes processing, eliminating concurrency benefits. Database polling (answer 3) introduces latency and scalability issues. In your implementation, agents call `message_bus.subscribe(EventType.BALL_DELIVERED, handler)` to register interest, and the bus automatically routes events to all subscribers asynchronously using `asyncio.gather()`, enabling true concurrent processing of cricket intelligence.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "AI agents and agentic workflows power mission-critical systems at scale across the globe. Google uses multi-agent systems in Search and Ads to autonomously optimize bidding strategies and rank content across billions of queries daily. Netflix deploys agent-based recommendation engines that handle 230+ million users, where agents negotiate between personalization, diversity, and catalog coverage in real-time. Uber's dispatch system uses hierarchical agents coordinating millions of driver-rider matches per hour, with agents making autonomous routing and pricing decisions across 70+ countries. OpenAI's GPT-4 powers API-driven agent workflows for enterprises handling document processing, code generation, and customer support at scale. Meta uses multi-agent reinforcement learning for ad targeting across 3 billion users, where agents autonomously optimize for relevance while respecting privacy constraints. Airbnb employs agents for dynamic pricing, availability prediction, and fraud detection across 7+ million listings. When done wrong, agent systems suffer from cascading failures (one bad agent decision propagates), hallucination loops, resource exhaustion, and poor coordination under high throughput. Production failures occur when agents lack proper observability, error recovery mechanisms, or when reward functions misalign with business goals.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A single batsman (monolithic AI) can only handle one ball at a time. But a championship team uses multiple specialized agents—the opener, middle-order batter, bowler, fielder, captain. Each agent makes autonomous decisions (when to attack, defend, or rotate strike) while coordinating toward one goal: win the match. The captain (orchestrator) monitors the match state, adjusts strategies, and ensures all agents work in harmony. If one bowler (agent) consistently fails, the captain pulls them and deploys another. Similarly, agentic workflows deploy specialized AI agents handling different tasks, making decisions autonomously while a central orchestrator ensures alignment and recovery.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Agentic workflows distribute decision-making across specialized AI agents that autonomously execute tasks with minimal human intervention.",
+        "Agent orchestration requires robust state management, inter-agent communication protocols, and fallback mechanisms for handling failures gracefully.",
+        "Production systems demand observability, logging, and tracing at every agent interaction point to diagnose cascading failures and performance bottlenecks.",
+        "Reward alignment is critical—misaligned objectives between agents cause suboptimal or harmful emergent behavior at scale.",
+        "Multi-agent coordination frameworks (like hierarchical, collaborative, or competitive architectures) must match your specific problem domain.",
+        "Tool integration, memory persistence, and context windows are practical constraints that directly impact agent reliability and cost efficiency.",
+        "Real-world agentic systems require continuous monitoring, A/B testing, and iterative refinement as agent behavior evolves with new data and objectives."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "AI agents operate through a continuous perception-action loop where the runtime maintains an internal state machine managing agent lifecycle, task queue, and decision context. The memory model stores episodic experiences (recent actions/observations), semantic knowledge (learned patterns), and procedural rules (executable strategies). Execution flow follows a synchronous event-driven architecture: agents receive stimuli, traverse a decision tree (rule evaluation or neural network inference), update internal state, and emit actions. The performance bottleneck typically occurs during policy evaluation—agents cache frequently-accessed memory segments and use hierarchical planning to reduce branching factor. Context windows define temporal scope, limiting backward-looking memory to prevent unbounded state explosion. Asynchronous task delegation enables parallel sub-agent execution, coordinated through a central orchestrator. State transitions are logged atomically to enable rollback on constraint violation. Vector embeddings compress memory into high-dimensional space, enabling semantic similarity search faster than brute-force comparison, reducing effective latency from O(n) to O(log n) with approximate nearest-neighbor indexing.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma as captain (the agent orchestrator) managing India's Test match strategy. His **perception loop** = constant observation of Jasprit Bumrah's bowling action, field positioning, and opposition batsman weaknesses. His **internal state** = mental model of match context (overs remaining, wickets lost, pitch behavior evolution). His **memory model** has three layers: episodic (last 5 overs' events), semantic (historical data: \"Virat Kohli scores 40% of runs in overs 10-15\"), and procedural (set strategies: \"aggressive field vs left-handers\"). The **decision tree** = Rohit evaluates: Is batsman struggling? → Tighten field → Place slip. Each decision triggers a **state transition** (field rearrangement, bowler swap). **Parallel sub-agents**: Bumrah plans his next 3 deliveries while Rohit simultaneously instructs fielders. **Performance optimization**: Rather than analyzing every possible field setup, Rohit uses cached patterns from 50 previous matches (vector embeddings = similar match states). This parallel reveals that agents, like captains, succeed by balancing real-time perception, historical knowledge, forward planning, and distributed decision-making—never in isolation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import asyncio\nfrom collections import deque\nfrom dataclasses import dataclass, field\nfrom typing import Any, Dict, List\nimport hashlib\n\n@dataclass\nclass MatchMemory:\n    \"\"\"Hierarchical memory for cricket match agent.\"\"\"\n    episodic_window: deque = field(default_factory=lambda: deque(maxlen=10))\n    semantic_patterns: Dict[str, float] = field(default_factory=dict)\n    procedural_strategies: Dict[str, List[str]] = field(default_factory=dict)\n    \n    def store_event(self, over_num: int, bowler: str, runs: int, wicket: bool):\n        self.episodic_window.append({\n            'over': over_num,\n            'bowler': bowler,\n            'runs': runs,\n            'wicket': wicket\n        })\n    \n    def update_semantic(self, pattern_key: str, confidence: float):\n        self.semantic_patterns[pattern_key] = confidence\n    \n    def get_cached_strategy(self, match_state_hash: str):\n        return self.procedural_strategies.get(match_state_hash, [])\n\n@dataclass\nclass AgentState:\n    \"\"\"Runtime state machine for captain agent.\"\"\"\n    captain_name: str\n    match_memory: MatchMemory = field(default_factory=MatchMemory)\n    current_field_config: Dict[str, str] = field(default_factory=dict)\n    decision_queue: deque = field(default_factory=deque)\n    context_window_overs: int = 5\n    \n    def compute_state_hash(self) -> str:\n        \"\"\"Compress current match state into vector embedding.\"\"\"\n        state_str = f\"{len(self.episodic_window)}_{sum(p['runs'] for p in self.episodic_window)}\"\n        return hashlib.md5(state_str.encode()).hexdigest()\n    \n    async def perceive_and_decide(self, bowler: str, batsman_form: str, pitch_behavior: str):\n        \"\"\"Perception-action loop: observe → evaluate → act.\"\"\"\n        state_hash = self.compute_state_hash()\n        \n        # Check procedural cache first (O(1) vs O(n) full evaluation)\n        cached_decision = self.match_memory.get_cached_strategy(state_hash)\n        if cached_decision:\n            return cached_decision\n        \n        # Evaluate decision tree\n        decision = await self._evaluate_policy(\n            bowler=bowler,\n            batsman_form=batsman_form,\n            pitch_behavior=pitch_behavior\n        )\n        \n        # Store in episodic memory\n        self.decision_queue.append({\n            'decision': decision,\n            'timestamp': state_hash\n        })\n        \n        # Update semantic confidence\n        if decision == 'aggressive_field':\n            self.match_memory.update_semantic(\n                'aggressive_vs_weak_batsman',\n                0.85\n            )\n        \n        return decision\n    \n    async def _evaluate_policy(self, bowler: str, batsman_form: str, pitch_behavior: str) -> str:\n        \"\"\"Hierarchical policy evaluation (reduced branching factor).\"\"\"\n        # Level 1: Quick filter\n        if pitch_behavior == 'seaming':\n            if batsman_form == 'struggling':\n                return 'aggressive_field'\n            else:\n                return 'balanced_field'\n        \n        # Level 2: Secondary evaluation\n        batsman_vs_bowler_history = {\n            ('Virat Kohli', 'Jasprit Bumrah'): 0.45,\n            ('Rohit Sharma', 'Jasprit Bumrah'): 0.92\n        }\n        \n        match_key = (batsman_form, bowler)\n        if match_key in batsman_vs_bowler_history:\n            confidence = batsman_vs_bowler_history[match_key]\n            return 'tight_field' if confidence < 0.6 else 'defensive_field'\n        \n        return 'neutral_field'\n    \n    async def execute_distributed(self, bowlers: List[str]):\n        \"\"\"Parallel sub-agent execution: each bowler plans independently.\"\"\"\n        tasks = [\n            self._plan_bowler_strategy(bowler)\n            for bowler in bowlers\n        ]\n        results = await asyncio.gather(*tasks)\n        return results\n    \n    async def _plan_bowler_strategy(self, bowler: str) -> Dict[str, Any]:\n        \"\"\"Sub-agent: individual bowler planning.\"\"\"\n        await asyncio.sleep(0.1)  # Simulate inference latency\n        return {\n            'bowler': bowler,\n            'next_3_balls': ['yorker', 'short_ball', 'line_and_length'],\n            'field_request': 'aggressive_slips'\n        }\n\n# Runtime demonstration\nasync def captain_match_loop():\n    agent = AgentState(captain_name='Rohit Sharma')\n    \n    # Simulate over-by-over decisions\n    for over in range(1, 6):\n        decision = await agent.perceive_and_decide(\n            bowler='Jasprit Bumrah',\n            batsman_form='struggling',\n            pitch_behavior='seaming'\n        )\n        print(f\"Over {over}: {decision}\")\n    \n    # Parallel bowler planning (distributed agents)\n    bowler_strategies = await agent.execute_distributed(\n        ['Jasprit Bumrah', 'Mohammed Shami', 'Ravichandran Ashwin']\n    )\n    for strategy in bowler_strategies:\n        print(f\"{strategy['bowler']} plans: {strategy['next_3_balls']}\")\n    \n    print(f\"\\nAgent state hash: {agent.compute_state_hash()}\")\n    print(f\"Episodic memory size: {len(agent.match_memory.episodic_window)}\")\n    print(f\"Semantic confidence: {agent.match_memory.semantic_patterns}\")\n\n# asyncio.run(captain_match_loop())",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Memory unboundedness is a critical failure mode. Without explicit context window limits (like episodic_window=deque(maxlen=10)), agent state grows linearly with execution time, causing latency degradation. Always implement TTL (time-to-live) policies on cached decisions and periodic memory consolidation to prevent state explosion in long-running agents.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Agents operate via continuous perception-action loops with atomically-logged state transitions",
+        "Three-layer memory (episodic, semantic, procedural) trades storage for inference speed via caching",
+        "Hierarchical policy evaluation reduces branching factor and avoids full decision tree traversal",
+        "Vector embeddings + approximate nearest-neighbor search compress context from O(n) to O(log n) lookup",
+        "Asynchronous sub-agent delegation enables parallel task execution under central orchestrator coordination",
+        "State hashing enables procedural cache hits, avoiding redundant policy evaluation on repeated contexts",
+        "Context windows prevent unbounded state growth; rollback mechanisms enforce constraint compliance"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the captain agent example, why does caching the field decision based on state_hash (episodic + semantic summary) outperform full policy re-evaluation?",
+      "items": [
+        "Because it skips the hierarchical tree traversal, reducing decision latency from O(n) to O(1)",
+        "Because Rohit Sharma uses intuition instead of logic",
+        "Because the deque automatically optimizes memory allocation",
+        "Because state hashing compresses context into a single float value"
+      ],
+      "answer": 0,
+      "explanation": "Caching converts a repeated O(n) policy evaluation (traversing levels 1–2 of the decision tree) into O(1) hash-table lookup. The state_hash acts as a fingerprint of match context (overs played, runs scored). When that hash reappears, the agent immediately retrieves the cached decision without re-evaluating batsman form vs. pitch conditions. This mirrors how Rohit recalls similar situations from 50 prior matches instantly, rather than analyzing field options from scratch each time. Options B and D misrepresent the mechanism: B ignores the algorithmic optimization, and D incorrectly suggests state is a float (it's a string hash used as a dictionary key)."
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production agentic workflows rely on three established patterns: the Supervisor pattern, where a central orchestrator delegates tasks to specialized sub-agents (ideal for complex multi-domain problems with clear task boundaries, trade-off is increased latency from coordination overhead); the Chain pattern, where agents execute sequentially with outputs feeding into inputs (best for linear workflows with deterministic dependencies, but lacks parallelization benefits); and the Mesh pattern, where agents communicate peer-to-peer without central coordination (maximizes concurrency and resilience, but introduces complexity in state synchronization and debugging). The Supervisor pattern scales best for 5-15 specialized agents; the Chain pattern for 2-4 sequential steps where each step requires full context; the Mesh pattern for autonomous swarms requiring minimal latency. Each incurs different costs: Supervisor requires robust inter-agent communication; Chain requires careful context passing and error handling; Mesh requires eventual consistency mechanisms and distributed tracing. Choose Supervisor for business workflows with clear ownership; Chain for data pipelines; Mesh for real-time decision systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The Supervisor pattern mirrors a captain orchestrating the team—the captain (supervisor) assigns roles to opener, middle-order, bowlers, and fielders (sub-agents), each executing their specialized function while reporting back to the captain for strategy adjustments. The Chain pattern resembles an innings: openers bat first, their contribution informs the middle-order's approach, which then sets up the lower-order's finishing role—each phase depends entirely on the previous one's success. The Mesh pattern is like a fielding setup where each fielder communicates directly with others to position optimally without waiting for captain's approval each time; the team reacts dynamically to ball placement. The Supervisor works well when you have distinct roles with unclear interdependencies; the Chain works perfectly for sequential match phases where one outcome directly determines the next strategy; the Mesh excels in fast-paced situations where communication delay costs runs or wickets.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Direct coupling, no task specialization\nclass MonolithicBatter:\n    def execute(self, ball_data):\n        # Doing everything in one agent - decision, footwork, shot selection\n        if ball_data['line'] == 'leg_stump':\n            return self.analyze_field() + self.calculate_shot() + self.execute_stroke()\n        # Impossible to reuse, test, or scale\n\n# BEST PRACTICE: Supervisor pattern with specialized agents\nclass CricketSupervisor:\n    def __init__(self):\n        self.batter_agent = BatterAgent(role='stroke_selection')\n        self.fielder_agent = FielderAgent(role='positioning')\n        self.bowler_agent = BowlerAgent(role='delivery_planning')\n    \n    def orchestrate_over(self, match_state):\n        batter_decision = self.batter_agent.decide(match_state)\n        field_position = self.fielder_agent.analyze(batter_decision)\n        bowl_strategy = self.bowler_agent.plan(field_position, match_state)\n        return self.execute_play(batter_decision, field_position, bowl_strategy)\n\n# BEST PRACTICE: Chain pattern for sequential deliveries\nclass BowlingChain:\n    def __init__(self):\n        self.agents = [\n            AnalysisAgent(),      # Step 1: Analyze batsman\n            DeliveryAgent(),      # Step 2: Plan delivery\n            ExecutionAgent()      # Step 3: Execute with feedback\n        ]\n    \n    def process_over(self, innings_context):\n        context = innings_context\n        for agent in self.agents:\n            context = agent.execute(context)  # Each feeds next\n        return context['final_result']\n\n# BEST PRACTICE: Mesh pattern for fielder communication\nclass MeshFielders:\n    def __init__(self, fielders):\n        self.fielders = {f.name: f for f in fielders}\n        self.ball_position = None\n    \n    def ball_played(self, ball_location):\n        self.ball_position = ball_location\n        # Each fielder directly communicates best coverage\n        optimal_coverage = max(\n            (f.calculate_intercept(ball_location) for f in self.fielders.values()),\n            key=lambda x: x['success_probability']\n        )\n        return optimal_coverage",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Inadequate State Handoff Between Agents** — The most common beginner mistake is failing to explicitly pass complete context between agents, leading to agents making decisions with stale or incomplete information. In cricket terms, it's like the captain not telling the bowler about the batter's weakness or the field changes. **How to fix it:** (1) Create a structured `MatchContext` object containing all mutable state (batter_form, pitch_condition, field_placement, recent_deliveries), (2) Pass the entire context object to each agent's execute() method rather than individual parameters, (3) Have agents return modified context objects so the supervisor sees all accumulated changes, (4) Log context transitions for debugging. Example: `context = batter_agent.decide(context)` then `context = bowler_agent.plan(context)` ensures each agent sees what the previous agent learned.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Supervisor pattern centralizes orchestration—best for 5-15 specialized agents with clear domain boundaries",
+        "Chain pattern enforces sequential execution—ideal for pipelines where each step's output becomes the next step's input",
+        "Mesh pattern enables peer communication—maximizes parallelism but requires distributed state management",
+        "Always explicitly pass complete context between agents to prevent information loss and decision drift",
+        "Use Supervisor for business workflows, Chain for data pipelines, Mesh for real-time autonomous systems",
+        "Production systems typically hybrid—Supervisor coordinating multiple Chains or Mesh clusters"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building an agent system where 12 independent fielders need to decide optimal positioning in response to each ball played, with <100ms response requirement. Which pattern should you use?",
+      "items": [
+        "Supervisor pattern—the captain coordinates all fielders",
+        "Chain pattern—fielders decide in sequence based on ball trajectory",
+        "Mesh pattern—fielders communicate peer-to-peer without central coordination",
+        "Monolithic pattern—one agent handles all fielding decisions"
+      ],
+      "answer": 2,
+      "explanation": "Mesh pattern is correct because: (1) sub-100ms latency eliminates Supervisor's coordination overhead, (2) fielders are independent and don't need sequential execution (Chain), (3) peer communication allows each fielder to determine optimal coverage based on ball position and teammate positions. Supervisor would add latency waiting for captain's decision; Chain would serialize decisions unnecessarily. Monolithic violates agent specialization principles. Mesh's trade-off of distributed state complexity is worth the latency gain in this scenario.",
+      "level": 2,
+      "language": ""
+    }
+  ]
+}

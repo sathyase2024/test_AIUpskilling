@@ -47,24 +47,79 @@ export class ProgressService {
   }
 
   async getHistory(userId: string) {
+    const since = new Date();
+    since.setDate(since.getDate() - 29);
+    since.setHours(0, 0, 0, 0);
+
+    // Single query: active dates in the last 30 days
+    const rows: { date: string }[] = await this.progressRepo
+      .createQueryBuilder('p')
+      .select("DATE(p.completedAt)", 'date')
+      .where('p.userId = :userId AND p.completed = true AND p.completedAt >= :since', { userId, since })
+      .groupBy("DATE(p.completedAt)")
+      .getRawMany();
+
+    const activeDates = new Set(rows.map((r) => r.date));
+
     const days: { date: string; active: boolean }[] = [];
     for (let i = 29; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i);
+      const d = new Date();
+      d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      const count = await this.progressRepo.createQueryBuilder('p').where('p.userId = :userId AND DATE(p.completedAt) = :d', { userId, d: dateStr }).getCount();
-      days.push({ date: dateStr, active: count > 0 });
+      days.push({ date: dateStr, active: activeDates.has(dateStr) });
     }
     return days;
   }
 
+  async getRecentActivity(userId: string) {
+    const rows = await this.progressRepo.find({
+      where: { userId, completed: true },
+      relations: { lesson: true },
+      order: { completedAt: 'DESC' },
+      take: 8,
+    });
+    return rows.map((r) => ({
+      lessonTitle: r.lesson?.title ?? 'Unknown lesson',
+      lessonId: r.lessonId,
+      topicId: r.topicId,
+      xpEarned: r.xpEarned,
+      completedAt: r.completedAt,
+    }));
+  }
+
   async getSkillProgress(userId: string) {
-    const categories = ['programming','frontend','backend','devops','ai-ml','databases'];
-    const results: Record<string, number> = {};
-    for (const cat of categories) {
-      const total = await this.lessonRepo.createQueryBuilder('l').innerJoin('l.topic', 't').where('t.category = :cat', { cat }).getCount();
-      const done = await this.progressRepo.createQueryBuilder('p').innerJoin('p.lesson', 'l').innerJoin('l.topic', 't').where('p.userId = :userId AND t.category = :cat AND p.completed = true', { userId, cat }).getCount();
-      results[cat] = total ? Math.round((done / total) * 100) : 0;
-    }
-    return results;
+    const categories = ['programming', 'frontend', 'backend', 'devops', 'ai-ml', 'databases'];
+
+    // Single query: total lessons per category
+    const totals: { category: string; total: string }[] = await this.lessonRepo
+      .createQueryBuilder('l')
+      .innerJoin('l.topic', 't')
+      .select('t.category', 'category')
+      .addSelect('COUNT(l.id)', 'total')
+      .where('t.category IN (:...categories)', { categories })
+      .groupBy('t.category')
+      .getRawMany();
+
+    // Single query: completed lessons per category for this user
+    const dones: { category: string; done: string }[] = await this.progressRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.lesson', 'l')
+      .innerJoin('l.topic', 't')
+      .select('t.category', 'category')
+      .addSelect('COUNT(p.id)', 'done')
+      .where('p.userId = :userId AND t.category IN (:...categories) AND p.completed = true', { userId, categories })
+      .groupBy('t.category')
+      .getRawMany();
+
+    const totalMap = Object.fromEntries(totals.map((r) => [r.category, Number(r.total)]));
+    const doneMap = Object.fromEntries(dones.map((r) => [r.category, Number(r.done)]));
+
+    return Object.fromEntries(
+      categories.map((cat) => {
+        const total = totalMap[cat] ?? 0;
+        const done = doneMap[cat] ?? 0;
+        return [cat, total ? Math.round((done / total) * 100) : 0];
+      }),
+    );
   }
 }

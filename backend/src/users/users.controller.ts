@@ -12,16 +12,16 @@ export class UsersController {
 
   @Get('me')
   getMe(@Req() req: any) {
-    return this.usersService.findById(req.user.userId);
+    return this.usersService.findById(req.user.id);
   }
 
   @Patch('me')
   updateMe(@Req() req: any, @Body() body: { name?: string; hobbies?: string[] }) {
-    return this.usersService.update(req.user.userId, body);
+    return this.usersService.update(req.user.id, body);
   }
 
   @Get('me/stats')
   getStats(@Req() req: any) {
-    return this.usersService.getStats(req.user.userId);
+    return this.usersService.getStats(req.user.id);
   }
 }

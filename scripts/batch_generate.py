@@ -529,14 +529,41 @@ def _parse_json_response(raw: str) -> dict:
         except json.JSONDecodeError:
             pass
 
-    # json_repair as last resort (handles unescaped quotes, trailing commas, etc.)
+    # json_repair as last resort — try on extracted block first, then full text
     try:
         from json_repair import repair_json
-        repaired = repair_json(text, return_objects=True)
-        if isinstance(repaired, dict):
-            return repaired
-    except Exception:
+        block = text[start:end + 1] if (start != -1 and end > start) else text
+        for candidate in (block, text):
+            try:
+                repaired = repair_json(candidate, return_objects=True)
+                if isinstance(repaired, dict):
+                    return repaired
+            except Exception:
+                pass
+    except ImportError:
         pass
+
+    # Salvage truncated output: walk back from end to find last complete section,
+    # then close the sections array and root object
+    if start != -1:
+        src = text[start:]
+        for i in range(len(src) - 1, -1, -1):
+            if src[i] == '}':
+                for suffix in (']}', ']}  }', ']\n}'):
+                    candidate = src[:i + 1] + suffix
+                    try:
+                        result = json.loads(candidate)
+                        if isinstance(result, dict):
+                            return result
+                    except json.JSONDecodeError:
+                        pass
+                    try:
+                        from json_repair import repair_json
+                        result = repair_json(candidate, return_objects=True)
+                        if isinstance(result, dict):
+                            return result
+                    except Exception:
+                        pass
 
     return json.loads(text)  # re-raise original error
 
@@ -654,10 +681,23 @@ async def generate_single_lesson(
         hobby=HOBBY,
     )
     json_reminder = "\n\nReturn ONLY valid JSON"
+    # Prompt suffix used when the model hits the token limit (output truncated)
+    brevity_suffix = (
+        "\n\nCRITICAL: Your previous response was cut off because it exceeded the token limit. "
+        "You MUST generate a SHORTER response this time. Use EXACTLY 4 sections. "
+        "Each section's 'content' field must be under 120 words. "
+        "No code blocks longer than 8 lines. Return ONLY valid JSON that fits within 3000 tokens."
+    )
 
     last_exc = None
+    truncated = False
     for attempt in range(5):
-        current_prompt = user_prompt if attempt == 0 else user_prompt + json_reminder
+        if attempt == 0:
+            current_prompt = user_prompt
+        elif truncated:
+            current_prompt = user_prompt + brevity_suffix
+        else:
+            current_prompt = user_prompt + json_reminder
         try:
             await rate_limiter.acquire()
             async with sem:
@@ -677,12 +717,18 @@ async def generate_single_lesson(
             raw = response.content[0].text.strip()
             in_tok = response.usage.input_tokens
             out_tok = response.usage.output_tokens
+            truncated = out_tok >= MAX_TOKENS - 10
 
             try:
                 lesson_data = _parse_json_response(raw)
+                if not isinstance(lesson_data, dict):
+                    raise json.JSONDecodeError(
+                        f"Expected JSON object, got {type(lesson_data).__name__}", raw, 0
+                    )
             except json.JSONDecodeError as exc:
                 if attempt < 4:
-                    print(f"    [lesson {lesson_idx}] JSON parse error ({exc}), retrying with JSON reminder...")
+                    reason = "output truncated (hit token limit)" if truncated else str(exc)
+                    print(f"    [lesson {lesson_idx}] JSON parse error ({reason}), retrying{'  with brevity hint' if truncated else ''}...")
                     await asyncio.sleep(2 ** attempt * 2)
                     last_exc = exc
                     continue

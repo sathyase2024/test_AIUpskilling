@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -20,6 +22,10 @@ import { CodingSubmission } from './entities/coding-submission.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([
+      { name: 'global', ttl: 60_000, limit: 120 },   // 120 req/min default
+      { name: 'auth',   ttl: 60_000, limit: 10 },    // 10 req/min on auth routes
+    ]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (cfg: ConfigService) => ({
@@ -30,8 +36,8 @@ import { CodingSubmission } from './entities/coding-submission.entity';
         password: cfg.get('DB_PASSWORD', 'postgres'),
         database: cfg.get('DB_NAME', 'skillforge'),
         entities: [User, Topic, Lesson, LearningPath, UserProgress, CodingSubmission],
-        synchronize: true,
-        logging: false,
+        synchronize: cfg.get('NODE_ENV') !== 'production' || cfg.get('DB_SYNC') === 'true',
+        logging: cfg.get('NODE_ENV') === 'development' ? ['error'] : false,
       }),
       inject: [ConfigService],
     }),
@@ -44,6 +50,9 @@ import { CodingSubmission } from './entities/coding-submission.entity';
     AiModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

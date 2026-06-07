@@ -28,4 +28,7 @@ export class ProgressController {
 
   @Get('skills')
   skills(@Req() req: any) { return this.progressService.getSkillProgress(req.user.id); }
+
+  @Get('recent')
+  recent(@Req() req: any) { return this.progressService.getRecentActivity(req.user.id); }
 }

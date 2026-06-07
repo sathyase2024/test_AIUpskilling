@@ -135,12 +135,9 @@ export default function Navbar() {
   const level = user?.level ?? 1
   const xp    = user?.xp ?? 0
 
-  const handleLogout = () => {
-    logout()
-    setUser(null)
-    setUserMenuOpen(false)
-    setMobileOpen(false)
-    router.push('/login')
+  async function handleLogout() {
+    await logout()
+    router.push('/')
   }
 
   /* Detect scroll for background opacity change */

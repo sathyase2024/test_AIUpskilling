@@ -5,11 +5,14 @@ import {
   CreateDateColumn,
   OneToMany,
   ManyToMany,
+  Index,
 } from 'typeorm';
 import { Lesson } from './lesson.entity';
 import { LearningPath } from './learning-path.entity';
 
 @Entity('topics')
+@Index(['category'])
+@Index(['isActive'])
 export class Topic {
   @PrimaryGeneratedColumn('uuid')
   id: string;

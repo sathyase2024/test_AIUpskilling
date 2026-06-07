@@ -2,8 +2,12 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from './filters/http-exception.filter';
+import cookieParser = require('cookie-parser');
+import helmet from 'helmet';
 
 async function bootstrap() {
+  // ── Guard: insecure JWT secret in production ─────────────────────────────────
   const jwtSecret = process.env.JWT_SECRET ?? '';
   const insecureDefault = 'skillforge-dev-secret-change-in-production';
   if (process.env.NODE_ENV === 'production' && (!jwtSecret || jwtSecret === insecureDefault)) {
@@ -13,6 +17,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
 
+  // ── Global exception filter ───────────────────────────────────────────────────
+  app.useGlobalFilters(new GlobalExceptionFilter());
+
   // ── No-cache middleware — API responses must never be cached ─────────────────
   app.use((_req: any, res: any, next: any) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -20,12 +27,16 @@ async function bootstrap() {
     next();
   });
 
+  // ── Security headers ──────────────────────────────────────────────────────────
+  app.use(helmet({ contentSecurityPolicy: false })); // CSP disabled: Next.js handles it client-side
+  app.use(cookieParser());
+
   // ── Global validation ────────────────────────────────────────────────────────
   app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: false }),
+    new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );
 
-  // ── CORS — allow localhost + any *.onrender.com + explicit FRONTEND_URL ──────
+  // ── CORS ─────────────────────────────────────────────────────────────────────
   const configured = (process.env.FRONTEND_URL || '')
     .split(',').map((o) => o.trim()).filter(Boolean);
   app.enableCors({
@@ -42,7 +53,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // ── Swagger / OpenAPI ─────────────────────────────────────────────────────────
+  // ── Swagger / OpenAPI ──────────────────────────────────────────────────────────
   const config = new DocumentBuilder()
     .setTitle('SkillForge AI API')
     .setDescription('AI-powered upskilling platform — REST API')

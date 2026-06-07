@@ -1,0 +1,189 @@
+{
+  "lessonId": "retrieval-augmented-generation-28",
+  "title": "Agentic RAG: Dynamic and Adaptive Retrieval",
+  "type": "reading",
+  "topicName": "Retrieval-Augmented Generation",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Retrieval-Augmented Generation (RAG) addresses a fundamental limitation in Large Language Models: their inability to reliably generate accurate information about events beyond their training cutoff, proprietary knowledge, or domain-specific data not present in their training corpus. LLMs suffer from hallucination—confidently producing plausible but incorrect information—because they generate text based purely on learned statistical patterns rather than factual grounding. RAG solves this by augmenting the generation process with real-time retrieval from external knowledge sources. When a user query arrives, the system first retrieves relevant documents from a knowledge base using semantic or lexical search, then passes both the query and retrieved documents to the LLM, which uses this grounded context to generate more accurate, factual, and verifiable responses. This two-stage approach fundamentally changes the model's role: instead of being the sole source of truth, the LLM becomes an intelligent synthesizer that reads retrieved facts and reasons over them. RAG is critical for building production systems because it decouples model training cycles from knowledge updates, allows organizations to incorporate proprietary or real-time data without fine-tuning, and dramatically reduces hallucination by conditioning generation on factual sources.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine a cricket commentator like Harsha Bhogle preparing to provide live analysis during an India vs. Australia Test match at the MCG. Before the match begins, he has his pre-match knowledge in memory—general cricket rules, historical records, player statistics he memorized. But during the match, as Virat Kohli faces the 87th over from Mitchell Starc, the commentator doesn't just rely on what he previously knew about their head-to-head record or Kohli's performance against left-arm pace bowlers. Instead, he has live access to a retrieval system—scorecards, real-time statistics, Duckworth-Lewis tables, field placements, and previous delivery data from this very innings. As each ball is bowled, he retrieves the specific context (what happened in the last five overs, the current run rate, the powerplay scoring pattern) and synthesizes it with his analytical skills to generate insightful commentary. The LLM is like Bhogle's analytical brain; the retrieved documents are like the live scorecard and match statistics he references. Without retrieval, he'd hallucinate what's happening (inventing runs that weren't scored, misremembering the bowling spell); with retrieval grounding his knowledge, he produces accurate, contextual insights. This is why RAG works: it separates the pattern-matching ability from the fact-verification source, just as a great commentator separates their analytical skill from their access to live data.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Semantic Retrieval and Embedding-Based Similarity",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Semantic retrieval is the foundational mechanism that identifies relevant documents for a given query by measuring semantic similarity rather than mere keyword overlap. Unlike traditional keyword-based search (which matches exact terms), semantic retrieval represents both the query and documents as dense vector embeddings in a high-dimensional space—typically 768 to 4096 dimensions—where semantic meaning is encoded as proximity. When a user submits a query, an embedding model (such as BERT, Sentence-Transformers, or OpenAI's text-embedding-ada-002) converts it into a vector. The system then computes similarity scores (using cosine similarity, Euclidean distance, or approximate nearest neighbor algorithms like HNSW or IVF) between the query vector and all or a filtered subset of document vectors in a vector database like Pinecone, Weaviate, or Milvus. The top-k documents with highest similarity scores are returned. This approach captures semantic relationships that keyword search would miss—for instance, a query about \"baseball injuries\" would retrieve documents about \"sports medicine\" or \"joint trauma\" even without exact keyword matches. The embeddings are typically pre-trained on large corpora and frozen, making retrieval computationally efficient enough for real-time systems at scale.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider a cricket statistician like Samson Johnson or Harsha Bhogle needing to find relevant past performances when a question arises: \"How did Rohit Sharma bat against short-pitched bowling by Jasprit Bumrah in powerplay situations?\" The statistician doesn't go through a chronological list of every Rohit Sharma inning looking for keyword matches like \"short pitch\" or \"Bumrah.\" Instead, they understand the semantic meaning of the query—the underlying cricket concept of \"batting technique against hostile fast bowling in the first six overs.\" They recall a multi-dimensional space of cricket performances: one axis represents bowler type and aggression, another represents match phase (powerplay vs. middle overs), another represents Rohit's scoring patterns. They intuitively find performances semantically similar to this question—perhaps the 2019 World Cup innings where Rohit faced Pat Cummins in the powerplay, or the IPL match where he dominated Bumrah with short-delivery counter-techniques. The embedding space is like this multi-dimensional cricket knowledge; the query is converted into coordinates in this space; the top matches are performances closest to those coordinates. This semantic approach captures deep cricket meaning that exact keyword matching could never find: it understands that \"facing hostile pace in early overs\" is semantically similar to \"powerplay against express pacers,\" even without those exact words.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Context Window Management and Token Limits",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Context window management is the critical engineering challenge of fitting retrieved documents plus the user query into the token limit imposed by the LLM. Modern language models have finite context windows—GPT-4 offers 8K to 128K tokens, Claude 3 offers up to 200K tokens—and exceeding this limit causes the system to either truncate content (losing information) or fail entirely. The RAG pipeline must intelligently select how many documents to retrieve and in what order to include them in the prompt. Token counting must be precise: a document that semantically scores high might consume 500 tokens, leaving only limited space for the user's actual question and the model's response. Advanced RAG systems implement sliding window selection, where the top-k retrieved documents are included in descending order of relevance, then truncated if they exceed a safety threshold (e.g., 70% of context window), preserving room for the query and response generation. Some systems use hierarchical retrieval: first coarsely retrieve 50 documents, then re-rank them using a cross-encoder, then select the top 3-5 to include. Others use abstractive summarization of documents to reduce their token footprint while preserving semantic content. The challenge intensifies at scale: retrieval latency, embedding computation, token counting, and re-ranking must all be optimized to maintain sub-second end-to-end latency for user-facing applications.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli preparing for an India vs. Pakistan ODI final. His coach has a complete library of Pakistani bowling strategies—video clips, statistical analyses, field placements, variations used by Shaheen Afridi, Mohammad Amir, and Naseem Shah. However, during the match pre-game meeting, Kohli has limited attention capacity. The coach must decide which intelligence to present: Should he explain every single over Shaheen bowled in the last two years (overwhelming, too much data), or cherry-pick the most relevant intelligence—Shaheen's behavior in powerplay overs with new ball, his yorker patterns when ahead in the 15th-20th over, his performance on this particular ground? The coach would select the top 5 most critical insights that fit in a 30-minute briefing, ordered by immediate relevance: powerplay bowling first (since Kohli bats early), then death-over variations (since he might bat later). This is context window management in RAG. The retrieved documents are like the coaching library; Kohli's attention span is the token limit; the coach's intelligent curation is the document selection algorithm. Including too many retrieved documents (like giving Kohli information about Shaheen's performance in T20 leagues when preparing for 50-overs) wastes the context window and pushes out space for the actual query response. The LLM works best when its context is curated to highest-value information, just as Kohli plays best when his pre-match preparation is laser-focused on the most relevant intelligence.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Re-ranking and Cross-Encoder Refinement",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Re-ranking is a post-retrieval filtering step that refines the initial candidate set from semantic search using a more computationally expensive but more accurate relevance signal. Semantic similarity (cosine distance between embeddings) is fast because it's a simple vector operation, but it's relatively coarse-grained: two documents might have high cosine similarity to a query yet differ dramatically in their relevance for answering that specific question. Cross-encoders address this by scoring document-query pairs jointly—they accept both the query and document as input tokens and output a relevance score between 0 and 1, typically trained with supervised labels indicating whether a query-document pair is truly relevant. A semantic retriever might return 100 candidate documents in 50ms; a cross-encoder then re-ranks those 100 in 500ms to 2 seconds by computing a joint relevance score for each pair. Because cross-encoders are orders of magnitude slower than embedding similarity, RAG systems use a two-stage pipeline: retrieval (fast, broad) followed by re-ranking (slower, precise). The re-ranked top-k documents are then passed to the LLM. Cross-encoders are particularly effective when the query and documents have subtle semantic distinctions—for instance, a query about \"diabetes management in elderly patients\" might retrieve documents about \"geriatric medicine\" and \"endocrinology\" with similar embedding distances, but a cross-encoder trained on medical relevance would strongly prefer the diabetes-specific document. Modern cross-encoders (like those from Sentence-Transformers or custom fine-tuned models) significantly improve generation quality without adding latency if the initial retrieval set is kept manageable (e.g., 50-200 candidates).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: During the Indian Premier League auction, franchises use a two-stage player selection process. The first stage is fast casting: scouts use quick heuristics to identify 200 potential players—batsmen with high career strike rates, bowlers with good economy rates, all-rounders with some magic factor. These first-stage metrics are like embedding similarity: they're coarse, fast, and capture broad patterns (\"this player generally bats well\"). However, franchises like Mumbai Indians don't just pick players based on these aggregate statistics. In the second stage—the actual auction meeting—team strategists like Mahela Jayawardene conduct deeper re-ranking. They ask: \"Yes, this batter has high strike rate, but does he specifically excel in powerplay situations on this ground with our team composition? Does he perform well under pressure in knockout matches?\" They re-examine video clips, discuss specific match situations, analyze how the player's style fits the team's balance. This re-ranking step is computationally expensive (it requires deep analysis by experienced cricket minds) but yields much more accurate selections. The first-stage heuristics are like semantic embeddings; the re-ranking with Mahela's expertise is like a cross-encoder. The final squad isn't just statistically high-strikers; it's semantically similar players that have been re-ranked to be actually relevant for this specific team's needs. Similarly, RAG's re-ranking step ensures that retrieved documents aren't just semantically close to the query, but genuinely relevant for answering it.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Prompt Engineering and Chain-of-Thought with Retrieved Context",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Prompt engineering in RAG systems is the art of structuring the LLM input to maximize the model's ability to use retrieved context effectively while avoiding pitfalls like over-reliance on irrelevant documents or ignoring the retrieval entirely. A naive RAG prompt might simply concatenate the query with all retrieved documents, but this often fails because LLMs can exhibit a phenomenon called \"lost in the middle\"—they weigh the first and last documents most heavily and may ignore middle content, or they conflate information across documents leading to confabulation. Effective RAG prompts use explicit structural cues: the prompt often follows a pattern like \"Context: [document 1] ... [document N]\nQuestion: [user query]\nAnswer:\" with clear delimiters between sections. Many systems add chain-of-thought instructions, asking the model to \"first identify which documents are relevant, then synthesize an answer by citing specific passages.\" This forces the model to reason over the retrieved content rather than relying on parametric knowledge. Advanced prompt engineering includes confidence signals—asking the model to rate its confidence in each statement or explicitly say \"this information is not in the provided context,\" which reduces hallucination. Some systems use in-context examples showing the model how to properly cite sources and when to say \"I don't know.\" Temperature settings are typically lower in RAG (0.2-0.5) compared to open-ended generation (0.7-0.9) because the goal is factual consistency with retrieval rather than creativity. The prompt structure itself encodes the RAG philosophy: documents are grounded truth; the model is a synthesis engine bound by that truth.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine a cricket journalist like Boria Majumdar writing a detailed match report for the Ashes series between England and Australia. The journalist has retrieved 15 relevant sources: ball-by-ball commentary, official scorecard, player interviews, historical statistics about the venue, weather data. But just throwing all this raw data at Boria and asking him to \"write the report\" won't produce good journalism. Instead, the editor structures the task: \"First, identify which sources are most relevant to the key storylines. Second, write the narrative by explicitly citing specific moments—quote the scorecard for exact runs, reference the commentary for the decisive over where Mitchell Starc took 3 wickets, cite the interview where Steve Smith explains his captaincy decision.\" This structure forces Boria to reason over the sources (not hallucinate match moments), cite evidence (making his claims verifiable), and acknowledge when he's relying on a specific source vs. general knowledge. If Boria writes \"Mitchell Marsh hit 6 sixes in the second innings\" but the scorecard shows only 4, the structured prompt with citation requirements would catch this—he'd have to verify against the retrieved data. Prompt engineering in RAG is like this editorial structure: it's not just giving the model retrieved documents, but framing the task to make the model reason consciously over those documents, cite them, and acknowledge boundaries of knowledge. The prompt becomes the guardrail that keeps generation grounded in retrieval.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import json\nfrom typing import List, Tuple\nfrom dataclasses import dataclass\nfrom collections import defaultdict\nimport math\n\n# Simulated embedding model (in production: use Sentence-Transformers, OpenAI API, etc.)\nclass CricketEmbeddingModel:\n    \"\"\"Simulates semantic embeddings for cricket documents.\"\"\"\n    \n    def embed_text(self",
+      "text": "str) -> List[float]:\n        \"\"\"Simple embedding: hash-based for demo (in production: real transformer model).\"\"\"\n        hash_val = hash(text) % 10000\n        # Create deterministic 384-dim embedding\n        embedding = [(hash_val * (i + 1)) % 1000 / 1000.0 for i in range(384)]\n        # Normalize\n        norm = math.sqrt(sum(x**2 for x in embedding))\n        return [x / (norm + 1e-8) for x in embedding]\n\n@dataclass\nclass CricketMatch:\n    \"\"\"Represents a cricket match document in the knowledge base.\"\"\"\n    match_id: str\n    players_involved: List[str]\n    match_type: str  # Test, ODI, T20\n    venue: str\n    key_moments: str\n    document_text: str\n    innings_summary: str\n    embedding: List[float] = None\n\nclass SemanticRetriever:\n    \"\"\"Retrieves cricket documents using semantic similarity.\"\"\"\n    \n    def __init__(self",
+      "embedding_model": "CricketEmbeddingModel):\n        self.embedding_model = embedding_model\n        self.knowledge_base: List[CricketMatch] = []\n    \n    def add_document(self",
+      "match": "CricketMatch):\n        \"\"\"Add a cricket match document and compute its embedding.\"\"\"\n        if match.embedding is None:\n            match.embedding = self.embedding_model.embed_text(match.document_text)\n        self.knowledge_base.append(match)\n    \n    def cosine_similarity(self",
+      "vec1": "List[float]",
+      "vec2": "List[float]) -> float:\n        \"\"\"Compute cosine similarity between two embeddings.\"\"\"\n        dot_product = sum(a * b for a, b in zip(vec1, vec2))\n        norm1 = math.sqrt(sum(x**2 for x in vec1)) + 1e-8\n        norm2 = math.sqrt(sum(x**2 for x in vec2)) + 1e-8\n        return dot_product / (norm1 * norm2)\n    \n    def retrieve(self",
+      "query": "str",
+      "top_k": "int = 5) -> List[Tuple[CricketMatch, float]]:\n        \"\"\"Retrieve top-k semantically similar cricket documents.\"\"\"\n        query_embedding = self.embedding_model.embed_text(query)\n        scored_docs = []\n        \n        for doc in self.knowledge_base:\n            similarity = self.cosine_similarity(query_embedding, doc.embedding)\n            scored_docs.append((doc, similarity))\n        \n        # Sort by similarity descending\n        scored_docs.sort(key=lambda x: x[1], reverse=True)\n        return scored_docs[:top_k]\n\nclass CrossEncoderReranker:\n    \"\"\"Re-ranks documents using joint query-document relevance scoring.\"\"\"\n    \n    def rerank_score(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "This code example demonstrates the complete RAG pipeline for cricket-related queries. The CricketEmbeddingModel simulates semantic embeddings (in production, this would use a real Sentence-Transformer or API). The SemanticRetriever stage performs fast cosine similarity search to find 10 candidate documents matching the query. The CrossEncoderReranker then applies a more computationally expensive relevance model, scoring documents based on entity overlap and match context, reducing the candidate set to the top 3 most relevant documents. The ContextWindowManager estimates token counts for each document and ensures the final selection fits within the context window budget (2000 tokens), leaving headroom for the query and LLM response. The RAGSystem orchestrates all stages: it first retrieves broadly using embeddings, then re-ranks precisely using a relevance model, then selects documents that fit the context window. For the query \"How did Rohit Sharma bat against fast bowling in powerplay?\", the system retrieves documents about Rohit's ODI performance and powerplay aggression, re-ranks them by matching player names and match context, and selects the highest-relevance documents. The augmented context output shows what the LLM would receive—the query plus relevant documents with source citations. This structure prevents the model from hallucinating: it has factual documents to ground its response. Running this code with two queries demonstrates that the RAG pipeline adapts: different queries retrieve different document combinations based on semantic similarity and explicit re-ranking, showing how the system grounds generation in retrieval rather than relying purely on the model's parameters.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}

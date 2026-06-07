@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -47,12 +48,14 @@ export class AiController {
   // tutor and code reviewer without signing in.
 
   @Post('chat')
+  @Throttle({ global: { ttl: 60_000, limit: 20 } })
   @ApiOperation({ summary: 'Chat with the AI tutor (public)' })
   chat(@Body() body: { message: string; context?: string }) {
     return this.aiService.chat(body.message, body.context).then((reply) => ({ reply }));
   }
 
   @Post('code/review')
+  @Throttle({ global: { ttl: 60_000, limit: 10 } })
   @ApiOperation({ summary: 'AI review of submitted code (public)' })
   reviewCode(@Body() body: { code: string; language: string }) {
     return this.aiService.reviewCode(body.code, body.language);

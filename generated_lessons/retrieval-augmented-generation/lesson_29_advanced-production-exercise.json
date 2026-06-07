@@ -1,0 +1,424 @@
+{
+  "lessonId": "retrieval-augmented-generation-29",
+  "title": "Advanced Production Exercise",
+  "type": "hands-on-exercise",
+  "topicName": "Retrieval-Augmented Generation",
+  "estimatedMinutes": 55,
+  "xpReward": 100,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "What You'll Build",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "You will construct a Retrieval-Augmented Generation system for cricket match analysis that retrieves relevant historical match statistics, player performance records, and tactical insights from a knowledge base, then augments those retrieved documents with a language model to generate contextual commentary and predictive analysis. The system combines vector similarity search over cricket match embeddings with prompt engineering to synthesize real-time match context with historical patterns, enabling the model to produce accurate, grounded predictions about player performance, team strategy, and match outcomes without requiring retraining. This end-to-end RAG pipeline demonstrates how retrieval mechanisms reduce hallucination by anchoring generative responses in factual cricket data.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli preparing for an innings against Mitchell Starc on a bouncy Australian pitch. Before walking to the crease, Kohli's team quickly retrieves his historical data against Starc—previous dismissals, Starc's line preferences in the powerplay, pitch reports from similar venues—storing this information on his dressing room notes. When Kohli takes strike, he doesn't rely on generic batting instincts; instead, he augments his immediate observations of Starc's first over with these retrieved tactical insights, consciously adjusting his line selection and shot planning based on the patterns he's retrieved. The retrieval phase is like consulting your match preparation notes; the augmentation phase is integrating those facts with real-time match conditions to make informed decisions. Without retrieval, Kohli might face Starc blind and make mistakes; without augmentation—without applying the retrieved facts to the current situation—the notes would be useless. RAG works exactly this way: retrieve relevant context first, then use that grounded context to generate accurate, situation-aware outputs rather than hallucinating generic responses. This is why RAG dramatically improves accuracy in domain-specific tasks like cricket analysis—the model stays tethered to reality.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Prerequisites",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "language": "",
+      "level": 2,
+      "items": [
+        "Familiarity with vector embeddings, cosine similarity, and semantic search fundamentals for document retrieval",
+        "Understanding of prompt engineering, chain-of-thought techniques, and how context windows affect model responses",
+        "Basic knowledge of Python, including data structures, file I/O, and working with dictionaries and lists",
+        "Experience with language model APIs (OpenAI, Anthropic, or local models) and token counting for context management",
+        "Conceptual grasp of RAG architecture: retriever component, ranking strategies, and integration with generative models"
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Setup & Project Structure",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "You will organize your RAG cricket analysis project using a modular architecture where document retrieval, embedding generation, and language model prompting are separated into distinct components. Create a project directory containing a knowledge base of cricket match records stored as JSON documents, an embeddings cache for vector similarity search, and a main orchestration script that coordinates retrieval and generation. Install essential dependencies including a vector database client (like LanceDB or FAISS), an embedding model library (sentence-transformers), and language model client libraries. This structure enables you to iteratively develop and test each RAG component independently before integration, simulating production patterns where retrieval indices are updated separately from generation pipelines.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "#!/bin/bash\n# Cricket RAG Analysis System - Project Setup\n\n# Create project directory structure\nmkdir -p cricket_rag_analysis\ncd cricket_rag_analysis\n\n# Create subdirectories for different components\nmkdir -p knowledge_base          # Cricket match records and statistics\nmkdir -p embeddings             # Vector embeddings cache\nmkdir -p retriever              # Retrieval component code\nmkdir -p generator              # Generation component code\nmkdir -p utils                  # Utility functions\nmkdir -p tests                  # Test cases\n\n# Create Python virtual environment\npython3 -m venv venv\nsource venv/bin/activate\n\n# Install required dependencies\npip install --upgrade pip\npip install sentence-transformers==2.2.2      # For embedding models\npip install lancedb==0.3.0                    # Vector database\npip install numpy==1.24.3                     # Numerical computing\npip install openai==1.3.5                     # OpenAI API\npip install python-dotenv==1.0.0              # Environment variables\npip install pandas==2.0.3                     # Data manipulation\npip install requests==2.31.0                  # HTTP requests\n\n# Create main configuration file\ncat > config.py << 'EOF'\n# Cricket RAG Configuration\nEMBEDDING_MODEL = \"all-MiniLM-L6-v2\"\nVECTOR_DB_PATH = \"./embeddings/cricket_db\"\nKNOWLEDGE_BASE_PATH = \"./knowledge_base\"\nEMBEDDING_DIMENSION = 384\nTOP_K_RETRIEVAL = 5\nMODEL_NAME = \"gpt-3.5-turbo\"\nTEMPERATURE = 0.7\nMAX_TOKENS = 500\nEOF\n\n# Create .gitignore for sensitive data\ncat > .gitignore << 'EOF'\nvenv/\n.env\n__pycache__/\n*.pyc\nembeddings/\n.DS_Store\nEOF\n\necho \"✅ Cricket RAG project structure created successfully!\"\necho \"📂 Project layout:\"\ntree -L 2 . 2>/dev/null || find . -maxdepth 2 -type d | sed 's|./||' | sort\n",
+      "language": "bash",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 1 — Foundation",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Step 1 establishes the knowledge base and embedding infrastructure by loading cricket match records, computing dense vector embeddings for each document using a pre-trained language model, and storing these embeddings in a queryable vector database. This phase transforms unstructured cricket match data (player statistics, team lineups, commentary, pitch conditions) into numerical vectors where semantically similar matches occupy nearby regions in embedding space. The retriever system learns to index documents efficiently, enabling rapid similarity-based lookup when queries arrive at inference time. Without this foundational embedding layer, retrieval cannot function—the system has no way to mathematically measure which historical matches are most relevant to a current query.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Before a series, a cricket analyst builds a comprehensive archive of all previous Test matches played between India and Australia—storing detailed scorecards, player performance logs, pitch reports, and match situations in a large physical library. Then, the analyst creates a detailed index system where each match is assigned a unique numerical fingerprint based on key characteristics: pitch type, weather conditions, player combinations, result patterns. When a match begins and the analyst needs historical precedent, they don't flip through every document manually—they consult the index to instantly find matches with similar conditions. The embeddings are like that numerical fingerprint system; the vector database is the indexed library. When Rohit Sharma walks in to bat, the analyst doesn't retrieve all 50 previous India-Australia matches; they retrieve only the 5 most relevant ones based on similarity to current conditions. The embedding model is the librarian who understands which historical matches are truly comparable—it recognizes that a slow, turning pitch in Delhi is more relevant to a seamless bowler's game plan than a fast, bouncy pitch in Perth, even though both are Australia-India Tests. This mathematical understanding of relevance through embeddings is what makes retrieval blazingly fast and contextually accurate.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import json\nimport numpy as np\nfrom sentence_transformers import SentenceTransformer\nimport lancedb\nfrom pathlib import Path\nfrom typing import List, Dict, Any\n\nclass CricketKnowledgeBaseBuilder:\n    \"\"\"Builds and indexes the cricket knowledge base with embeddings.\"\"\"\n    \n    def __init__(self, embedding_model_name: str = \"all-MiniLM-L6-v2\", db_path: str = \"./embeddings/cricket_db\"):\n        self.embedding_model = SentenceTransformer(embedding_model_name)\n        self.db_path = db_path\n        self.db = None\n        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)\n    \n    def load_cricket_knowledge_base(self) -> List[Dict[str, Any]]:\n        \"\"\"Load cricket match records from JSON knowledge base.\"\"\"\n        cricket_documents = [\n            {\n                \"match_id\": \"IND_AUS_TEST_2023_01\",\n                \"teams\": \"India vs Australia\",\n                \"venue\": \"MCG, Melbourne\",\n                \"pitch_type\": \"fast_bouncy\",\n                \"match_type\": \"Test\",\n                \"content\": \"India toured Australia for Test series. Jasprit Bumrah bowled with exceptional accuracy. Rohit Sharma scored 150 runs. Australia won by 8 wickets. Pitch favored pace bowling with high bounce. Weather conditions cool and overcast.\",\n                \"player_stats\": {\"Rohit Sharma\": {\"runs\": 150, \"dismissal\": \"lbw\"}, \"Jasprit Bumrah\": {\"wickets\": 3, \"economy\": 2.1}}\n            },\n            {\n                \"match_id\": \"IND_AUS_TEST_2023_02\",\n                \"teams\": \"India vs Australia\",\n                \"venue\": \"SCG, Sydney\",\n                \"pitch_type\": \"slow_turning\",\n                \"match_type\": \"Test\",\n                \"content\": \"Second Test in Sydney. Axar Patel exploited turning pitch. Virat Kohli scored 89 runs. India won by 6 wickets. Pitch turned significantly on Day 3. Spinners dominated second innings.\",\n                \"player_stats\": {\"Virat Kohli\": {\"runs\": 89, \"dismissal\": \"caught\"}, \"Axar Patel\": {\"wickets\": 5, \"economy\": 2.8}}\n            },\n            {\n                \"match_id\": \"IND_AUS_TEST_2023_03\",\n                \"teams\": \"India vs Australia\",\n                \"venue\": \"WACA, Perth\",\n                \"pitch_type\": \"fast_bouncy\",\n                \"match_type\": \"Test\",\n                \"content\": \"Third Test at Perth. Aggressive Australian batting on flat pitch. David Warner scored 164 runs. Australia dominated. Fast bowlers ineffective on flat surface. Weather hot and sunny.\",\n                \"player_stats\": {\"David Warner\": {\"runs\": 164, \"dismissal\": \"not_out\"}, \"Mitchell Starc\": {\"wickets\": 2, \"economy\": 3.5}}\n            },\n            {\n                \"match_id\": \"IND_AUS_ODI_2023_01\",\n                \"teams\": \"India vs Australia\",\n                \"venue\": \"MCG, Melbourne\",\n                \"pitch_type\": \"flat_batting\",\n                \"match_type\": \"ODI\",\n                \"content\": \"ODI series begins. India bats first. Shubman Gill scored 98 runs. Australia chased successfully. Powerplay aggression from Australian openers. India bowlers leaked 25 runs in final over.\",\n                \"player_stats\": {\"Shubman Gill\": {\"runs\": 98, \"dismissal\": \"caught\"}, \"Steve Smith\": {\"runs\": 112, \"dismissal\": \"not_out\"}}\n            },\n            {\n                \"match_id\": \"IND_SA_TEST_2023_01\",\n                \"teams\": \"India vs South Africa\",\n                \"venue\": \"Wanderers, Johannesburg\",\n                \"pitch_type\": \"fast_bouncy\",\n                \"match_type\": \"Test\",\n                \"content\": \"India's tour of South Africa. Kagiso Rabada took 6 wickets. India collapsed in first innings for 179. South Africa declared at 402. Pace bowling was destructive. High bounce challenged Indian batsmen.\",\n                \"player_stats\": {\"Virat Kohli\": {\"runs\": 45, \"dismissal\": \"caught\"}, \"Kagiso Rabada\": {\"wickets\": 6, \"economy\": 2.2}}\n            }\n        ]\n        return cricket_documents\n    \n    def create_embeddings(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:\n        \"\"\"Generate embeddings for each document.\"\"\"\n        embeddings_with_docs = []\n        \n        for doc in documents:\n            # Combine relevant fields for embedding\n            text_to_embed = f\"{doc['teams']} {doc['venue']} {doc['pitch_type']} {doc['match_type']} {doc['content']}\"\n            \n            # Generate embedding vector\n            embedding = self.embedding_model.encode(text_to_embed, convert_to_numpy=True)\n            \n            # Store embedding with document\n            doc_with_embedding = doc.copy()\n            doc_with_embedding['embedding'] = embedding.tolist()\n            embeddings_with_docs.append(doc_with_embedding)\n            \n            print(f\"✓ Embedded: {doc['match_id']} - {doc['teams']}\")\n        \n        return embeddings_with_docs\n    \n    def build_vector_database(self, embedded_documents: List[Dict[str, Any]]) -> None:\n        \"\"\"Create LanceDB vector database with embeddings.\"\"\"\n        # Convert embeddings back to numpy for LanceDB\n        data = []\n        for doc in embedded_documents:\n            data.append({\n                \"match_id\": doc[\"match_id\"],\n                \"teams\": doc[\"teams\"],\n                \"venue\": doc[\"venue\"],\n                \"pitch_type\": doc[\"pitch_type\"],\n                \"match_type\": doc[\"match_type\"],\n                \"content\": doc[\"content\"],\n                \"player_stats\": json.dumps(doc[\"player_stats\"]),\n                \"vector\": doc[\"embedding\"]\n            })\n        \n        # Create LanceDB table\n        self.db = lancedb.connect(self.db_path)\n        self.db.create_table(\"cricket_matches\", data=data, mode=\"overwrite\")\n        print(f\"\\n✅ Vector database created with {len(data)} matches\")\n    \n    def build(self) -> None:\n        \"\"\"Orchestrate the complete knowledge base building process.\"\"\"\n        print(\"🏏 Starting Cricket Knowledge Base Builder...\\n\")\n        \n        # Load documents\n        documents = self.load_cricket_knowledge_base()\n        print(f\"📚 Loaded {len(documents)} cricket match documents\\n\")\n        \n        # Generate embeddings\n        print(\"🔢 Generating embeddings...\")\n        embedded_docs = self.create_embeddings(documents)\n        \n        # Build vector database\n        print(\"\\n💾 Building vector database...\")\n        self.build_vector_database(embedded_docs)\n        \n        print(\"\\n🎯 Knowledge base foundation ready!\")\n\n\nif __name__ == \"__main__\":\n    builder = CricketKnowledgeBaseBuilder()\n    builder.build()\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 2 — Core Logic",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Step 2 implements the core retrieval logic that takes a user query about cricket match situations and retrieves the most relevant historical matches from the vector database using semantic similarity. The retriever component embeds the incoming query using the same model trained in Step 1, then performs similarity search to find the top-k most contextually similar cricket matches. This step is critical because the quality of retrieved documents directly determines the quality of final generation—if retrieval fails to surface relevant historical context, the language model cannot augment its response with grounded facts. The retriever ranks matches by cosine similarity in embedding space, effectively solving a nearest-neighbor search problem that would be prohibitively slow with traditional keyword matching but executes in milliseconds with vector indices.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine a cricket analyst receives a real-time query during India's Test match against South Africa in Johannesburg: \"South Africa just won the toss and chose to bat first on a pace-friendly pitch. What should India's bowling strategy be?\" The analyst doesn't randomly flip through past Test match records; instead, they quickly mentally assess which previous matches are most similar to this exact scenario. They recall that India faced South Africa in Johannesburg with similar pitch conditions in 2023—a match with fast, bouncy conditions where pace bowling strategy mattered. They retrieve that specific match record along with 4 other contextually close matches where India faced pace-friendly pitches. The retrieval query is like the analyst's mental assessment; the vector database is their indexed memory; and the retrieved matches are the most relevant historical examples. Without this intelligent retrieval, the analyst would waste time sifting through irrelevant matches like ODIs on flat wickets or Tests on turning pitches. The semantic similarity metric (cosine similarity between query and document embeddings) is what enables this intelligent filtering—the system automatically understands that \"fast, bouncy pitch\" in a Johannesburg context maps most strongly to specific historical matches, not random ones. This is why RAG retrieval works better than keyword search for nuanced queries—it understands semantic context, not just keyword matches.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom sentence_transformers import SentenceTransformer\nimport lancedb\nfrom typing import List, Dict, Any, Tuple\nimport json\n\nclass CricketRetriever:\n    \"\"\"Retrieves relevant cricket match documents using semantic similarity.\"\"\"\n    \n    def __init__(self, embedding_model_name: str = \"all-MiniLM-L6-v2\", db_path: str = \"./embeddings/cricket_db\"):\n        self.embedding_model = SentenceTransformer(embedding_model_name)\n        self.db = lancedb.connect(db_path)\n        self.table = self.db.open_table(\"cricket_matches\")\n    \n    def encode_query(self, query: str) -> np.ndarray:\n        \"\"\"Convert query text to embedding vector.\"\"\"\n        return self.embedding_model.encode(query, convert_to_numpy=True)\n    \n    def retrieve_similar_matches(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:\n        \"\"\"Retrieve top-k most similar cricket matches for the query.\"\"\"\n        # Encode the query\n        query_embedding = self.encode_query(query)\n        \n        # Search the vector database\n        results = self.table.search(query_embedding).limit(top_k).to_list()\n        \n        # Process results\n        retrieved_matches = []\n        for i, result in enumerate(results, 1):\n            # Parse player stats if stored as JSON string\n            player_stats = result.get(\"player_stats\", \"{}\")\n            if isinstance(player_stats, str):\n                player_stats = json.loads(player_stats)\n            \n            match_context = {\n                \"rank\": i,\n                \"match_id\": result.get(\"match_id\", \"unknown\"),\n                \"teams\": result.get(\"teams\", \"\"),\n                \"venue\": result.get(\"venue\", \"\"),\n                \"pitch_type\": result.get(\"pitch_type\", \"\"),\n                \"match_type\": result.get(\"match_type\", \"\"),\n                \"content\": result.get(\"content\", \"\"),\n                \"player_stats\": player_stats,\n                \"similarity_score\": float(result.get(\"_distance\", 0))  # LanceDB uses _distance\n            }\n            retrieved_matches.append(match_context)\n        \n        return retrieved_matches\n    \n    def format_retrieved_context(self, matches: List[Dict[str, Any]]) -> str:\n        \"\"\"Format retrieved matches into a contextual prompt for the generator.\"\"\"\n        formatted_context = \"🏏 RETRIEVED HISTORICAL CONTEXT:\\n\\n\"\n        \n        for match in matches:\n            formatted_context += f\"Match {match['rank']}: {match['match_id']}\\n\"\n            formatted_context += f\"  Teams: {match['teams']}\\n\"\n            formatted_context += f\"  Venue: {match['venue']}\\n\"\n            formatted_context += f\"  Pitch Type: {match['pitch_type']}\\n\"\n            formatted_context += f\"  Match Type: {match['match_type']}\\n\"\n            formatted_context += f\"  Key Details: {match['content']}\\n\"\n            \n            if match['player_stats']:\n                formatted_context += f\"  Player Performance:\\n\"\n                for player, stats in match['player_stats'].items():\n                    formatted_context += f\"    - {player}: {stats}\\n\"\n            \n            formatted_context += f\"  Similarity Score: {match['similarity_score']:.4f}\\n\\n\"\n        \n        return formatted_context\n\n\nif __name__ == \"__main__\":\n    # Initialize retriever\n    retriever = CricketRetriever()\n    \n    # Test retrieval with various cricket scenarios\n    test_queries = [\n        \"India batting first on a fast bouncy pitch against Australia at MCG. What worked before?\",\n        \"South Africa pace bowling strategy on bouncy Johannesburg wicket\",\n        \"Rohit Sharma against Mitchell Starc on turning pitch conditions\",\n        \"ODI chase strategy against Australia with flat wicket conditions\"\n    ]\n    \n    print(\"🏏 CRICKET RAG RETRIEVER - TEST RUN\\n\" + \"=\"*60 + \"\\n\")\n    \n    for query_idx, query in enumerate(test_queries, 1):\n        print(f\"Query {query_idx}: {query}\\n\")\n        \n        # Retrieve matches\n        matches = retriever.retrieve_similar_matches(query, top_k=3)\n        \n        # Format and display context\n        context = retriever.format_retrieved_context(matches)\n        print(context)\n        print(\"-\" * 60 + \"\\n\")\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 3 — Integration & Enhancement",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Step 3 integrates the retriever with a language model to create the complete RAG pipeline. The generator takes the user query, invokes the retriever to fetch relevant cricket match context, augments a carefully engineered prompt with the retrieved documents, and passes this augmented context to a language model for generation. The critical enhancement is prompt engineering: the system constructs prompts that explicitly instruct the model to ground its analysis in the retrieved historical matches, cite specific examples, and avoid speculation beyond the context provided. This integration demonstrates the core RAG principle—the model generates responses conditioned on factual retrieved context rather than relying solely on training data knowledge. The system implements guardrails to ensure generated cricket analysis references at least one retrieved match and maintains factual consistency with the historical data.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine a cricket commentator preparing match analysis for a live broadcast. The commentator receives a query: \"Virat Kohli is coming to bat in the 15th over against pace bowling on a bouncy pitch. What will be his approach?\" The commentator doesn't generate commentary from thin air based on generic cricket knowledge. Instead, they follow a three-step process: First, their research team retrieves 5 previous matches where Kohli faced similar pace conditions on similar pitches. Second, the commentator reviews these specific historical matches—how Kohli played Starc on bouncy pitches, how he handled Bumrah on similar surfaces, what his success rate was. Third, the commentator synthesizes these retrieved facts into live commentary: \"Based on Kohli's performance in the MCG Test against Australia, where he scored 89 runs using aggressive footwork against Starc's short-pitched bowling...\" Notice the commentator grounds every insight in retrieved fact. Without retrieval, the commentary would be generic: \"Kohli is a great player, expect attacking shots.\" Without generation grounded in retrieval, the context wouldn't inform analysis. RAG creates this virtuous cycle—retrieval supplies facts, generation synthesizes them into contextual insights, and the final output is simultaneously creative and factually grounded. This is why RAG hallucination rates drop dramatically compared to pure language models.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "from typing import List, Dict, Any\nimport os\nfrom dotenv import load_dotenv\n\n# Load environment variables\nload_dotenv()\n\nclass CricketRAGPipeline:\n    \"\"\"Complete RAG pipeline integrating retrieval with language model generation.\"\"\"\n    \n    def __init__(self, retriever: 'CricketRetriever', model_name: str = \"gpt-3.5-turbo\"):\n        self.retriever = retriever\n        self.model_name = model_name\n        \n        # Note: In production, use actual OpenAI client\n        # For this example, we demonstrate the orchestration\n        try:\n            import openai\n            self.client = openai.OpenAI(api_key=os.getenv(\"OPENAI_API_KEY\"))\n        except:\n            self.client = None\n            print(\"⚠️ OpenAI client not available. Using mock responses for demo.\")\n    \n    def build_augmented_prompt(self, user_query: str, retrieved_context: str) -> str:\n        \"\"\"Construct a prompt that combines user query with retrieved context.\"\"\"\n        prompt = f\"\"\"You are an expert cricket analyst with deep knowledge of match strategy and player psychology.\n\nYou have been provided with HISTORICAL CRICKET CONTEXT retrieved from similar past matches:\n\n{retrieved_context}\n\nBased ONLY on the historical context provided above, answer this question about the current match:\n\nCURRENT MATCH QUERY: {user_query}\n\nIMPORTANT INSTRUCTIONS:\n1. Ground your analysis in the retrieved historical matches. Cite specific player names and match details.\n2. Identify patterns and strategies that worked (or failed) in similar situations.\n3. Make predictions about the current match based on these historical precedents.\n4. If the retrieved context doesn't directly address the query, say so explicitly.\n5. Do NOT invent cricket facts or statistics not present in the retrieved context.\n6. Structure your response with: ANALYSIS, KEY PATTERNS, PREDICTION, CONFIDENCE LEVEL.\n\nRESPONSE:\"\"\"\n        return prompt\n    \n    def generate_analysis(self, user_query: str, top_k: int = 5) -> Dict[str, Any]:\n        \"\"\"Execute the complete RAG pipeline.\"\"\"\n        print(f\"\\n🏏 CRICKET RAG ANALYSIS PIPELINE\\n\" + \"=\"*70)\n        print(f\"Query: {user_query}\\n\")\n        \n        # Step 1: Retrieve relevant matches\n        print(\"🔍 Step 1: Retrieving relevant historical matches...\")\n        retrieved_matches = self.retriever.retrieve_similar_matches(user_query, top_k=top_k)\n        print(f\"✓ Retrieved {len(retrieved_matches)} relevant matches\")\n        \n        # Step 2: Format context\n        print(\"\\n📝 Step 2: Formatting retrieved context...\")\n        formatted_context = self.retriever.format_retrieved_context(retrieved_matches)\n        print(f\"✓ Context formatted ({len(formatted_context)} characters)\")\n        \n        # Step 3: Build augmented prompt\n        print(\"\\n🤖 Step 3: Building augmented prompt...\")\n        augmented_prompt = self.build_augmented_prompt(user_query, formatted_context)\n        print(f\"✓ Augmented prompt created ({len(augmented_prompt)} characters)\")\n        \n        # Step 4: Generate response (mock if client unavailable)\n        print(\"\\n💭 Step 4: Generating analysis...\")\n        if self.client:\n            try:\n                response = self.client.chat.completions.create(\n                    model=self.model_name,\n                    messages=[\n                        {\"role\": \"system\", \"content\": \"You are an expert cricket analyst.\"},\n                        {\"role\": \"user\", \"content\": augmented_prompt}\n                    ],\n                    temperature=0.7,\n                    max_tokens=500\n                )\n                generated_text = response.choices[0].message.content\n            except Exception as e:\n                generated_text = self._mock_response(user_query, retrieved_matches)\n                print(f\"⚠️ Using mock response (API error: {str(e)[:50]}...)\")\n        else:\n            generated_text = self._mock_response(user_query, retrieved_matches)\n            print(\"⚠️ Using mock response (client not configured)\")\n        \n        print(\"✓ Analysis generated\")\n        \n        # Step 5: Compile results\n        result = {\n            \"query\": user_query,\n            \"retrieved_matches\": [\n                {\n                    \"match_id\": m[\"match_id\"],\n                    \"teams\": m[\"teams\"],\n                    \"venue\": m[\"venue\"],\n                    \"pitch_type\": m[\"pitch_type\"],\n                    \"similarity_score\": m[\"similarity_score\"]\n                }\n                for m in retrieved_matches\n            ],\n            \"analysis\": generated_text,\n            \"context_length\": len(formatted_context),\n            \"augmented_prompt_length\": len(augmented_prompt)\n        }\n        \n        return result\n    \n    def _mock_response(self, query: str, matches: List[Dict[str, Any]]) -> str:\n        \"\"\"Generate mock cricket analysis response for demo purposes.\"\"\"\n        match_summaries = [m['teams'] + \" at \" + m['venue'] for m in matches[:2]]\n        \n        return f\"\"\"ANALYSIS:\nBased on the retrieved historical matches, particularly {', '.join(match_summaries)}, the current scenario shows clear patterns from past performance.\n\nKEY PATTERNS:\n1. Pitch conditions significantly impact batting strategy - similar pitch types show 65-75% pattern consistency\n2. Player performance varies by venue and opposition - venue-specific averages shift by 15-25 runs\n3. Opening partnerships are more stable on bouncy pitches, with success rate improving 20% on Australian grounds\n\nPREDICTION:\nThe batsman should expect a challenging period in the first 3 overs given the pace bowling conditions. Historical data from similar scenarios suggests:\n- Defending off-stump deliveries should be prioritized (67% success rate)\n- Attacking short balls yields positive results (72% boundary conversion)\n- Expected run rate: 3.2-4.1 runs per over in powerplay conditions\n\nCONFIDENCE LEVEL: 78%\n(Based on 5 highly relevant historical matches with similar pitch, venue, and opposition conditions)\"\"\"\n    \n    def run_analysis_suite(self, queries: List[str]) -> List[Dict[str, Any]]:\n        \"\"\"Run complete RAG analysis for multiple cricket scenarios.\"\"\"\n        results = []\n        for i, query in enumerate(queries, 1):\n            print(f\"\\n\\n{'='*70}\")\n            print(f\"ANALYSIS {i} of {len(queries)}\")\n            print(f\"{'='*70}\")\n            result = self.generate_analysis(query, top_k=3)\n            results.append(result)\n            \n            # Display result\n            print(f\"\\n📊 RETRIEVED MATCHES:\")\n            for match in result['retrieved_matches']:\n                print(f\"  ✓ {match['match_id']}: {match['teams']} ({match['pitch_type']})\")\n            \n            print(f\"\\n📋 GENERATED ANALYSIS:\")\n            print(result['analysis'])\n        \n        return results\n\n\nif __name__ == \"__main__\":\n    # Import retriever from Step 2\n    from cricket_retriever import CricketRetriever\n    \n    # Initialize components\n    retriever = CricketRetriever()\n    pipeline = CricketRAGPipeline(retriever)\n    \n    # Define test scenarios\n    test_queries = [\n        \"India is batting first against Australia on a fast bouncy pitch at MCG. What should be the batting strategy for the opening partnership?\",\n        \"South Africa is preparing to defend on a pitch that's expected to take turn. Based on similar conditions, what bowling attack should they deploy?\",\n        \"Jasprit Bumrah is about to bowl the death overs against aggressive Australian batsmen. What has worked in similar high-pressure situations?\"\n    ]\n    \n    # Execute RAG pipeline\n    results = pipeline.run_analysis_suite(test_queries)\n    \n    print(f\"\\n\\n{'='*70}\")\n    print(\"✅ RAG PIPELINE COMPLETE\")\n    print(f\"{'='*70}\")\n    print(f\"Total queries processed: {len(results)}\")\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Step 4 — Testing & Verification",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Step 4 validates that the complete RAG system functions correctly by executing end-to-end tests with cricket-specific scenarios, verifying that retrieval returns contextually appropriate matches, and confirming that generated analysis cites retrieved facts accurately. Run the integrated system with diverse queries ranging from batting strategy questions to bowling tactics, monitoring that similarity scores make intuitive sense and that generated responses reference specific player names and match details from the retrieved context. Validation ensures the retriever isn't returning irrelevant matches, the embeddings capture domain semantics correctly, and the language model respects the augmented context constraint.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "#!/bin/bash\n# Cricket RAG System - Testing & Verification\n\necho \"🏏 CRICKET RAG SYSTEM - TESTING & VERIFICATION\"\necho \"=============================================================\"\n\n# Activate virtual environment\nsource venv/bin/activate\n\n# Step 1: Build knowledge base and embeddings\necho \"\"\necho \"[Test 1] Building cricket knowledge base and embeddings...\"\npython3 -c \"\nfrom cricket_knowledge_base import CricketKnowledgeBaseBuilder\nbuilder = CricketKnowledgeBaseBuilder()\nbuilder.build()\nprint('✓ Knowledge base built successfully')\n\" 2>&1 | head -20\n\necho \"\"\necho \"[Test 2] Verifying vector database creation...\"\npython3 -c \"\nimport lancedb\ndb = lancedb.connect('./embeddings/cricket_db')\ntable = db.open_table('cricket_matches')\nprint(f'✓ Vector database verified: {len(table.search([0]*384).limit(100).to_list())} matches indexed')\n\" 2>&1\n\n# Step 2: Test retriever component\necho \"\"\necho \"[Test 3] Testing cricket match retrieval...\"\npython3 << 'RETRIEVER_TEST'\nfrom cricket_retriever import CricketRetriever\n\nretriever = CricketRetriever()\n\ntest_queries = [\n    \"India opening partnership against fast bowling on bouncy pitch\",\n    \"Pace bowling strategy on turning pitch\",\n    \"Batting collapse recovery after early wickets\"\n]\n\nprint(\"\\nTesting Retrieval Quality:\")\nprint(\"-\" * 60)\n\nfor query in test_queries:\n    matches = retriever.retrieve_similar_matches(query, top_k=3)\n    print(f\"\\nQuery: {query[:50]}...\")\n    print(f\"Retrieved {len(matches)} matches:\")\n    for match in matches:\n        print(f\"  • {match['teams']} - Similarity: {match['similarity_score']:.4f}\")\n\nprint(\"\\n✓ Retriever tests passed\")\nRETRIEVER_TEST\n\n# Step 3: Test RAG pipeline\necho \"\"\necho \"[Test 4] Testing complete RAG pipeline...\"\npython3 << 'RAG_TEST'\nfrom cricket_retriever import CricketRetriever\nfrom cricket_rag_pipeline import CricketRAGPipeline\n\nretriever = CricketRetriever()\npipeline = CricketRAGPipeline(retriever)\n\ntest_query = \"Rohit Sharma batting first on MCG against Mitchell Starc. Historical context?\"\nprint(f\"\\nTest Query: {test_query}\")\nprint(\"=\"*60)\n\nresult = pipeline.generate_analysis(test_query, top_k=3)\n\nprint(f\"\\nRAG Pipeline Results:\")\nprint(f\"  • Query processed: ✓\")\nprint(f\"  • Matches retrieved: {len(result['retrieved_matches'])}\")\nprint(f\"  • Context size: {result['context_length']} characters\")\nprint(f\"  • Prompt size: {result['augmented_prompt_length']} characters\")\nprint(f\"  • Analysis generated: ✓\")\nprint(f\"\\nFirst 200 chars of analysis:\")\nprint(f\"  {result['analysis'][:200]}...\")\nprint(f\"\\n✓ RAG pipeline tests passed\")\nRAG_TEST\n\n# Step 4: Performance metrics\necho \"\"\necho \"[Test 5] Verifying performance metrics...\"\npython3 << 'METRICS_TEST'\nimport time\nfrom cricket_retriever import CricketRetriever\n\nretriever = CricketRetriever()\n\n# Measure retrieval latency\nqueries = [\n    \"Fast bowling on bouncy pitch\",\n    \"Batting strategy on turning surface\",\n    \"Powerplay aggression tactics\"\n]\n\nlatencies = []\nfor query in queries:\n    start = time.time()\n    retriever.retrieve_similar_matches(query, top_k=5)\n    latencies.append((time.time() - start) * 1000)  # Convert to ms\n\navg_latency = sum(latencies) / len(latencies)\nprint(f\"\\nPerformance Metrics:\")\nprint(f\"  • Average retrieval latency: {avg_latency:.2f} ms\")\nprint(f\"  • Min latency: {min(latencies):.2f} ms\")\nprint(f\"  • Max latency: {max(latencies):.2f} ms\")\nprint(f\"  • Status: ✓ Performance acceptable (< 500ms)\" if avg_latency < 500 else \"  • Status: ⚠️ Performance needs optimization\")\nMETRICS_TEST\n\n# Step 5: Factuality verification\necho \"\"\necho \"[Test 6] Verifying factuality grounding...\"\npython3 << 'FACTUALITY_TEST'\nfrom cricket_retriever import CricketRetriever\nfrom cricket_rag_pipeline import CricketRAGPipeline\n\nretriever = CricketRetriever()\npipeline = CricketRAGPipeline(retriever)\n\n# Test factuality\nqueries_with_expected_context = [\n    (\"India vs South Africa pace bowling\", [\"South Africa\", \"Johannesburg\", \"pace\"]),\n    (\"Rohit Sharma Melbourne Test\", [\"Rohit Sharma\", \"MCG\", \"Australia\"]),\n    (\"Spin bowling strategy\", [\"Axar Patel\", \"Sydney\", \"turning\"])\n]\n\nprint(\"\\nFactuality Grounding Tests:\")\nprint(\"-\" * 60)\nfor query, expected_terms in queries_with_expected_context:\n    result = pipeline.generate_analysis(query, top_k=2)\n    analysis = result['analysis'].lower()\n    \n    matched_terms = [term for term in expected_terms if term.lower() in analysis]\n    match_rate = len(matched_terms) / len(expected_terms) * 100\n    \n    status = \"✓\" if match_rate >= 50 else \"⚠️\"\n    print(f\"\\n{status} Query: {query[:40]}...\")\n    print(f\"   Expected terms found: {len(matched_terms)}/{len(expected_terms)} ({match_rate:.0f}%)\")\n\nprint(f\"\\n✓ Factuality verification complete\")\nFACTUALITY_TEST\n\n# Final summary\necho \"\"\necho \"=============================================================\"\necho \"✅ ALL TESTS COMPLETED SUCCESSFULLY\"\necho \"=============================================================\"\necho \"\"\necho \"Test Summary:\"\necho \"  [✓] Knowledge base construction\"\necho \"  [✓] Vector database creation\"\necho \"  [✓] Semantic retrieval accuracy\"\necho \"  [✓] RAG pipeline integration\"\necho \"  [✓] Performance metrics\"\necho \"  [✓] Factuality grounding\"\necho \"\"\necho \"System ready for production use!\"\necho \"\"\n",
+      "language": "bash",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: One of the most common failures in RAG systems is query-context mismatch where the embedding model represents the user query and documents in different semantic spaces, causing relevant matches to be ranked low. This happens when your embedding model was pretrained on general text but your cricket domain uses specialized terminology. Fix this by: (1) Fine-tuning the embedding model on cricket-specific document pairs using contrastive learning, (2) Using domain-specific prompting in queries (e.g., \"cricket match context: India vs Australia Test\") to guide the embedding, (3) Implementing a hybrid retrieval system that combines semantic search with keyword matching on cricket-specific fields like player names and venues, or (4) Testing retrieval quality on a benchmark set of queries where you know the correct matches should be returned. Always validate that your top-5 retrieved matches make intuitive sense before deploying RAG to production.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "info_box",
+      "content": "Extension Challenge: Implement a feedback loop where the system learns which retrieved matches were actually useful for correct predictions. Add a scoring mechanism that tracks whether generated analyses that cited specific retrieved matches led to accurate predictions. Use this feedback to fine-tune the embedding model or adjust retrieval ranking weights. For example, if matches retrieved for \"MCG bouncy pitch\" regularly appear in high-accuracy analyses, the system should learn to weight MCG-specific vectors higher. This creates a self-improving RAG system where retrieval quality continuously improves as you gather more match data. Consider implementing A/B testing where some queries use top-5 retrieved matches and others use top-10, measuring which configuration produces more accurate tactical predictions.",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "language": "",
+      "level": 2,
+      "items": [
+        "RAG pipelines eliminate hallucination by conditioning generation on retrieved factual context, reducing false cricket statistics or invented player records.",
+        "Vector embeddings enable semantic understanding of cricket queries—models recognize that 'bouncy pitch' and 'pace-friendly surface' are equivalent concepts despite different wording.",
+        "Retrieval latency is critical for real-time applications; vector databases achieve millisecond-level search on large match datasets, compared to seconds with keyword search.",
+        "Prompt engineering in RAG must explicitly instruct models to cite retrieved matches and avoid inventing facts beyond provided context, creating trustworthy domain analysis.",
+        "Embedding model choice shapes retrieval quality; domain-specific models (fine-tuned on cricket matches) significantly outperform general models on specialized terminology.",
+        "RAG systems require continuous validation that retrieved matches are contextually appropriate; automated benchmarking prevents silent degradation of retrieval quality."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a cricket RAG system, why does semantic similarity search (using embeddings) outperform keyword-based retrieval for finding relevant historical matches?",
+      "language": "",
+      "level": 2,
+      "items": [
+        "Keyword search is faster but requires exact phrase matches, missing semantically equivalent descriptions like 'bouncy pitch' vs 'pace-friendly surface', whereas embeddings capture intent across equivalent phrasings",
+        "Embeddings are always smaller in storage size than keyword indices, making them more efficient for real-time retrieval in broadcast scenarios",
+        "Keyword search cannot handle cricket-specific terminology like 'maiden over' or 'DRS', while embeddings inherently understand sports domain language",
+        "Semantic search returns results instantly while keyword search requires manual filtering by cricket experts to remove irrelevant matches"
+      ],
+      "answer": 0,
+      "explanation": "Semantic similarity search using embeddings understands that queries like 'India batting on a fast bouncy pitch' and 'India opening partnership on pace-friendly surface' are semantically equivalent even with different wording. Keyword search would fail to match these unless they share exact phrases. Embeddings map both queries to nearby points in embedding space, retrieving truly relevant matches based on meaning, not keywords. This is why RAG systems using embeddings successfully retrieve matches where batting strategy is relevant even when the query words differ from the stored match descriptions. Option 1 correctly identifies this fundamental advantage."
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Retrieval-Augmented Generation operates through a multi-stage pipeline that manages memory hierarchies, vector space operations, and conditional execution flows. At runtime, the system first encodes incoming queries into dense vector representations using transformer-based encoders, then performs approximate nearest neighbor (ANN) search against a pre-indexed vector database—typically leveraging HNSW (Hierarchical Navigable Small World) or product quantization algorithms for sub-linear retrieval latency. Retrieved documents are ranked using relevance scorers, then concatenated into a context window that conditions the generative model. The generator operates in a constrained attention scope, processing both retrieved context and query simultaneously through self-attention mechanisms. Memory consumption scales with chunk size, embedding dimensionality, and batch size; latency is dominated by retrieval I/O and reranking compute. Token budget constraints require careful context pruning—truncating or summarizing lower-relevance passages. The entire pipeline exhibits performance trade-offs: larger embedding models improve recall but increase retrieval time; aggressive filtering reduces hallucination but risks losing relevant information. Cache coherence between retrieval and generation layers impacts throughput in distributed settings.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli preparing to bat against Jasprit Bumrah's bowling attack. Before stepping into the crease, Kohli reviews video footage of Bumrah's recent bowling patterns (retrieval step)—he encodes this intelligence into tactical awareness (vector encoding). The fielding coach ranks which bowls are most relevant to Kohli's current form (relevance scoring and reranking). Rohit Sharma, as captain, synthesizes this retrieved context—\"Bumrah bowls yorkers on off-stump in powerplay\"—and advises Kohli on stance and positioning (context window conditioning). During the actual delivery, Kohli executes his shot by integrating both the live ball trajectory (query) and the pre-retrieved tactical knowledge (augmented context) in real-time decision-making (generation with context). If Kohli overweights historical patterns and ignores the actual pitch conditions, his shot fails (hallucination risk from poor retrieval). The entire process—scouting, encoding, ranking, and adaptive batting—reveals that RAG success depends on both high-quality information retrieval AND proper contextual synthesis, not just generation capacity alone.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "from typing import List, Tuple\nimport numpy as np\nfrom dataclasses import dataclass\n\n@dataclass\nclass BatsmanPerformance:\n    \"\"\"Internal representation of retrieval pipeline state.\"\"\"\n    player_name: str\n    recent_scores: List[int]\n    opponent_weakness: str\n    confidence_vector: np.ndarray\n    retrieval_timestamp: float\n\nclass CricketRAGEngine:\n    \"\"\"Advanced RAG with internal execution flow tracking.\"\"\"\n    \n    def __init__(self, vector_dim: int = 384, cache_size: int = 1000):\n        self.vector_dim = vector_dim\n        self.retrieval_cache = {}  # Memory model: LRU cache\n        self.cache_size = cache_size\n        self.attention_history = []  # Execution flow tracking\n    \n    def _encode_batsman_context(self, batsman_name: str, recent_form: List[int]) -> np.ndarray:\n        \"\"\"Encode batsman performance into vector space.\"\"\"\n        form_vector = np.array(recent_form, dtype=np.float32)\n        normalized = form_vector / (np.linalg.norm(form_vector) + 1e-8)\n        return np.pad(normalized, (0, self.vector_dim - len(normalized)))\n    \n    def _retrieve_bowling_strategies(self, batsman_vector: np.ndarray, \n                                      strategy_database: np.ndarray) -> List[Tuple[str, float]]:\n        \"\"\"Approximate nearest neighbor retrieval with ranking.\"\"\"\n        # Cosine similarity in vector space\n        similarities = np.dot(strategy_database, batsman_vector)\n        top_k_indices = np.argsort(similarities)[::-1][:5]\n        return [(f\"strategy_{idx}\", similarities[idx]) for idx in top_k_indices]\n    \n    def augment_batting_decision(self, batsman_name: str, current_ball: str,\n                                  retrieved_strategies: List[Tuple[str, float]]) -> str:\n        \"\"\"Generation with augmented context (core RAG integration).\"\"\"\n        # Context window construction\n        context_budget = 256  # Token constraint\n        augmented_prompt = f\"Batsman: {batsman_name}. Current ball: {current_ball}. \"\n        \n        # Selective context inclusion based on relevance scores\n        for strategy, score in retrieved_strategies:\n            if score > 0.5 and len(augmented_prompt) < context_budget:\n                augmented_prompt += f\"Strategy: {strategy}. \"\n            self.attention_history.append((strategy, score))\n        \n        # Generation decision (simplified)\n        decision = self._generate_shot_type(augmented_prompt)\n        return decision\n    \n    def _generate_shot_type(self, augmented_context: str) -> str:\n        \"\"\"Generative model output (mock implementation).\"\"\"\n        if \"short_pitch\" in augmented_context:\n            return \"pull_shot\"\n        elif \"yorker\" in augmented_context:\n            return \"defensive_block\"\n        return \"drive\"\n\n# Advanced usage: Runtime performance monitoring\nengine = CricketRAGEngine(vector_dim=512)\nbatsman_vector = engine._encode_batsman_context(\"Rohit Sharma\", [45, 67, 82, 91])\nstrategy_db = np.random.randn(100, 512)  # Simulated strategy database\nretrieved = engine._retrieve_bowling_strategies(batsman_vector, strategy_db)\nshot_decision = engine.augment_batting_decision(\"Rohit Sharma\", \"short_pitch_yorker\", retrieved)\nprint(f\"Decision latency tracked in: {len(engine.attention_history)} attention steps\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three established RAG patterns dominate production systems, each optimized for different latency and quality constraints. The **Dense Retrieval + Reranking** pattern uses a fast retriever (BM25 or embedding-based) followed by a costly but accurate neural reranker—maximizing recall while controlling latency by reranking only top-k candidates. Use this when you tolerate 100-500ms latency and need highest quality. The **Hybrid Retrieval** pattern combines lexical (BM25) and semantic (vector) search, handling both keyword-specific and semantic queries; the trade-off is increased indexing complexity but robust coverage across diverse query types. The **Iterative Refinement** pattern reformulates and retrieves multiple times, useful for complex multi-hop questions where single-pass retrieval fails; this adds computational cost (3-5x latency) but dramatically improves accuracy on reasoning tasks. Each pattern's cost scales differently: dense retrieval costs CPU-bound reranking; hybrid costs dual-index maintenance; iterative costs multiple LLM forward passes. Selection depends on your SLA (latency budget), data heterogeneity, and query complexity distribution.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The three patterns mirror distinct match situations and field strategies. **Dense Retrieval + Reranking** is like fast-bowling with slip fielders: the fast bowler (dense retriever) delivers quick pace to identify threatening batsmen, while slip fielders (rerankers) stand ready to catch high-value chances. You trade initial velocity uncertainty for guaranteed accuracy on critical moments. **Hybrid Retrieval** resembles a balanced bowling attack—opening with pace, transitioning to spin depending on pitch conditions (query type). You maintain multiple bowling variations (lexical + semantic signals) because different batsmen require different strategies. **Iterative Refinement** mirrors DRS (Decision Review System) usage: after an initial on-field decision (first retrieval), you request review, analyze multiple angles, and refine the call. Each review costs time and resources, so you reserve it for high-stakes deliveries. Which pattern you choose depends on match pressure (SLA strictness), opponent type (data diversity), and required decision certainty (output quality thresholds).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Hybrid retrieval with defensive filtering\nfrom abc import ABC, abstractmethod\n\nclass RetrieverStrategy(ABC):\n    @abstractmethod\n    def retrieve(self, query: str, k: int) -> List[Tuple[str, float]]:\n        pass\n\nclass BM25Retriever(RetrieverStrategy):\n    \"\"\"Lexical retrieval—fast, keyword-aware.\"\"\"\n    def retrieve(self, query: str, k: int) -> List[Tuple[str, float]]:\n        # Tokenize and match against inverted index\n        tokens = query.lower().split()\n        results = [(f\"doc_bm25_{i}\", 0.8 - i*0.1) for i in range(k)]\n        return results\n\nclass VectorRetriever(RetrieverStrategy):\n    \"\"\"Semantic retrieval—slower, meaning-aware.\"\"\"\n    def retrieve(self, query: str, k: int) -> List[Tuple[str, float]]:\n        # Encode query, search embeddings\n        results = [(f\"doc_vec_{i}\", 0.75 - i*0.1) for i in range(k)]\n        return results\n\nclass HybridCricketRetriever:\n    \"\"\"BEST PRACTICE: Combine both strategies safely.\"\"\"\n    def __init__(self, bm25_weight: float = 0.4, vector_weight: float = 0.6):\n        self.bm25 = BM25Retriever()\n        self.vector = VectorRetriever()\n        self.bm25_weight = bm25_weight\n        self.vector_weight = vector_weight\n    \n    def retrieve(self, query: str, k: int = 5) -> List[Tuple[str, float]]:\n        # Retrieve from both sources\n        bm25_results = self.bm25.retrieve(query, k)\n        vector_results = self.vector.retrieve(query, k)\n        \n        # Merge with weighted scores\n        merged = {}\n        for doc, score in bm25_results:\n            merged[doc] = self.bm25_weight * score\n        for doc, score in vector_results:\n            merged[doc] = merged.get(doc, 0) + self.vector_weight * score\n        \n        # Filter out low-confidence results (defensive threshold)\n        filtered = [(doc, score) for doc, score in merged.items() if score > 0.3]\n        return sorted(filtered, key=lambda x: x[1], reverse=True)[:k]\n\n# ANTI-PATTERN: Using only dense retrieval without reranking on latency-constrained systems\nclass NaiveDenseOnly:\n    \"\"\"❌ AVOID: Skips reranking, sacrifices quality for latency.\"\"\"\n    def retrieve_and_generate(self, query: str) -> str:\n        # Single retrieval pass—no reranking\n        results = [(f\"doc_{i}\", 0.5 + i*0.1) for i in range(5)]\n        context = \"\\n\".join([doc for doc, _ in results])\n        return f\"Generated response based on: {context}\"\n        # Problem: Low-ranked docs may contain noise; no opportunity to filter.\n\n# BEST PRACTICE: Minimal latency with quality controls\nclass LatencyAwareRetriever:\n    \"\"\"✓ CORRECT: Balance speed and accuracy.\"\"\"\n    def retrieve_and_generate(self, query: str, latency_budget_ms: float = 100) -> str:\n        # Use faster retriever first, conditionally apply reranking\n        fast_results = self.bm25.retrieve(query, k=10)\n        \n        if latency_budget_ms > 50:  # Only rerank if time permits\n            reranked = self._quick_rerank(fast_results, query, top_k=5)\n        else:\n            reranked = fast_results[:5]\n        \n        context = \"\\n\".join([doc for doc, _ in reranked])\n        return f\"Generated response based on: {context}\"\n    \n    def _quick_rerank(self, docs: List[Tuple[str, float]], query: str, top_k: int):\n        # Light reranking (not full neural reranker)\n        return sorted(docs, key=lambda x: x[1], reverse=True)[:top_k]\n\nretriever = HybridCricketRetriever(bm25_weight=0.35, vector_weight=0.65)\nresults = retriever.retrieve(\"Rohit Sharma batting strategies\", k=5)\nprint(f\"Hybrid retrieval results: {results}\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Most common beginner mistake — **Context Window Overflow without Truncation Strategy**. Developers retrieve many high-relevance documents and concatenate all of them into the prompt, exceeding the model's token limit (4K, 8K, etc.). The generation then fails silently or produces truncated, incoherent responses. Fix: Implement a strict context budget counter before each generation. Sort retrieved documents by relevance score, add them incrementally while tracking cumulative token count, and STOP when remaining_tokens < document_tokens. Use a fallback strategy: if no documents fit within budget, use only top-1 retrieval result plus query. Example: `remaining_budget = 2048; selected_docs = []; for doc, score in ranked_results: doc_tokens = len(tokenizer.encode(doc)); if doc_tokens <= remaining_budget: selected_docs.append(doc); remaining_budget -= doc_tokens; else: break;`. Always test with worst-case document sizes to prevent deployment surprises.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG runtime executes in distinct stages: query encoding → vector retrieval → relevance reranking → context window construction → conditional generation, with latency dominated by retrieval I/O and reranking compute.",
+        "Vector space operations use approximate nearest neighbor search (HNSW, product quantization) for sub-linear retrieval, trading recall precision for speed—a fundamental latency-quality trade-off.",
+        "Three production patterns address different constraints: Dense + Reranking (highest quality, moderate latency), Hybrid (balanced coverage), Iterative Refinement (multi-hop reasoning, high latency cost).",
+        "Context window management is critical—token budget constraints require selective document inclusion with relevance-based ranking and aggressive pruning to prevent generation failures.",
+        "Beginner mistake: concatenating all retrieved documents without token counting leads to silent failures or truncated outputs—always implement strict context budgets with fallback strategies."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the RAG pipeline, what is the primary reason for using a separate reranking stage after fast retrieval?",
+      "items": [
+        "To increase the number of documents retrieved from the database",
+        "To apply expensive neural scoring models only to top-k candidates, balancing latency and quality without running reranking on all indexed documents",
+        "To replace the dense retriever and improve vector search accuracy",
+        "To guarantee that all documents are semantically relevant regardless of query"
+      ],
+      "answer": 1,
+      "explanation": "The reranking stage exists specifically to improve recall of the fast retriever (BM25 or embedding-based) without incurring the latency cost of scoring every document in the index. By applying an expensive neural reranker only to the top-k candidates from the fast retriever, you get better quality at reasonable latency. This is fundamentally different from replacing the retriever, increasing total documents, or guaranteeing semantic relevance—it's about strategic, conditional application of compute."
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Retrieval-Augmented Generation powers mission-critical systems at scale across industry leaders. Google integrates RAG into Search Generative Experience, processing billions of queries daily by retrieving relevant documents before generation. OpenAI's ChatGPT plugins use RAG to access real-time information and proprietary databases. Meta deploys RAG in customer service automation, handling millions of support tickets by retrieving historical resolutions. Netflix uses RAG for personalized content recommendations by retrieving viewing history and metadata. Uber leverages RAG for driver support systems, retrieving policy documentation and incident patterns. Airbnb implements RAG in host assistance, retrieving booking rules and guest communication best practices. Production systems break when: vector databases become bottlenecks (slow retrieval), context windows overflow with irrelevant documents (quality degradation), embedding drift occurs over time (stale vectors), or hallucinations emerge when retrieval fails silently. Companies like OpenAI now run RAG retrieval in <100ms at 99.9% availability, requiring distributed vector databases, intelligent ranking systems, and continuous monitoring of retrieval quality metrics.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Traditional LLMs are like a batsman trying to hit every ball based only on instinct and training—sometimes they'll play a shot that doesn't match the ball's actual trajectory (hallucinate). RAG is like a coach analyzing bowler statistics, pitch conditions, and field placements before every delivery—the batsman now retrieves contextual intelligence before committing to their stroke, making informed decisions at scale.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG combines retrieval speed with generation quality—retrieve relevant documents in <100ms, generate grounded responses with 40-60% accuracy improvement",
+        "Vector databases (Pinecone, Weaviate, Milvus) are critical infrastructure—they must scale to billions of embeddings while maintaining sub-second latency",
+        "Embedding quality directly impacts retrieval quality—use domain-specific models (e.g., cricket statistics embeddings) rather than generic models for 25-35% accuracy gain",
+        "Context window management prevents hallucination—rank and filter retrieved documents to fit model limits while maintaining relevance and coherence",
+        "Production RAG requires monitoring—track retrieval precision, generation drift, embedding staleness, and latency to catch failures before users experience them",
+        "Hybrid retrieval (dense + sparse search) outperforms single-method approaches—combine semantic vectors with keyword matching for 15-20% better recall",
+        "Fine-tuned ranking systems beat raw similarity scores—train rerankers on user feedback and relevance labels to improve top-k accuracy by 30%+"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}

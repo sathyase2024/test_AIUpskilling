@@ -1,0 +1,169 @@
+{
+  "lessonId": "retrieval-augmented-generation-16",
+  "title": "Handling Conflicting and Contradictory Documents",
+  "type": "reading",
+  "topicName": "Retrieval-Augmented Generation",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Retrieval-Augmented Generation (RAG) at scale introduces critical architectural challenges that traditional LLM pipelines do not address. When an LLM generates responses using only its training data, it suffers from hallucinations, stale information, and an inability to access proprietary or real-time knowledge. As RAG systems grow to process millions of queries across terabytes of document collections, the retrieval component becomes a sophisticated bottleneck. Advanced RAG architectures must solve multi-hop retrieval (finding documents that answer complex questions requiring synthesis across multiple sources), rank aggregation (when multiple retrievers produce contradictory results), and latency optimization under query load. Furthermore, the feedback loop between retrieved context and generation quality creates a non-trivial problem: poorly ranked retrieval results poison the generation, yet measuring whether a generation is 'correct' requires human annotation or expensive evaluations. This lesson focuses on the engineering patterns, ranking algorithms, and feedback mechanisms that transform RAG from a conceptual idea into a production system capable of handling enterprise knowledge bases while maintaining sub-second response times and factual accuracy.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli facing a bowler in an ODI final. Before each delivery, his support staff needs to retrieve the latest information about that specific bowler's performance in the last five overs, the field placement analysis from DRS reviews, and the match situation statistics—all within 2 seconds. Without this real-time data retrieval, Kohli must rely only on his pre-match preparation, which is now outdated. The retrieval system is analogous to the support staff feeding him crucial context; the generation is Kohli's shot selection based on that context. Just as a support staff member might pull contradictory information (one spotter says the bowler is tiring, another says the reverse based on recent pace readings), a RAG system must reconcile conflicting retrieved documents and rank which sources are most trustworthy for this specific decision. The feedback loop occurs when Kohli's shot choice (generation) reveals whether the retrieved context was accurate—if he gets out after being told the bowler was exhausted, the retrieval ranking was fundamentally wrong. This highlights why RAG systems need sophisticated ranking mechanisms: poor retrieval context leads directly to poor generation, just as misleading field intelligence leads directly to poor batting decisions.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Dense Vector Retrieval and Multi-Stage Ranking",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Modern RAG systems abandon keyword-based BM25 retrieval in favor of dense vector embeddings, where both queries and documents are encoded into high-dimensional vector spaces using transformer models like BERT or specialized retrievers such as ColBERT and DPR (Dense Passage Retriever). The retrieval process occurs in stages: a fast, approximate nearest-neighbor search (using HNSW or IVF indices) retrieves top-k candidates in milliseconds, then a second-stage cross-encoder re-ranks these candidates by computing the relevance score between the query and each candidate document directly. This two-stage approach is crucial because the initial retriever, optimized for speed over accuracy, may rank relevant documents outside the top-k. The cross-encoder, though computationally expensive, is applied only to the smaller set of re-ranked candidates, making it feasible. Furthermore, ensemble retrieval—combining signals from multiple retrievers (dense retrieval, BM25, and query expansion)—improves coverage for edge cases where a single retriever fails. The ranking quality directly determines downstream generation quality: a document ranked at position 3 instead of position 1 may be deprioritized by attention mechanisms in the LLM, even if both documents are retrieved.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider a cricket analytics team preparing for England's tour of India. Stage one is like the initial scouting: analysts use a fast heuristic process to identify the 50 most relevant match videos from 10 years of data—those where English batsmen faced left-arm spinners on turning pitches similar to the upcoming surface. This initial retrieval is quick but imperfect; some crucial footage might be ranked 60th. Stage two is the expert review: the head coach (cross-encoder) personally watches only the top 50 videos and re-ranks them by assigning a detailed relevance score based on how precisely each video matches the specific opposition bowler, pitch condition, and match context. The coach reorders the list, moving a video from rank 45 to rank 1 because it shows the exact left-arm spinner they'll face, even though the automated system had missed its significance. Ensemble retrieval mirrors having three separate scouts (one analyzing pace variations, one analyzing field placement history, one analyzing weather patterns) whose insights are combined to form the final list. The parallel reveals that a single ranking metric is insufficient; specialized, computationally intensive analysis on a smaller, pre-filtered set outperforms naive ranking across the entire dataset.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Context Window Management and Token Budgeting",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "LLMs have finite context windows (commonly 4K-128K tokens depending on the model). In RAG systems, the context is partitioned between retrieved documents and the user query, leaving a remaining budget for generation. If 10 documents are retrieved as context, they may consume 80% of the available tokens, leaving insufficient space for the LLM to reason and generate a detailed response. Token budgeting—algorithmically deciding how many documents to retrieve and how to compress or summarize them—is therefore a critical tuning parameter. Beyond simple document truncation, advanced systems employ hierarchical retrieval: the initial retrieval returns full documents, but a summarization stage (via extractive or abstractive methods) compresses each document to its most relevant sentences before concatenation. This reduces token consumption while preserving critical information. Additionally, the order of document insertion into the prompt affects generation quality due to position bias: LLMs tend to weight information appearing at the beginning and end of the context more heavily than middle content (the \"lost in the middle\" problem). Consequently, RAG systems reorder retrieved documents to place the highest-ranked documents at the prompt boundaries, not in the middle, ensuring the most relevant context influences generation most strongly.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Rohit Sharma's coaching staff prepares a pre-match briefing document for an innings, but they only have 15 minutes to present (the context window). If they attempt to read all 200 pages of detailed opposition analysis, they'll run out of time before Rohit has time to strategize (generate a game plan). Token budgeting is like the assistant coach deciding to include only the most critical 5 pages: opposition fast bowlers' average bounce patterns, recent form statistics, and field placement preferences against left-handers. The hierarchical retrieval mirrors how the assistant coach summarizes each of 10 opposition bowlers' spells—instead of recounting every ball from every match, the coach extracts the key insight: \"This bowler bowls short at 145 kmph in the first over but slows to 138 kmph in death overs.\" Position bias is reflected in how a coach presents information: if the crucial detail \"This bowler has a weakness outside off-stump\" is buried in page 12 of the briefing, Rohit's attention flags and he forgets it by the time he walks to the crease. Instead, it's repeated at the beginning and end. This teaches us that information retrieval and generation are not independent: the quality of what you retrieve and how you present it directly shapes the quality of the final output.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Query Reformulation and Multi-Hop Reasoning",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Complex user queries often require information from multiple documents that do not directly share surface-level term overlap. For example, \"How did the COVID-19 pandemic affect semiconductor supply chains?\" requires synthesizing documents about pandemic lockdowns, semiconductor factory locations, and supply chain logistics—none of which may mention all three topics together. Query reformulation addresses this by transforming the user's natural language query into a series of sub-queries or intermediate retrieval goals. Techniques include query expansion (adding synonyms and related concepts), hypothetical document embeddings (HyDE), and multi-step reasoning chains where the LLM itself generates intermediate queries to guide retrieval. Multi-hop retrieval then iteratively retrieves documents using these reformulated queries. The first retrieval might return documents about pandemic lockdowns; the LLM reasons over this context and generates a second query like \"semiconductor fabs geographic distribution\", triggering a second retrieval phase. This chaining process, though increasing latency, dramatically improves the system's ability to answer questions requiring cross-domain synthesis. State-of-the-art systems employ learned query reformulation models, trained end-to-end with the retriever and generator to optimize for downstream answer quality rather than optimizing each component independently.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider an analyst preparing a post-match report to answer: \"Why did India's bowling strategy fail against Australia's aggressive batting?\" This question requires information from three separate documents: Australia's recent batting statistics against left-arm fast bowlers, India's available bowling lineup and their recent form, and the specific pitch characteristics of the venue. A single naive retrieval for \"India Australia bowling strategy\" might miss crucial documents. Instead, the analyst reformulates the original question into three sub-queries: (1) \"Australia batting aggression metrics against left-arm bowlers\", (2) \"India's fast bowling performance statistics recent matches\", (3) \"MCG pitch characteristics and bounce patterns\". The first retrieval returns documents about Australia's powerful batting unit; the analyst reasons over this context and formulates the second query. From the second set of documents, the analyst learns that India was missing their primary pace bowler to injury, which triggers a third query about contingency bowlers. This multi-hop chain—query → retrieval → reasoning → new query → retrieval—mirrors how human analysts break down complex questions into answerable sub-problems. The analogy reveals why naive single-stage retrieval fails for complex questions: the user's question is expressed in natural language that doesn't match the vocabulary of all relevant documents, requiring intermediate reasoning steps to bridge the gap.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Relevance Feedback and Iterative Ranking Refinement",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In interactive RAG systems, user feedback on the quality of generated responses can be leveraged to improve future retrievals. When a user marks a generated response as incorrect or irrelevant, the system can analyze which retrieved documents were responsible and adjust ranking weights accordingly. This creates a feedback loop where the retriever learns from failed retrieval decisions. Techniques include pseudo-relevance feedback (automatically assuming the top-ranked documents are relevant and using them to reformulate the query) and explicit relevance feedback (users explicitly mark which retrieved documents were helpful). At scale, this feedback is collected across millions of queries, forming a training signal for fine-tuning retrieval models or adjusting ensemble weights. However, relevance feedback introduces complications: a document marked as \"irrelevant\" by one user may actually be relevant for a different interpretation of the same query, creating label noise. Additionally, feedback is sparse—only a small fraction of queries generate user feedback—requiring careful handling of sparse, noisy signals. Modern systems employ online learning frameworks where the retriever is continuously fine-tuned on incoming feedback without requiring batch retraining, enabling real-time adaptation to domain shifts or emerging query patterns in production.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: After each match, the Indian cricket team reviews whether the bowling strategy successfully executed the game plan. If the team learns that their initial strategy (\"attack the batsman aggressively\") led to loose deliveries and sixes, they feed this feedback into preparation for the next match. The coach adjusts the weighting of strategies: aggressive bowling now has lower weight, while line-and-length bowling has higher weight. This is relevance feedback—the match outcome teaches the team which strategic decisions were effective. Pseudo-relevance feedback mirrors the coach assuming that whichever bowlers took the most wickets must have deployed the best strategy, and copying aspects of their approach without explicitly analyzing performance data. In a series against the same opposition, iterative feedback refines the strategy: Match 1 reveals the opposition's weakness to short-pitch bowling, so Match 2's retrieval of bowling tactics prioritizes that approach higher. However, this feedback is noisy: one batsman's weakness to short-pitch is not the entire opposition's weakness, creating label noise. The parallel teaches us that learning systems require continuous feedback integration, but feedback is inherently noisy and requires careful statistical handling to avoid overfitting to outliers.",
+      "language": "text",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom typing import List, Dict, Tuple\nfrom dataclasses import dataclass\nfrom enum import Enum\n\n@dataclass\nclass CricketMatch:\n    \"\"\"Represents a cricket match with metadata.\"\"\"\n    match_id: str\n    opposition: str\n    venue: str\n    match_type: str  # 'ODI', 'T20', 'Test'\n    date: str\n\n@dataclass\nclass RetrievedDocument:\n    \"\"\"Represents a retrieved document with relevance scores.\"\"\"\n    doc_id: str\n    content: str\n    initial_score: float  # Score from dense retriever (0-1)\n    reranked_score: float  # Score from cross-encoder (0-1)\n    token_count: int\n    rank: int\n\n@dataclass\nclass QueryReformulation:\n    \"\"\"Stores original query and reformulated sub-queries for multi-hop retrieval.\"\"\"\n    original_query: str\n    sub_queries: List[str]\n    hop_number: int\n\nclass RAGRankingStrategy(Enum):\n    \"\"\"Enum for different ranking strategies.\"\"\"\n    DENSE_ONLY = \"dense_only\"\n    TWO_STAGE = \"two_stage\"\n    ENSEMBLE = \"ensemble\"\n\nclass AdvancedRAGPipeline:\n    \"\"\"\n    Production RAG system demonstrating multi-stage ranking, context management,\n    query reformulation, and feedback integration.\n    \"\"\"\n    \n    def __init__(self",
+      "context_window": "int = 8000",
+      "strategy": "RAGRankingStrategy = RAGRankingStrategy.TWO_STAGE):\n        self.context_window = context_window\n        self.strategy = strategy\n        self.feedback_log: List[Dict] = []  # Stores user feedback for iterative refinement\n        self.ranking_weights = {\"dense\": 1.0, \"bm25\": 0.7, \"expansion\": 0.5}\n    \n    def dense_retrieval(self",
+      "query": "str",
+      "documents": "List[Dict]",
+      "top_k": "int = 20) -> List[RetrievedDocument]:\n        \"\"\"\n        Stage 1: Fast dense vector retrieval using approximate nearest neighbors.\n        Simulates HNSW or IVF-based retrieval.\n        \"\"\"\n        # Simulate embedding similarity scores\n        retrieved = []\n        for idx, doc in enumerate(documents):\n            # Simple similarity metric: fraction of query terms in document\n            query_terms = set(query.lower().split())\n            doc_terms = set(doc[\"content\"].lower().split())\n            similarity = len(query_terms & doc_terms) / max(len(query_terms), 1)\n            \n            retrieved.append(RetrievedDocument(\n                doc_id=doc[\"id\"],\n                content=doc[\"content\"],\n                initial_score=similarity,\n                reranked_score=0.0,  # Will be set in reranking stage\n                token_count=len(doc[\"content\"].split()),\n                rank=0  # Will be set after sorting\n            ))\n        \n        # Sort by initial score and keep top-k\n        retrieved.sort(key=lambda x: x.initial_score, reverse=True)\n        for i, doc in enumerate(retrieved[:top_k]):\n            doc.rank = i + 1\n        \n        return retrieved[:top_k]\n    \n    def cross_encoder_reranking(self",
+      "language": "",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}

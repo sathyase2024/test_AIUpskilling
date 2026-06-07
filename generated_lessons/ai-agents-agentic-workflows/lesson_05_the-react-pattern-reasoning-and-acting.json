@@ -1,0 +1,166 @@
+{
+  "lessonId": "ai-agents-agentic-workflows-05",
+  "title": "The ReAct Pattern: Reasoning and Acting",
+  "type": "reading",
+  "topicName": "AI Agents & Agentic Workflows",
+  "estimatedMinutes": 35,
+  "xpReward": 75,
+  "generated": true,
+  "sections": [
+    {
+      "type": "heading",
+      "content": "Overview",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "In Lesson 6, we advance beyond the foundational agent architectures and explore the critical mechanisms that enable agents to operate reliably at scale: state management, recursive planning, tool composition, and failure recovery. Modern AI agents in production (such as those deployed by OpenAI, Anthropic, and Google DeepMind) must maintain consistent internal state across multiple planning horizons, dynamically compose complex workflows from simpler tools, and gracefully degrade when intermediate steps fail. Without robust state management, an agent may repeat actions or lose context mid-execution. Without recursive planning, agents cannot break down multi-step problems into hierarchical sub-tasks. Without proper tool composition semantics, agents either fail to reuse existing capabilities or create rigid, unmaintainable workflows. This lesson addresses the architectural patterns that enable production-grade agentic systems to handle real-world complexity: how state transitions are tracked, how planning goals are refined recursively, how tools are discovered and invoked compositionally, and how failure modes are anticipated and mitigated through explicit error handling and fallback strategies.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider a Test match between India and Australia where Virat Kohli leads the team through a five-day encounter. On Day 1, Rohit Sharma plays an opening partnership with Shubman Gill, building context (the state) of pitch behavior, field placements, and bowler strategies. As conditions evolve—new bowlers replace tired ones, the pitch deteriorates, weather changes—Kohli must recursively plan India's innings strategy: first, establish the powerplay approach (aggressive batting), then consolidate the middle overs (steady accumulation), then accelerate late in the day (aggressive closing). Similarly, an AI agent maintains state (current facts, past actions, goals achieved) across its execution timeline, like how Kohli remembers that Jasprit Bumrah's economy rate was 2.1 in the last over and adjusts the batting approach accordingly. The agent recursively decomposes \"win the match\" into \"bat 500+ runs\" then \"score 80+ in the first session\" then \"rotate strike against Cummins.\" Each tool (a specific batting technique, a particular field rotation tactic) is composed together—Kohli instructs Gill to play defensively against Mitchell Starc's short-pitched deliveries while Rohit targets Nathan Lyon's off-spinners. When Gill gets out unexpectedly (a failure), Kohli doesn't abandon the innings; instead, he immediately re-plans with Cheteshwar Pujara as the new middle-order anchor. This reveals why state management, recursive planning, and tool composition are inseparable: an agent operating in real-world complexity must remember what has been tried, break large problems into nested sub-problems, seamlessly switch between different capabilities based on context, and recover from setbacks by replanning rather than starting fresh.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Core Concepts",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "State Management and Context Persistence",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "State management in AI agents refers to the systematic tracking and persistence of the agent's knowledge, beliefs, and execution history across multiple planning steps and tool invocations. In production systems, state is typically organized into several layers: the observation state (what the agent has directly perceived or retrieved from external systems), the belief state (what the agent infers about the world given the observations), the goal state (what objectives remain unsatisfied), and the execution state (which actions have been attempted, their outcomes, and the current step in a plan). Without explicit state management, agents suffer from hallucination (inventing facts that contradict prior observations), infinite loops (retrying the same failed action because the failure was not recorded), or goal drift (losing sight of the original objective mid-execution). Modern frameworks like LangChain, AutoGen, and Claude's API support state via conversation memory (implicit, using message history) or explicit state stores (Redis, DynamoDB, graph databases) that maintain structured facts, action logs, and dependency tracking. The key challenge at scale is consistency: if an agent modifies state during planning but a tool invocation fails, the state must either rollback to the prior consistent snapshot or record the partial failure explicitly so subsequent actions can account for it. This is analogous to database transactions in distributed systems—agents must provide ACID-like guarantees or at least clearly communicate the consistency model to downstream consumers of the agent's output.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Jasprit Bumrah leading India's bowling attack across a three-day Test match. Bumrah must maintain precise state: he knows he has bowled 15 overs so far (execution state), his economy rate is 2.3 (observation state), the ball is reversing in the last hour (belief state about pitch conditions), and his objective is to take 2 more wickets before stumps (goal state). When Bumrah is taken off for a short break, he records his figures, the batsmen's weaknesses he has discovered (right-hander struggles against short-pitched deliveries), and the field adjustments that worked—this is state persistence. When he returns to bowl in the evening session, he doesn't restart from scratch; he immediately recalls that the left-hander got out to a yorker, so he repeats that line against the new batsman. This explicit memory prevents Bumrah from wasting overs on bowling strategies that failed earlier. Similarly, an AI agent persists its state: \"I already checked the database and found 3 matches—don't query again.\" \"I tried calling the email tool and it returned rate-limit error at 3:45pm—use exponential backoff before retrying.\" \"The user's primary goal is cost reduction; don't suggest expensive solutions.\" Each state layer mirrors a cricket reality: observations are scorecard facts, beliefs are tactical inferences (\"the bowler is tiring\"), goals are match objectives, and execution state is the sequence of deliveries bowled. This reveals that state management is not peripheral bookkeeping—it is the agent's memory, and without it, an agent is perpetually learning the same lessons and making the same mistakes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Recursive Planning and Hierarchical Goal Decomposition",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Recursive planning is the process by which an AI agent breaks down a high-level goal into progressively smaller, more concrete sub-goals until each sub-goal can be directly executed by a single tool or primitive action. This hierarchical decomposition is essential because real-world problems are rarely solvable in a single step. For example, the goal \"analyze quarterly sales trends and recommend pricing adjustments\" cannot be executed by a single tool; it must decompose into sub-goals: \"retrieve sales data from the last four quarters,\" \"compute growth rates and seasonality,\" \"identify outliers and anomalies,\" \"evaluate competitor pricing,\" then \"synthesize recommendations.\" Each of these sub-goals may further decompose. Recursive planning enables agent architectures like hierarchical task network (HTN) planning, which is used in systems like STRIPS-based planners and modern LLM-based agents with tool-use prompting. The recursion is bounded by termination conditions: when a sub-goal is sufficiently concrete (e.g., \"call the database fetch tool\") or when computational depth reaches a limit. A critical aspect is plan refinement: as the agent executes, it may discover that an assumption underlying a sub-goal is false (e.g., \"the database is unavailable\"), requiring dynamic re-planning at that level rather than abandoning the entire plan. Recursive planning also enables abstraction: a high-level planner focuses on goal structure without knowing implementation details, while a low-level planner binds concrete tools to abstract actions. This separation of concerns makes agents maintainable: you can change how a sub-goal is achieved (swap tools) without rewriting the entire plan hierarchy.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider a cricket team's approach to winning a T20 match against the West Indies. The head coach Rahul Dravid defines the top-level goal: \"win by 15+ runs.\" This immediately decomposes into two recursive sub-goals: \"score 180+ runs in batting\" and \"restrict opposition to under 165 runs in bowling.\" The batting sub-goal further breaks down: \"score 50+ in the powerplay (overs 1-6),\" \"steady accumulation in middle overs (7-16),\" and \"aggressive acceleration in death overs (17-20).\" The powerplay sub-goal itself decomposes into concrete actions: \"Rohit and Gill play out Alzarri Joseph's pace bowling defensively,\" \"target Romario Shepherd's off-spinners for boundaries,\" \"rotate strike against short-pitched deliveries.\" Each action is now specific enough for the opening batsmen to execute without further decomposition. The bowling side mirrors this: the goal \"restrict to under 165\" decomposes into \"maintain economy under 8 runs per over\" which further breaks into \"Bumrah bowls 4 overs with 1.8 economy,\" \"Axar Patel delivers 4 overs with 7.5 economy,\" \"death bowling plan: yorkers and slower balls.\" As the match unfolds, if Gill gets out early, the plan must dynamically re-plan: the powerplay sub-goal becomes \"Pujara and Rohit now target 40 runs instead of 50 to allow Kohli recovery time,\" adapting the hierarchy without abandoning the top-level goal. This reveals that recursive planning mirrors cricket's natural coaching workflow: teams don't decide a single action for 20 overs; they decompose the match into phases, each phase into smaller tactical chunks, and each chunk into specific player instructions, while remaining flexible when reality diverges from the plan.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Tool Composition and Capability Chaining",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Tool composition refers to the systematic ability of an agent to chain multiple tools together such that the output of one tool becomes the input to another, and the entire composition appears to the agent as a single reusable capability. In production AI systems, tools are granular: \"fetch data from database,\" \"parse JSON,\" \"call a REST API,\" \"invoke an LLM,\" \"send email,\" etc. Composing tools means that an agent can perform high-level tasks (e.g., \"send a personalized report to all stakeholders\") by invoking a composition of lower-level tools (fetch stakeholder list → filter by role → generate report content → format with logos → send via email). Tool composition is enabled by explicit interfaces: each tool declares its input schema (what arguments it accepts), output schema (what it returns), and pre/post-conditions (when it can be called, what state it expects). This enables agents to reason about compatibility: can tool A's output directly feed into tool B's input? Do intermediate transformation steps need to be inserted? Modern frameworks like LangChain use tool composition through chains (sequential execution), branches (conditional execution), and loops (iterative execution). A critical sophistication is semantic tool discovery: given an agent's goal, which tools should be composed? This is typically solved via embedding-based retrieval (convert goal to embedding, find tools with similar embeddings) or via explicit tool registries with semantic descriptions. Tool composition also requires error handling: if a tool in a composition fails, what should the agent do? Retry just that tool? Backtrack and try a different composition? Roll forward with a sensible default? Well-designed tool interfaces include explicit failure modes and recovery suggestions, enabling agents to compose not just success paths but also intelligent failure handling.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider how a modern T20 team composes batting tactics. The team has a library of fundamental tools: \"play defensive forward defense against pace,\" \"advance down the pitch against spinners,\" \"late cut against short deliveries,\" \"pull shot against short-pitched fast bowling,\" and \"rotate strike via singles.\" A batter like Virat Kohli composes these tools into more complex, situation-dependent capabilities. Against Mitchell Starc's opening spell, Kohli chains: (1) play defensive forward defense for the first two deliveries (builds context, understanding pace and bounce), (2) advance down the pitch against expected slower ball (increases strike rate), (3) if successful, follow with late cut against the fourth delivery (consolidates the advantage). The output of tool 1 (understanding Starc's line) becomes input to tool 2 (deciding to advance), which informs tool 3 (tactical shot selection). This is composition. Meanwhile, against Nathan Lyon's off-spin bowling, Kohli composes a different chain: (1) rotate strike with pushes into gaps (safe, builds dot percentage), (2) if a full toss appears, dispatch it over mid-on (reward boundary). The interface of each tool is well-defined: \"defensive forward defense requires front foot movement; expects pace bowling; outputs: safe passage or caught on boundary.\" If Kohli attempts to play a pull shot (tool) against a spinner (incompatible input), the tool fails—he gets stumped or bowled. Kohli learns the tool composition rules and doesn't attempt invalid combinations. When a composition fails (Starc bowls a yorker, breaking through the defensive forward defense), Kohli has fallback compositions ready: switch to aggressive stance, change batting position, or ask the non-striker to take more strike. This demonstrates that tool composition in cricket (and in AI agents) is not mechanical chaining; it is intelligent sequencing where each tool's output informs the next tool's selection, interfaces encode pre-conditions and post-conditions, and failure in a composition triggers tactical re-planning.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Failure Recovery and Backtracking Strategies",
+      "level": 3,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Failure recovery and backtracking are the mechanisms by which an agent gracefully handles situations where an attempted action does not produce the expected outcome. In deterministic systems, failures are usually data errors (invalid input format) or system errors (service unavailable). In agentic systems operating in open-world environments, failures are more nuanced: a tool may succeed technically (returns HTTP 200) but produce an unexpected result (the database query returned no rows when rows were expected). The agent must distinguish between recoverable failures (retry with different parameters, try an alternative tool, backtrack to a prior decision point and pursue a different plan branch) and unrecoverable failures (goal is impossible given current constraints, must fail fast and report to user). Backtracking is the process of unwinding recent decisions and returning to a prior state from which a different path can be explored. In classical planning (e.g., STRIPS, GraphPlan), backtracking is the core search mechanism: the planner explores a branch of the plan space, and if it hits a dead-end (no further actions can achieve a goal), it backtracks to the most recent choice point and tries an alternative. In modern LLM-based agents, backtracking is typically implicit: the agent re-plans from scratch or from the most recent consistent state. Explicit backtracking strategies include: (1) depth-bounded backtracking (only backtrack N steps, then fail), (2) breadth-first exploration (maintain multiple plan branches in parallel), (3) heuristic backtracking (prioritize branches that appear to have higher probability of success), and (4) human-in-the-loop backtracking (escalate to a human when backtracking options are exhausted). Production systems often combine multiple strategies: attempt recovery at the task level, fall back to backtracking at the plan level, and escalate to human operators at the mission level. The key challenge is avoiding infinite loops—if the agent backtracks to the same state and tries the same action, it will fail again. This requires explicit loop detection (record visited states and transitions) and forced exploration of new actions when loops are detected.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Consider a chase scenario in a One-Day International where India needs 280 runs off 50 overs, and the captain Rohit Sharma must manage batsmen through failures and recoveries. When the opening pair of Rohit and Shubman Gill faces Pakistan's Shaheen Shah Afridi in the powerplay, their plan is to accumulate 50 runs. Gill plays an attempted drive against a full delivery but edges it through the slips for 4 runs—unplanned success. The next ball, Gill is bowled by an in-swinger; plan failure. This is a recoverable failure: India backtracks to the prior plan state (powerplay target of 50 runs is still valid) but must re-plan the execution: Pujara comes in (alternative tool) and takes a different approach—leaving deliveries rather than driving. Pakistan's bowlers shift tactics, and Pujara's new strategy pays off. However, if three wickets fall in rapid succession and India is reduced to 50/3 after 10 overs, the original plan (chase 280 calmly) has hit an unrecoverable state; Kohli must wholesale backtrack to a prior strategic choice point and adopt a new mission: \"swing aggressive from the start\" rather than \"steady accumulation.\" Rohit's explicit loop detection prevents repeated failure: he notices that Afridi's short-pitched deliveries are causing edges; he doesn't keep attempting to drive; instead, he uses an explicit new strategy—hook shots and pull shots. When Kohli arrives at the crease, he maintains a backtracking depth limit: if the chase requires more than 15+ runs per over with 20 overs left, backtracking to a steady approach will not help; he commits to aggressive batting (cutting losses, accelerating forward). This reveals that failure recovery is not about trying the same action harder; it is about recognizing when a plan branch has failed, efficiently backtracking to a decision point, and pursuing an alternative path with explicit tracking to avoid repeating the same failure.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "language": "python",
+      "content": "import json\nfrom dataclasses import dataclass, field\nfrom typing import Any, Dict, List, Optional, Callable\nfrom enum import Enum\nfrom datetime import datetime\nimport hashlib\n\n# ============================================================================\n# STATE MANAGEMENT & CONTEXT PERSISTENCE\n# ============================================================================\n\nclass ExecutionPhase(Enum):\n    PLANNING = \"planning\"\n    EXECUTING = \"executing\"\n    RECOVERING = \"recovering\"\n    COMPLETED = \"completed\"\n\n@dataclass\nclass AgentState:\n    \"\"\"Represents the complete state of an agentic workflow.\"\"\"\n    agent_id: str\n    observations: Dict[str, Any] = field(default_factory=dict)\n    beliefs: Dict[str, Any] = field(default_factory=dict)\n    goals: List[str] = field(default_factory=list)\n    current_goal_index: int = 0\n    execution_history: List[Dict[str, Any]] = field(default_factory=list)\n    phase: ExecutionPhase = ExecutionPhase.PLANNING\n    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())\n    \n    def record_observation(self",
+      "key": "str",
+      "value": "Any):\n        \"\"\"Persist an observation (ground truth from external world).\"\"\"\n        self.observations[key] = value\n        self.timestamp = datetime.now().isoformat()\n    \n    def record_belief(self",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    }
+  ]
+}

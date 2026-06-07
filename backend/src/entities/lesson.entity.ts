@@ -6,10 +6,12 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Topic } from './topic.entity';
 
 @Entity('lessons')
+@Index(['topicId'])
 export class Lesson {
   @PrimaryGeneratedColumn('uuid')
   id: string;

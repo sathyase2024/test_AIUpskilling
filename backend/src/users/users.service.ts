@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
@@ -33,7 +33,7 @@ export class UsersService {
 
   async update(userId: string, data: { name?: string; hobbies?: string[] }): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundException('User not found');
     if (data.name !== undefined) user.name = data.name;
     if (data.hobbies !== undefined) user.hobbies = data.hobbies;
     return this.userRepo.save(user);
@@ -41,7 +41,7 @@ export class UsersService {
 
   async getStats(userId: string): Promise<Record<string, any>> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundException('User not found');
     return {
       xp: user.xp,
       level: user.level,
@@ -53,7 +53,7 @@ export class UsersService {
 
   async addXp(userId: string, xp: number): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundException('User not found');
     user.xp = (user.xp || 0) + xp;
     user.level = Math.floor(user.xp / 1000) + 1;
     return this.userRepo.save(user);
@@ -61,7 +61,7 @@ export class UsersService {
 
   async updateStreak(userId: string, streak: number): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundException('User not found');
     user.streak = streak;
     user.lastActiveAt = new Date();
     return this.userRepo.save(user);
