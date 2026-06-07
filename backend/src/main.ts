@@ -2,8 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import cookieParser = require('cookie-parser');
-import helmet from 'helmet';
 
 async function bootstrap() {
   const jwtSecret = process.env.JWT_SECRET ?? '';
@@ -14,10 +12,6 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
   const logger = new Logger('Bootstrap');
-
-  // ── Security headers ──────────────────────────────────────────────────────────
-  app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(cookieParser());
 
   // ── No-cache middleware — API responses must never be cached ─────────────────
   app.use((_req: any, res: any, next: any) => {
@@ -48,7 +42,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // ── Swagger / OpenAPI ──────────────────────────────────────────────────────────
+  // ── Swagger / OpenAPI ─────────────────────────────────────────────────────────
   const config = new DocumentBuilder()
     .setTitle('SkillForge AI API')
     .setDescription('AI-powered upskilling platform — REST API')
