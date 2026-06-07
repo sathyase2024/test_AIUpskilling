@@ -218,8 +218,13 @@ export class LearningPathsService implements OnApplicationBootstrap {
     private topicRepo: Repository<Topic>,
   ) {}
 
-  async onApplicationBootstrap() {
-    await this.upsertPaths();
+  onApplicationBootstrap() {
+    // Defer so the HTTP server binds and health checks pass before seeding starts
+    setTimeout(() => {
+      this.upsertPaths().catch((err) =>
+        console.error(`[LearningPaths] Seeder failed: ${err.message}`),
+      );
+    }, 12_000); // 4 s after TopicsService seeder starts
   }
 
   async upsertPaths() {

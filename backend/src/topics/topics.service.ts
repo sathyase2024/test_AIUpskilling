@@ -127,14 +127,29 @@ export class TopicsService implements OnApplicationBootstrap {
     @InjectRepository(Lesson) private lessonRepo: Repository<Lesson>,
   ) {}
 
-  async onApplicationBootstrap() {
+  onApplicationBootstrap() {
+    // Defer all seeding so the HTTP server is already accepting requests
+    // (and health checks are passing) before any heavy DB/file work starts.
+    setTimeout(() => {
+      this.runSeeders().catch((err) =>
+        this.logger.error(`Seeder failed: ${err.message}`),
+      );
+    }, 8_000);
+  }
+
+  private async runSeeders() {
     const count = await this.topicRepo.count();
     if (count === 0) await this.seedMissing();
-    // Idempotent — only inserts slugs that don't already exist.
     await this.seedGeneratedLessons();
   }
 
   async seedMissing() {
+    // One count check — if all topics are already there, skip all per-slug queries
+    const count = await this.topicRepo.count();
+    if (count >= SEED_TOPICS.length) {
+      this.logger.log(`All ${SEED_TOPICS.length} base topics present — skipping seedMissing`);
+      return;
+    }
     for (const t of SEED_TOPICS) {
       const existing = await this.topicRepo.findOne({ where: { slug: t.slug } });
       if (existing) continue;
@@ -195,8 +210,8 @@ export class TopicsService implements OnApplicationBootstrap {
     }
 
     let seeded = 0;
-    let updated = 0;
     for (const [slug, meta] of Object.entries(GENERATED_TOPIC_META)) {
+      // Directory listing is cheap — just filenames, no file reads yet
       const dir = path.join(baseDir, slug);
       if (!fs.existsSync(dir)) {
         this.logger.warn(`Generated content for "${slug}" not found at ${dir} — skipping`);
@@ -212,26 +227,37 @@ export class TopicsService implements OnApplicationBootstrap {
         continue;
       }
 
-      let topic = await this.topicRepo.findOne({ where: { slug } });
-      const isNew = !topic;
+      // Compare file count vs DB count — skip only when fully in sync
+      const topic = await this.topicRepo.findOne({ where: { slug } });
+      const existingCount = topic
+        ? await this.lessonRepo.count({ where: { topicId: topic.id, isGenerated: true } })
+        : 0;
 
-      if (!topic) {
-        topic = (await this.topicRepo.save(
-          this.topicRepo.create({
-            ...meta,
-            slug,
-            rating: 4.7 + Math.random() * 0.3,
-            enrolledCount: Math.floor(Math.random() * 5000) + 500,
-          } as Topic),
-        )) as Topic;
+      if (existingCount >= lessonFiles.length) {
+        this.logger.log(`Topic "${slug}" up to date (${existingCount}/${lessonFiles.length} lessons) — skipping`);
+        continue;
       }
 
-      // Always sync lesson content from JSON files so updates are picked up on redeploy
-      const existingLessons = await this.lessonRepo.find({ where: { topicId: topic.id }, order: { orderIndex: 'ASC' } });
-      const existingByOrder = new Map(existingLessons.map((l) => [l.orderIndex, l]));
+      this.logger.log(`Topic "${slug}": ${existingCount} in DB, ${lessonFiles.length} files — seeding ${lessonFiles.length - existingCount} new lesson(s)`);
+
+      const savedTopic = topic ?? (await this.topicRepo.save(
+        this.topicRepo.create({
+          ...meta,
+          slug,
+          rating: 4.7 + Math.random() * 0.3,
+          enrolledCount: Math.floor(Math.random() * 5000) + 500,
+        } as Topic),
+      )) as Topic;
+
+      // Only process files that don't have a DB row yet (by orderIndex)
+      const existingOrders = new Set(
+        (await this.lessonRepo.find({ where: { topicId: savedTopic.id }, select: ['orderIndex'] }))
+          .map((l) => l.orderIndex),
+      );
 
       let order = 1;
       for (const file of lessonFiles) {
+        if (existingOrders.has(order)) { order++; continue; } // already written
         let contentJson: Record<string, any>;
         try {
           contentJson = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8'));
@@ -243,47 +269,29 @@ export class TopicsService implements OnApplicationBootstrap {
         const rawType = String(contentJson.type ?? 'reading');
         const type = (LESSON_TYPES as readonly string[]).includes(rawType) ? rawType : 'reading';
         const title = String(contentJson.title ?? `Lesson ${order}`);
-        const existing = existingByOrder.get(order);
 
-        if (existing) {
-          await this.lessonRepo.update(existing.id, {
+        await this.lessonRepo.save(
+          this.lessonRepo.create({
+            topicId: savedTopic.id,
             title,
+            slug: `${slug}-lesson-${order}`,
+            orderIndex: order,
             type: type as Lesson['type'],
             durationMinutes: Number(contentJson.estimatedMinutes) || 30,
             xpReward: Number(contentJson.xpReward) || 50,
             content: JSON.stringify(contentJson),
             contentJson,
-          });
-        } else {
-          await this.lessonRepo.save(
-            this.lessonRepo.create({
-              topicId: topic.id,
-              title,
-              slug: `${slug}-lesson-${order}`,
-              orderIndex: order,
-              type: type as Lesson['type'],
-              durationMinutes: Number(contentJson.estimatedMinutes) || 30,
-              xpReward: Number(contentJson.xpReward) || 50,
-              content: JSON.stringify(contentJson),
-              contentJson,
-              isGenerated: true,
-            }),
-          );
-        }
+            isGenerated: true,
+          }),
+        );
         order++;
       }
 
-      if (isNew) {
-        seeded++;
-        this.logger.log(`Seeded generated topic "${slug}" with ${order - 1} lessons`);
-      } else {
-        updated++;
-        this.logger.log(`Synced generated topic "${slug}" — ${order - 1} lessons updated`);
-      }
+      seeded++;
+      this.logger.log(`✅ "${slug}" — wrote ${lessonFiles.length - existingCount} new lesson(s)`);
     }
 
-    if (seeded > 0) this.logger.log(`✅ Seeded ${seeded} pre-generated topic(s)`);
-    if (updated > 0) this.logger.log(`✅ Synced ${updated} pre-generated topic(s)`);
+    if (seeded > 0) this.logger.log(`✅ Seeded ${seeded} pre-generated topic(s) for the first time`);
   }
 
   async findAll(query: { category?: string; difficulty?: string; search?: string; page?: number; limit?: number }) {
