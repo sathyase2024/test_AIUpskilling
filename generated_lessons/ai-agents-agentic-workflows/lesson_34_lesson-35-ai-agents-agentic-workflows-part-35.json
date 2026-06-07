@@ -340,6 +340,83 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production AI agent systems rely on three dominant architectural patterns, each optimized for different deployment scenarios. The **Synchronous Request-Response pattern** maintains tight coupling between agent actions and external results, offering predictable latency and immediate feedback loops—ideal for real-time decision systems where sub-second responsiveness matters (e.g., fraud detection agents). However, this pattern creates bottlenecks under high concurrency and fails gracefully when external services lag. The **Asynchronous Event-Driven pattern** decouples agent actions from results via message queues (Kafka, RabbitMQ), enabling horizontal scaling and resilience to service failures, but introduces eventual consistency challenges and debugging complexity. The **Hierarchical Multi-Agent Orchestration pattern** delegates specialized subtasks to focused agent instances with a coordinator managing interdependencies—powerful for complex workflows but requiring sophisticated state management and inter-agent communication protocols. Trade-offs: synchronous systems are simpler but fragile; asynchronous systems scale but demand careful handling of failure states and message idempotency; hierarchical systems offer modularity but multiply debugging surface area. Production deployments typically mix patterns: synchronous for critical paths, asynchronous for background enrichment, and hierarchical for domain-specific branching logic.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The Synchronous pattern mirrors a captain calling field placements in real-time during play—every bowler knows instantly where to position fielders, enabling tight coordination but creating communication bottlenecks when players are scattered. The Asynchronous pattern resembles pre-innings team meetings where strategies are queued (aggressive bowling rotation vs. defensive field setup) and communicated via message boards; players execute independently knowing the plan, resilient to individual delays but requiring clarity on *when* to switch strategies. The Hierarchical pattern is like a franchise's multi-format setup: the captain (coordinator) manages overall strategy, specialized bowling coaches (agents) optimize pace/spin rotations, and batsmen coaches (agents) focus on stroke selection—each domain expert operates autonomously but reports to central leadership. Just as a captain must choose between live tactical adjustments (sync, tight but risky) versus pre-planned contingencies (async, flexible but less reactive), agentic architects must balance responsiveness against resilience.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Blocking synchronous agent with no timeout/retry\nclass BattingAnalysisAgent:\n    def analyze_bowling_weakness(self, batsman_id):\n        # Calls external video analysis API—blocks forever if service hangs\n        weakness_data = self.video_api.analyze(batsman_id)  \n        self.memory.store(batsman_id, weakness_data)\n        return weakness_data\n\n# ✅ BEST PRACTICE: Hybrid pattern with timeouts, fallbacks, and async enrichment\nimport asyncio\nfrom tenacity import retry, stop_after_attempt, wait_exponential\n\nclass BattingAnalysisAgent:\n    def __init__(self, event_bus, cache):\n        self.video_api = VideoAnalysisService(timeout=5)\n        self.event_bus = event_bus  # Async event emitter\n        self.cache = cache\n    \n    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))\n    async def analyze_bowling_weakness(self, batsman_id):\n        # Fast path: check cache first\n        cached = await self.cache.get(f\"weakness:{batsman_id}\")\n        if cached:\n            return cached\n        \n        try:\n            # Sync call with timeout for critical path\n            weakness_data = await asyncio.wait_for(\n                self.video_api.analyze_async(batsman_id),\n                timeout=5.0\n            )\n            await self.cache.set(f\"weakness:{batsman_id}\", weakness_data, ttl=3600)\n            return weakness_data\n            \n        except asyncio.TimeoutError:\n            # Fallback to statistical baseline\n            baseline = await self._get_statistical_weakness(batsman_id)\n            # Emit async enrichment task—don't block agent\n            self.event_bus.emit(\"enrich_weakness\", batsman_id)\n            return baseline\n    \n    async def _get_statistical_weakness(self, batsman_id):\n        # Fast heuristic-based fallback\n        stats = await self.cache.get(f\"stats:{batsman_id}\")\n        return {\"primary_weakness\": stats.get(\"weak_bowler_type\", \"yorker\")}\n\n# Usage demonstrates resilience: agent completes quickly, enrichment happens background\nagent = BattingAnalysisAgent(event_bus=kafka_bus, cache=redis)\nweakness = await agent.analyze_bowling_weakness(\"virat_kohli\")",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Blocking on External Service Calls**—The most common beginner mistake is making synchronous HTTP requests inside agent action handlers without timeouts or circuit breakers. When a downstream service (video analysis API, player database) slows down, your agent stalls, cascading failures across the system. **Exact fix**: (1) Wrap all external calls in `asyncio.wait_for(..., timeout=N)` to enforce maximum wait time; (2) Implement exponential backoff retry logic using libraries like `tenacity` to avoid thundering herd; (3) Add a fallback strategy that returns cached or heuristic-based results instead of failing completely; (4) Use a circuit breaker pattern (e.g., `pybreaker`) to fail fast if the service is down. Example: if your batting analysis agent times out fetching video data, emit an async enrichment event and return last-known-good weakness stats immediately, keeping the agent responsive while background workers retry the full analysis.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Synchronous patterns guarantee tight coupling but sacrifice fault tolerance; use for critical decision paths only",
+        "Asynchronous patterns scale horizontally but require explicit handling of failure states and eventual consistency semantics",
+        "Hierarchical multi-agent orchestration distributes complexity across specialized agents but multiplies testing and debugging scope",
+        "Always implement timeouts, retries with exponential backoff, and fallback strategies for external service calls",
+        "Cache results aggressively at multiple layers (in-memory, distributed) to reduce latency and improve resilience",
+        "Use circuit breakers to fail fast when downstream services degrade, preventing cascade failures",
+        "Prefer fire-and-forget async events over blocking waits for non-critical enrichment tasks",
+        "Monitor agent state transitions and action latencies; use structured logging to debug distributed failure modes"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a match-prediction agent that needs bowling-strength data from an external analytics service (P99 latency: 8 seconds). Your agent must deliver a prediction within 2 seconds. Which pattern best fits this requirement?",
+      "items": [
+        "Synchronous request-response: call the analytics API and wait for the full result",
+        "Asynchronous event-driven: emit a request event, return cached/statistical prediction immediately, enrich asynchronously",
+        "Hierarchical multi-agent: delegate prediction to a sub-agent that specializes in external API calls",
+        "Synchronous with no timeout: the API will eventually respond, and the prediction will be accurate"
+      ],
+      "answer": 1,
+      "explanation": "Option B is correct. The external service's P99 latency (8s) exceeds your SLA (2s), making synchronous blocking impossible. The asynchronous event-driven pattern allows your agent to return a cached or statistical baseline prediction within SLA, then emit an enrichment event to update the model with actual analytics data in the background. Option A violates the latency requirement. Option C adds unnecessary complexity without addressing the fundamental timeout problem. Option D ignores SLA constraints.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

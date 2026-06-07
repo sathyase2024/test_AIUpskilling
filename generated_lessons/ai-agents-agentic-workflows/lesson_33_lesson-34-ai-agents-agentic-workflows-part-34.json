@@ -246,6 +246,152 @@
       ],
       "answer": 1,
       "explanation": "The correct approach is fallback to baseline heuristics. When a tool fails at scale, the agent must prioritize maintaining service (graceful degradation) over perfect information. A 5-second deadline is hard; waiting for API recovery violates that constraint. Fallback routing using distance-based heuristics ensures 2M partners get assignments on time, with slightly suboptimal routes, rather than no routes at all. This is the circuit breaker pattern. Option A fails the real-time constraint. Option C (error) cascades failure to users—unacceptable at delivery scale. Option D (statistical imputation) is unreliable and risky when 70% of data is missing; it can lead to systematic route failures. In production agentic systems, predictable degradation always beats unpredictable optimality. State management requires fallback policies alongside primary tools."
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "AI agents operate through a carefully orchestrated runtime loop that manages state transitions, memory persistence, and execution flow. At the core, the agent maintains an internal state representation—typically a combination of working memory (short-term context), episodic memory (past interactions), and semantic memory (learned patterns). The execution cycle follows a fetch-decode-execute model: the agent retrieves relevant context from memory, processes observations through its reasoning engine, generates candidate actions via the language model, selects the highest-value action using a decision mechanism (deterministic or stochastic), executes the action through tool APIs, observes the result, and updates internal state. Performance characteristics depend on context window size (tokens available for decision-making), latency of tool calls (synchronous vs. asynchronous), and memory lookup efficiency. The agent's ability to recover from errors, adapt to changing environments, and maintain coherence across long task sequences hinges on robust state management and periodic checkpoint-and-restore mechanisms.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Rohit Sharma as captain leading India in a Test match. His internal state is maintained through three memory layers: (1) working memory = the current over's strategy and field placements he's actively considering; (2) episodic memory = recalls from the previous session how Virat Kohli scored against this bowler; (3) semantic memory = his deep knowledge of pitch conditions and Jasprit Bumrah's strengths. During play, Rohit's execution cycle works as follows: he observes the batter's stance (fetch context), recalls similar situations from memory (decode), decides whether to set attacking or defensive fields (reasoning), calls for a specific field placement and bowling change (generate action), Bumrah executes the plan and bowls a yorker (execute tool), sees the result—a dot ball or wicket (observe), and updates his understanding of the batter's weakness (update state). The agent's latency is Rohit's decision-making speed; its coherence depends on whether he maintains consistent strategy across 20 overs; its error recovery is his ability to pivot tactics when the plan fails. This parallel reveals that real-time reasoning systems, like cricket captaincy, must balance rapid decision-making with long-term memory coherence while managing external tool execution (bowlers, fielders) with partial observability.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import asyncio\nfrom collections import deque\nfrom dataclasses import dataclass, field\nfrom typing import Dict, List, Any\nimport json\n\n@dataclass\nclass CricketAgentMemory:\n    \"\"\"Three-tier memory model for cricket match agent.\"\"\"\n    working_memory: deque = field(default_factory=lambda: deque(maxlen=10))\n    episodic_memory: Dict[str, List[dict]] = field(default_factory=dict)  # player->history\n    semantic_memory: Dict[str, Any] = field(default_factory=dict)  # rules, patterns\n\nclass CricketCaptainAgent:\n    \"\"\"AI agent for real-time match decision-making.\"\"\"\n    \n    def __init__(self, captain_name: str):\n        self.captain_name = captain_name\n        self.memory = CricketAgentMemory()\n        self.execution_log = []\n        self.state = {\"current_over\": 0, \"wickets_lost\": 0, \"runs_scored\": 0}\n    \n    async def decision_loop(self, observation: Dict[str, Any]) -> str:\n        \"\"\"Fetch-Decode-Execute cycle for match decisions.\"\"\"\n        # FETCH: Retrieve context from memory\n        self.memory.working_memory.append(observation)\n        batter_name = observation[\"batter\"]\n        recent_vs_batter = self.memory.episodic_memory.get(batter_name, [])\n        \n        # DECODE: Unpack rules and patterns\n        bowling_strength = self.memory.semantic_memory.get(\"team_bowlers\", {})\n        pitch_condition = observation.get(\"pitch_type\")\n        \n        # REASONING: Generate decision candidates\n        candidates = [\n            {\"action\": \"defensive_field\", \"confidence\": 0.7, \"reasoning\": \"Bumrah's strength\"},\n            {\"action\": \"aggressive_field\", \"confidence\": 0.5, \"reasoning\": \"Push for wicket\"},\n            {\"action\": \"rotate_strike\", \"confidence\": 0.6, \"reasoning\": \"Minimize exposure\"}\n        ]\n        \n        # SELECT: Pick highest-value action\n        selected = max(candidates, key=lambda x: x[\"confidence\"])\n        \n        # EXECUTE: Call tool (bowling/fielding API)\n        result = await self._execute_field_setup(selected[\"action\"], batter_name)\n        \n        # OBSERVE & UPDATE STATE\n        self.state[\"current_over\"] += 1\n        self.memory.episodic_memory.setdefault(batter_name, []).append({\n            \"action_taken\": selected[\"action\"],\n            \"outcome\": result,\n            \"over\": self.state[\"current_over\"]\n        })\n        \n        # LOG for debugging\n        self.execution_log.append({\n            \"timestamp\": self.state[\"current_over\"],\n            \"decision\": selected[\"action\"],\n            \"confidence\": selected[\"confidence\"],\n            \"result\": result\n        })\n        \n        return f\"{self.captain_name} decided: {selected['action']} vs {batter_name} (confidence: {selected['confidence']})\"\n    \n    async def _execute_field_setup(self, field_action: str, vs_player: str) -> Dict:\n        \"\"\"Simulate async tool execution (field/bowling setup).\"\"\"\n        await asyncio.sleep(0.1)  # Simulate API latency\n        \n        outcomes = {\n            \"defensive_field\": {\"runs_conceded\": 2, \"wicket_chance\": 0.15},\n            \"aggressive_field\": {\"runs_conceded\": 5, \"wicket_chance\": 0.35},\n            \"rotate_strike\": {\"runs_conceded\": 3, \"wicket_chance\": 0.08}\n        }\n        return outcomes.get(field_action, {})\n    \n    def inject_semantic_knowledge(self, bowlers: Dict[str, Dict]):\n        \"\"\"Inject domain knowledge into semantic memory.\"\"\"\n        self.memory.semantic_memory[\"team_bowlers\"] = bowlers\n        print(f\"✓ Knowledge injected: {list(bowlers.keys())}\")\n\n# Usage\nasync def main():\n    agent = CricketCaptainAgent(\"Rohit Sharma\")\n    agent.inject_semantic_knowledge({\n        \"Jasprit Bumrah\": {\"strength\": \"yorkers\", \"accuracy\": 0.92},\n        \"Ravindra Jadeja\": {\"strength\": \"spin\", \"accuracy\": 0.85}\n    })\n    \n    observation = {\"batter\": \"Virat Kohli\", \"pitch_type\": \"hard\", \"runs_last_over\": 12}\n    decision = await agent.decision_loop(observation)\n    print(decision)\n    print(json.dumps(agent.execution_log[-1], indent=2))\n\n# asyncio.run(main())",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Context window overflow is a silent killer in long-running agents. When working_memory exceeds the LLM's token limit, older observations are forgotten, causing inconsistent decisions. Always implement explicit memory eviction policies and checkpoint-restore mechanisms before deploying agents to production. Also monitor for 'hallucination drift'—where the agent's semantic memory becomes corrupted by false confident predictions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Agents use a three-tier memory architecture: working (active context), episodic (past events), and semantic (patterns/rules) to maintain coherent state across long task sequences.",
+        "The core execution loop (Fetch → Decode → Reason → Select → Execute → Observe → Update) mirrors human decision-making and is language-model agnostic.",
+        "Latency bottlenecks typically occur in tool execution (API calls) and memory lookups; optimize these for real-time applications like match captaincy or trading.",
+        "State management failures (stale observations, memory corruption, token overflow) are the leading cause of agent failure in production systems—implement robust checkpointing.",
+        "Asynchronous execution of tools enables agents to parallelize decisions (e.g., querying multiple APIs simultaneously) and reduces wall-clock latency significantly."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the CricketCaptainAgent code, why does the agent store `episodic_memory` as a dictionary keyed by player name rather than a simple list?",
+      "items": [
+        "To reduce memory usage by deduplicating player records.",
+        "To enable O(1) lookup of past interactions with a specific batter, supporting faster context retrieval during decision-making.",
+        "Because the LLM API requires hierarchical JSON structures.",
+        "To prevent the working_memory deque from overflowing."
+      ],
+      "answer": 1,
+      "explanation": "Organizing episodic memory by player (key-value lookup) allows the agent to instantly retrieve relevant historical interactions with a specific batter (e.g., how Virat Kohli performed against Bumrah previously). This O(1) lookup is critical for real-time reasoning under latency constraints. A simple list would require O(n) scanning, which is prohibitive in fast-paced environments. The other options misunderstand the purpose of episodic memory organization.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant patterns emerge in production agentic systems: the Reactive Agent pattern, the Planning Agent pattern, and the Hierarchical Agent pattern. The Reactive Agent pattern uses immediate tool invocation based on observations—optimal for low-latency tasks with clear state spaces (e.g., real-time API queries, data retrieval). Trade-off: limited lookahead causes suboptimal decisions in complex domains. The Planning Agent pattern builds explicit action sequences before execution, using search or LLM-based reasoning—ideal for multi-step problems requiring coordination. Cost: increased latency and token consumption due to planning overhead. The Hierarchical Agent pattern decomposes problems into specialized sub-agents with a coordinator—best for systems requiring domain expertise segregation and scalability across teams. Trade-off: increased complexity in synchronization and error propagation across agent boundaries. Choice depends on your latency budget, state space complexity, and team structure.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: A Reactive Agent mirrors an aggressive opener—responding immediately to each ball without pre-planned sequences, maximizing early runs but risking dismissal against quality bowling. A Planning Agent resembles a Test match captain building an innings strategy: surveying the pitch, weather, and opposition before committing to a batting order and field placements, accepting slower scoring for stability. A Hierarchical Agent reflects a franchise structure where the main captain (coordinator) delegates bowling rotations to the head coach, batting strategy to a specialist consultant, and fielding adjustments to the vice-captain—distributing expertise but requiring careful communication. Reactive works for T20 scenarios; Planning for Test cricket; Hierarchical for large tournament operations.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Planning Agent with explicit state validation\nclass CricketMatchPlanner:\n    def __init__(self, match_state):\n        self.match_state = match_state\n        self.plan = []\n    \n    def plan_next_overs(self, overs_remaining, wickets_down):\n        # Build explicit plan before execution\n        if overs_remaining > 15 and wickets_down < 3:\n            self.plan = [\n                {\"action\": \"aggressive_batting\", \"duration\": 5},\n                {\"action\": \"assess_conditions\", \"duration\": 1},\n                {\"action\": \"accelerate\", \"duration\": overs_remaining - 6}\n            ]\n        else:\n            self.plan = [\n                {\"action\": \"consolidate\", \"duration\": overs_remaining // 2},\n                {\"action\": \"controlled_acceleration\", \"duration\": overs_remaining // 2}\n            ]\n        return self.plan\n    \n    def execute_with_validation(self):\n        for step in self.plan:\n            assert self.match_state.is_valid(), \"Invalid state detected\"\n            self.execute_step(step)\n            self.match_state.update()\n\n# ANTI-PATTERN: Reactive with no planning or validation\nclass PoorCricketAgent:\n    def act(self, observation):\n        # Immediate action without context or future consideration\n        if observation[\"run_rate\"] < 5:\n            return \"hit_boundary\"  # Greedy, no lookahead\n        if observation[\"wickets\"] > 5:\n            return \"play_aggressively\"  # Contradictory logic\n        # No state validation, can accumulate errors",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is implementing reactive agents for inherently sequential problems, causing agents to make locally optimal but globally suboptimal decisions. For example, an agent might call an API immediately upon a user request without checking if similar data was queried seconds ago, wasting tokens and API quota. Fix: Always analyze your problem's temporal dependencies before choosing a pattern. If action A's success depends on outcome B, use a Planning Agent. Add explicit memoization or state caching layers before reactive tool invocation. Test against multi-step scenarios (3+ sequential decisions) during development to catch this early.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Reactive Agent: Fast, simple, suited for stateless queries with immediate feedback",
+        "Planning Agent: Builds decision trees, higher cost, better for complex multi-step problems",
+        "Hierarchical Agent: Scales expertise, requires robust inter-agent communication",
+        "Always validate state transitions between agent actions to prevent error accumulation",
+        "Match pattern selection to your latency budget and problem structure, not just capability"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building an agent for a fantasy cricket league that must recommend team compositions within 2 seconds per user request. The recommendation requires checking player availability (1 API call), historical performance (1 API call), and injury updates (1 API call). Which pattern should you choose?",
+      "items": [
+        "Planning Agent—build full strategy before any API calls",
+        "Reactive Agent—call APIs sequentially as observations arrive",
+        "Hierarchical Agent—create a sub-agent for each data source",
+        "Reactive Agent with parallel API calls and result caching"
+      ],
+      "answer": 3,
+      "explanation": "Option D is correct. The 2-second latency constraint eliminates Planning (too slow for planning overhead). Pure sequential Reactive (B) would violate latency. Hierarchical (C) adds unnecessary complexity. Reactive with parallelization (D) combines speed of Reactive pattern with result caching to prevent duplicate API calls across requests, meeting both latency and efficiency requirements."
     }
   ]
 }

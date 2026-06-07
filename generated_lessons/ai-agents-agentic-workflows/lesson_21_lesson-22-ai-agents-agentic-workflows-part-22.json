@@ -271,6 +271,156 @@
       ],
       "answer": 0,
       "explanation": "Sequential execution with timeouts and fallbacks is the safest production pattern under strict latency budgets. Each step completes before the next begins; if an API (e.g., route calculation) times out, the agent falls back to cached or approximated data rather than waiting. This respects the 100ms constraint and avoids cascading failures. Full parallelism (B) risks race conditions and inconsistent state merges. Tree-search (C) explodes complexity and violates latency budgets by ranking 10 candidates across multiple tools. Reward-based iteration (D) breaks the termination requirement—without a hard cutoff, the agent will loop past the 100ms window, causing timeout and poor user experience. Real Uber dispatch uses sequential subgoals with strict timeouts and probabilistic fallbacks."
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "AI agents operate through a continuous observe-plan-act loop with sophisticated internal mechanics. The runtime behavior begins when sensory input (observations) flows into the agent's perception layer, which transforms raw environmental data into structured representations stored in working memory. The decision engine then processes this state through learned policies or planning algorithms, generating action probabilities or explicit action sequences. Crucially, the memory model maintains both short-term buffers (active context for current decisions) and long-term storage (historical patterns, learned policies, outcome records), enabling temporal reasoning across multiple timesteps. Execution flow involves asynchronous task scheduling—some agents spawn parallel tool calls, while others serialize them with dependencies. Performance characteristics depend heavily on memory access patterns (cache hits for frequent state lookups), computational complexity of the planning algorithm (exponential for exhaustive search, polynomial for heuristic-driven approaches), and latency-throughput tradeoffs when batching multiple agent instances. Internal state transitions are tracked through immutable event logs, enabling deterministic replay and audit trails critical for debugging and safety verification.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli batting in a T20 match where his agentic system must decide whether to attack or defend each ball. Kohli's perception layer scans the bowler (Jasprit Bumrah's grip, field placement, pitch conditions)—this is the observe step, feeding raw input into working memory. His short-term buffer holds the last three deliveries' outcomes and current match situation (score needed, wickets in hand)—immediate context for decisions. His long-term memory contains thousands of previous encounters with Bumrah, learned patterns of his yorkers and slower balls, and historical success rates against different tactics—this is his policy store. When Bumrah releases the ball, Kohli's decision engine (the planning layer) rapidly evaluates options: drive, leave, defend—ranking them by probability of success. The chosen action (say, a front-foot drive) executes through coordinated muscle memory (parallel tools firing: weight transfer, bat swing, eye positioning). If the shot succeeds, it updates his event log (\"successful drive to Bumrah's 80mph slower ball\"). If he gets out, that outcome cascades back through memory, adjusting future policies. This loop—observe Bumrah's delivery → recall similar past balls → plan response → execute stroke → log result → refine mental model—mirrors the agent's runtime behavior, showing how perception, memory depth, decision speed, and action coordination interlock to produce intelligent cricket performance.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import asyncio\nfrom collections import deque\nfrom dataclasses import dataclass, field\nfrom typing import Any, Dict, List\nfrom enum import Enum\n\nclass CricketPhase(Enum):\n    BATTING = \"batting\"\n    FIELDING = \"fielding\"\n    BOWLING = \"bowling\"\n\n@dataclass\nclass MatchMemory:\n    \"\"\"Long-term episodic and semantic memory for cricket agent.\"\"\"\n    bowler_profiles: Dict[str, Dict[str, Any]] = field(default_factory=dict)\n    historical_outcomes: deque = field(default_factory=lambda: deque(maxlen=1000))\n    success_rates: Dict[str, float] = field(default_factory=dict)\n    \n    def record_encounter(self, bowler: str, delivery: Dict, result: str):\n        \"\"\"Log a ball faced and its outcome to long-term memory.\"\"\"\n        self.historical_outcomes.append({\n            'bowler': bowler,\n            'delivery': delivery,\n            'result': result,\n            'timestamp': asyncio.get_event_loop().time()\n        })\n        if bowler not in self.bowler_profiles:\n            self.bowler_profiles[bowler] = {'balls_faced': 0, 'runs_scored': 0}\n        self.bowler_profiles[bowler]['balls_faced'] += 1\n        if result in ['run1', 'run2', 'run4', 'run6']:\n            self.bowler_profiles[bowler]['runs_scored'] += int(result[-1]) if result != 'run6' else 6\n\n@dataclass\nclass WorkingMemory:\n    \"\"\"Short-term context buffer for immediate decision-making.\"\"\"\n    recent_deliveries: deque = field(default_factory=lambda: deque(maxlen=3))\n    current_phase: CricketPhase = CricketPhase.BATTING\n    match_state: Dict[str, Any] = field(default_factory=dict)\n    active_tools: List[str] = field(default_factory=list)\n    \n    def update_context(self, new_delivery: Dict):\n        \"\"\"Update short-term buffer with latest observation.\"\"\"\n        self.recent_deliveries.append(new_delivery)\n\nclass CricketAgent:\n    \"\"\"Agentic system for cricket decision-making.\"\"\"\n    \n    def __init__(self, player_name: str):\n        self.player_name = player_name\n        self.long_term_memory = MatchMemory()\n        self.working_memory = WorkingMemory()\n        self.execution_log = []\n    \n    async def _plan_batting_shot(self, bowler: str, delivery: Dict) -> str:\n        \"\"\"Planning layer: decide action based on observed delivery.\"\"\"\n        # Retrieve relevant memories\n        bowler_history = self.long_term_memory.bowler_profiles.get(bowler, {})\n        recent_context = list(self.working_memory.recent_deliveries)\n        \n        # Heuristic decision logic\n        ball_type = delivery.get('type', 'unknown')\n        if ball_type == 'yorker' and bowler_history.get('balls_faced', 0) > 5:\n            action = 'defend'  # Conservative after pattern recognition\n        elif delivery.get('line') == 'off_stump' and len(recent_context) >= 2:\n            action = 'drive'    # Aggressive on familiar patterns\n        else:\n            action = 'leave'    # Default conservative\n        \n        return action\n    \n    async def _execute_action(self, action: str) -> Dict:\n        \"\"\"Execution layer: simulate tool invocation (muscle memory).\"\"\"\n        tools = {\n            'drive': {'success_rate': 0.72, 'risk': 0.15},\n            'defend': {'success_rate': 0.95, 'risk': 0.02},\n            'leave': {'success_rate': 0.98, 'risk': 0.01}\n        }\n        execution_result = tools.get(action, tools['defend'])\n        self.execution_log.append({'action': action, 'result': execution_result})\n        return execution_result\n    \n    async def face_delivery(self, bowler: str, delivery: Dict) -> str:\n        \"\"\"Main agent loop: observe → plan → act → remember.\"\"\"\n        # Step 1: Observe (update working memory)\n        self.working_memory.update_context(delivery)\n        \n        # Step 2: Plan (decision engine with memory retrieval)\n        action = await self._plan_batting_shot(bowler, delivery)\n        \n        # Step 3: Act (execute tool/action)\n        execution = await self._execute_action(action)\n        \n        # Step 4: Evaluate outcome\n        outcome = 'success' if execution['success_rate'] > 0.7 else 'risky'\n        \n        # Step 5: Store in long-term memory (learning)\n        self.long_term_memory.record_encounter(bowler, delivery, outcome)\n        \n        return action\n\n# Usage\nasync def main():\n    agent = CricketAgent(\"Rohit Sharma\")\n    delivery_sequence = [\n        {'type': 'fast', 'speed': 145, 'line': 'good_length'},\n        {'type': 'yorker', 'speed': 138, 'line': 'off_stump'},\n        {'type': 'slower', 'speed': 125, 'line': 'leg_stump'}\n    ]\n    \n    for ball in delivery_sequence:\n        action = await agent.face_delivery('Jasprit Bumrah', ball)\n        print(f\"Decision: {action} | Memory size: {len(agent.long_term_memory.historical_outcomes)}\")\n\nasyncio.run(main())",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The observe-plan-act loop must handle non-determinism carefully. If memory access patterns are inconsistent (e.g., stale state), agent decisions become unpredictable. Always ensure memory synchronization points exist between observation and planning phases, especially in distributed agentic systems. Async execution of parallel tools can cause race conditions if shared state is modified—use immutable data structures or explicit locking.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Agents operate through continuous observe-plan-act loops with dedicated memory layers (working and long-term).",
+        "Internal execution relies on asynchronous task scheduling; tools can be parallelized or serialized based on dependency graphs.",
+        "Memory access patterns (cache hits, lookups) directly impact latency and decision quality—optimize frequently retrieved states.",
+        "State transitions are immutable and logged; this enables replay, debugging, and deterministic behavior verification.",
+        "Planning complexity varies: heuristic approaches (linear time) vs. exhaustive search (exponential)—choose based on latency budget.",
+        "Performance bottlenecks typically occur at memory retrieval (slow semantic search) or planning computation (large action spaces).",
+        "Temporal reasoning spans multiple timesteps—agents must maintain causal relationships between past observations and future predictions."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the cricket agent code example, why does the agent retrieve `bowler_history` and `recent_context` before planning the shot?",
+      "items": [
+        "To reduce computational load during action execution.",
+        "To populate both long-term and working memory layers, enabling context-aware decision-making based on patterns and immediate observations.",
+        "To ensure the agent always chooses the most aggressive action.",
+        "To log the decision for later audit purposes only."
+      ],
+      "answer": 1,
+      "explanation": "The agent retrieves bowler history (long-term semantic memory) to recognize patterns learned across many encounters, and recent deliveries (working memory) to maintain immediate tactical context. Together, these inform the planning layer's heuristic decision logic—short-term context prevents reactivity while long-term memory provides strategic grounding. Option 1 is incorrect (memory retrieval adds overhead); Option 3 misses the defensive logic; Option 4 treats memory retrieval as secondary when it's core to the planning engine.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge in agentic systems: the ReAct (Reasoning + Acting) loop, hierarchical delegation with supervisor agents, and the Plan-Execute-Monitor pattern. ReAct maximizes flexibility and real-time adaptability—the agent reasons about its observation, selects actions dynamically, and immediately incorporates feedback; use this when your environment is unpredictable and requires constant course-correction, though it incurs higher token costs and latency. Hierarchical delegation assigns complex goal decomposition to a supervisor agent that delegates subtasks to specialist agents with narrower action spaces; this pattern scales well and isolates failures but introduces coordination overhead and potential latency bottlenecks at the supervisor layer. Plan-Execute-Monitor front-loads reasoning into a comprehensive plan before execution, then monitors for deviations and triggers replanning only when necessary; this reduces token consumption and provides better auditability for regulated domains, but fails catastrophically when initial assumptions become invalid mid-execution. Choose ReAct for real-time trading or customer support bots where adaptability trumps cost. Choose hierarchical delegation for large enterprises managing dozens of specialized agents. Choose Plan-Execute-Monitor for safety-critical systems like medical diagnosis or financial compliance where explainability and cost-predictability matter more than millisecond responsiveness.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: ReAct is like a batter playing each ball on its merits—reading the bowler's intention mid-delivery, adjusting stance in real-time, and responding to field placement changes instantly. It's maximally adaptive but cognitively exhausting and risky. Hierarchical delegation mirrors a captain delegating bowling rotations, field placements, and batting order to specialist coaches—the captain (supervisor) reasons about match strategy while bowlers focus only on executing their brief, reducing captain burden but requiring trust in delegation. Plan-Execute-Monitor resembles pre-match strategy: the captain plans the entire innings (field positions, bowling sequence, batting order) in the first 20 minutes, then executes rigidly while monitoring opposition adjustments; if the opposition plays unexpectedly (e.g., aggressive opening), replanning is triggered, but this happens rarely because plans are thorough. Each pattern trades cognitive load, adaptability, and cost differently—choosing the right one depends on your match conditions (environment predictability) and resources (token budget).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Unbounded ReAct loop without termination guardrails\nclass UnboundedCricketAgent:\n    def run_batting_session(self, target_runs):\n        runs_scored = 0\n        iteration = 0\n        while runs_scored < target_runs:  # No max_iterations!\n            observation = self.observe_bowler()\n            thought = self.reason(observation)\n            action = self.select_action(thought)\n            runs_scored += self.execute_shot(action)\n            iteration += 1\n            # Agent may loop infinitely if action selection fails\n        return runs_scored\n\n# BEST PRACTICE: Bounded ReAct with fallback strategies\nclass BoundedCricketAgent:\n    def run_batting_session(self, target_runs, max_iterations=50):\n        runs_scored = 0\n        iteration = 0\n        \n        while runs_scored < target_runs and iteration < max_iterations:\n            try:\n                observation = self.observe_bowler()\n                thought = self.reason(observation, confidence_threshold=0.7)\n                \n                if thought['confidence'] < 0.7:\n                    action = self.fallback_conservative_shot()\n                else:\n                    action = self.select_action(thought)\n                \n                runs_scored += self.execute_shot(action)\n                iteration += 1\n                \n            except ActionExecutionError as e:\n                self.log_error(e)\n                action = self.safe_defensive_shot()\n                runs_scored += self.execute_shot(action)\n        \n        if runs_scored < target_runs:\n            self.trigger_replanning()\n        \n        return {'runs': runs_scored, 'iterations': iteration, 'status': 'completed' if runs_scored >= target_runs else 'timeout'}\n\n# HIERARCHICAL DELEGATION: Supervisor + Specialist agents\nclass CricketCaptain:\n    def __init__(self):\n        self.batting_coach = BattingSpecialist()\n        self.bowling_coach = BowlingSpecialist()\n        self.fielding_coach = FieldingSpecialist()\n    \n    def manage_innings(self, match_state):\n        innings_plan = self.decompose_match_goal(match_state)\n        \n        batting_subtask = innings_plan['batting']\n        runs = self.batting_coach.execute(batting_subtask)\n        \n        bowling_subtask = innings_plan['bowling']\n        wickets = self.bowling_coach.execute(bowling_subtask)\n        \n        field_subtask = innings_plan['fielding']\n        catches = self.fielding_coach.execute(field_subtask)\n        \n        return self.aggregate_results(runs, wickets, catches)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is creating agents with unbounded action loops and no fallback mechanism. Developers implement ReAct patterns expecting the agent to 'figure it out,' but when action selection returns low-confidence results or repeated failed actions, the loop spins indefinitely, exhausting token budgets and creating cascading failures downstream. Fix this immediately by: (1) Always set max_iterations as a hard limit based on your token budget (typically 20-50 for ReAct). (2) Implement a confidence threshold—if reasoning confidence falls below 0.6, trigger a fallback action (conservative move, seek human input, or abort gracefully). (3) Add a circuit breaker that detects repeated failed actions (same action attempted 3+ times) and escalates to replanning. (4) Log every iteration with reasoning trace and action result so you can audit failure modes post-execution. One unchecked ReAct loop can consume your entire monthly token budget in seconds.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "ReAct (Reason-Act) maximizes adaptability for unpredictable environments but incurs high token costs and latency; use for real-time decision-making",
+        "Hierarchical delegation (supervisor + specialists) scales to complex multi-agent systems and isolates failures, but adds coordination overhead",
+        "Plan-Execute-Monitor front-loads reasoning and reduces tokens, making it ideal for regulated/safety-critical domains, but fails if initial assumptions become invalid",
+        "Always bound agentic loops with max_iterations and confidence thresholds to prevent token budget exhaustion",
+        "Implement fallback strategies (conservative actions, human escalation) when agent confidence drops below threshold",
+        "Use circuit breakers to detect repeated failed actions and trigger replanning before cascading failures occur",
+        "Choose your pattern based on environment predictability (stable→Plan-Execute; unpredictable→ReAct; complex→Hierarchical) and cost constraints"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a batting agent for a T20 cricket simulator. The environment is unpredictable (bowlers change tactics every over), but you have a strict token budget of 10,000 tokens per innings. Which pattern should you prioritize?",
+      "items": [
+        "ReAct (maximize adaptability regardless of token cost)",
+        "Plan-Execute-Monitor (front-load strategy, reduce per-action tokens, accept lower adaptability)",
+        "Hierarchical delegation (split batting decisions into sub-agents for specialist roles)",
+        "No pattern—let the agent learn from experience without preset strategies"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is Plan-Execute-Monitor. While ReAct would provide maximum adaptability, the tight token budget makes it unsustainable—ReAct loops typically consume 50-200 tokens per iteration, and an unpredictable environment could trigger 50+ iterations. Plan-Execute-Monitor allows you to plan a 10-over batting strategy upfront (using ~2,000 tokens), then execute with minimal per-action tokens (~100 per shot), leaving buffer for replanning if the bowler drastically changes tactics. Hierarchical delegation introduces coordination overhead that's unnecessary for a single batting agent. Option 4 is never correct in production—agents always need preset strategies as guardrails."
     }
   ]
 }

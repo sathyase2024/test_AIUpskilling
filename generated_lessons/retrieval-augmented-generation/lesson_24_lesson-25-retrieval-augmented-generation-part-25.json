@@ -311,6 +311,155 @@
       "language": "",
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "How It Works Under the Hood",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Retrieval-Augmented Generation operates through a sophisticated pipeline that interleaves retrieval and generation phases. At runtime, the system first encodes the input query into a dense vector representation using a pre-trained encoder model. This vector is then compared against a pre-computed index of document embeddings using similarity metrics like cosine distance or dot product, retrieving the top-k most relevant passages. These retrieved passages are concatenated with the original query and fed into a generative language model (typically a transformer decoder), which conditions its output on both the query and retrieved context. The memory model employs hierarchical storage: the embedding index is held in RAM or vector databases for sub-millisecond retrieval, while full documents reside in persistent storage. Execution flow involves asynchronous batch processing of queries with dynamic context windowing—longer contexts reduce token efficiency but improve factual grounding. Performance characteristics show sub-quadratic scaling with corpus size due to approximate nearest neighbor search algorithms (FAISS, Annoy), though latency increases linearly with retrieved context length due to sequential token generation in the decoder.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Imagine Virat Kohli preparing to bat in a Test match. Before he walks to the crease, his team's analyst (the encoder) converts his batting record—technique, recent form, weaknesses—into a strategic profile. The fielding captain (the retriever) then searches through the opposition's playbook to find the top-k most relevant bowling strategies: Jasprit Bumrah's yorker tactics, pace bowling sequences, field placements used against left-handers. These retrieved strategies are passed to Rohit Sharma (the generative model), who synthesizes them with Kohli's profile to formulate a specific game plan—which bowlers to attack, where to position himself, which deliveries to leave. The memory model works like a dressing room: recent strategic notes (embeddings) stay mentally accessible, the full video library (documents) is archived but retrievable. The retrieval phase happens instantly (like Rohit recalling key strategies), then the generation phase takes time (like Rohit carefully crafting the batting approach). This parallel reveals that RAG succeeds by separating knowledge retrieval (fast, indexed, pattern-matched) from reasoning (slower, contextual, generative), just as cricket teams separate scouting from strategy formulation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "import numpy as np\nfrom typing import List, Tuple\nimport faiss\n\nclass CricketRAGEngine:\n    \"\"\"Internal mechanics of RAG retrieval and generation pipeline.\"\"\"\n    \n    def __init__(self, embedding_dim: int = 768):\n        self.embedding_dim = embedding_dim\n        self.player_embeddings_index = faiss.IndexFlatL2(embedding_dim)\n        self.match_context_store = {}\n        self.generation_cache = {}\n    \n    def encode_query(self, query: str, encoder_model) -> np.ndarray:\n        \"\"\"Convert batting query into dense vector representation.\"\"\"\n        query_embedding = encoder_model.encode(query)\n        return np.array([query_embedding], dtype=np.float32)\n    \n    def retrieve_relevant_strategies(\n        self,\n        query_embedding: np.ndarray,\n        k: int = 5\n    ) -> Tuple[List[int], List[float]]:\n        \"\"\"Retrieve top-k most relevant bowling/batting strategies.\"\"\"\n        distances, indices = self.player_embeddings_index.search(query_embedding, k)\n        return indices[0].tolist(), distances[0].tolist()\n    \n    def augment_context(\n        self,\n        query: str,\n        retrieved_passages: List[str],\n        max_context_tokens: int = 2048\n    ) -> str:\n        \"\"\"Interleave query with retrieved passages for generation.\"\"\"\n        context_window = f\"Query: {query}\\n\\nRelevant Match Context:\\n\"\n        token_count = len(context_window.split())\n        \n        for passage in retrieved_passages:\n            passage_tokens = len(passage.split())\n            if token_count + passage_tokens <= max_context_tokens:\n                context_window += f\"- {passage}\\n\"\n                token_count += passage_tokens\n            else:\n                break\n        \n        return context_window\n    \n    def generate_strategy(\n        self,\n        augmented_context: str,\n        generation_model,\n        player_name: str = \"rohit_sharma\",\n        temperature: float = 0.7\n    ) -> str:\n        \"\"\"Generate game strategy conditioned on retrieved context.\"\"\"\n        cache_key = hash(augmented_context)\n        \n        if cache_key in self.generation_cache:\n            return self.generation_cache[cache_key]\n        \n        strategy = generation_model.generate(\n            augmented_context,\n            max_length=256,\n            temperature=temperature,\n            top_p=0.95\n        )\n        \n        self.generation_cache[cache_key] = strategy\n        return strategy\n    \n    def rag_pipeline(\n        self,\n        batting_query: str,\n        encoder,\n        generator,\n        retrieval_k: int = 5\n    ) -> dict:\n        \"\"\"Complete RAG execution flow: encode → retrieve → augment → generate.\"\"\"\n        # Phase 1: Encoding (sub-millisecond)\n        query_vec = self.encode_query(batting_query, encoder)\n        \n        # Phase 2: Retrieval (vector similarity)\n        indices, scores = self.retrieve_relevant_strategies(query_vec, k=retrieval_k)\n        retrieved_docs = [self.match_context_store[idx] for idx in indices]\n        \n        # Phase 3: Augmentation (context window management)\n        augmented = self.augment_context(batting_query, retrieved_docs)\n        \n        # Phase 4: Generation (sequential token decoding)\n        final_strategy = self.generate_strategy(augmented, generator)\n        \n        return {\n            \"query\": batting_query,\n            \"retrieved_count\": len(retrieved_docs),\n            \"retrieval_scores\": scores,\n            \"augmented_context_length\": len(augmented.split()),\n            \"generated_strategy\": final_strategy\n        }\n\n# Usage example\nrag_engine = CricketRAGEngine(embedding_dim=768)\nresult = rag_engine.rag_pipeline(\n    batting_query=\"How should Kohli bat against Bumrah's yorkers?\",\n    encoder=encoder_model,\n    generator=generation_model,\n    retrieval_k=5\n)",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The retrieval index must be synchronized with your document store. Stale embeddings cause hallucination even with perfect generation. Always validate that retrieved passages are semantically relevant before feeding to the generator—a low-quality retrieval phase cascades into low-quality generation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG separates retrieval (fast, indexed) from generation (slower, contextual), reducing hallucination risk",
+        "Vector embeddings enable approximate nearest-neighbor search, achieving sub-quadratic scaling with corpus size",
+        "Context windowing and token budgets balance factual grounding against generation efficiency",
+        "Caching at both embedding and generation stages is critical for production latency under 500ms",
+        "Retrieval quality directly determines generation factuality—garbage in, garbage out applies strongly to RAG"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the RAG pipeline, what is the primary role of the retrieval phase?",
+      "items": [
+        "To generate the final response text",
+        "To find relevant documents and reduce the search space for the generator",
+        "To train the embedding model on new data",
+        "To cache all historical user queries"
+      ],
+      "answer": 1,
+      "explanation": "The retrieval phase uses vector similarity to efficiently locate top-k relevant passages from a large corpus. This narrows the context that the generator must process, enabling it to ground responses in factual information rather than relying solely on learned parameters. The generator then synthesizes these retrieved passages with the query.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems demand careful architectural decisions based on retrieval patterns and latency requirements. The primary patterns are: (1) Dense retrieval with vector embeddings—optimal for semantic matching when you have 10K–1M documents and can afford 50–200ms latency; use when relevance matters more than exact keyword matching. (2) Sparse BM25 retrieval—fast, interpretable, requires <10ms for real-time applications, but struggles with paraphrasing; ideal for legal documents or technical specs where exact term presence signals relevance. (3) Hybrid retrieval combining dense + sparse—eliminates individual weaknesses, adds 30–40% overhead but catches both semantic and lexical relevance; production standard for balanced systems. (4) Multi-stage ranking—coarse retrieval (fast, thousands of candidates) followed by fine-grained reranking (slow, top-100); trades compute cost for accuracy gains of 15–25%. Choose dense-only for startups prioritizing speed-to-market; hybrid for mature products where relevance directly impacts revenue; multi-stage for enterprise where misranking has compliance costs. Cache retrieved contexts aggressively—90% of RAG latency is retrieval, not LLM generation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Dense retrieval is like an aggressive opening batsman—reads the pitch semantically and commits to stroke direction even if the exact ball seam isn't visible. BM25 is the defensive blocker—reacts only to exact line and length, highly predictable but sometimes misses yorkers. Hybrid retrieval resembles a complete all-rounder who adjusts to both ball trajectory and field placement simultaneously. Multi-stage ranking mirrors the captain's field placement strategy: position multiple fielders broadly first (coarse retrieval), then refine placement when the bowler's action telegraphs intent (fine reranking). Caching context is like reviewing match footage before DRS—you avoid redundant deliberation by preparing answers in advance. Choosing between patterns is like deciding whether to bat conservatively (BM25 for exact specs) or aggressively (dense for complex queries)—context and stakes determine the right approach.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Naive single retrieval without ranking\nclass NaiveMatchday:\n    def fetch_innings_insights(self, query: str, batter_db):\n        results = batter_db.search(query)  # Returns first 10, unranked\n        return results[:5]  # Assumes top-k are best—often wrong\n\n# BEST PRACTICE: Hybrid retrieval with reranking\nfrom sentence_transformers import CrossEncoder\n\nclass ProMatchday:\n    def __init__(self, dense_retriever, sparse_retriever, reranker):\n        self.dense = dense_retriever  # Vector search\n        self.sparse = sparse_retriever  # BM25\n        self.reranker = reranker  # CrossEncoder\n    \n    def fetch_innings_insights(self, query: str, batter_db, top_k=5):\n        # Stage 1: Retrieve from both pathways\n        dense_results = self.dense.search(query, top_k=20)\n        sparse_results = self.sparse.search(query, top_k=20)\n        \n        # Stage 2: Deduplicate and merge\n        combined = self._merge_results(dense_results, sparse_results)\n        \n        # Stage 3: Rerank with cross-encoder\n        scores = self.reranker.predict(\n            [[query, doc[\"text\"]] for doc in combined]\n        )\n        ranked = sorted(\n            zip(combined, scores), \n            key=lambda x: x[1], \n            reverse=True\n        )\n        \n        # Stage 4: Cache and return\n        self._cache_results(query, ranked[:top_k])\n        return [doc for doc, _ in ranked[:top_k]]\n    \n    def _merge_results(self, dense, sparse):\n        seen = set()\n        merged = []\n        for result in dense + sparse:\n            if result[\"id\"] not in seen:\n                merged.append(result)\n                seen.add(result[\"id\"])\n        return merged\n    \n    def _cache_results(self, query: str, results):\n        # Persistent cache prevents recomputation\n        self.cache[query] = results",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "The anti-pattern assumes retrieval order guarantees relevance and skips ranking—fails on semantic paraphrasing. The best practice implements hybrid retrieval (combining dense semantic + sparse keyword), deduplicates, applies learned reranking via CrossEncoder, and caches results. This recovers 20–30% accuracy vs naive baseline with ~100ms added latency."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is **ignoring retrieval latency in favor of pure accuracy metrics**. You implement a perfect reranker but measure only top-5 accuracy offline, ignoring that multi-stage retrieval now takes 500ms—users abandon your system. Fix: Profile your retrieval pipeline end-to-end with real queries. Set a latency SLA (e.g., <200ms for 95th percentile), then optimize within that constraint. Use approximate nearest neighbor search (FAISS, Annoy) instead of exact similarity for dense retrieval—loses 2–3% accuracy but cuts latency 10x. Cache the top-1000 queries and their results; real systems have highly skewed traffic where 80% of queries repeat. Monitor cache hit rate (should exceed 60% for mature systems) and adjust cache TTL based on document update frequency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Dense retrieval (embeddings) excels at semantic matching; BM25 excels at exact-match recall. Hybrid systems capture both at cost of ~2x compute.",
+        "Multi-stage ranking (coarse → fine) is production standard: retrieve 100–1000 candidates quickly, then rerank top-100 with expensive cross-encoders.",
+        "Cache aggressively—90% of RAG latency is retrieval, not LLM generation. Skewed query distribution means cache hit rates >60% are achievable.",
+        "Latency SLA must drive architecture decisions. A 95% accurate system that takes 5 seconds is worse than an 85% accurate system that takes 100ms.",
+        "Reranker choice matters: lightweight models (distilBERT) for speed; full cross-encoders (e5-reranker) for accuracy. Measure accuracy–latency tradeoff empirically.",
+        "Deduplication between dense and sparse results reduces redundant LLM processing. Use document ID sets to track seen results across retrieval paths."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying RAG for a cricket statistics platform. Users query facts like 'fastest bowler in ODI history' (exact, lexical) and 'what does aggressive batting look like' (semantic, paraphrased). Your latency budget is 150ms. Which retrieval strategy minimizes accuracy loss within budget?",
+      "items": [
+        "Dense-only retrieval with approximate nearest neighbors (ANN). Catches semantics, ANN keeps latency under 150ms.",
+        "BM25-only with precomputed indexes. Exact keywords guaranteed, latency <50ms.",
+        "Hybrid: BM25 (50ms) + ANN (50ms) in parallel, merge results, skip reranking to stay under 150ms.",
+        "Hybrid with reranking: BM25 + ANN in parallel (80ms), lightweight reranker (40ms), total ~120ms. Catches both query types."
+      ],
+      "answer": 3,
+      "explanation": "Option 3 (hybrid + lightweight reranker) is correct because your query distribution has both lexical ('fastest bowler') and semantic ('aggressive batting') intents. Dense-only (A) misses exact keyword matches. BM25-only (B) fails on paraphrasing. Hybrid without reranking (C) mixes signals without learning their importance. Hybrid + lightweight reranker (D) uses both retrieval paths in parallel (parallelization stays within latency SLA) and applies a fast-to-compute cross-encoder (distilBERT, ~40ms on modern GPUs) to rank merged results. Total latency ~120ms leaves 30ms buffer. This recovers 15–20% accuracy vs hybrid without reranking.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

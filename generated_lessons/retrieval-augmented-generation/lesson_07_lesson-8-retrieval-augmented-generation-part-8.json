@@ -289,6 +289,78 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production RAG systems rely on three dominant patterns, each optimized for specific latency and accuracy trade-offs. The **Retrieve-Then-Rank pattern** executes dense retrieval at scale (retrieving top-k candidates) followed by cross-encoder re-ranking, balancing recall (via broad retrieval) with precision (via expensive scoring). This pattern dominates when serving latency budgets allow 100-500ms end-to-end, typical for search and Q&A. The **Sparse-Dense Fusion pattern** combines BM25 lexical matching with dense embedding similarity, improving robustness to query paraphrasing while maintaining high precision on exact keyword matches; it costs minimal additional compute but requires careful weight tuning (typically α ∈ [0.3, 0.7]). The **Iterative Query Refinement pattern** performs lightweight retrieval, feeds results back into an LLM for query reformulation, then re-retrieves—powerful for complex multi-hop reasoning but incurs 2-4× retrieval calls and 100-300ms LLM latency overhead. Choose Retrieve-Then-Rank for high-volume, single-turn queries; Fusion for mixed lexical-semantic workloads; and Iterative Refinement only when reasoning depth justifies the cost.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Retrieve-Then-Rank mirrors setting an aggressive field (retrieve broadly) then rotating in your death-overs specialist (re-rank expensively) only when it matters most—you invest premium resources late. Sparse-Dense Fusion is like keeping both a slip cordon (lexical precision) and deep fielders (semantic recall) active simultaneously; different batsmen require different setups. Iterative Query Refinement resembles using DRS (Decision Review System)—after initial fielding placement fails, you stop play, review the situation, adjust your strategy, and execute again. The trade-off is clear: each additional review costs time and reviews remaining, just as each retrieval iteration consumes latency budget. Elite teams (production systems) know when each tactic wins: DRS when the decision is genuinely ambiguous (complex queries), standard field placement when conditions are clear (straightforward queries). Choosing wrong—calling DRS on an obvious decision or never reviewing marginal calls—wastes resources or loses matches.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Naive single-pass retrieval, no re-ranking\nclass NaiveRetriever:\n    def retrieve_batsman_insights(self, query: str):\n        \"\"\"Retrieves top-10 documents, returns as-is. High recall, low precision.\"\"\"\n        embeddings = self.encoder.encode(query)\n        scores = self.index.search(embeddings, k=10)\n        return scores  # Returns unranked, includes noisy documents\n\n# BEST PRACTICE: Retrieve-Then-Rank with fusion\nclass ProductionRetriever:\n    def retrieve_batsman_insights(self, query: str, budget_ms: int = 200):\n        \"\"\"Two-stage: broad dense retrieval + expensive re-ranking.\"\"\"\n        # Stage 1: Dual retrieval (sparse + dense) - fast\n        dense_scores = self.dense_index.search(query, k=50)  # ~20ms\n        sparse_scores = self.bm25_index.search(query, k=50)  # ~10ms\n        \n        # Normalize and fuse\n        fused = self._fuse_scores(dense_scores, sparse_scores, alpha=0.6)\n        candidates = self._get_top_k(fused, k=20)  # ~5ms\n        \n        # Stage 2: Expensive cross-encoder re-ranking on candidates only\n        reranked = self.cross_encoder.score(\n            query, \n            candidates,\n            batch_size=16  # Parallel scoring\n        )  # ~150ms for 20 docs\n        \n        return sorted(reranked, key=lambda x: x['score'], reverse=True)\n    \n    def _fuse_scores(self, dense, sparse, alpha=0.6):\n        \"\"\"Weighted combination: semantic + lexical signals.\"\"\"\n        return {doc_id: alpha * dense.get(doc_id, 0) + (1-alpha) * sparse.get(doc_id, 0)\n                for doc_id in set(dense.keys()) | set(sparse.keys())}\n    \n    def _get_top_k(self, scores_dict, k):\n        return sorted(scores_dict.items(), key=lambda x: x[1], reverse=True)[:k]",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Retrieving too many candidates and re-ranking all of them.** Beginners often retrieve top-100 or top-1000 documents, then score every single one with expensive cross-encoders, thinking 'more data = better results'. This is wrong and costly: (1) Cross-encoder latency scales linearly; re-ranking 1000 docs can take 2-5 seconds vs. 150ms for 20 candidates. (2) Gains plateau: top-30 usually contains 95% of relevant documents; beyond that, re-ranking noise introduces ranking errors. (3) Cost per query multiplies: at 100k QPS, unnecessary re-ranking burns 10000 GPU hours/day. **Fix:** Use the two-stage pipeline. Retrieve broadly (k=50-100) in the fast stage, then re-rank only top-20 candidates. Profile your latency budget: if you have 200ms, allocate ~50ms to retrieval, ~150ms to re-ranking. Tune k_retrieve and k_rerank based on recall@k on your validation set—find the minimum k_rerank where recall plateaus, then stop.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Retrieve-Then-Rank: Execute fast dense/sparse retrieval broadly (k=50-100), then expensive cross-encoder scoring on top-k candidates only (k=10-20). Balances recall and latency.",
+        "Sparse-Dense Fusion: Combine BM25 (lexical) and dense embedding (semantic) scores with weighted average (α typically 0.3-0.7). Robust to paraphrasing, minimal overhead.",
+        "Iterative Query Refinement: Use LLM to reformulate queries based on initial retrieval results, then re-retrieve. Powerful for multi-hop reasoning but 2-4× cost.",
+        "Latency allocation: Profile your full pipeline; typical budget: 50-100ms retrieval + 100-200ms re-ranking. Trade-off precision for speed only when validated on test set.",
+        "Never re-rank all candidates. Plateau effect: recall gains flatten after top-20-30 documents. Tuning k_retrieve and k_rerank on validation data prevents cost explosion."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket analytics RAG system retrieves top-100 player statistics documents and re-ranks all 100 with a cross-encoder in 3 seconds. User satisfaction is high but you're hitting GPU limits at 10k QPS. What should you do first?",
+      "items": [
+        "Reduce embedding dimension from 768 to 128 to speed up dense retrieval",
+        "Switch to Retrieve-Then-Rank: retrieve top-100 in fast stage, re-rank only top-20 with cross-encoder",
+        "Remove BM25 lexical retrieval to reduce duplicate scoring",
+        "Fine-tune the cross-encoder on more cricket data to improve ranking speed"
+      ],
+      "answer": 1,
+      "explanation": "The bottleneck is re-ranking all 100 candidates (quadratic cost). Switching to two-stage retrieval (option B) reduces re-ranking burden from 100 docs to 20—a 5× speedup—while maintaining recall (fast stage still captures relevant docs). Option A reduces retrieval speed negligibly. Option C loses signal diversity. Option D doesn't address the architectural inefficiency. This is the classic 'over-ambitious re-ranking' anti-pattern."
     }
   ]
 }
