@@ -94,6 +94,12 @@ const GENERATED_TOPIC_META: Record<
     difficulty: 'beginner', durationHours: 45,
     tags: ['python', 'numpy', 'pandas', 'data', 'ai'], imageGradient: 'from-green-500 to-teal-600',
   },
+  'tensorflow-keras': {
+    name: 'TensorFlow & Keras', category: 'ai-ml',
+    description: 'Build, train and deploy neural networks with TensorFlow 2 and the Keras high-level API',
+    difficulty: 'intermediate', durationHours: 50,
+    tags: ['tensorflow', 'keras', 'deep-learning', 'neural-networks', 'ai'], imageGradient: 'from-amber-500 to-orange-600',
+  },
 };
 
 const LESSON_TYPES = ['video', 'reading', 'exercise', 'quiz', 'project'] as const;
