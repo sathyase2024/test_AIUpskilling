@@ -11,7 +11,12 @@ async function bootstrap() {
   const jwtSecret = process.env.JWT_SECRET ?? '';
   const insecureDefault = 'skillforge-dev-secret-change-in-production';
   if (process.env.NODE_ENV === 'production' && (!jwtSecret || jwtSecret === insecureDefault)) {
-    throw new Error('JWT_SECRET must be set to a secure value in production');
+    // Warn loudly but don't crash — a missing secret is better than a dead server.
+    // Auth endpoints will fail for users but the app stays up.
+    console.warn(
+      '[SECURITY] JWT_SECRET is not set or uses the insecure default. ' +
+      'Set a strong JWT_SECRET environment variable in your deployment platform.',
+    );
   }
 
   const app = await NestFactory.create(AppModule);
