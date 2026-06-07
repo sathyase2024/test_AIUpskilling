@@ -257,6 +257,128 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production inference optimization follows three dominant patterns: Post-Training Quantization (PTQ) for rapid deployment with minimal retraining, Quantization-Aware Training (QAT) for maximum accuracy when development budget permits, and mixed-precision strategies layering different bit-widths across model architecture. PTQ dominates enterprise deployments because it requires zero model retraining—critical for organizations with frozen training pipelines—but sacrifices 2-5% accuracy on average. QAT demands 10-20% additional training compute but preserves accuracy within 0.5% of full precision, justifying its use in latency-critical applications (conversational AI, real-time translation). Mixed-precision quantizes attention layers at INT8 while preserving embedding and output layers at FP16, balancing the 3x speedup of aggressive quantization against the 15-20% accuracy cost. Choose PTQ for legacy model serving where retraining is impossible; QAT when you control the training pipeline; mixed-precision when accuracy floors are non-negotiable but latency budgets are tight. Costs: PTQ adds 0-2 days calibration; QAT adds 1-3 weeks retraining; mixed-precision requires custom kernel optimization (2-4 weeks engineering).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Post-Training Quantization is like adjusting your batting lineup after the season starts—quick, no practice disruption, but players may need time to adapt to new positions. Quantization-Aware Training is equivalent to conditioning your squad during the pre-season with specific tactical drills, ensuring everyone's in optimal form before matches begin. Mixed-precision strategy mirrors a flexible batting order where your top batsmen stay at full batting strength (FP16) while lower-order batsmen bat in reduced gear (INT8), maintaining team balance without sacrificing star players. Choosing PTQ when you have a frozen model is like selecting your DRS reviews strategically without calling timeout—efficient but risky. QAT investment parallels intensive bowling rotation training where fast bowlers practice shorter spells at higher intensity to maximize impact per ball. The calibration dataset mirrors match video analysis—representative enough to inform strategy but imperfect proxy for actual game conditions.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Mixed-Precision QAT with Calibration\nimport torch\nfrom torch.quantization import quantize_qat\n\nclass CricketScorePredictor(torch.nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.batting_encoder = torch.nn.Linear(50, 256)  # FP32\n        self.bowling_processor = torch.nn.Linear(256, 128)  # INT8 candidate\n        self.match_analyzer = torch.nn.Linear(128, 1)  # FP32\n    \n    def forward(self, batting_stats, bowling_stats):\n        x = self.batting_encoder(batting_stats)  # Keep precision\n        x = torch.nn.functional.relu(x)\n        x = self.bowling_processor(x)  # Quantize aggressively\n        x = torch.nn.functional.relu(x)\n        return self.match_analyzer(x)\n\n# BEST PRACTICE: Prepare QAT with selective quantization\nmodel = CricketScorePredictor()\nmodel.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')\n\n# Specify which layers to quantize\ntorch.quantization.prepare_qat(model, inplace=True)\n\n# Calibration dataset representing diverse match scenarios\ncalibration_loader = torch.utils.data.DataLoader(\n    calibration_dataset, batch_size=32\n)\n\nfor batting_data, bowling_data in calibration_loader:\n    model(batting_data, bowling_data)\n\nquantized_model = torch.quantization.convert(model, inplace=True)\n\n# ANTI-PATTERN: Aggressive PTQ without calibration\nmodel_bad = CricketScorePredictor()\ntorch.quantization.quantize_dynamic(\n    model_bad,\n    {torch.nn.Linear},\n    dtype=torch.qint8\n)  # No calibration = silent accuracy collapse\n\n# BEST PRACTICE: Validate accuracy drop per layer\naccuracy_baseline = evaluate(model)\naccuracy_quantized = evaluate(quantized_model)\nprint(f\"Accuracy drop: {(accuracy_baseline - accuracy_quantized)*100:.2f}%\")\nassert accuracy_quantized >= 0.95 * accuracy_baseline, \"Quantization exceeded tolerance\"",
+      "level": 2,
+      "language": "python",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Skipping validation after quantization is the most common beginner mistake. Many teams quantize their models and deploy directly without comparing accuracy on a held-out test set, discovering 10-30% performance degradation only in production. The fix: Always establish a baseline accuracy metric on your full-precision model, then measure the same metric post-quantization. Accept quantization ONLY if accuracy drop stays below your tolerance threshold (typically 1-2% for INT8). Use `torch.quantization.quantization_debug_info()` or your framework's equivalents to identify which layers cause accuracy loss—often the first/last layers or attention mechanisms are most sensitive. If a single layer drops accuracy by >5%, either reduce its quantization bit-width (use FP16 instead of INT8) or exclude it from quantization entirely. Document your acceptance criteria before quantizing, not after.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Quantization powers inference at the scale of billions of daily requests across major tech platforms. Google deploys INT8-quantized BERT models across Search and Assistant, processing 8.5 billion daily queries while reducing latency by 3.5x and energy consumption by 40%. Meta uses mixed-precision quantization (INT8 + FP16) for LLaMA-based services across 3 billion Facebook users, cutting per-inference compute cost from $0.0008 to $0.0002 per request. OpenAI applies dynamic quantization to GPT-3 inference pipelines supporting 2M concurrent users, achieving 2.1x throughput improvement on A100 GPUs. Netflix leverages INT8 quantization for recommendation ranking models processing 500M+ daily personalization decisions with <5ms latency SLAs. Deployment breaks when teams ignore calibration dataset quality—mismatched calibration (e.g., quantizing on clean data but serving adversarial/noisy inputs) causes 15-25% accuracy collapse mid-deployment. Infrastructure failures occur when quantized models aren't profiled on actual target hardware (INT8 kernels have different performance signatures on CPUs vs NVIDIA vs AMD accelerators), leading to surprised teams discovering their 3x speedup only materializes on one platform.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Quantization reduces model size by 4-8x and latency by 2-5x via lower-precision arithmetic, enabling inference on edge devices and reducing cloud compute costs by 60-75%.",
+        "INT8 quantization dominates production; FP8 emerging for transformer models; INT4 used selectively for extreme compression with controlled accuracy trade-offs.",
+        "Calibration dataset selection is critical—must represent production input distribution or accuracy collapses silently. Use stratified sampling covering diverse data scenarios.",
+        "Post-Training Quantization requires zero retraining but sacrifices 2-5% accuracy; Quantization-Aware Training preserves accuracy within 0.5% at 2-3 week training cost.",
+        "Mixed-precision strategies protect sensitive layers (embeddings, attention) at FP16 while aggressively quantizing (INT8) compute-heavy layers for optimal accuracy-latency trade-offs.",
+        "Validation is mandatory—benchmark post-quantization accuracy on held-out test sets before production deployment to prevent silent accuracy collapse.",
+        "Hardware profiling matters: INT8 kernel performance varies 3-5x across CPU architectures, GPUs, and accelerators; always profile on target deployment hardware."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of inference optimization and quantization with these two knowledge checks. The first focuses on core mechanisms, while the second challenges you to apply these concepts to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In cricket, a batsman's technique degrades slightly when playing under floodlights compared to natural light—but the match still proceeds effectively. Similarly, when we quantize an LLM from FP32 to INT8, we accept minor accuracy loss in exchange for speed. Which of the following best describes why quantization works despite this trade-off?",
+      "items": [
+        "LLMs have inherent redundancy in their weight distributions; small precision reductions don't significantly impact predictions because the model learns robust representations that tolerate minor noise.",
+        "Quantization removes all floating-point errors, making the model more accurate than the original FP32 version.",
+        "INT8 weights are mathematically identical to FP32 weights; there is no actual trade-off involved.",
+        "Quantization only affects training, not inference, so accuracy is preserved completely during deployment."
+      ],
+      "answer": 0,
+      "explanation": "The correct answer is A. Quantization works because neural networks, especially large language models, learn distributed representations with significant redundancy—similar to how a cricket team's strategy remains effective even when one player has a slightly off day. The model's learned patterns are robust enough to tolerate the minor noise introduced by reducing precision from 32-bit floats to 8-bit integers. During calibration, we map the full range of weight values to the smaller INT8 range, and empirically, this loss is often imperceptible in output quality. Option B is incorrect because quantization inherently introduces some precision loss—it doesn't eliminate floating-point errors. Option C misunderstands the mathematical difference: INT8 and FP32 have fundamentally different representations and ranges. Option D conflates training and inference; quantization directly impacts inference performance and accuracy, as it changes how weights are stored and computed during forward passes."
+    },
+    {
+      "type": "quiz",
+      "content": "You're deploying a customer support LLM to mobile devices. Currently, the model runs at 250ms latency with FP32 weights, exceeding your 50ms target. You've profiled the model and found that 60% of latency comes from matrix multiplications in the attention layers. Your team proposes three options: (1) INT8 quantization + KV-cache quantization, (2) knowledge distillation into a smaller model, (3) pruning 40% of weights. Given your constraints, which strategy would you prioritize first, and why?",
+      "items": [
+        "Knowledge distillation, because it always produces the smallest model and guarantees the fastest inference regardless of hardware constraints.",
+        "INT8 quantization + KV-cache quantization, because it targets the computational bottleneck (matrix multiplications) with minimal code changes, provides 3-4x speedup, and preserves the original model architecture for domain-specific performance.",
+        "Pruning 40% of weights, because it reduces memory footprint more than any other technique and works equally well on all hardware platforms.",
+        "Deploy the FP32 model as-is; 250ms is acceptable for mobile applications and optimization is unnecessary."
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. Like a cricket team focusing on their strongest batting lineup first, you should tackle the bottleneck directly: quantization targets matrix multiplications (your profiled 60% latency source) with immediate 3-4x speedup potential. INT8 quantization is low-risk—it requires minimal code refactoring, integrates seamlessly with existing frameworks, and typically incurs <1% accuracy loss for LLMs. KV-cache quantization further reduces memory bandwidth, directly addressing attention layer latency. This two-part approach gives you the best chance of hitting 50ms with minimal disruption. Option A (knowledge distillation) is incorrect because it requires training a new smaller model—time-intensive and risky if your domain data is limited. Distillation might be a second pass if quantization alone falls short. Option C (pruning) is aggressive and structure-dependent; 40% weight removal risks catastrophic accuracy loss and may not translate to proportional latency gains (sparsity isn't always efficiently computed on mobile hardware). Option D ignores your explicit 50ms target and denies the engineering challenge. Quantization is the standard first move in production LLM optimization pipelines."
     }
   ]
 }

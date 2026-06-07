@@ -269,6 +269,132 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns have emerged for agentic workflows: the Hierarchical Coordinator pattern, where a parent agent orchestrates specialized child agents with strict task delegation; the Peer-to-Peer pattern, where agents operate as equals with consensus-based decision-making; and the Reactive Pipeline pattern, where agents trigger sequentially based on state transitions. The Hierarchical Coordinator minimizes latency and simplifies debugging—ideal for time-sensitive systems like Uber's routing optimization (coordinating location, pricing, and ETA agents)—but introduces single points of failure and requires careful timeout management. Peer-to-Peer excels at fault tolerance and horizontal scaling, used by Netflix for recommendation agents negotiating content preference conflicts, but introduces consensus overhead and potential deadlocks costing 200-500ms per negotiation cycle. The Reactive Pipeline offers simplicity and observability, perfect for Google's document processing agents, but tight coupling between stages can cascade failures. Trade-offs: Hierarchical = fast but brittle; Peer-to-Peer = resilient but slow; Reactive = maintainable but rigid. Most production systems blend patterns—hierarchical for control layers, peer consensus for conflict resolution, reactive pipelines for deterministic flows.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The Hierarchical Coordinator is your captain calling all shots—deciding field placements, bowling changes, and batting order instantly. Fast decisions, but if the captain misreads the pitch, everyone suffers. The Peer-to-Peer pattern resembles a team huddle where batters, bowlers, and fielders negotiate strategy together—slower, but no single decision breaks the plan. The Reactive Pipeline mirrors a pre-planned bowling rotation: first pacer bowls 6 overs, triggers spinner's entry, who triggers fielder adjustments—rigid but predictable. In high-pressure matches (Uber surge pricing), you want the captain's quick calls (Hierarchical). In series play where learning matters (Netflix recommendations), team consensus wins (Peer-to-Peer). And in routine Test cricket (document processing), the rotation schedule works flawlessly (Reactive).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Hierarchical Coordinator with timeout and fallback\nclass CricketMatchOrchestrator:\n    def __init__(self):\n        self.batting_agent = BattingAgent()\n        self.bowling_agent = BowlingAgent()\n        self.fielding_agent = FieldingAgent()\n        self.timeout_ms = 500\n    \n    async def orchestrate_over(self, over_number: int) -> MatchState:\n        try:\n            # Coordinator makes strategic calls\n            field_setup = await asyncio.wait_for(\n                self.fielding_agent.suggest_placement(self.match_state),\n                timeout=self.timeout_ms/1000\n            )\n            bowling_plan = await asyncio.wait_for(\n                self.bowling_agent.select_bowler(field_setup, over_number),\n                timeout=self.timeout_ms/1000\n            )\n            return MatchState(field_setup, bowling_plan)\n        except asyncio.TimeoutError:\n            # Fallback: use cached strategy from last successful state\n            return self.state_checkpoint.last_valid_strategy()\n\n# ANTI-PATTERN: Agents negotiating without timeout or deadlock detection\nclass PoorCricketWorkflow:\n    async def coordinate(self):\n        # NO TIMEOUT - agents argue indefinitely\n        strategy = await self.batting_agent.negotiate_with(self.bowling_agent)\n        # NO FALLBACK - if negotiation fails, entire match halts\n        return strategy\n\n# BEST PRACTICE: Reactive Pipeline with state validation\ndef process_match_event(event: MatchEvent) -> List[AgentAction]:\n    actions = []\n    # Stage 1: Validate event\n    if not validate_event(event):\n        return actions  # Fail gracefully\n    \n    # Stage 2: Update state atomically\n    with state_lock:\n        state.update(event)\n        actions.append(state_change_action())\n    \n    # Stage 3: Trigger next stage only if state valid\n    if state.is_valid():\n        actions.append(next_pipeline_stage(state))\n    \n    return actions\n\n# ANTI-PATTERN: No state validation between stages\ndef bad_pipeline(event):\n    state.update(event)  # No validation\n    return next_stage(state)  # Propagates corruption",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is building agents without explicit timeout and fallback mechanisms, causing the entire system to hang when one agent stalls. In cricket terms: your captain calls a strategy but the bowler never acknowledges—the whole match freezes. FIX: (1) Always wrap agent calls in asyncio.wait_for(agent_call(), timeout=X) with a deadline measured in milliseconds, not seconds. (2) Implement a fallback strategy stored in state checkpoints—if negotiation times out, revert to the last known-good strategy, not a crash. (3) Log timeouts as WARN level with agent_id and operation, then use those logs to identify slow agents and add caching or parallel execution. Example: if BowlingAgent takes >800ms consistently, cache its decisions for similar game states rather than calling it fresh every over.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Agentic workflows power production systems at extraordinary scale. Google uses hierarchical agents for document processing pipelines (Gmail spam detection, Drive OCR), coordinating classification, ranking, and remediation agents handling billions of documents daily—when done wrong, a single misbehaving agent can corrupt entire user inboxes, so they enforce strict state checkpointing every 100 documents. Uber's routing system deploys peer-coordinated agents for location, ETA, and surge pricing decisions, processing 15+ million ride requests per day; network latency between agents compounds, so they cache agent outputs aggressively and accept 2-3 second stale data rather than block. OpenAI's function-calling agents in GPT-4 use reactive pipelines with strict error recovery—a failed API call triggers retry logic with exponential backoff, critical for their millions of concurrent API users. Netflix's recommendation orchestrator balances multiple genre, engagement, and retention agents, running A/B tests on coordination strategies affecting 250M+ subscribers; suboptimal communication costs millions in engagement. Meta's content moderation combines all three patterns: hierarchical for urgent policy violations, peer consensus for gray-area content, reactive pipelines for bulk processing—any breakdown risks regulatory penalties. Airbnb's search ranking layers multiple agents (search quality, business value, host reliability) coordinating through shared state and periodic resyncing, where poor checkpointing leads to stale rankings costing revenue per search.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Agent memory and state persistence separate operational data from learned patterns—implement both with different durability SLAs.",
+        "Checkpointing strategies (periodic vs. event-driven) balance recovery speed against write overhead; most production systems use hybrid approaches.",
+        "Error recovery must be proactive with retry logic, fallbacks, and circuit breakers; passive approaches cause cascading failures at scale.",
+        "Inter-agent communication requires explicit coordination patterns (hierarchical, peer-to-peer, or reactive) chosen based on latency tolerance and consistency needs.",
+        "Timeouts and fallback strategies are non-negotiable—agents without deadlines and backups will halt your entire system under load.",
+        "State validation between pipeline stages prevents corruption propagation; always validate before passing to downstream agents.",
+        "Production monitoring must track per-agent latency, error rates, state checkpoint size, and coordination overhead separately to identify bottlenecks."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of AI agents and agentic workflows with these two knowledge checks. Quiz 1 focuses on conceptual understanding of core mechanisms, while Quiz 2 applies these concepts to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In an agentic workflow managing a cricket tournament, an agent stores the batting order and player statistics in memory. The agent later retrieves this information to make decisions about team strategy. Which component of the Agent Memory Architecture is primarily responsible for enabling this capability?",
+      "items": [
+        "State Persistence Layer that maintains historical snapshots of agent decisions",
+        "Short-term working memory that holds only the current conversation context",
+        "Semantic memory that stores facts and knowledge about the domain",
+        "Action log that records only the most recent agent actions"
+      ],
+      "answer": 2,
+      "explanation": "Semantic memory is the correct answer because it's specifically designed to store domain knowledge and facts—in this case, player statistics, tournament rules, and team information—that the agent needs to reference across multiple interactions. Short-term working memory (option B) only handles current context, not persistent knowledge. The state persistence layer (option A) focuses on snapshots of decisions rather than knowledge storage. The action log (option D) tracks actions, not domain knowledge. Semantic memory enables agents to maintain a knowledge base that informs decisions throughout the workflow lifecycle.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your agentic workflow coordinates three specialized agents: a batting_analyzer_agent that evaluates player form, a pitch_conditions_agent that monitors weather and field state, and a strategy_agent that recommends team tactics. During a match, the pitch_conditions_agent detects a sudden change in weather that invalidates assumptions made by the strategy_agent 30 seconds earlier. The strategy_agent is about to recommend a strategy based on stale data. What is the most effective approach to handle this situation?",
+      "items": [
+        "Implement a message queue that processes all agent communications sequentially without prioritization, ensuring no messages are lost",
+        "Use pub-sub messaging with event versioning where the pitch_conditions_agent publishes an invalidation event that triggers the strategy_agent to recalculate based on fresh data",
+        "Store all agent outputs in a centralized database and have the strategy_agent periodically poll for updates every 5 minutes",
+        "Prevent the pitch_conditions_agent from communicating with other agents to avoid conflicting information"
+      ],
+      "answer": 1,
+      "explanation": "The pub-sub messaging with event versioning approach (option B) is the most effective because it enables real-time, event-driven communication where agents react immediately to critical state changes. This pattern allows the pitch_conditions_agent to broadcast the weather change, triggering the strategy_agent to invalidate and recalculate its recommendations with fresh data. Option A (sequential queue processing) introduces latency and doesn't prioritize urgent updates. Option C (periodic polling every 5 minutes) is too slow for dynamic match conditions and wastes resources. Option D (preventing communication) defeats the purpose of a coordinated multi-agent system. Event-driven architectures with versioning ensure agents maintain consistency while responding to real-world changes in tournament state.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

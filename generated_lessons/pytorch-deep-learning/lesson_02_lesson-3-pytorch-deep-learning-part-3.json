@@ -176,6 +176,128 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch systems rely on three dominant patterns: (1) Checkpoint-based training with early stopping prevents overfitting and reduces compute waste—ideal when validation loss plateaus, but requires careful metric selection and adds wall-clock latency checking. (2) Distributed Data Parallel (DDP) across GPUs scales linearly until communication overhead dominates (typically 8-16 GPUs), requiring synchronized batch normalization and gradient accumulation tuning. (3) Mixed precision training (AMP) reduces memory by 40-50% and accelerates computation via float16, trading numerical stability for speed—critical for large models but demands gradient scaling to prevent underflow. Choose checkpointing for single-GPU experimentation, DDP when batch size exceeds GPU VRAM, and AMP when model parameters exceed 500M. The cost: checkpointing adds I/O overhead (~10% slower), DDP introduces all-reduce latency (5-15% slower per GPU added), and AMP requires hyperparameter retuning. Netflix uses DDP for recommendation models at 100B examples/day; Google applies AMP to BERT-scale NLP—both sacrifice some convergence speed for 3-4x throughput gains.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Checkpoint-based early stopping mirrors declaring an innings—you recognize peak advantage and exit before collapse, avoiding unnecessary deliveries that risk wickets. Distributed Data Parallel is field rotation strategy: spreading bowlers across positions (GPUs) covers more ground faster, but coordination overhead (captain's calls, sync signals) slows response time slightly. Mixed precision training resembles DRS usage: you sacrifice confidence in marginal decisions (lower float precision) to accelerate play (computation), betting the umpire's call (loss scaling) keeps you in the game. Batch normalization synchronization across GPUs is like ensuring all fielders play the same pitch conditions—asynchronous play causes chaos. Gradient accumulation before synchronization mirrors combining multiple overs into one analysis—fewer sync points, less communication tax, but delayed feedback.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Checkpoint + Early Stopping + Mixed Precision\nimport torch\nfrom torch.cuda.amp import autocast, GradScaler\n\nclass CricketBatsmanPredictor(torch.nn.Module):\n    def __init__(self, striker_dim=128):\n        super().__init__()\n        self.striker_encoder = torch.nn.Linear(50, striker_dim)\n        self.bowler_encoder = torch.nn.Linear(50, striker_dim)\n        self.predictor = torch.nn.Sequential(\n            torch.nn.Linear(striker_dim * 2, 256),\n            torch.nn.ReLU(),\n            torch.nn.Linear(256, 1)\n        )\n    \n    def forward(self, striker_stats, bowler_stats):\n        striker_emb = self.striker_encoder(striker_stats)\n        bowler_emb = self.bowler_encoder(bowler_stats)\n        combined = torch.cat([striker_emb, bowler_emb], dim=1)\n        return self.predictor(combined)\n\nmodel = CricketBatsmanPredictor()\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\nscaler = GradScaler()\nbest_val_loss = float('inf')\npatience = 5\npatience_counter = 0\n\nfor epoch in range(100):\n    model.train()\n    for batch_striker, batch_bowler, batch_target in train_loader:\n        optimizer.zero_grad()\n        \n        # Mixed precision: forward pass in float16\n        with autocast():\n            pred = model(batch_striker, batch_bowler)\n            loss = torch.nn.functional.mse_loss(pred, batch_target)\n        \n        # Backward with gradient scaling\n        scaler.scale(loss).backward()\n        scaler.unscale_(optimizer)\n        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)\n        scaler.step(optimizer)\n        scaler.update()\n    \n    # Validation and early stopping\n    model.eval()\n    val_loss = 0.0\n    with torch.no_grad():\n        for batch_striker, batch_bowler, batch_target in val_loader:\n            with autocast():\n                pred = model(batch_striker, batch_bowler)\n                val_loss += torch.nn.functional.mse_loss(pred, batch_target).item()\n    \n    val_loss /= len(val_loader)\n    \n    if val_loss < best_val_loss:\n        best_val_loss = val_loss\n        patience_counter = 0\n        torch.save(model.state_dict(), 'best_batsman_predictor.pt')\n    else:\n        patience_counter += 1\n        if patience_counter >= patience:\n            print(f\"Early stopping at epoch {epoch}\")\n            break\n\n# ANTI-PATTERN: No early stopping, no mixed precision, synchronous updates\nmodel = CricketBatsmanPredictor()\noptimizer = torch.optim.SGD(model.parameters(), lr=0.01)  # Too high LR\n\nfor epoch in range(1000):  # Trains forever\n    for batch_striker, batch_bowler, batch_target in train_loader:\n        pred = model(batch_striker, batch_bowler)  # No mixed precision\n        loss = torch.nn.functional.mse_loss(pred, batch_target)\n        loss.backward()\n        # No gradient clipping—gradient explosion risk\n        optimizer.step()\n        optimizer.zero_grad()\n    # No validation check—overfits silently\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is training without validation loss monitoring, then discovering the model overfits after weeks of computation. Fix: Always implement early stopping by checkpointing model weights when validation loss improves, setting patience (typically 5-10 epochs), and restoring the best checkpoint when patience exhausts. Additionally, never skip gradient clipping in RNN/Transformer models—exploding gradients cause NaN losses within 2-3 epochs. Use `torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)` before every optimizer step. Finally, gradient accumulation is NOT a substitute for batch size: accumulating 4 batches of size 32 does NOT equal one batch of size 128 due to batch norm layer behavior—use `sync_batch_norm()` in distributed settings or accumulate without BN layers.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At production scale, these patterns power systems handling billions of examples daily. Google uses DDP with mixed precision for BERT-scale NLP models (340M parameters) serving 5B+ queries/day across TPU pods, reducing inference latency by 40% via gradient checkpointing. Netflix applies early stopping during training of 2B-parameter recommendation models on 100B user-interaction events, preventing overfitting that would cost millions in poor recommendations. Meta (Facebook) trains recommendation systems using DDP across 1000+ GPUs with synchronized batch norm, balancing throughput against communication overhead—undersynchronized models diverge (10-30% accuracy drop), while over-synchronized systems become I/O bound. OpenAI scales GPT models via pipeline parallelism + gradient checkpointing, trading forward-pass recomputation for memory efficiency. Uber's ranking systems fail silently without validation curves: a model appearing converged may degrade on out-of-distribution data (e.g., holiday traffic patterns), causing business-critical ranking errors. Airbnb discovered DDP bugs in production affecting 1M+ nightly bookings—synchronization mismatches caused stale gradients. Critical lesson: production systems demand instrumentation (validation curves, gradient histograms, gradient-to-parameter ratios), not just accuracy metrics.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Custom loss functions enable domain-specific optimization: cricket strikeout prediction needs calibrated confidence, not just binary accuracy.",
+        "Advanced optimizers (Adam, AdamW, LAMB) adapt learning rates per parameter, critical for models exceeding 100M parameters.",
+        "Validation loss divergence from training loss signals overfitting; early stopping prevents wasted compute and memory.",
+        "Mixed precision training cuts memory 40-50% and accelerates computation via float16, requiring gradient scaling to prevent underflow.",
+        "Distributed Data Parallel requires synchronized batch norm and all-reduce collectives; asynchrony causes 5-30% accuracy loss silently.",
+        "Gradient checkpointing trades recomputation for memory, enabling 2-3x larger batch sizes on fixed hardware.",
+        "Production systems fail without monitoring: track validation curves, gradient norms, learning rate schedules—accuracy alone misses distribution shift."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of PyTorch deep learning concepts with these two quizzes. The first focuses on conceptual knowledge of core mechanisms, while the second applies your learning to a realistic scenario.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket ball trajectory prediction model. During training, your validation loss plateaus while training loss continues decreasing. You notice the model performs poorly on new match data. Which phenomenon are you experiencing, and what is the PRIMARY mechanism causing it?",
+      "items": [
+        "Overfitting: the model has memorized training patterns (high capacity) without learning generalizable features, causing poor validation performance and increased weight magnitudes",
+        "Underfitting: the model architecture is too simple to capture the relationship between input features and ball trajectory",
+        "Batch normalization failure: the validation dataset has different statistical properties than the training set",
+        "Learning rate decay: the optimizer is reducing step sizes too aggressively, preventing convergence"
+      ],
+      "answer": 0,
+      "explanation": "Overfitting is the correct answer because the divergence between training and validation loss is the classic hallmark of a model learning training-specific noise rather than generalizable patterns. The model's high capacity allows it to fit idiosyncrasies in the training data (specific match conditions, player styles) that don't transfer to new matches. Training loss continues decreasing because the model keeps optimizing for these spurious patterns, but validation loss plateaus because these patterns don't exist in unseen data. Underfitting would show both losses remaining high and non-decreasing. Batch normalization failure and learning rate decay issues would manifest differently—typically as training loss stalling rather than diverging validation behavior. Regularization techniques (L1/L2, dropout, early stopping) directly combat this overfitting mechanism."
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a runs-per-over prediction model using PyTorch with a custom loss function. Mid-training, gradients become NaN values across all parameters. You recently switched from Adam optimizer to SGD with momentum=0.9, increased learning rate from 0.001 to 0.1, and removed batch normalization. Which change is MOST likely the root cause, and what's the underlying mechanism?",
+      "items": [
+        "Removing batch normalization: without layer-wise normalization, internal covariate shift increases, activations explode, and gradients become unstable",
+        "Switching to SGD: momentum-based optimizers cannot handle complex loss landscapes that Adam was designed for",
+        "The learning rate increase: without adaptive learning rates, large steps amplify gradient magnitudes exponentially, causing numerical overflow (NaN)",
+        "Custom loss function: the new loss formulation has undefined gradients or produces infinities for certain prediction ranges"
+      ],
+      "answer": 2,
+      "explanation": "The learning rate increase from 0.001 to 0.1 is the most likely culprit when combined with removing batch normalization. Here's why: SGD with momentum=0.9 is a perfectly valid optimizer; it's just less forgiving than Adam (which adapts per-parameter). Without batch normalization, activations can grow unbounded through layers, and a 100× learning rate increase amplifies this problem catastrophically. Large learning rate steps cause parameter updates that are too aggressive, pushing weights into regions where activations overflow, producing NaN gradients. Removing batch normalization removes a critical stabilizing force. While the custom loss function *could* be problematic, NaN across ALL parameters suggests numerical overflow rather than a logic error in loss computation. The solution is to reduce the learning rate (0.01-0.05), reintroduce batch normalization, or use learning rate schedules. This demonstrates why validation is critical before changing multiple hyperparameters simultaneously."
     }
   ]
 }

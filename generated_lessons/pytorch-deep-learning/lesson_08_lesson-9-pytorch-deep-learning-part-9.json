@@ -203,6 +203,133 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch systems employ three dominant patterns for autograd management. **Gradient Accumulation** batches multiple forward-backward passes before optimizer updates, critical when GPU memory constrains batch size; use this when training large models on limited hardware, but accept 5-15% training speed reduction and delayed weight updates. **Mixed Precision Training** runs forward passes in float16 while maintaining float32 master weights, cutting memory by 50% and accelerating computation 2-3x on modern GPUs (NVIDIA A100, H100); employed by OpenAI and Meta at scale, but requires loss scaling to prevent gradient underflow and careful numerical monitoring. **Gradient Checkpointing** trades compute for memory by recomputing intermediate activations during backward pass instead of storing them; essential for training 70B+ parameter models (like Meta's LLaMA), reducing memory by 30-40% at 20-30% computational overhead. Choose accumulation for constrained memory, mixed precision for speed-critical training, checkpointing for extreme-scale models. The trade-off matrix: accumulation increases wall-clock time, mixed precision requires tuning, checkpointing demands extra computation. Production systems typically combine all three—Meta's training pipeline uses all three simultaneously for efficiency.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: **Gradient Accumulation** mirrors building partnership runs—batters don't sprint for every single run; they accumulate multiple singles and rotate strike wisely before committing to aggressive shots (parameter updates). **Mixed Precision Training** is like using DRS (Decision Review System) strategically—you don't review every decision (full precision), but focus computational resources on borderline calls (float16 speed) while keeping the scorebook accurate (float32 master copy). **Gradient Checkpointing** resembles bowling rotation in a 5-day Test match: rather than keeping all five bowlers fresh throughout (storing all activations), you rotate fewer bowlers and let them recover between spells (recompute during backward pass), conserving energy (GPU memory) while maintaining effectiveness. A captain uses field placement (accumulation) for early overs, DRS sparingly (mixed precision) during critical moments, and bowling rotations (checkpointing) across sessions. Choosing the right pattern depends on match situation—T20 demands aggressive strategies, Test cricket requires conservation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Gradient Accumulation with Mixed Precision and Checkpointing\nimport torch\nfrom torch.cuda.amp import autocast, GradScaler\nfrom torch.utils.checkpoint import checkpoint\n\nclass BatsmanLSTM(torch.nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.encoder = torch.nn.LSTM(128, 512, num_layers=4, batch_first=True)\n        self.decoder = torch.nn.Linear(512, 1)\n    \n    def forward(self, innings_data):\n        # Use checkpointing on encoder to save memory\n        hidden = checkpoint(self.encoder, innings_data, use_reentrant=False)\n        return self.decoder(hidden[0][:, -1, :])\n\nmodel = BatsmanLSTM().cuda()\noptimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)\nscaler = GradScaler()\naccumulation_steps = 4\n\nfor epoch in range(num_epochs):\n    for batch_idx, (innings, runs) in enumerate(dataloader):\n        with autocast(dtype=torch.float16):  # Mixed precision\n            predictions = model(innings.cuda())\n            loss = criterion(predictions, runs.cuda()) / accumulation_steps\n        \n        scaler.scale(loss).backward()  # Scale for numerical stability\n        \n        # Optimizer step only after accumulation\n        if (batch_idx + 1) % accumulation_steps == 0:\n            scaler.unscale_(optimizer)\n            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)\n            scaler.step(optimizer)\n            scaler.update()\n            optimizer.zero_grad()\n\nprint(\"✓ Memory-efficient training with 3 optimization patterns applied\")\n\n# ANTI-PATTERN: Naive single-pass training (memory inefficient)\n# for epoch in range(num_epochs):\n#     for batch_idx, (innings, runs) in enumerate(dataloader):\n#         predictions = model(innings.cuda())  # Full precision, all activations stored\n#         loss = criterion(predictions, runs.cuda())\n#         loss.backward()  # Backward on full tensors\n#         optimizer.step()\n#         optimizer.zero_grad()\n#         # Result: Out-of-memory on large models, 2-3x slower execution",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Best practice combines three patterns: checkpointing reduces intermediate activation memory (use_reentrant=False for efficiency), autocast executes forward in float16 while maintaining float32 state, and GradScaler with accumulation prevents gradient underflow. Gradient clipping stabilizes training. Anti-pattern stores all activations, uses full precision throughout, and updates every step—causing OOM errors and slow training on realistic models."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Forgetting to scale loss during gradient accumulation.** When accumulating gradients over N steps, you MUST divide loss by N (as shown: `loss / accumulation_steps`), otherwise gradients explode and training becomes unstable. Many practitioners accumulate without scaling, producing nan losses within 5-10 batches. Fix: Always use `loss = loss_fn(...) / num_accumulation_steps` before backward(). Additionally, when using mixed precision + accumulation together, ensure scaler.unscale_() is called before gradient clipping, and scaler.update() after optimizer.step()—wrong order causes gradient clipping to see unscaled values, defeating its purpose.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production deep learning at scale depends entirely on autograd optimization patterns. **Google** uses gradient checkpointing in LLM training across TPU clusters (training PaLM at 540B parameters); without checkpointing, memory per accelerator would exceed 1TB. **OpenAI** employs mixed precision training for GPT models, reducing training cost by ~40% on Azure GPU clusters while maintaining model quality. **Meta** combines all three patterns (accumulation + mixed precision + checkpointing) simultaneously in LLaMA training across 16k A100 GPUs, achieving 400 tokens/sec/GPU throughput; a single implementation bug in gradient scaling once cost 24 hours of cluster time ($500k+). **Netflix** applies gradient checkpointing in recommendation ranking models with 100M+ parameters, serving inference across millions of users—incorrect backward pass implementation caused ranking regression affecting 8% of watch time. **Uber** uses accumulation patterns in autonomous vehicle perception models, balancing accuracy (larger effective batches) against latency constraints. Scale breaks at: batch size beyond GPU memory (needs accumulation), models exceeding 10B parameters (needs checkpointing), and throughput demands exceeding 100k samples/sec (needs mixed precision). Wrong implementations cause NaN losses, memory leaks, or silent accuracy degradation—production systems monitor gradient statistics continuously.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Autograd tape-based tracking enables dynamic computation graphs; retain_graph=True allows multiple backward passes at cost of increased memory.",
+        "Custom autograd functions via Function.forward/backward provide fine-grained control for non-differentiable operations and gradient optimization.",
+        "Gradient checkpointing trades 20-30% compute for 30-40% memory savings—mandatory for models exceeding GPU VRAM limits in production.",
+        "Mixed precision training with GradScaler cuts memory 50% and accelerates computation 2-3x; requires loss scaling to prevent float16 underflow.",
+        "Gradient accumulation enables larger effective batch sizes on memory-constrained hardware; must divide loss by accumulation steps to prevent explosion.",
+        "Tape-based backward pass requires O(depth) memory; use inplace operations cautiously as they break computational graph and cause silent errors.",
+        "Production systems combine accumulation, mixed precision, and checkpointing simultaneously; monitoring gradient norms detects numerical instability before NaN loss.",
+        "Gradient clipping with unscaled values is critical in mixed precision; wrong order between unscale_(), clip, and step() nullifies clipping effectiveness."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of PyTorch's autograd system, gradient computation, and optimization techniques through these two comprehensive quizzes. The first quiz focuses on conceptual understanding of how autograd works under the hood, while the second applies these concepts to real-world deep learning scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "When you call .backward() on a scalar loss in PyTorch, the autograd system traverses the computation graph in reverse order. This process is known as backpropagation. During this traversal, gradients are computed using the chain rule. Which of the following best describes what happens to the computation graph after .backward() completes execution?",
+      "items": [
+        "The computation graph is retained in memory by default, allowing multiple backward passes",
+        "The computation graph is automatically deleted unless you set retain_graph=True, freeing memory for subsequent forward passes",
+        "The computation graph is converted to a static graph that cannot be modified",
+        "The computation graph is moved to CPU memory regardless of the device the tensors were on"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. By default, PyTorch deletes the computation graph after .backward() completes to save memory, since each forward pass typically creates a new graph. However, if you need to perform multiple backward passes (e.g., for gradient accumulation or computing higher-order derivatives), you must explicitly set retain_graph=True. Option A is incorrect because the graph is NOT retained by default. Option C is wrong because PyTorch uses dynamic graphs that can change with each forward pass. Option D is incorrect because device placement is unrelated to graph retention—graphs exist as computational records, not physical memory allocations.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket batting performance prediction model using a ResNet-50 backbone with 50 layers. The model processes game statistics and produces batting average predictions. During training, you notice that GPU memory consumption is very high (nearly 80% of 24GB VRAM), limiting your batch size to just 8 samples. Your training speed is suffering because you cannot parallelize across more samples. You want to maintain your current model architecture and batch size for gradient stability. What is the BEST optimization technique to reduce memory consumption without sacrificing model capacity?",
+      "items": [
+        "Reduce the number of ResNet layers from 50 to 18 and retrain from scratch to use less memory",
+        "Use gradient checkpointing (activation checkpointing) to trade computation for memory by recomputing activations during backward pass",
+        "Switch to float16 (half-precision) training immediately, as it always reduces memory by 50% without any downsides",
+        "Remove all dropout layers and batch normalization to reduce the size of cached activations during the forward pass"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. Gradient checkpointing is specifically designed for this scenario—it selectively stores only certain activations (like those at layer boundaries) during the forward pass and recomputes intermediate activations during backpropagation. This reduces memory usage by ~30-40% with only a modest 20-30% increase in computation time, which is usually acceptable. Option A is incorrect because reducing model capacity changes your architecture and loses expressiveness. Option C is misleading because float16 has numerical stability issues and doesn't provide a clean 50% reduction in all memory components (optimizer states, gradients also consume memory). Option D is wrong because removing regularization techniques degrades model performance and doesn't significantly reduce memory consumption—activations are the primary memory bottleneck, not dropout/batch norm parameters.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

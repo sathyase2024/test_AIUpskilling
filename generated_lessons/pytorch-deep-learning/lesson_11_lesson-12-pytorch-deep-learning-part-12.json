@@ -210,6 +210,128 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch systems typically employ three dominant patterns: (1) Gradient Accumulation with synchronization checkpoints—used when batch size constraints exist but effective batch semantics are required. Trade-off: reduces per-step throughput by 15-30% but enables larger effective batches without OOM. Deploy when memory budget is tight but training stability matters. (2) Mixed Precision Training with loss scaling—standard at Google, Meta, and OpenAI for 2-3x speedup on modern GPUs. Cost: requires careful hyperparameter tuning for loss scale schedules; incompatible with certain custom CUDA kernels. Use when targeting sub-100ms inference latency on V100s or newer. (3) Distributed Data Parallel with gradient bucketing—Netflix and Airbnb use this at scale across 256+ GPUs. Bottleneck: all-reduce communication becomes network-bound above 64 nodes; requires gradient compression or topology-aware scheduling. Choose when horizontal scaling matters more than per-GPU efficiency. Each pattern solves distinct problems: accumulation handles algorithmic constraints, mixed precision solves hardware limits, and DDP solves scale-out physics. Combining all three is standard practice but introduces complex interaction surfaces where bugs hide.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Gradient Accumulation is like setting a defensive field and bowling tight lines over multiple overs before attacking—you're patient, accumulating pressure (gradients) before committing your resources (backward pass). Mixed Precision Training is like using DRS strategically—you don't review every decision (cast everything in float32), just the critical ones (float16 where noise tolerance is high), saving your reviews (computation) for moments that matter. Distributed Data Parallel is like fielding a separate XI across multiple grounds simultaneously, with a captain (rank 0) collecting match updates from each ground before deciding the next strategy adjustment. Gradient bucketing is like the captain grouping players by position before receiving updates—wicketkeepers report together, bowlers together—reducing communication overhead. Learning rate scheduling is like rotating your bowling attack: aggressive pace early (high LR), then switching to spin as the pitch deteriorates (decay schedule). The trade-off between patterns mirrors cricket strategy: aggressive field placements (high learning rates) risk boundary sixes; defensive setups (gradient accumulation) take longer to build advantage.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Not synchronizing accumulation with gradient updates\nclass BatterStatsPredictorWrong:\n    def __init__(self, model, optimizer):\n        self.model = model\n        self.optimizer = optimizer\n        self.accumulation_steps = 4\n    \n    def training_step(self, batch_wickets, batch_runs):\n        logits = self.model(batch_wickets)\n        loss = F.cross_entropy(logits, batch_runs)\n        loss.backward()  # Gradients accumulate\n        # WRONG: optimizer step every iteration instead of every N steps\n        self.optimizer.step()\n        self.optimizer.zero_grad()\n\n# BEST PRACTICE: Proper gradient accumulation with synchronization\nclass BatterStatsPredictorCorrect:\n    def __init__(self, model, optimizer, accumulation_steps=4):\n        self.model = model\n        self.optimizer = optimizer\n        self.accumulation_steps = accumulation_steps\n        self.step_count = 0\n    \n    def training_step(self, batch_wickets, batch_runs):\n        logits = self.model(batch_wickets)\n        loss = F.cross_entropy(logits, batch_runs)\n        \n        # Scale loss by accumulation factor for correct gradient magnitude\n        scaled_loss = loss / self.accumulation_steps\n        scaled_loss.backward()\n        \n        self.step_count += 1\n        \n        # Only update weights at accumulation boundary\n        if self.step_count % self.accumulation_steps == 0:\n            self.optimizer.step()\n            self.optimizer.zero_grad()\n        \n        return loss.item()\n\n# BEST PRACTICE: Mixed precision with gradient scaling\nscaler = torch.cuda.amp.GradScaler()\n\nfor epoch in range(num_epochs):\n    for batch_wickets, batch_runs in cricket_dataloader:\n        optimizer.zero_grad()\n        \n        # Autocast reduces float32 to float16 where safe\n        with torch.autocast(device_type='cuda', dtype=torch.float16):\n            logits = model(batch_wickets)\n            loss = criterion(logits, batch_runs)\n        \n        # Scale loss to prevent gradient underflow in float16\n        scaler.scale(loss).backward()\n        scaler.step(optimizer)\n        scaler.update()",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Gradient accumulation without loss scaling causes gradient magnitude collapse. Symptom: loss plateaus or diverges after 10-20 accumulation steps. Fix: Always divide loss by accumulation_steps before backward() to keep gradients in normal range [0.01-1.0]. Example: loss_scaled = loss / num_accumulate_steps; loss_scaled.backward() instead of loss.backward(). Missing this step causes effective learning rate to increase unexpectedly per accumulation cycle, breaking convergence guarantees. Additionally, never call optimizer.step() inside the accumulation loop—only call it every N backward() calls, otherwise you're applying micro-updates that contradict the purpose of accumulation.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Gradient accumulation enables larger effective batches on memory-constrained devices; scale loss by accumulation steps to maintain gradient magnitude.",
+        "Mixed precision training achieves 2-3x speedup on modern GPUs by computing in float16 while preserving float32 weights; use GradScaler to prevent underflow.",
+        "Distributed Data Parallel requires synchronizing gradients across ranks via all-reduce; bucketing by size reduces communication overhead on slow networks.",
+        "Learning rate schedules (cosine annealing, warm restarts) outperform fixed rates by 5-15% on vision/NLP tasks; warm-up prevents early training instability.",
+        "Combining all patterns (accumulation + mixed precision + DDP + scheduling) is production standard at Google, Meta, OpenAI for training 10B+ parameter models.",
+        "Common pitfall: applying optimizer.step() inside accumulation loop breaks effective batch semantics; only step at accumulation boundaries.",
+        "Profile communication vs computation bottleneck before deploying DDP; gradient compression essential when all-reduce time exceeds backward pass time."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At production scale, these patterns are mandatory infrastructure. Google uses DDP + mixed precision across TPU pods (8,192+ chips) to train Gemini models on 30T token datasets—failure modes include synchronization deadlocks requiring 48-hour training restarts. Meta's LLaMA training pipeline combines gradient accumulation (effective batch 4M tokens) with DeepSpeed ZeRO offloading, reducing per-GPU memory from 80GB to 16GB on A100 clusters. Netflix deploys mixed precision in recommendation ranking models processing 200M+ user sessions daily; losing 0.1% accuracy at inference costs $2M annually in missed recommendations. OpenAI's GPT training uses cosine annealing schedules tuned per model size—wrong schedule choices add 10-20% extra tokens to convergence. Uber's ETA prediction system scales across 256 GPUs with gradient bucketing; network saturation without bucketing increased training time 6x. Airbnb's search ranking model uses all four patterns together: trains on 8 A100s with effective batch 65,536, completing in 6 hours vs 36 hours without optimizations. When these patterns fail (common: forgetting loss scaling, wrong accumulation boundaries), training silently diverges after 1000+ steps, wasting weeks of compute before detection.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of PyTorch advanced training techniques with these two knowledge checks. Quiz 1 focuses on conceptual mastery of core mechanisms, while Quiz 2 presents real-world scenarios requiring applied decision-making.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You are training a cricket bat detection model on a dataset of 100,000 images distributed across 4 GPUs. Your gradient accumulation steps is set to 4, and your batch size per GPU is 32. What is the effective batch size that your model sees before parameter updates occur?",
+      "items": [
+        "128 (batch_size × num_gpus)",
+        "512 (batch_size × num_gpus × accumulation_steps)",
+        "32 (batch_size only)",
+        "256 (batch_size × accumulation_steps only, single GPU)"
+      ],
+      "answer": 1,
+      "explanation": "The effective batch size is calculated by multiplying batch_size_per_gpu × num_gpus × accumulation_steps. With 32 samples per GPU on 4 GPUs, you get 128 samples per accumulation step. Over 4 accumulation steps before the optimizer updates, the model aggregates gradients from 512 total samples (32 × 4 × 4). This is why gradient accumulation is useful—it simulates training with a larger batch size without requiring more GPU memory. Option A only counts the per-step batch size across GPUs. Option C ignores both distribution and accumulation. Option D ignores the multi-GPU aspect entirely."
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a wicketkeeper position classifier using Distributed Data Parallel (DDP) across 8 GPUs. During training, you notice one GPU consistently produces NaN loss values while others train normally. What is the MOST likely cause and first debugging step?",
+      "items": [
+        "Use torch.nn.SyncBatchNorm to synchronize batch normalization statistics across all GPUs before retraining",
+        "Reduce the learning rate globally because one GPU's data distribution is different from others",
+        "Check if data loading on that GPU produces anomalies (extreme values, corrupted samples) or if that GPU has hardware issues causing numerical instability",
+        "Increase the number of accumulation steps to smooth out gradients across all processes"
+      ],
+      "answer": 2,
+      "explanation": "NaN loss on a single GPU in DDP typically indicates a data quality or hardware issue specific to that GPU's data loader or device, not a synchronization problem. Corrupted images, extreme pixel values, or hardware malfunction (thermal throttling, memory errors) on one device can cause numerical instability and NaN propagation. Option A addresses batch norm desynchronization, which affects performance but doesn't typically cause NaN in one GPU only. Option B (learning rate reduction) doesn't solve root cause and affects all GPUs unnecessarily. Option D (more accumulation steps) masks rather than fixes the underlying problem. Always investigate data quality and hardware health first when one distributed worker fails while others succeed, just as a cricket captain would investigate if one fielder is missing rather than changing team strategy."
     }
   ]
 }

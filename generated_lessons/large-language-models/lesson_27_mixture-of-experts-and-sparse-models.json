@@ -244,6 +244,142 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production Mixture of Experts systems follow three dominant patterns. The **Dense Router pattern** (used by Google's Switch Transformers) routes every token to a single expert with minimal computation overhead—ideal for inference-heavy workloads where latency matters more than throughput. Trade-off: reduced model capacity and occasional expert overload. The **Top-K routing pattern** (employed by Meta's PEER and OpenAI's GPT-4 sparse variants) sends each token to K experts (typically 2-8), enabling load distribution and graceful degradation at the cost of K× expert computation. Best for training stability and balanced expert utilization across diverse data. The **Expert dropout/Conditional computation pattern** uses probabilistic expert selection during training but deterministic routing at inference—reduces training cost by 30-40% while maintaining inference speed. All three require careful load-balancing auxiliary losses; neglecting this causes expert collapse where 90%+ of tokens route to 1-2 experts, reducing effective model capacity by orders of magnitude and degrading performance below dense baselines.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The Dense Router pattern is like declaring a batter as your primary run-scorer for this over—minimize overthinking, maximize execution. Top-K routing mirrors a captain's field placement strategy: send your best slip fielder AND a deep square-leg specialist to cover more wicket-taking angles, but you're paying with extra player focus. The conditional computation approach resembles DRS usage—invest review resources (computation) during uncertain moments (training) to gather data, but commit to faster decisions (fixed routing) during live play (inference). Load-balancing auxiliary losses are your match-ups and bowling rotations: ignore them, and your death bowlers face 15 overs while your seamers rest—your team collapses despite having talent. The difference between a well-balanced MoE and an unbalanced one is like a balanced XI versus one where all runs come from opener batting: one scales, the other crumbles under pressure.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Ignoring load balancing\nclass UnbalancedCricketTeamMoE:\n    def __init__(self, num_batsmen_experts=8):\n        self.batsmen = [BatsmanExpert(name=f'batter_{i}') for i in range(num_batsmen_experts)]\n        self.router = SimpleRouter()  # No load-balancing loss\n    \n    def forward(self, ball_token):\n        scores = [batter.score(ball_token) for batter in self.batsmen]\n        expert_idx = argmax(scores)  # Always picks same expert\n        return self.batsmen[expert_idx](ball_token)  # Expert #0 gets 87% of balls!\n\n# BEST PRACTICE: With auxiliary load-balancing loss\nclass BalancedCricketTeamMoE:\n    def __init__(self, num_bowlers_experts=8, load_balance_weight=0.01):\n        self.bowlers = [BowlerExpert(name=f'bowler_{i}') for i in range(num_bowlers_experts)]\n        self.router = LoadBalancedRouter()\n        self.load_balance_weight = load_balance_weight\n    \n    def forward(self, batsman_token):\n        logits = self.router(batsman_token)  # Shape: [batch, num_experts]\n        expert_indices = top_k_gating(logits, k=2)  # Route to 2 bowlers\n        \n        # Compute auxiliary load-balancing loss\n        expert_distribution = softmax(logits)  # Expected load per expert\n        expert_balance_loss = compute_cv_squared_loss(expert_distribution)\n        \n        outputs = [self.bowlers[idx](batsman_token) for idx in expert_indices]\n        final_output = merge_expert_outputs(outputs, weights=softmax(logits[expert_indices]))\n        \n        # Total loss = task_loss + load_balance_weight * expert_balance_loss\n        return final_output, expert_balance_loss  # Backward pass balances team\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "The anti-pattern fails because the router's gradient incentivizes concentration—high-scoring experts get more tokens, receive more gradient signal, improve further, and dominate. The best practice adds explicit load-balancing loss that penalizes uneven expert utilization, forcing the router to distribute tokens across all experts even when one seems locally optimal. This maintains model capacity and prevents collapse."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The #1 beginner mistake is **omitting auxiliary load-balancing losses or setting their weight too low** (< 0.001). This causes expert collapse within 5-10K training steps: your gating network converges to routing most tokens to 1-2 experts, effectively reducing your model to a dense network. You lose 60-80% of the capacity benefits you built the MoE for. Fix: Always include auxiliary loss (e.g., load_balancing_loss_weight = 0.01 for Switch Transformers, 0.002-0.01 for GShard). Monitor expert load balance metrics during training: if any expert receives <5% or >30% of tokens, increase loss weight or add expert dropout. Use expert utilization dashboards in production—silent expert collapse happens when you're not watching.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Mixture of Experts powers production systems at planetary scale. **Google** deployed Switch Transformers (sparse MoE) in T5-based models for search ranking and document understanding, scaling to 1.6 trillion parameters with <7% compute increase over dense models. **OpenAI's GPT-4** uses sparse expert routing for efficiency gains, enabling inference at scale while maintaining quality. **Meta** (Facebook) implements expert-based systems in recommendation ranking and feed ranking—their MoE variants serve billions of predictions daily with 50-70% compute savings versus dense equivalents. **Netflix** and **Uber** use sparse routing in their recommendation and ETA prediction systems respectively, operating at 10M+ inference requests/second. Failures occur silently: unbalanced expert utilization reduces effective capacity; communication bottlenecks between routers and experts cause 40-60% inference latency increases in distributed setups; expert collapse makes sparse models perform worse than dense baselines. At scale (>100B parameters, >1000 experts), managing expert placement across GPUs/TPUs, handling stragglers, and preventing load imbalance require sophisticated systems engineering—naive approaches fail catastrophically.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Sparse activation in MoE models reduces compute by 50-80% while maintaining or improving quality through expert specialization.",
+        "Gating/routing functions learn conditional computation: which experts to activate for each token based on learned preferences and input content.",
+        "Top-K and Switch routing are production-proven patterns; choose based on latency targets (K=1 for inference speed, K=2-8 for training stability).",
+        "Load-balancing auxiliary losses are non-negotiable: without them, expert collapse occurs within days, wasting all MoE benefits.",
+        "Expert utilization monitoring is critical in production: track per-expert load distribution, communication latency, and accuracy per routing decision.",
+        "Sparse models scale to trillions of parameters efficiently; dense models at the same scale become computationally prohibitive without sparse routing.",
+        "Distributed deployment complexity increases dramatically; communication overhead between routers and remote experts can exceed compute savings if not carefully optimized."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of Mixture of Experts and sparse activation patterns with two comprehensive quizzes. The first focuses on conceptual mastery of core mechanisms, while the second applies your knowledge to real-world scenarios you might encounter when building or deploying MoE systems.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a cricket-themed Mixture of Experts model, you have 8 batting experts (opening batsmen, middle-order specialists, finishers, etc.) and a gating network that routes each input token to the top-2 most relevant experts. During inference on a dataset of 1000 tokens, you observe that 95% of tokens are routed exclusively to just 2 of the 8 experts, while the remaining 6 experts receive almost no traffic. What is the PRIMARY issue this reveals, and what is the BEST immediate diagnostic step?",
+      "items": [
+        "Load imbalance and poor expert utilization; implement auxiliary loss terms to encourage uniform expert selection across all experts",
+        "The gating network has collapsed to preferring only a subset of experts; analyze the gating logits and check if expert embeddings have diverged during training",
+        "The model architecture is fundamentally flawed; you should immediately switch to a dense model instead",
+        "Sparsity is working perfectly and this is the expected behavior; no action is needed"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is B. When the gating network routes the vast majority of tokens to only a small subset of experts, this indicates a collapse or under-utilization of the expert pool—similar to a cricket team where only 2-3 batsmen are consistently selected and others never get to bat. The PRIMARY diagnostic step is to inspect the gating logits (the raw scores before softmax) and check whether expert embeddings or representations have diverged significantly, causing the network to consistently favor certain experts. While auxiliary loss terms (option A) can help address load imbalance as a follow-up, the diagnostic investigation of gating logits comes first. Option C is incorrect because this is a solvable training issue, not an architectural flaw. Option D is incorrect because severe load imbalance actually indicates the sparse routing is NOT working as intended—sparse activation should be strategic and somewhat distributed, not a complete collapse to a few experts. Addressing this early prevents wasted expert capacity and ensures the full model can be leveraged."
+    },
+    {
+      "type": "quiz",
+      "content": "You are deploying a Mixture of Experts language model for real-time cricket commentary generation across multiple hardware nodes. Each node hosts 4 of 32 experts. During testing, you notice that during peak hours (when processing multiple commentary requests in parallel), certain nodes become bottlenecks because the gating network routes 60% of incoming tokens to the experts on those specific nodes, while other nodes sit idle. What is your BEST solution given the constraints?",
+      "items": [
+        "Immediately retrain the entire model with a stronger load-balancing auxiliary loss and redistribute all 32 experts evenly across all nodes",
+        "Implement dynamic expert assignment or expert migration, moving some experts to overloaded nodes at runtime to redistribute the incoming token traffic",
+        "Apply a token-level load-aware gating mechanism that probabilistically adjusts routing decisions based on real-time expert utilization metrics, or implement expert caching on frequently-accessed nodes",
+        "Accept the bottleneck as an unavoidable consequence of sparse routing and horizontally scale by adding more hardware nodes"
+      ],
+      "answer": 2,
+      "explanation": "The correct answer is C. This scenario describes a real-world deployment challenge: the gating network has naturally (and perhaps correctly, based on token semantics) learned to prefer certain experts, but this creates uneven load across distributed hardware. Option C addresses this pragmatically by either implementing a load-aware gating mechanism that slightly adjusts routing probabilities when certain nodes are overloaded, or by caching expert outputs on frequently-accessed nodes. These are practical, runtime solutions that don't require full retraining. Option A is incorrect because full retraining is expensive and may degrade model quality—forcing uniform load distribution when the model has learned non-uniform preferences can hurt performance. Option B (expert migration) is theoretically sound but operationally complex and incurs communication overhead that may exceed the benefits. Option D is incorrect because it ignores the real problem: the issue is not sparsity itself, but uneven *distribution* of sparse load across hardware. The solution in C balances model accuracy with practical deployment constraints by making lightweight, runtime adjustments rather than wholesale architectural changes."
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "MoE systems can suffer from expert collapse, where the gating network routes most traffic to a tiny subset of experts; diagnose by inspecting gating logits and expert embeddings",
+        "Load imbalance is distinct from deliberate sparsity—some imbalance is natural, but extreme concentration indicates a training or deployment issue",
+        "Real-world solutions often combine multiple approaches: auxiliary losses during training, load-aware routing at inference, expert caching, and strategic hardware placement",
+        "The goal is *strategic sparsity*—activating the right experts for each token—not random or collapsed sparsity"
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
     }
   ]
 }

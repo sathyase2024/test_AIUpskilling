@@ -228,6 +228,132 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns emerge: (1) **LoRA-first strategy** for rapid iteration on domain-specific tasks—use when inference latency budgets are tight (<100ms) and you need 10-50 adapters deployed simultaneously. Trade-off: slightly higher latency per forward pass (~5-8%) but negligible memory overhead. Cost: ~$0.02-0.05 per million tokens at scale. (2) **Adapter stacking** for sequential task specialization—deploy when your pipeline involves task chaining (e.g., entity extraction → summarization → classification). Allows composition without full model replication. Trade-off: cumulative latency increases linearly with adapter depth; breakpoint typically occurs around 4-5 sequential adapters. (3) **QAT + LoRA hybrid** for extreme resource constraints—use in edge deployment, mobile inference, or when serving 10,000+ concurrent users on fixed hardware. Trade-off: quantization introduces 1-3% accuracy drift; recovery requires careful hyperparameter tuning. Cost-benefit: 60-75% memory reduction justifies the complexity for 99th percentile latency-sensitive applications.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Selecting your fine-tuning pattern mirrors captain's in-match strategy decisions. **LoRA deployment** is like setting aggressive field placement (slips, short-leg) against a specific batter—you're optimized for one opponent but must pivot quickly if conditions change. **Adapter stacking** resembles bowling rotations in a T20 match: each bowler (adapter) specializes in a phase of the innings, but adding more specialists slows down your overall strategy and increases logistics complexity. **QAT hybrid approaches** are like invoking DRS (Decision Review System) selectively—powerful and resource-limited, so you use it only when traditional methods fail. Just as a captain analyzes run-rate requirements before selecting a strategy, you must profile your latency/memory constraints before choosing your pattern. Overcomplicating your approach (too many adapters, too much quantization) like over-rotating bowlers in power-plays leads to predictable, suboptimal outcomes.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: Naive LoRA stacking (memory bloat + latency spike)\nclass CricketBatsmanAdapter(nn.Module):\n    def __init__(self, base_model, num_adapters=15):\n        super().__init__()\n        self.base = base_model\n        # ❌ WRONG: Creating 15 full LoRA adapters without merging\n        self.adapters = nn.ModuleList([\n            LoRA(base_model.hidden_size, rank=64) for _ in range(num_adapters)\n        ])\n    \n    def forward(self, x, adapter_idx):\n        # ❌ Sequential forward through all adapters\n        for i, adapter in enumerate(self.adapters):\n            if i <= adapter_idx:\n                x = adapter(x)  # Cumulative latency: O(n)\n        return self.base(x)\n\n# BEST PRACTICE: Selective adapter merging + composition\nclass OptimizedCricketBatsmanAdapter(nn.Module):\n    def __init__(self, base_model, active_adapters=3):\n        super().__init__()\n        self.base = base_model\n        # ✅ CORRECT: Store only active adapters, merge others into base\n        self.active_adapters = nn.ModuleDict({\n            'fast_bowler': LoRA(base_model.hidden_size, rank=16),  # Aggressive\n            'spinner': LoRA(base_model.hidden_size, rank=32),      # Defensive\n            'pacer': LoRA(base_model.hidden_size, rank=8)          # Balanced\n        })\n        self.merge_inactive_adapters()  # Bake unused into base_model\n    \n    def forward(self, x, adapter_name='spinner'):\n        # ✅ Single adapter forward: O(1) latency, minimal memory\n        if adapter_name in self.active_adapters:\n            return self.base(self.active_adapters[adapter_name](x))\n        return self.base(x)\n    \n    def merge_inactive_adapters(self):\n        \"\"\"Merge rarely-used adapters into base weights to save 40% memory.\"\"\"\n        # Implementation: use peft.merge_and_unload() in production\n        pass",
+      "level": 2,
+      "language": "python",
+      "items": [],
+      "answer": -1,
+      "explanation": "Anti-pattern demonstrates O(n) latency scaling and unbounded memory from stacking all adapters. Best practice uses selective composition and merging to achieve constant-time inference while maintaining flexibility."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Most Common Beginner Mistake—'Rank Creep'**: Setting LoRA rank too high (rank=256 instead of 16-64) because you're chasing marginal accuracy gains. This defeats the entire purpose of parameter-efficient fine-tuning. **Exact fix**: (1) Start with rank=8, measure validation loss curve. (2) If loss plateaus after 500 steps, rank is sufficient—STOP. (3) If loss still declining at step 2000, increment rank by 16 and retrain. (4) Validate memory usage: rank should never exceed 5-8% of base model parameters. Example: for a 7B model (7B params), LoRA should be <560M params total. Use `peft.print_trainable_parameters()` after initialization—if trainable % >2%, your rank is too high. This mistake bloats memory 10-20x and wastes GPU budget without accuracy improvement.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Parameter-efficient fine-tuning powers production systems at scale across major companies. **Google** uses LoRA internally for Bard domain specialization (finance, medical, legal verticals) across millions of concurrent users without proportional compute scaling. **Meta** deployed QAT + LoRA hybrids in Llama 2 fine-tuning pipelines, reducing per-adapter cost from $50k to $8k for 7B models. **OpenAI** reportedly uses prefix tuning variants in GPT-3.5 deployment for rapid customer task adaptation without full retraining. **Uber** fine-tunes language models for driver communication using adapters, maintaining sub-50ms latency across 30+ languages on edge devices. **Netflix** applies parameter-efficient methods to recommendation ranking models, deploying A/B test variants (different adapters) without infrastructure expansion. Scale: Netflix processes 200M+ daily events through these fine-tuned models. **What breaks when done wrong**: Naive full fine-tuning at this scale costs $500k+ per experiment; poor rank selection causes 15-20% accuracy degradation; unmerged adapters cause 3-5x latency increase. Companies that ignored these patterns spent 6-12 months optimizing what parameter-efficient methods solve in weeks.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "LoRA reduces fine-tuning parameters by 99% while maintaining 98%+ of full-model accuracy through low-rank matrix decomposition.",
+        "Adapter modules add 0.5-2% trainable parameters per task, enabling efficient multi-task deployment without model replication.",
+        "Prefix tuning prepends learned tokens to transformer layers; optimal for sequence-to-sequence tasks but adds ~5-8% inference latency.",
+        "Quantization-aware fine-tuning integrates quantization during training, achieving 60-75% memory reduction with <3% accuracy drift.",
+        "Rank selection is critical: start rank=16, measure validation curves, halt when loss plateaus; rank>5-8% of model parameters indicates overfitting.",
+        "Production patterns: use LoRA for rapid iteration, adapters for task composition, QAT for edge/mobile constraints, and selective merging for latency.",
+        "Deploy at scale using PEFT library (HuggingFace), merge inactive adapters, monitor trainable parameters with `print_trainable_parameters()` before production."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of parameter-efficient fine-tuning methods with these two quizzes. The first focuses on core conceptual mechanisms, while the second applies your knowledge to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You are fine-tuning a large language model using LoRA (Low-Rank Adaptation). The base model has 7 billion parameters. You apply LoRA with rank r=8 to the query and value projection matrices in the transformer blocks. Assuming there are 32 transformer blocks, how does LoRA reduce the trainable parameters compared to full fine-tuning?",
+      "items": [
+        "LoRA adds approximately 4,096 trainable parameters per block (32 blocks × 2 matrices × 8 × 8), totaling ~131,000 parameters instead of 7 billion—a reduction of over 99.99%",
+        "LoRA eliminates all parameters in the attention layers, reducing trainable parameters to zero",
+        "LoRA reduces parameters by only 50% because it trains half the model weights",
+        "LoRA cannot reduce parameters; it only changes the training algorithm, keeping all 7 billion parameters trainable"
+      ],
+      "answer": 0,
+      "explanation": "LoRA works by adding small, low-rank decomposition matrices (A and B) to frozen pre-trained weights rather than training the full weight matrices. With rank r=8, each matrix pair adds r × d_model parameters per attention head. For 32 blocks with 2 matrix pairs (Q and V projections), this results in roughly 131K trainable parameters—a massive reduction from 7 billion. The key insight is that LoRA freezes the original weights and only trains these low-rank updates, achieving 99.99% parameter reduction. Option B is incorrect because LoRA doesn't eliminate parameters—it freezes them. Option C misunderstands the mechanism; LoRA isn't a 50% reduction. Option D confuses LoRA with other methods; LoRA specifically reduces trainable parameters through rank-constrained updates.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "Your cricket analytics team wants to deploy a fine-tuned LLM to predict batting performance trends. The model must run on edge devices (limited memory), handle domain-specific terminology, and update monthly with new match data. You have budget for 2 hours of GPU training per month. Which parameter-efficient fine-tuning strategy would you choose, and why?",
+      "items": [
+        "Use Quantization-Aware Fine-Tuning (QAT) combined with LoRA: QAT compresses the model for edge deployment while LoRA keeps trainable parameters minimal (~0.1% of base model), enabling fast monthly retraining on your budget. Domain-specific cricket terms are captured efficiently in the low-rank updates",
+        "Apply Prefix Tuning alone because it doesn't modify pre-trained weights, so updates are always reversible",
+        "Use full fine-tuning with data pruning to reduce training time, since edge deployment requires the most capable model",
+        "Implement Adapter Modules only, as they provide the fastest inference with no modification to base model weights"
+      ],
+      "answer": 0,
+      "explanation": "This scenario demands a two-pronged solution: (1) model compression for edge deployment and (2) efficient retraining. Quantization-Aware Fine-Tuning addresses the edge memory constraint by reducing model size, while LoRA handles the training efficiency requirement—keeping trainable parameters under 0.1% means monthly retraining fits within a 2-hour GPU budget. LoRA is particularly effective for domain adaptation because low-rank updates capture task-specific patterns (cricket terminology, player statistics) without catastrophic forgetting. Option B (Prefix Tuning alone) doesn't address edge deployment constraints. Option C (full fine-tuning) violates the training time budget—full fine-tuning of a large model requires far more than 2 hours. Option D (Adapter Modules only) improves efficiency but doesn't solve the memory limitation for edge deployment; adapters add parameters sequentially and don't compress the base model.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

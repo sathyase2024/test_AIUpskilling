@@ -210,6 +210,164 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch workloads employ three dominant patterns: (1) **Gradient Accumulation with checkpointing** for memory-constrained training of large models like GPT-scale transformers, trading compute for memory by recomputing activations during backpass; (2) **Mixed Precision (AMP) with loss scaling** standard across Google's TPU clusters and Meta's training infrastructure, reducing memory footprint by 50% and accelerating training 1.5-2x on modern GPUs while maintaining convergence stability through dynamic loss scaling to prevent gradient underflow; (3) **Custom autograd with gradient checkpointing** for specialized architectures (recurrent networks, graph neural networks) where standard backprop becomes prohibitively expensive. The trade-off matrix: gradient accumulation increases wall-clock time by 20-30% but enables batch-size-constrained training; AMP reduces precision but requires careful validation; custom autograd adds implementation complexity but unlocks otherwise intractable problems. Netflix and OpenAI predominantly use pattern 2 for efficiency; research teams use patterns 1+3 for experimentation with massive models.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Gradient accumulation resembles a captain's decision to bat deeper in the order—you sacrifice immediate runs (compute time) to build innings stability (fit larger models). Mixed precision is like DRS strategy: you trade some review certainty (lower precision) for tactical advantage (speed and memory savings), but miscalibrating your loss scaling is like wasting reviews on uncertain decisions. Custom autograd functions are specialist bowlers brought in for specific match situations—they require extra training (implementation work) but solve problems standard bowlers (automatic differentiation) cannot. The field placement analogy: gradient checkpointing positions fielders defensively (recomputing activations) to cover more ground (use less memory) at the cost of exhausting them (extra computation). Teams like Google and Meta optimize all three patterns together, much like a team fine-tuning batting order, bowling rotations, and field placement simultaneously for a tournament campaign.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Combined gradient accumulation + AMP + checkpointing\nimport torch\nfrom torch.cuda.amp import autocast, GradScaler\nfrom torch.utils.checkpoint import checkpoint\n\nclass CricketBatsmanModel(torch.nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.batting_layers = torch.nn.Sequential(\n            torch.nn.Linear(50, 128),\n            torch.nn.ReLU(),\n            torch.nn.Linear(128, 64),\n            torch.nn.ReLU(),\n            torch.nn.Linear(64, 1)\n        )\n    \n    def forward(self, wickets_faced):\n        return self.batting_layers(wickets_faced)\n\nmodel = CricketBatsmanModel().cuda()\noptimizer = torch.optim.Adam(model.parameters(), lr=1e-3)\nscaler = GradScaler()\naccumulation_steps = 4\n\nfor epoch in range(100):\n    for batch_idx, (wickets, strike_rate) in enumerate(dataloader):\n        wickets, strike_rate = wickets.cuda(), strike_rate.cuda()\n        \n        # AMP wraps forward pass\n        with autocast(dtype=torch.float16):\n            # Checkpointing reduces memory for backward\n            predictions = checkpoint(\n                model, wickets,\n                use_reentrant=False\n            )\n            loss = torch.nn.functional.mse_loss(predictions, strike_rate)\n            loss = loss / accumulation_steps\n        \n        # Scaled backward for AMP stability\n        scaler.scale(loss).backward()\n        \n        # Step optimizer only after accumulation\n        if (batch_idx + 1) % accumulation_steps == 0:\n            scaler.unscale_(optimizer)\n            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)\n            scaler.step(optimizer)\n            scaler.update()\n            optimizer.zero_grad()\n\n# ANTI-PATTERN: Inefficient approach (DON'T DO THIS)\nfor epoch in range(100):\n    for batch_idx, (wickets, strike_rate) in enumerate(dataloader):\n        # Missing AMP: slow\n        predictions = model(wickets.cuda())\n        # No checkpointing: OOM on large models\n        loss = torch.nn.functional.mse_loss(predictions, strike_rate.cuda())\n        loss.backward()\n        # Optimizer steps every iteration: inefficient\n        optimizer.step()\n        optimizer.zero_grad()\n        # No gradient clipping: instability\n        # No loss scaling: underflow risk",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "The best practice combines all three patterns: AMP reduces precision safely, checkpointing trades compute for memory, gradient accumulation enables larger effective batch sizes. The anti-pattern lacks all optimizations, resulting in slower training, OOM errors on large models, and gradient instability."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Mismatched AMP loss scaling is the #1 beginner mistake—gradients in float16 underflow to zero before optimizer updates. FIX: Always use torch.cuda.amp.GradScaler with scaler.scale(loss).backward() and scaler.step(optimizer). Never call optimizer.step() directly with AMP without scaler. Second critical error: forgetting to set use_reentrant=False in checkpoint() on newer PyTorch versions causes CUDA memory leaks. FIX: Always use checkpoint(fn, *args, use_reentrant=False) for safety. Third: accumulating gradients across different loss scales—ensure loss is divided BEFORE backward during accumulation (loss/accumulation_steps), not after.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At scale, gradient accumulation + AMP + checkpointing is foundational infrastructure: Google's TPU training pipelines use these patterns across Gemini and LLaMA-scale models (70B+ parameters); Meta's PyTorch Distributed team built torch.distributed.fsdp specifically around mixed precision and gradient checkpointing for 175B parameter models trained on thousands of GPUs. OpenAI's GPT training used custom gradient checkpointing extensively to fit 1.5B→3B parameters on hardware-constrained clusters circa 2020. Netflix employs AMP in recommendation ranking models processing 500M+ user events daily—incorrect implementation caused a 15% throughput regression in production (caught before full deployment). Uber's ML infrastructure defaults to gradient checkpointing for any model exceeding 100M parameters to prevent OOM during mobile deployment pipeline runs. When done wrong: Airbnb experienced 3-4x slowdown from unchecked automatic mixed precision precision bugs in their personalization models, causing delayed recommendations. At billion-scale training, losing 10% efficiency wastes $50K-500K in compute monthly.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Gradient accumulation enables larger effective batch sizes on memory-constrained hardware by distributing loss backward across multiple forward passes.",
+        "Automatic Mixed Precision (AMP) reduces memory by 40-50% and accelerates training 1.5-2x via float16 computation with float32 accumulation.",
+        "Gradient checkpointing trades recomputation for memory: recompute activations during backward to avoid storing intermediate states.",
+        "Custom autograd functions enable gradient computation for non-differentiable operations or specialized architectures PyTorch autodiff cannot handle.",
+        "Loss scaling in AMP prevents gradient underflow in float16 by dynamically scaling loss before backward, then unscaling gradients before optimizer steps.",
+        "Combined patterns (AMP + checkpointing + accumulation) are production standard at scale; using only one pattern leaves 30-50% efficiency gains on table.",
+        "Common mistakes: forgetting GradScaler with AMP, incorrect loss division during accumulation, and deprecated checkpoint reentrant settings cause silent failures."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of advanced PyTorch optimization techniques with these conceptual and applied quizzes. These questions cover gradient accumulation, mixed precision training, checkpointing, and custom autograd functions—all critical for training large-scale deep learning models efficiently.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket ball detection model on your GPU with limited memory (8GB). Your batch size of 32 causes out-of-memory errors, but you need the stability that large batches provide. You implement gradient accumulation with accumulation_steps=4. After how many forward-backward passes will the optimizer.step() be called?",
+      "items": [
+        "Every forward pass",
+        "Every 4 forward-backward pass pairs",
+        "Every backward pass",
+        "Only at the end of the entire epoch"
+      ],
+      "answer": 1,
+      "explanation": "Gradient accumulation delays optimizer.step() until gradients from multiple batches are summed together. With accumulation_steps=4, the optimizer updates after 4 forward-backward cycles, not after each one. This simulates a larger effective batch size (32×4=128) while keeping memory usage low. Option 0 is wrong because that would defeat the purpose of accumulation. Option 2 is incorrect because every backward pass still accumulates—step() doesn't trigger then. Option 3 is wrong because you typically step multiple times per epoch, especially with smaller accumulated batches."
+    },
+    {
+      "type": "quiz",
+      "content": "In automatic mixed precision (AMP) training, you notice that your loss occasionally becomes NaN during training. You check your loss_scaler.scale() and loss_scaler.step() calls. What is the most likely cause, and how should you respond?",
+      "items": [
+        "NaN is expected in AMP and should be ignored; continue training normally",
+        "The loss scaler's multiplier grew too large and caused overflow in float16 operations; reduce the initial scale factor or enable gradient clipping",
+        "AMP doesn't support your loss function; switch to standard float32 training",
+        "The backward pass is incompatible with mixed precision; add .double() calls to all tensors"
+      ],
+      "answer": 1,
+      "explanation": "When the loss scaler's multiplier gets too aggressive, float16 gradients can overflow before being scaled back up, resulting in NaN values. The solution is to reduce the initial scale factor (e.g., from 2^16 to 2^14), enable gradient clipping to prevent extreme gradients, or let the scaler's dynamic loss scaling handle it automatically. Option 0 is dangerous—NaN is a sign of training failure. Option 2 is incorrect; AMP works with most loss functions, and the issue is scaling, not incompatibility. Option 3 wastes the memory efficiency gains of AMP and doesn't address the root cause. Like a cricket bowler adjusting their run-up length to prevent foot-faults, you adjust scaling parameters rather than abandoning the technique."
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a 12-layer cricket bat design classifier using gradient checkpointing. You set checkpoint_segments=3, meaning the model is divided into 3 segments. During the backward pass, PyTorch recomputes layer activations on-demand. Compared to standard training without checkpointing, what is the primary trade-off?",
+      "items": [
+        "Peak memory usage is lower, but backward pass is slightly slower due to recomputation",
+        "Peak memory usage is higher, but backward pass is faster",
+        "Both memory and speed are improved; checkpointing has no trade-offs",
+        "Checkpointing reduces accuracy by discarding intermediate activations"
+      ],
+      "answer": 0,
+      "explanation": "Gradient checkpointing achieves memory savings by recomputing activations during the backward pass instead of storing them all in memory. This reduces peak memory usage, allowing larger models or batch sizes to fit on GPU. However, the recomputation adds computational overhead, making the backward pass slower overall. Think of it like a cricket groundskeeper choosing to mow the pitch on-demand rather than keeping pre-mowed sections stored—it saves storage space but takes more time. Option 1 reverses the trade-off. Option 2 is false; checkpointing always sacrifices speed for memory. Option 3 is incorrect; activations are recomputed, not discarded, so accuracy is preserved."
+    },
+    {
+      "type": "quiz",
+      "content": "You implement a custom autograd function for a specialized cricket trajectory calculation. You define a forward() method that computes the ball's path, but you forget to implement backward(). What happens when you call .backward() on a loss that depends on this custom function?",
+      "items": [
+        "PyTorch automatically derives the backward pass using finite differences",
+        "Training proceeds silently with zero gradients for this operation",
+        "An error is raised because backward() is required for autograd to work",
+        "The forward pass is re-executed to approximate gradients"
+      ],
+      "answer": 2,
+      "explanation": "Custom autograd functions require both forward() and backward() methods. If backward() is missing, PyTorch raises a RuntimeError when backpropagation reaches that function, preventing training from proceeding. This design enforces explicit gradient definitions—you cannot silently produce incorrect zero gradients. Option 0 is wrong; PyTorch doesn't use finite differences by default. Option 1 is dangerous and incorrect; silent zero gradients would mask bugs. Option 3 is false; re-executing forward() doesn't compute gradients. Implementing backward() correctly is mandatory, just as specifying field placement rules in cricket is mandatory—you can't leave it ambiguous."
+    },
+    {
+      "type": "quiz",
+      "content": "Your team is deploying a real-time cricket ball impact detection model. You've trained with gradient checkpointing and AMP. Before deployment, you convert the model to evaluation mode with model.eval(). Which of the following statements is true?",
+      "items": [
+        "Dropout and batch normalization layers behave the same in eval() mode as in training mode",
+        "eval() mode disables gradient computation, so you don't need torch.no_grad() during inference",
+        "eval() mode changes batch norm to use running statistics and disables dropout stochasticity, but does not disable gradient tracking by itself",
+        "eval() mode removes all checkpointed activations from memory"
+      ],
+      "answer": 2,
+      "explanation": "model.eval() configures layers like BatchNorm2d and Dropout to use their inference-time behavior: batch norm uses running mean/variance instead of batch statistics, and dropout is disabled. However, eval() does NOT disable gradient computation—you still need torch.no_grad() or torch.inference_mode() to prevent unnecessary gradient tracking during inference. Option 0 is wrong; these layers change behavior. Option 1 is incorrect; eval() doesn't stop gradients from being computed. Option 3 is false; checkpointing is a training-time optimization, not affected by eval() mode. Like switching from match play to practice drills in cricket, eval() changes the model's operational mode but doesn't remove the capability to record detailed statistics."
     }
   ]
 }

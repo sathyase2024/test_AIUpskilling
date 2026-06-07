@@ -203,6 +203,128 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch systems employ three dominant patterns, each with distinct performance and flexibility trade-offs. The eager execution pattern (default PyTorch behavior) prioritizes debugging flexibility and dynamic control flow—ideal for research and variable-length sequences, but incurs overhead from Python interpreter loops and prevents compiler optimizations; Meta and OpenAI use this extensively for transformer research. The graph compilation pattern (TorchScript, torch.compile) sacrifices dynamic flexibility for 2-10x speedup through ahead-of-time compilation and kernel fusion; Google and Netflix deploy this for inference at scale where model architecture is fixed. The distributed training pattern (DDP, FSDP) partitions computation across GPUs/TPUs with synchronized gradient updates—critical for 100B+ parameter models but introduces communication bottlenecks and requires careful loss scaling to prevent gradient underflow. Choosing wrong costs millions in cloud infrastructure: eager execution at 1000-GPU scale wastes 70% compute on synchronization overhead, while over-compiling simple models adds 30-second startup latency for marginal gains.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Eager execution resembles a T20 captain making real-time field adjustments after each ball—you respond dynamically to what actually happens, but constant repositioning burns energy. Graph compilation is like a Test match plan set before play begins—rigid but hyper-optimized for the full innings. Distributed training mirrors a multi-format series where teams coordinate across grounds simultaneously; one delayed ground (GPU) stalls the entire fixture. Choosing eager execution for inference at massive scale is like fielding a 50-player team for a 2-hour ODI—you've got flexibility you'll never use while communication between fielders becomes impossibly slow. Using TorchScript for rapid prototyping is like using a Test captain's detailed playbook during a T20—the overhead of preparation destroys your advantage.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Pattern selection based on use case\n\n# Pattern 1: Eager Execution (Research/Dynamic)\nimport torch\nimport torch.nn as nn\n\nclass DynamicBattingModel(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.lstm = nn.LSTM(input_size=10, hidden_size=64, batch_first=True)\n        self.fc = nn.Linear(64, 1)\n    \n    def forward(self, ball_sequences, sequence_lengths):\n        # Dynamic control flow—adapts to actual sequence length\n        packed = nn.utils.rnn.pack_padded_sequence(\n            ball_sequences, sequence_lengths, batch_first=True, enforce_sorted=False\n        )\n        out, _ = self.lstm(packed)\n        unpacked, _ = nn.utils.rnn.pad_packed_sequence(out, batch_first=True)\n        return self.fc(unpacked[:, -1, :])\n\n# Use case: Research, variable-length batting records\nmodel = DynamicBattingModel()\nbatting_data = torch.randn(32, 120, 10)  # Variable innings\nlengths = torch.tensor([45, 67, 120, 89, ...])  # Actual delivery counts\nprediction = model(batting_data, lengths)\n\n\n# Pattern 2: Graph Compilation (Production Inference)\nimport torch.compile\n\nclass StaticWicketPredictor(nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.conv_stack = nn.Sequential(\n            nn.Conv1d(10, 32, kernel_size=3, padding=1),\n            nn.ReLU(),\n            nn.Conv1d(32, 64, kernel_size=3, padding=1),\n            nn.ReLU()\n        )\n        self.classifier = nn.Linear(64, 11)  # 11 ways to get out\n    \n    def forward(self, ball_data):\n        # Fixed input shape: [batch, features, deliveries]\n        features = self.conv_stack(ball_data)\n        return self.classifier(features.mean(dim=-1))\n\n# Compile once, run 1000x faster\nmodel = StaticWicketPredictor()\nmodel = torch.compile(model, mode='reduce-overhead')\n\n# Fixed shape inference\nfixed_input = torch.randn(1, 10, 180)  # Always 180 deliveries\nfor _ in range(1000):\n    prediction = model(fixed_input)  # 10-20x faster than eager\n\n\n# ANTI-PATTERN: Mixing patterns incorrectly\nclass BadApproach(nn.Module):\n    def forward(self, bowler_stats):\n        # Recompiling every forward pass due to dynamic shapes\n        compiled_model = torch.compile(self.core_model)\n        return compiled_model(bowler_stats)\n\n# COST: Recompilation overhead dominates—slower than eager!\n",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Gradient accumulation with in-place operations—the silent killer. Beginners write `loss.backward()` then immediately `optimizer.step()` inside accumulation loops, or worse, modify tensors in-place after backward() starts. Fix: (1) Always call `loss.backward()` WITHOUT `retain_graph=True` unless explicitly needed—saves memory. (2) Never modify model parameters or intermediate tensors in-place after `.backward()` has begun computing gradients through them. (3) Use explicit accumulation: `if (step+1) % accumulation_steps == 0: optimizer.step(); optimizer.zero_grad()` OUTSIDE the accumulation loop. (4) Verify with `model.parameters()` checks—if a parameter's `.grad` is None after backward(), your accumulation logic is broken. Cost: Silent incorrect training, 40% accuracy drop, wastes weeks debugging.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At production scale, PyTorch powers recommendation systems (Netflix processes 200M+ daily interactions), large language models (OpenAI's GPT-4 training required synchronized gradients across 10,000+ GPUs), and computer vision pipelines (Google Photos, Meta's content moderation). When done wrong, the costs are catastrophic: Uber's early autonomous vehicle perception models trained with poor gradient accumulation converged 3x slower, delaying deployment by 8 months. Airbnb's search ranking system initially used eager execution for inference on 500M daily queries, generating $2M+ monthly compute bills until migration to compiled kernels. Amazon's recommendation engine experienced gradient explosions from unclipped norms, causing NaN training failures that cascaded across 50 distributed nodes, requiring 18-hour recovery. The pattern: tiny implementation mistakes (forgotten .zero_grad(), incorrect device placement, disabled autograd in training mode) multiply across billions of parameters and millions of users into visible system failures, revenue loss, and user-facing bugs.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Autograd automatically computes derivatives via reverse-mode autodiff on computational graphs; explicitly call .backward() to trigger gradient computation.",
+        "In-place operations (+=, -=) with gradient tracking corrupt the graph; use out-of-place ops or detach() before modifying to prevent silent gradient errors.",
+        "Gradient accumulation requires explicit .zero_grad() ONLY after optimizer.step(), not after each backward()—common mistake causes incorrect parameter updates.",
+        "Computational graphs persist in memory; use .detach() or torch.no_grad() blocks to break graphs and free memory during inference or validation loops.",
+        "torch.compile() and TorchScript require fixed tensor shapes/control flow but enable 2-10x speedup; use for production inference, avoid for research prototyping.",
+        "Distributed training (DDP) synchronizes gradients across GPUs but introduces communication bottlenecks; gradient accumulation reduces sync frequency at the cost of temporary memory increase.",
+        "Always verify backward() completes before modifying tensors or parameters; silent in-place modification after backward() start is the #1 cause of non-convergent training."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of PyTorch's autograd mechanism and optimization strategies with these two knowledge checks. The first focuses on conceptual understanding of how gradients flow through computational graphs, while the second presents a real-world scenario where you must apply these concepts to solve a practical deep learning problem.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In PyTorch's autograd system, you're training a neural network for cricket ball trajectory prediction. After computing loss and calling loss.backward(), you notice the gradients for your intermediate layers are extremely small (near zero) compared to the output layer. What phenomenon is this, and which architectural change would most directly address it?",
+      "items": [
+        "This is exploding gradients; use gradient clipping to cap gradient values",
+        "This is vanishing gradients; use skip connections or normalized activations like Layer Norm",
+        "This is gradient saturation; reduce the learning rate to allow finer updates",
+        "This is momentum decay; increase the batch size to stabilize gradient flow"
+      ],
+      "answer": 1,
+      "explanation": "This describes vanishing gradients, a critical problem in deep networks where gradients diminish as they backpropagate through many layers due to the chain rule multiplying values less than 1. Skip connections (residual networks) and Layer Normalization directly address this by providing gradient highways and stabilizing activation distributions. Gradient clipping targets exploding gradients (opposite problem), learning rate reduction doesn't fix the mathematical cause, and batch size doesn't directly solve gradient flow through layers. The correct answer recognizes both the problem (vanishing) and the structural solution."
+    },
+    {
+      "type": "quiz",
+      "content": "You're optimizing a cricket pitch quality classifier with a complex model. During training, you notice that loss.backward() is being called multiple times per batch update without calling optimizer.zero_grad(). Your loss values are increasing instead of decreasing despite a reasonable learning rate. What's happening and how should you fix it?",
+      "items": [
+        "Gradients are accumulating across iterations; call optimizer.zero_grad() before each backward() to reset them",
+        "The learning rate is too high; reduce it by half and add momentum=0.9 to the optimizer",
+        "In-place operations are corrupting the computational graph; use non-in-place tensor operations exclusively",
+        "The model architecture is fundamentally broken; rebuild with batch normalization and dropout layers"
+      ],
+      "answer": 0,
+      "explanation": "Without calling optimizer.zero_grad(), gradients accumulate in the .grad attributes of all parameters. Each backward() call adds new gradients to existing ones, causing parameters to update in increasingly chaotic directions. When you call optimizer.step(), these accumulated gradients produce massive, incorrect updates that increase loss rather than decrease it. This is exactly like a cricket batsman adjusting their swing based on the accumulated feedback from multiple previous shots rather than just the current one—the signal becomes corrupted. The fix is simple: call zero_grad() before backward(). The other options address different problems (learning rate tuning, computational graph issues, architecture redesign) but don't fix gradient accumulation."
     }
   ]
 }

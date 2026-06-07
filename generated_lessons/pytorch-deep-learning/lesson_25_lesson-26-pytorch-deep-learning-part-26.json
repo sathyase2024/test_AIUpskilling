@@ -206,6 +206,132 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production-grade distributed training relies on three established patterns: (1) Data Parallel with synchronized gradients (DDP) for balanced training across homogeneous GPUs—ideal when model fits in memory and data is abundant; (2) Gradient Accumulation with delayed synchronization for effective batch size increases without memory overhead, sacrificing per-step synchronization cost for fewer communication rounds; (3) Mixed Precision Training (AMP) combined with distributed setup to reduce memory bandwidth by 50% and accelerate compute on tensor cores, though requiring careful loss scaling to prevent gradient underflow. The trade-off between DDP and gradient accumulation depends on your gradient communication bottleneck: DDP shines with fast interconnects (NVLink, InfiniBand), while accumulation suits slower networks (Ethernet). Synchronizing at every step (DDP) guarantees freshest gradients but increases communication overhead; delaying synchronization (accumulation) reduces overhead but introduces staleness. Mixed precision adds complexity—loss scaling values must be tuned per model, and some operations (BatchNorm, reductions) suffer numerical instability if precision is too aggressive. Choose DDP for multi-GPU on single machines; choose gradient accumulation when distributed across slow networks; combine both for very large-scale training like Meta's LLaMA infrastructure.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: DDP is analogous to fielding with all players actively communicating every ball—maximum coordination but exhausting constant chatter. Gradient accumulation is like your captain batching bowling strategy decisions over multiple overs rather than after every delivery—fewer huddles, but the field plan might lag one ball behind. Mixed precision training mirrors using DRS (Decision Review System) selectively: you could review every close call (full precision), but that wastes reviews; instead, use it strategically only when confidence is borderline (mixed precision for specific layers). Learning rate scaling in distributed settings is like adjusting batting aggression based on field placement—with 8 fielders close in, you play defensively; with aggressive learning rates across many GPUs, you must scale them proportionally or risk reckless acceleration. The synchronization pattern you choose is like choosing between an aggressive bowling rotation (constant changes = DDP's frequent syncs) versus a steady-state attack (fewer changes = gradient accumulation). Master all three patterns, and like a captain with flexible field placements, you'll handle any distributed training challenge.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: DDP with gradient accumulation and mixed precision\nimport torch\nimport torch.nn as nn\nfrom torch.distributed import init_process_group, destroy_process_group\nfrom torch.nn.parallel import DistributedDataParallel as DDP\nfrom torch.amp import autocast, GradScaler\nfrom torch.utils.data.distributed import DistributedSampler\n\n# Initialize distributed environment\ndef setup_ddp():\n    init_process_group(backend='nccl')\n    torch.cuda.set_device(torch.distributed.get_rank())\n\nsetup_ddp()\n\nclass CricketBallClassifier(nn.Module):\n    \"\"\"Classify ball type: seamer, spinner, bouncer\"\"\"\n    def __init__(self):\n        super().__init__()\n        self.encoder = nn.Sequential(\n            nn.Linear(128, 256),\n            nn.ReLU(),\n            nn.Linear(256, 128)\n        )\n        self.classifier = nn.Linear(128, 3)\n    \n    def forward(self, x):\n        return self.classifier(self.encoder(x))\n\nmodel = CricketBallClassifier().cuda()\nmodel = DDP(model, device_ids=[torch.distributed.get_rank()])\noptimizer = torch.optim.Adam(model.parameters(), lr=0.001)\nscaler = GradScaler()\n\n# BEST PRACTICE: Accumulate gradients over 4 steps before sync\naccumulation_steps = 4\nfor epoch in range(10):\n    for batch_idx, (batting_data, ball_type) in enumerate(train_loader):\n        batting_data = batting_data.cuda()\n        ball_type = ball_type.cuda()\n        \n        # Mixed precision forward pass\n        with autocast(device_type='cuda'):\n            predictions = model(batting_data)\n            loss = nn.functional.cross_entropy(predictions, ball_type)\n            loss = loss / accumulation_steps  # Scale loss for accumulation\n        \n        # Backward without immediate synchronization\n        scaler.scale(loss).backward()\n        \n        # Synchronize gradients only every N steps\n        if (batch_idx + 1) % accumulation_steps == 0:\n            scaler.unscale_(optimizer)\n            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)\n            scaler.step(optimizer)\n            scaler.update()\n            optimizer.zero_grad()\n\n# ANTI-PATTERN: Every-step synchronization without accumulation (slow!)\nfor batch_idx, (data, labels) in enumerate(train_loader):\n    data = data.cuda()\n    labels = labels.cuda()\n    \n    # ❌ WRONG: Syncing every iteration kills distributed throughput\n    output = model(data)\n    loss = nn.functional.cross_entropy(output, labels)\n    optimizer.zero_grad()\n    loss.backward()  # Triggers collective communication every step\n    optimizer.step()  # Inefficient: constant allreduce overhead\n\ndestroy_process_group()",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is forgetting to synchronize gradients before the optimizer step when using gradient accumulation, causing stale parameter updates. New users write `loss.backward()` multiple times, then call `optimizer.step()` without manually syncing DDP gradients. FIX: Explicitly synchronize by calling `optimizer.step()` only after accumulated steps complete—DDP's backward() automatically syncs only on the final step if you've disabled synchronization via `model.no_sync()` context manager for non-accumulation steps. Alternatively, use `scaler.step(optimizer)` in mixed precision workflows, which handles synchronization internally. Always verify gradient values match across ranks using `torch.distributed.all_reduce(param.grad)` in debug mode to catch synchronization bugs early.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "These patterns power production AI at massive scale: Google's TPU v5 clusters train models like PaLM 2 using synchronized DDP across thousands of accelerators with gradient checkpointing, achieving 55% hardware utilization on 2048 TPUs. Meta's PyTorch FSDP (Fully Sharded Data Parallel) combines DDP principles with memory sharding to train LLaMA across 2000+ GPUs, reducing per-GPU memory footprint by 4x. OpenAI uses mixed precision training with gradient accumulation to train GPT-4's massive models efficiently, balancing communication overhead against convergence speed. Netflix employs distributed training for recommendation models serving 250+ million users, where gradient accumulation allows batch sizes of 100K+ without OOM. Uber's real-time ML pipelines use synchronized DDP for rapid retraining of ride-matching models across 128 GPUs, requiring sub-second synchronization. The cost of misalignment is severe: Netflix encountered 40% throughput loss when synchronization intervals weren't tuned to their Ethernet bandwidth, causing gradient communication to bottleneck computation. Airbnb's booking prediction models train on heterogeneous hardware (V100s mixed with A100s), requiring careful learning rate scaling—misconfigured scaling caused 8-hour training runs to diverge completely, wasting GPU-weeks monthly.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "DDP synchronizes gradients across ranks every step; use for small models or fast interconnects (NVLink, InfiniBand).",
+        "Gradient accumulation delays synchronization, reducing communication overhead by 4-16x; essential for slow networks (Ethernet).",
+        "Mixed precision (AMP) cuts memory bandwidth 50% and accelerates tensor cores; requires loss scaling to prevent gradient underflow.",
+        "Learning rate must scale linearly with batch size and number of GPUs; use rule: lr_new = lr_old * (batch_size_new / batch_size_old).",
+        "Combine all three techniques (DDP + accumulation + AMP) for production training of 1B+ parameter models on distributed clusters.",
+        "Monitor gradient magnitude and loss scaling frequency; divergence signals misconfigured loss scaling or learning rate misalignment.",
+        "Profile communication vs. computation ratio; if allreduce exceeds 30% of iteration time, increase accumulation steps or reduce synchronization frequency."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of distributed PyTorch training, gradient accumulation, and mixed precision techniques with these two assessments. The first quiz focuses on conceptual knowledge, while the second presents a real-world scenario requiring practical decision-making.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a Distributed Data Parallel (DDP) training setup with 4 GPUs, each processing a batch of 32 samples, what is the effective global batch size per training step, and why does gradient synchronization occur at this scale?",
+      "items": [
+        "32 samples total; each GPU computes gradients independently without synchronization",
+        "128 samples total; DDP synchronizes gradients across all GPUs after each backward pass to ensure consistent model updates",
+        "32 samples total; synchronization happens only at epoch boundaries to save communication overhead",
+        "128 samples total; but only GPU 0 synchronizes gradients while others compute independently"
+      ],
+      "answer": 1,
+      "explanation": "The correct answer is option 1 (128 samples total with synchronization after each backward pass). When using DDP with 4 GPUs and batch_size=32, the effective global batch size is 4 × 32 = 128. After the backward pass on each GPU, DDP automatically synchronizes gradients across all processes using collective communication (AllReduce). This ensures all GPUs have identical averaged gradients before the optimizer step, maintaining training consistency. Option 0 is incorrect because DDP explicitly performs synchronization—that's its core purpose. Option 2 is wrong because synchronization happens every step, not just at epoch boundaries. Option 3 is incorrect because all GPUs participate in synchronization equally; GPU 0 doesn't have a special role in gradient averaging.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "🏏 Imagine you're training a cricket ball detection model on 8 GPUs. Your initial learning rate was 0.001 with batch_size=32 per GPU (global=256). You've now scaled to 16 GPUs with the same per-GPU batch size. Which learning rate adjustment strategy is most appropriate, and why?",
+      "items": [
+        "Keep learning rate at 0.001; the model architecture hasn't changed, so hyperparameters remain constant",
+        "Scale learning rate linearly to 0.002 (0.001 × √16/√8 ≈ 0.001 × √2) to account for reduced noise per sample",
+        "Scale learning rate linearly to 0.002 (0.001 × 16/8) because global batch size doubled, reducing gradient noise and requiring proportionally larger steps",
+        "Reduce learning rate to 0.0005 because more GPUs means more computation time per step"
+      ],
+      "answer": 2,
+      "explanation": "The correct answer is option 2 (scale to 0.002 using linear scaling rule). When you double the global batch size (from 256 to 512), the gradient noise per sample decreases. The linear scaling rule states: LR_new = LR_old × (global_batch_new / global_batch_old) = 0.001 × (512/256) = 0.002. This is the standard practice in distributed training to maintain convergence behavior. Option 0 is incorrect because changing batch size affects gradient variance, which requires LR adjustment. Option 1 uses an incorrect formula (square root scaling is not the standard rule; linear scaling is). Option 3 is wrong because the number of GPUs doesn't directly determine LR—only the global batch size matters. More GPUs with the same per-GPU batch size means larger global batches, which need larger learning rates to compensate for reduced noise.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

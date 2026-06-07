@@ -238,6 +238,144 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production NLP systems employ three dominant patterns: (1) Fine-tuning pre-trained models on task-specific data—optimal when you have 1K-100K labeled examples and computational budget of $100-$10K. Use Google's BERT or Meta's RoBERTa. Trade-off: requires GPU resources but dramatically reduces training time from months to days. (2) Prompt engineering with frozen large models (GPT-4, Claude)—ideal for zero-shot/few-shot scenarios with minimal labeled data, no retraining cost, but higher inference latency (500-2000ms) and per-token API costs ($0.01-$0.03 per 1K tokens). (3) Retrieval-Augmented Generation (RAG)—combines dense embeddings with external knowledge bases for factual accuracy in production. Netflix uses pattern 1 for personalized descriptions; OpenAI uses pattern 2 at scale; Google's Search uses pattern 3. The cost-accuracy-latency triangle governs choice: fine-tuning maximizes accuracy, frozen models minimize latency, RAG minimizes hallucination risk. Most production systems hybrid these patterns.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Fine-tuning is like training your specific team intensively for a tournament—expensive preparation but peak performance. Prompt engineering is like calling a time-out to give tactical instructions to batsmen mid-match—instant, no prep, but limited depth. RAG is like consulting the DRS (Decision Review System) during contentious moments—you're checking external authority (video replay = knowledge base) before committing to a decision. Field placement selection parallels choosing your embedding dimension: too few fielders (embeddings too small) and you miss nuanced coverage; too many creates redundancy. Bowling rotation (attention heads) distributes responsibility—fast bowlers handle short-range patterns, spinners handle long-range dependencies, just as different attention heads capture different linguistic relationships. The captain decides when to use each strategy based on match state (data availability), conditions (computational budget), and opposition strength (task complexity).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# BEST PRACTICE: Task-specific fine-tuning with proper validation\nimport torch\nfrom transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments\n\nclass CricketCommentaryClassifier:\n    def __init__(self, model_name=\"distilbert-base-uncased\"):\n        self.tokenizer = AutoTokenizer.from_pretrained(model_name)\n        self.model = AutoModelForSequenceClassification.from_pretrained(\n            model_name, \n            num_labels=3  # aggressive, defensive, neutral\n        )\n    \n    def prepare_dataset(self, texts, labels, max_length=128):\n        encodings = self.tokenizer(\n            texts,\n            truncation=True,\n            max_length=max_length,\n            padding=\"max_length\",\n            return_tensors=\"pt\"\n        )\n        return encodings, torch.tensor(labels)\n    \n    def train(self, train_texts, train_labels, eval_texts, eval_labels):\n        train_encodings, train_tensor_labels = self.prepare_dataset(train_texts, train_labels)\n        eval_encodings, eval_tensor_labels = self.prepare_dataset(eval_texts, eval_labels)\n        \n        args = TrainingArguments(\n            output_dir=\"./cricket_classifier\",\n            num_train_epochs=3,\n            per_device_train_batch_size=16,\n            per_device_eval_batch_size=16,\n            warmup_steps=500,\n            weight_decay=0.01,\n            evaluation_strategy=\"epoch\",\n            save_strategy=\"epoch\",\n            load_best_model_at_end=True\n        )\n        \n        trainer = Trainer(\n            model=self.model,\n            args=args,\n            train_dataset=train_encodings,\n            eval_dataset=eval_encodings\n        )\n        trainer.train()\n        return trainer\n\n# ANTI-PATTERN: Raw fine-tuning without validation split\nclass BadCricketClassifier:\n    def __init__(self, model_name=\"distilbert-base-uncased\"):\n        self.tokenizer = AutoTokenizer.from_pretrained(model_name)\n        self.model = AutoModelForSequenceClassification.from_pretrained(model_name)\n    \n    def train(self, all_texts, all_labels):\n        # ❌ PROBLEM 1: No train/val split—model memorizes instead of generalizing\n        # ❌ PROBLEM 2: No max_length—variable tensor sizes cause GPU crashes at scale\n        # ❌ PROBLEM 3: No warmup_steps—learning rate starts too high, diverges\n        encodings = self.tokenizer(all_texts, truncation=False, return_tensors=\"pt\")\n        # Train directly on full dataset with default learning rate\n        pass",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": "Best practice uses proper train/eval splitting, fixed max_length padding, warmup scheduling, and monitored validation. Anti-pattern trains on all data without splits, causing overfitting; skips length standardization causing variable tensor dimensions; omits learning rate warmup causing divergence."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: Batch size mismatch in production. Common mistake: training with batch_size=32 on GPU but deploying with batch_size=1 or batch_size=128 (different hardware). This causes: (1) performance degradation (1-shot inference is 10x slower), (2) OOM errors on smaller devices, (3) numerical instability from different normalization statistics. FIX: Always profile inference latency at your target batch size. Use dynamic batching if deployment receives variable request volumes. For batch_size=1 inference, quantize (INT8) to reduce memory 4x. For batch_size=128, use mixed precision (FP16) to halve memory while maintaining accuracy.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At production scale, NLP powers critical systems: Google Search uses contextual embeddings to understand query intent across 8.5 billion daily searches, processing 200K queries/second. OpenAI's ChatGPT serves 100 million weekly users by fine-tuning on RLHF-aligned data, managing token costs ($0.02-$0.15 per request). Netflix personalizes recommendations using contextual representations on 230M user profiles. Meta's translation system (No Language Left Behind) handles 200+ languages with attention mechanisms to preserve linguistic nuance. Uber uses embeddings to match driver intent with rider requests across 75+ cities in real-time. What breaks: (1) Latency at scale—a 500ms per-request model on 1M QPS becomes 140+ years of latency annually; (2) Token economy—GPT-4 on 100M users costs $4.2M daily; (3) hallucinations without RAG cause factual errors in customer-facing outputs. Airbnb's search ranking combines embeddings with click signals to handle 6M daily searches. These systems measure success by latency SLA (p99 < 200ms), token cost per inference, and factual accuracy metrics.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "Tokenization breaks text into processable units; byte-pair encoding reduces vocabulary size while preserving meaning and subword information.",
+        "Word embeddings map tokens to dense vectors capturing semantic relationships; distance in embedding space reflects linguistic similarity and context.",
+        "Attention mechanism allows models to weight relationships between all token pairs, enabling context-aware representations superior to fixed embeddings.",
+        "Transformer architecture stacks attention and feed-forward layers; contextual outputs depend on position, surrounding tokens, and learned attention patterns across layers.",
+        "Fine-tuning pre-trained models on task data outperforms training from scratch; use frozen models for zero-shot inference when labeled data is scarce.",
+        "Production deployment requires optimization: batch sizing, quantization for latency reduction, RAG for factual grounding, and monitoring for drift in real-time inference.",
+        "NLP systems at scale (Google, OpenAI, Meta) balance accuracy, latency (p99 < 200ms), and cost; choose patterns based on data availability, compute budget, and real-time constraints."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of Natural Language Processing fundamentals with these two knowledge checks. The first quiz focuses on core conceptual understanding, while the second presents a real-world scenario where you apply what you've learned.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the attention mechanism, why does the model compute attention scores between query and key vectors before applying softmax?",
+      "items": [
+        "To measure the relevance or similarity between different positions in the sequence, allowing the model to focus on the most important tokens for generating each output",
+        "To randomly select which tokens should be processed first in a sequential manner",
+        "To convert word embeddings into a fixed-size vector representation for storage efficiency",
+        "To replace recurrent connections in the neural network architecture"
+      ],
+      "answer": 0,
+      "explanation": "The attention mechanism computes query-key dot products to measure how relevant each token is to every other token in the sequence. The softmax operation then normalizes these scores into a probability distribution, enabling the model to dynamically weight which contextual information matters most for each position. This is fundamentally about calculating relevance similarities. Option B is incorrect because attention doesn't impose sequential processing—it's actually parallel. Option C describes word embeddings, not attention scoring. Option D confuses the architectural benefit with the primary mechanism's purpose; while attention does help with long-range dependencies, its core function is relevance measurement.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a cricket commentary chatbot using an LLM. The model sometimes generates contextually irrelevant descriptions, occasionally calling a batter 'bowler' or mixing up which team is fielding. Which two foundational NLP components from this lesson would most directly address these errors?",
+      "items": [
+        "Tokenization and word embeddings alone—they handle all semantic understanding",
+        "Contextual representation (from transformer layers) and attention mechanism—they maintain position awareness and semantic relationships across the entire sequence",
+        "Only the tokenization step, which separates words into distinct entities",
+        "Real-world application frameworks, which bypass the need for other NLP components"
+      ],
+      "answer": 1,
+      "explanation": "Role confusion and entity misidentification occur when the model fails to maintain semantic relationships and positional context across the sequence. Contextual representation from transformer layers enables the model to encode what role each player has based on surrounding context, while the attention mechanism allows the model to 'look back' at relevant tokens (like the team name or 'batting order' mentions) to maintain consistency. Tokenization alone (Option A) only breaks text into pieces without understanding relationships. Option C is too narrow—tokenization doesn't capture semantic context. Option D oversimplifies by suggesting frameworks replace foundational mechanisms. A properly trained attention mechanism would weight tokens about batter roles more heavily when generating role descriptions, and contextual layers would encode relational information that prevents the 'bowler' mixup.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "key_points",
+      "content": "Remember these critical insights when working with LLMs:",
+      "items": [
+        "Attention mechanisms solve the relevance problem—not all tokens matter equally for every prediction",
+        "Contextual representation means each token's embedding changes based on its sequence context, enabling true semantic understanding",
+        "Tokenization is the bridge between raw text and mathematical operations—garbage tokenization leads to garbage embeddings",
+        "No single NLP component works in isolation; the power comes from their integrated interaction in the transformer stack"
+      ],
+      "level": 2,
+      "language": ""
     }
   ]
 }

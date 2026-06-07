@@ -226,6 +226,132 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Three dominant production patterns have emerged for RAG systems: (1) **Dense Retrieval + Single-Pass Generation** optimizes for latency by retrieving top-k documents once and generating immediately, sacrificing accuracy for sub-500ms responses—ideal for real-time chat and search applications where user patience is limited. (2) **Iterative Retrieval with Query Refinement** performs multiple retrieval cycles, refining queries based on intermediate outputs, improving accuracy by 15-30% but requiring 3-5x computational overhead—essential for complex reasoning tasks like legal document analysis or medical diagnosis where precision exceeds cost concerns. (3) **Hybrid Retrieval (Dense + Sparse + Semantic Reranking)** combines BM25 keyword matching, dense embeddings, and cross-encoder scoring to balance recall and precision, adding 200-400ms latency but recovering 8-12% accuracy lost to pure dense methods. Trade-offs are severe: latency vs. accuracy, cost per query ($0.001-0.10), and token consumption (1K-50K tokens per request). Choose pattern based on SLA requirements and user tolerance thresholds.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Dense retrieval + single-pass generation resembles setting a balanced field at the start of play—committed to one strategy, fast execution, accepting some risk. Iterative query refinement mirrors a captain adjusting field placement after each over based on batsman performance and pitch behavior, requiring time investment but maximizing wicket probability. Hybrid retrieval is like using DRS (Decision Review System) in critical moments—combining human judgment (sparse search), technology (embeddings), and expert analysis (rerankers) to make the most defensible decision. Dense-only systems fail like over-aggressive bowling without field awareness; hybrid systems succeed like legendary captains who adapt strategy in real-time. Your choice depends on match context: T20 cricket demands speed (dense), Test cricket demands precision (iterative), international tournaments demand reliability (hybrid).",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: Single retrieval, no quality control\nclass BatsmanAnalyzer_BadRAG:\n    def analyze_performance(self, player_name):\n        docs = self.retriever.retrieve(player_name, top_k=5)\n        # No reranking, no relevance filtering\n        context = \"\\n\".join([d.text for d in docs])\n        response = self.llm.generate(f\"Analyze {player_name}: {context}\")\n        return response  # Hallucinations + noise guaranteed\n\n# ✅ BEST PRACTICE: Filtered retrieval with reranking\nclass BatsmanAnalyzer_GoodRAG:\n    def analyze_performance(self, player_name):\n        # Step 1: Dense + sparse hybrid retrieval\n        dense_docs = self.dense_retriever.retrieve(player_name, top_k=50)\n        sparse_docs = self.bm25_retriever.retrieve(player_name, top_k=50)\n        combined = self._deduplicate_and_merge(dense_docs, sparse_docs)\n        \n        # Step 2: Rerank with cross-encoder\n        reranked = self.cross_encoder.rank(\n            query=player_name,\n            docs=combined,\n            top_k=5\n        )\n        \n        # Step 3: Quality gate - skip if confidence < threshold\n        if reranked[0].score < 0.6:\n            return \"Insufficient data confidence\"\n        \n        # Step 4: Context pruning - trim to token budget\n        context = self._prune_to_tokens(\n            [d.text for d in reranked],\n            max_tokens=2000\n        )\n        \n        response = self.llm.generate(\n            f\"Analyze {player_name} (high-confidence data): {context}\",\n            temperature=0.7\n        )\n        return response",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Context Collapse & Hallucination Amplification** — The most common beginner mistake is retrieving too many documents (top_k=50-100) and passing all into the LLM context, causing the model to average contradictory information and generate plausible-sounding fabrications. The LLM's confidence increases because the context is \"rich,\" but actually confidence is INVERSELY correlated with token count above ~3-4K tokens. **Fix:** (1) Set top_k=3-5 maximum, (2) Add a reranking step with confidence thresholds (score > 0.6), (3) Implement token budgets that hard-cap context to 1500-2500 tokens, (4) Use retrieval quality metrics (MRR, NDCG) in your validation pipeline to detect degradation before production, (5) Add explicit contradiction detection—if top-2 docs disagree, flag uncertainty in output or perform query refinement.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "RAG systems operate at massive scale across production platforms: Google's SGE (Search Generative Experience) retrieves from billions of web pages in <200ms using dense embeddings + learned ranking. OpenAI's ChatGPT Plus with plugins implements iterative retrieval patterns for API calls. Netflix uses RAG for personalized content recommendation by retrieving relevant viewing history and metadata (processing 100M+ user sessions daily). Uber's internal systems retrieve trip context, driver profiles, and regulatory docs for customer support automation at scale. Meta's LLaMA-based systems combine retrieval with social graph context. At scale, failures manifest as: latency explosion when retrieving >20K documents (SLA breaches), embedding drift requiring monthly reindexing (causing stale results), context window overflow leading to token billing >$10/query, and hallucinations from low-relevance documents dominating context pools. Production RAG requires monitoring retrieval quality (MRR, coverage metrics), embedding staleness, and LLM output confidence calibration—companies ignoring these face 10-50% accuracy degradation within months.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "items": [
+        "RAG combines retrieval and generation to reduce hallucinations and ground LLM outputs in factual, verifiable source documents.",
+        "Semantic embeddings enable dense retrieval by converting text to high-dimensional vectors, enabling similarity search at scale.",
+        "Cross-encoder reranking refines retrieved results by scoring document-query pairs, improving precision by 8-15% with minimal latency cost.",
+        "Token limits force aggressive context pruning; use retrieval quality gates and hard caps to prevent context collapse and LLM confusion.",
+        "Hybrid retrieval (dense + sparse) balances recall across exact matches and semantic similarity, outperforming single-method approaches in production.",
+        "Chain-of-thought prompting with retrieved context improves reasoning on complex queries by forcing explicit step-by-step verification against source materials.",
+        "Production RAG systems fail when context count > 10-15 docs or token budget > 4K tokens; monitor embedding staleness, retrieval MRR, and LLM confidence continuously."
+      ],
+      "content": "",
+      "level": 2,
+      "language": "",
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of Retrieval-Augmented Generation with these two knowledge checks. Quiz 1 focuses on core conceptual mechanisms, while Quiz 2 applies those concepts to real-world scenarios.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In a RAG system, why is re-ranking with a cross-encoder considered more effective than relying solely on embedding-based semantic similarity scores from the retriever?",
+      "items": [
+        "Cross-encoders directly compare query-document pairs and capture complex interaction patterns, while embedding-based scorers rank independently without considering the relationship between query and document together",
+        "Cross-encoders use transformer models that are always faster and more computationally efficient than semantic embeddings",
+        "Embedding-based similarity is completely unreliable and should never be used in production RAG systems",
+        "Cross-encoders eliminate the need for context window management by automatically truncating long documents"
+      ],
+      "answer": 0,
+      "explanation": "Cross-encoders are more effective because they process the query and document together as a pair, allowing the model to learn nuanced interaction patterns and ranking signals that isolated embedding comparisons cannot capture. Just like a cricket commentator analyzing both the bowler's action AND the batter's stance together gains better insight than evaluating each separately, cross-encoders understand bidirectional relationships. The second option is false—cross-encoders are typically slower. The third option is incorrect; embeddings remain valuable as the initial retriever stage. The fourth option is false; cross-encoders don't solve context window issues—that requires separate truncation strategies.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building a RAG system for a cricket statistics database. Your retriever pulls 20 documents about player performance, but many are about similar players (e.g., multiple all-rounders from the same era). Your LLM's context window allows ~8 documents. What's the best approach?",
+      "items": [
+        "Pass all 20 documents to the LLM and let it ignore irrelevant ones; LLMs are smart enough to filter context",
+        "Use a cross-encoder re-ranker to score query-document relevance, then select the top 8 ranked documents before passing to the LLM for generation",
+        "Retrieve only 8 documents initially to avoid the re-ranking step and save latency",
+        "Randomly sample 8 documents from the 20 to ensure diversity of perspectives"
+      ],
+      "answer": 1,
+      "explanation": "Using a cross-encoder re-ranker is optimal because it intelligently identifies the most relevant documents before context selection, similar to how a cricket captain reviews multiple strategy options and selects the best plays for the match situation. Re-ranking captures nuanced relevance signals beyond initial embedding similarity, ensuring the 8 selected documents are truly the most valuable. Option A fails because flooding context degrades LLM performance and wastes tokens. Option C sacrifices retrieval quality by limiting initial retrieval. Option D introduces unnecessary randomness when principled ranking is available. The re-ranker-then-select approach maximizes information value within token constraints.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

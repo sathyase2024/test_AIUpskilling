@@ -221,6 +221,132 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production agentic workflows typically follow three established patterns: the Hierarchical Agent pattern (one coordinator agent spawns sub-agents for specialized tasks), the Sequential Chain pattern (agents execute in strict order with state passing between them), and the Collaborative Mesh pattern (peer agents negotiate and vote on decisions). The Hierarchical pattern excels when you have clear task decomposition—like delegating batting strategy decisions to separate agents for powerplay, middle-overs, and death overs—but introduces overhead from inter-agent communication and potential bottlenecks at the coordinator. The Sequential Chain minimizes complexity and latency, ideal for time-critical workflows (real-time match analysis), but lacks resilience if an intermediate agent fails. The Collaborative Mesh enables robustness and handles ambiguous decisions through consensus, but requires sophisticated conflict resolution mechanisms and exponentially increases communication costs. Choose Hierarchical for complex domain problems with natural task hierarchies; Sequential for deterministic pipelines where order matters; Collaborative when decision quality trumps speed and you need redundancy. Trade-off analysis: Hierarchical trades latency for flexibility, Sequential trades robustness for speed, and Collaborative trades cost for reliability.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: The Hierarchical pattern mirrors how a cricket captain delegates authority—the captain (coordinator) strategizes overall game plan, then directs a bowling coach for fast-bowling rotations and a fielding coach for placement adjustments. The Sequential Chain resembles a pre-planned bowling sequence where the opening bowlers execute exactly as planned, then hand responsibility to spinners; deviations mid-plan create chaos. The Collaborative Mesh is like a captain using DRS (Decision Review System) where multiple analysts review the same footage simultaneously and vote on the decision—slow but rarely wrong. In a T20 match, you'd use Sequential (execute fixed powerplay tactics), but in a Test series where conditions vary unpredictably, Hierarchical works better. And when a critical LBW decision arises, that's your Collaborative moment—the cost of a 30-second review is worth eliminating wrong calls.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ANTI-PATTERN: No state isolation, all agents mutate shared context\nclass MatchAnalyzer:\n    def __init__(self):\n        self.match_state = {\"runs\": 0, \"wickets\": 0, \"overs\": 0}\n    \n    async def batting_strategy_agent(self):\n        # BUG: Direct mutation causes race conditions\n        self.match_state[\"runs\"] += 50\n        return \"Aggressive batting\"\n    \n    async def bowling_strategy_agent(self):\n        # BUG: Reads potentially inconsistent state\n        if self.match_state[\"runs\"] > 200:\n            return \"Defensive bowling\"\n\n# BEST PRACTICE: Immutable state transitions with explicit handoffs\nclass MatchAnalyzerBest:\n    def __init__(self):\n        self.match_state = {\"runs\": 0, \"wickets\": 0, \"overs\": 0}\n        self.state_lock = asyncio.Lock()\n    \n    async def batting_strategy_agent(self, current_state: dict) -> tuple:\n        # Create isolated copy, compute, return new state\n        new_state = current_state.copy()\n        new_state[\"runs\"] += 50\n        return \"Aggressive batting\", new_state\n    \n    async def bowling_strategy_agent(self, current_state: dict) -> str:\n        # Work only with passed snapshot\n        async with self.state_lock:\n            if current_state[\"runs\"] > 200:\n                return \"Defensive bowling\"\n        return \"Balanced bowling\"\n    \n    async def orchestrate_match(self):\n        # Explicit state threading prevents conflicts\n        strategy, updated_state = await self.batting_strategy_agent(self.match_state)\n        self.match_state = updated_state\n        bowling = await self.bowling_strategy_agent(self.match_state)\n        return {\"batting\": strategy, \"bowling\": bowling, \"state\": self.match_state}",
+      "level": 2,
+      "language": "python",
+      "items": [],
+      "answer": -1,
+      "explanation": "The anti-pattern demonstrates shared mutable state leading to race conditions and inconsistent reads. The best practice uses immutable state transitions, explicit locks, and state threading—ensuring each agent sees consistent snapshots and changes are atomic."
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: The most common beginner mistake is creating agents that modify shared state objects (dictionaries, lists) without synchronization, causing race conditions where one agent's update gets overwritten by another's read-modify-write cycle. Fix this by: (1) Always passing state as function arguments, not accessing class/global variables; (2) Use async locks (asyncio.Lock or threading.Lock) around any state modifications; (3) Prefer returning new state objects rather than in-place mutations; (4) Add state versioning/timestamps to detect and recover from conflicts; (5) Test with concurrent_agent_calls > 2 before production deployment.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At production scale, agentic workflows power critical systems across major tech companies. Google uses hierarchical agent networks in their Search Generative Experience (SGE), where specialized agents retrieve documents, verify facts, and synthesize answers in parallel—processing millions of queries daily. OpenAI's ChatGPT employs a Collaborative Mesh pattern for function-calling workflows, coordinating between reasoning agents, tool-execution agents, and safety validators. Netflix uses Sequential Chain patterns in their recommendation engine, where content agents retrieve titles, filtering agents apply business rules, and ranking agents score candidates—failures at scale impact millions of users. Uber's dispatch system runs concurrent agents for driver matching, surge pricing, and ETA calculation across 100+ cities, requiring aggressive state synchronization. When done wrong, common failures include: unbounded token accumulation (context window explosion after ~50 agent steps), cascading tool failures (one API timeout triggering retry storms), and state divergence in distributed multi-agent setups (inconsistent decisions across regions). Companies like Meta and Airbnb have published benchmarks showing that proper error recovery mechanisms reduce production incidents by 60-70%, while naive agent chains show exponential failure rates beyond 5 sequential steps.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Agents execute reasoning loops via tool invocation; state management prevents race conditions and context window overflow.",
+        "Three production patterns exist: Hierarchical (complex tasks), Sequential (deterministic pipelines), Collaborative (consensus decisions).",
+        "Tool integration requires function schemas, return validation, and fallback mechanisms for failed API calls.",
+        "Error recovery uses retry policies with exponential backoff, circuit breakers, and graceful degradation strategies.",
+        "Context windows are finite; track token usage per agent step and implement summarization or state pruning past ~70% capacity.",
+        "Distributed agents require versioned state, atomic transactions, and conflict resolution to prevent divergent decisions.",
+        "Real-world systems at Google, OpenAI, Netflix, Uber scale to millions of operations by treating agents as microservices with explicit failure domains."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of AI agents and agentic workflows with these two knowledge checks. Quiz 1 focuses on conceptual understanding of core mechanisms, while Quiz 2 presents a real-world scenario requiring applied decision-making.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In the Agent Reasoning Loop, what is the primary purpose of the 'Observation' step, and why is it critical before the agent proceeds to the next Action?",
+      "items": [
+        "To store the tool output in memory and prepare the agent to call the same tool again with identical parameters",
+        "To capture the actual result or feedback from the environment after executing a tool, enabling the agent to assess progress toward the goal and dynamically adjust its strategy",
+        "To log all function calls for debugging purposes and ensure the state management system records every interaction",
+        "To validate that the tool was called with the correct syntax and return an error code if the function signature was incorrect"
+      ],
+      "answer": 1,
+      "explanation": "The Observation step is critical because it grounds the agent's reasoning in reality. After executing an action (tool call), the agent receives concrete feedback from the environment—this could be data, an error message, or a status update. This observation allows the agent to evaluate whether it's progressing toward its goal, identify unexpected outcomes, and adjust its reasoning path accordingly. Option 0 is incorrect because observations don't necessarily trigger tool reuse; they inform decision-making. Option 2 conflates logging with the core reasoning function—logging is secondary. Option 3 describes syntax validation, which happens at execution time, not during observation. Without proper observation, agents become blind to outcomes and cannot perform effective goal-directed reasoning.",
+      "level": 2,
+      "language": ""
+    },
+    {
+      "type": "quiz",
+      "content": "You're building an AI agent for a cricket analytics platform. The agent must call three tools: (1) fetch_match_data(), (2) calculate_player_stats(), and (3) generate_commentary(). During execution, fetch_match_data() occasionally returns incomplete data, causing calculate_player_stats() to fail. The agent has no retry logic implemented. What should you implement to make this workflow resilient?",
+      "items": [
+        "Remove calculate_player_stats() from the tool set and only use fetch_match_data() and generate_commentary() to avoid cascading failures",
+        "Implement exponential backoff retry logic in fetch_match_data(), add fallback values in state management, and use error handling to gracefully degrade commentary generation when stats are unavailable",
+        "Replace all three tools with a single mega-tool that performs all operations at once, eliminating the need for chaining and tool dependencies",
+        "Manually verify data completeness before each agent execution and prevent the agent from running if any data is missing"
+      ],
+      "answer": 1,
+      "explanation": "Option 1 is incorrect because removing tools limits functionality unnecessarily—the real issue is handling incomplete data, not the tool itself. Option 3 creates a monolithic tool that defeats the composability principle of agentic workflows and makes the system less maintainable. Option 4 is a manual workaround that doesn't scale and doesn't teach the agent resilience. Option 1 (correct) addresses the core problem: incomplete data. Implementing exponential backoff gives fetch_match_data() multiple chances to succeed; adding fallback values in state management allows downstream tools to proceed with partial data; and graceful degradation in generate_commentary() ensures the workflow completes even if stats are unavailable. This approach embodies best practices in error handling and recovery mechanisms for multi-tool agentic workflows, ensuring robustness without sacrificing functionality.",
+      "level": 2,
+      "language": ""
     }
   ]
 }

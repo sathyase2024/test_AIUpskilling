@@ -203,6 +203,152 @@
       "items": [],
       "answer": -1,
       "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Common Patterns & Best Practices",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Production PyTorch deployments rely on three established patterns: (1) **Gradient Checkpointing with DDP** — trade memory savings (~50%) for 20-30% compute overhead; use when VRAM limits scaling, common in large language models (OpenAI GPT training); (2) **Mixed Precision + Gradient Accumulation** — reduces memory by 40%, speeds training 1.5-2x, but requires careful loss scaling to prevent gradient underflow; Meta uses this for 175B+ parameter models; (3) **Dynamic Graph with Static Optimization** — keeps computational flexibility while caching graph structure across iterations (~15% speedup); Uber's recommendation systems use this for variable-length sequences. Each pattern involves fundamental trade-offs: checkpointing sacrifices latency for scale, mixed precision trades numerical precision for throughput, and dynamic caching trades flexibility for performance. Choose based on your bottleneck—memory-limited systems need checkpointing, compute-bound need mixed precision, and latency-sensitive need static optimization. Wrong choices cause 5-10x performance degradation or OOM failures in production.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Gradient checkpointing resembles a bowler rotating rest days—you sacrifice immediate performance to preserve stamina for the full match. Mixed precision mirrors DRS usage: you accept a small error margin (±2mm LBW) to gain speed of decision-making; use it strategically, not for every delivery. Dynamic graph caching is like field placement adjustments mid-over—you keep flexibility to change formations (batsman-specific) while optimizing for the most likely scenarios. Gradient accumulation is similar to building partnerships through singles: you don't need boundaries every ball; steady runs (small gradients) accumulate into match-winning scores. The anti-pattern is trying all techniques simultaneously—like playing 11 bowlers on a 22-yard pitch—you'll collapse under resource constraints. Smart teams (Google, Meta) pick ONE primary bottleneck to optimize, just as captains focus on one weakness in opposition batting.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "code",
+      "content": "# ❌ ANTI-PATTERN: No gradient accumulation, no mixed precision, no DDP coordination\nimport torch\nimport torch.nn as nn\nfrom torch.utils.data import DataLoader\n\nmodel = nn.Linear(1000, 100)\noptimizer = torch.optim.Adam(model.parameters(), lr=0.001)\n\nfor epoch in range(10):\n    for batch_idx, (cricket_data, labels) in enumerate(DataLoader(dataset, batch_size=32)):\n        outputs = model(cricket_data)\n        loss = nn.functional.cross_entropy(outputs, labels)\n        optimizer.zero_grad()\n        loss.backward()  # Full backward on tiny batch\n        optimizer.step()  # Update on noisy gradients\n        # Problem: High variance updates, poor GPU utilization, OOM on larger batches\n\n# ✅ BEST PRACTICE: Combined gradient accumulation + mixed precision + DDP\nfrom torch.cuda.amp import autocast, GradScaler\nfrom torch.nn.parallel import DistributedDataParallel as DDP\nimport torch.distributed as dist\n\ndist.init_process_group(backend='nccl')\ndevice = torch.device(f'cuda:{dist.get_rank()}')\n\nmodel = nn.Linear(1000, 100).to(device)\nmodel = DDP(model, device_ids=[dist.get_rank()])\noptimizer = torch.optim.Adam(model.parameters(), lr=0.001)\nscaler = GradScaler()\n\naccum_steps = 4  # Accumulate 4 micro-batches\n\nfor epoch in range(10):\n    for batch_idx, (cricket_data, labels) in enumerate(DataLoader(dataset, batch_size=8)):\n        cricket_data, labels = cricket_data.to(device), labels.to(device)\n        \n        with autocast(dtype=torch.float16):  # Mixed precision\n            outputs = model(cricket_data)\n            loss = nn.functional.cross_entropy(outputs, labels) / accum_steps\n        \n        scaler.scale(loss).backward()  # Accumulated gradient\n        \n        if (batch_idx + 1) % accum_steps == 0:\n            scaler.step(optimizer)\n            scaler.update()\n            optimizer.zero_grad()\n        \n        # Benefit: Effective batch size = 32, 40% less memory, 1.8x faster, stable updates\n        if batch_idx % 10 == 0:\n            print(f'Epoch {epoch}, Batch {batch_idx}, Loss: {loss.item():.4f}')",
+      "language": "python",
+      "level": 2,
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "warning_box",
+      "content": "Warning: **Forgetting to synchronize gradients across DDP processes before optimizer.step()**. This causes each GPU to update with different gradient values, breaking distributed training convergence. Beginners often use `loss.backward()` directly in DDP without ensuring `all_reduce()` completes first. FIX: Always use DDP's built-in gradient synchronization (automatic on .backward()) and verify with `dist.barrier()` before stepping. Alternatively, use `model.no_sync()` context manager explicitly when intentionally skipping synchronization (e.g., gradient accumulation steps), then synchronize on the final step.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Real-World Application",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "At scale, these patterns enable production systems handling petabytes of data. Google trains 540B-parameter PaLM models using gradient checkpointing + DDP + mixed precision across 3,072 TPU chips, reducing training time from 8 months to 47 days. Meta's LLaMA training leveraged all three patterns simultaneously, achieving 2.7x speedup versus baseline mixed precision alone. Netflix uses gradient accumulation for recommendation models on variable-length user histories (some users have 10K+ interactions), preventing OOM on sequences that would require batch_size=1 otherwise. OpenAI reports that dynamic computational graphs saved 40% latency in GPT-3 inference preprocessing compared to static-graph competitors, critical for sub-500ms API guarantees. Uber's real-time bidding system processes 10M events/second using gradient accumulation with small batches to maintain decision latency <100ms. When done wrong—skipping DDP synchronization, mixing precision incorrectly, or ignoring gradient explosion—training diverges within hours, wasting millions in cloud compute costs.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "Gradient checkpointing halves memory usage; use for models >1B parameters at 15-25% compute cost trade-off.",
+        "Mixed precision training reduces memory by 40%, doubles throughput; requires GradScaler to prevent gradient underflow.",
+        "Distributed Data Parallel synchronizes gradients across GPUs; missing synchronization breaks convergence in multi-GPU setups.",
+        "Gradient accumulation simulates larger batch sizes on limited VRAM; critical for sequence models and recommendation systems.",
+        "Dynamic graph caching maintains flexibility while optimizing repeated patterns; provides 10-15% speedup in variable-length inputs.",
+        "Combined patterns (checkpointing + mixed precision + DDP) enable training 500B+ models; each pattern targets different bottlenecks.",
+        "Production systems fail silently when patterns conflict; always verify numerical stability and loss curves in early epochs."
+      ],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "heading",
+      "content": "Knowledge Checks",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "paragraph",
+      "content": "Test your understanding of PyTorch advanced optimization techniques with these conceptual and applied knowledge checks. These quizzes validate your grasp of distributed training, mixed precision, gradient accumulation, and dynamic computational graphs.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "quiz",
+      "content": "In Distributed Data Parallel (DDP) training with 4 GPUs, you're training a cricket player performance model. Each GPU processes a batch of 32 player statistics. After the backward pass, what happens to the gradients before the optimizer step?",
+      "items": [
+        "Gradients are averaged across all GPUs using AllReduce operation",
+        "Each GPU keeps its own gradients and updates independently",
+        "Gradients are sent to GPU 0 only, which broadcasts updates back",
+        "The gradients are discarded and recomputed on the next iteration"
+      ],
+      "answer": 0,
+      "explanation": "In DDP, the AllReduce collective communication operation automatically synchronizes and averages gradients across all participating GPUs after the backward pass. This ensures all replicas have identical gradients before the optimizer step, maintaining model consistency across the distributed setup. Option 1 is incorrect because gradients aren't kept separate—synchronization is the entire point of DDP. Option 2 would lead to model divergence. Option 3 describes parameter server architecture, not DDP's ring-allreduce pattern. Option 4 would cause training to fail as gradients are essential for weight updates."
+    },
+    {
+      "type": "quiz",
+      "content": "You're training a cricket match outcome prediction model using mixed precision (AMP). Your loss becomes NaN after 50 iterations. You check that loss_scaler.scale() is being called, but gradient scaling might not be sufficient. What is the most likely issue and best solution?",
+      "items": [
+        "The learning rate is too low; increase it by 10x",
+        "Loss scaling factor is too small, causing gradient underflow; increase initial_scale or use dynamic loss scaling",
+        "Mixed precision is fundamentally incompatible with this model; disable AMP entirely",
+        "The model weights are corrupted; reinitialize all parameters from scratch"
+      ],
+      "answer": 1,
+      "explanation": "NaN loss in mixed precision training typically indicates numerical instability, commonly caused by insufficient gradient scaling. If the scale factor is too small, gradients in float16 can underflow to zero, halting learning or causing NaN propagation. Dynamic loss scaling (GradScaler) automatically adjusts the scale factor during training, preventing both underflow and overflow. This is the standard solution used in production PyTorch AMP workflows. Option 0 ignores the root numerical issue. Option 2 is overly pessimistic—mixed precision is widely used successfully. Option 3 is unnecessary since the issue is numerical precision, not model corruption."
+    },
+    {
+      "type": "analogy",
+      "content": "🏏 Think of it like cricket: Distributed training is like coordinating fielders across the pitch—each fielder (GPU) catches balls (processes data) independently, but they must share information about what happened (gradients) so the captain can make consistent decisions. Mixed precision is like using a lighter bat for faster reflexes but needing a scout to watch for dangerous deliveries (gradient scaling to prevent underflow). Gradient accumulation is like a batsman collecting runs over multiple balls instead of trying to score everything in one shot—spreading the effort makes the approach more sustainable.",
+      "level": 2,
+      "language": "",
+      "items": [],
+      "answer": -1,
+      "explanation": ""
+    },
+    {
+      "type": "key_points",
+      "content": "",
+      "level": 2,
+      "language": "",
+      "items": [
+        "AllReduce operations in DDP synchronize gradients across GPUs with minimal communication overhead using ring topology",
+        "Gradient underflow in float16 requires careful loss scaling; GradScaler provides automatic dynamic scaling to prevent NaN",
+        "Gradient accumulation trades memory for compute by splitting large batches into micro-batches over multiple iterations",
+        "Dynamic computational graphs enable variable-length sequences and control flow, essential for NLP and sequential models",
+        "Mixed precision reduces memory usage and accelerates compute while maintaining numeric stability through loss scaling"
+      ],
+      "answer": -1,
+      "explanation": ""
     }
   ]
 }
