@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Runtime env var — read when each request is served, not at build time.
-// Set BACKEND_URL on Render (or any platform) without rebuilding the image.
-const BACKEND = (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '')
+// BACKEND_URL must be set as a server-side runtime env var on your deployment
+// platform (Render, Railway, Vercel, etc.). NEXT_PUBLIC_* vars are baked in at
+// build time and must not be used for server-to-server URLs.
+const BACKEND_URL_RAW = process.env.BACKEND_URL
+if (!BACKEND_URL_RAW) {
+  console.warn(
+    '[proxy] BACKEND_URL is not set — falling back to http://localhost:3001 ' +
+    'which will be unreachable on deployed infra. ' +
+    'Set BACKEND_URL in your platform environment variables.',
+  )
+}
+const BACKEND = (BACKEND_URL_RAW || 'http://localhost:3001').replace(/\/$/, '')
 
 const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'proxy-authorization', 'te', 'trailers'])
 
@@ -31,7 +40,15 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
     })
   } catch (err) {
     console.error('[proxy] upstream fetch failed:', target, err)
-    return NextResponse.json({ message: 'Backend unreachable' }, { status: 502 })
+    return NextResponse.json(
+      {
+        message: 'Backend unreachable',
+        ...(BACKEND_URL_RAW
+          ? {}
+          : { hint: 'BACKEND_URL env var is not set — proxy is targeting localhost:3001 which is unreachable on deployed infra. Set BACKEND_URL to your backend service URL.' }),
+      },
+      { status: 502 },
+    )
   }
 
   const resHeaders = new Headers()
