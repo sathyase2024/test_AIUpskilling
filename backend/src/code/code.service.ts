@@ -17,7 +17,7 @@ const EXEC_OPTS = {
   },
 };
 
-interface ExecResult { stdout: string; stderr: string; exitCode: number }
+export interface ExecResult { stdout: string; stderr: string; exitCode: number }
 
 function tag() {
   return `${Date.now()}_${Math.random().toString(36).slice(2)}`;

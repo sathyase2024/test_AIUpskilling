@@ -251,7 +251,7 @@ export class TopicsService implements OnApplicationBootstrap {
 
       // Only process files that don't have a DB row yet (by orderIndex)
       const existingOrders = new Set(
-        (await this.lessonRepo.find({ where: { topicId: savedTopic.id }, select: ['orderIndex'] }))
+        (await this.lessonRepo.find({ where: { topicId: savedTopic.id }, select: { orderIndex: true } }))
           .map((l) => l.orderIndex),
       );
 
