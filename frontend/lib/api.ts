@@ -1,4 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// All API calls go through the Next.js proxy route (/api/proxy/*).
+// The proxy reads BACKEND_URL at runtime — no rebuild needed to change the backend URL.
+const API_URL = '/api/proxy'
 
 const USER_KEY = 'skillforge_user';
 

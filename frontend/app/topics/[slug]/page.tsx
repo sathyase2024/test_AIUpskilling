@@ -242,7 +242,7 @@ export default function TopicDetailPage() {
   useEffect(() => {
     if (!slug) return
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+    const API_URL = '/api/proxy'
 
     async function fetchTopic() {
       try {
