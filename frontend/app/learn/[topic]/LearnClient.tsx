@@ -91,11 +91,16 @@ export default function LearnClient({ topic }: { topic: string }) {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(
-          "We couldn't load this course. Make sure the backend is running and the topic exists.",
-        );
         // eslint-disable-next-line no-console
         console.error("Failed to load topic", err);
+        try {
+          const body = JSON.parse(err.message);
+          const hint = body.hint ? ` (${body.hint})` : '';
+          const msg = body.message || 'Unknown error';
+          setError(`Couldn't load this course: ${msg}${hint}`);
+        } catch {
+          setError("We couldn't load this course. Make sure the backend is running and the topic exists.");
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

@@ -134,13 +134,39 @@ export class TopicsService implements OnApplicationBootstrap {
       this.runSeeders().catch((err) =>
         this.logger.error(`Seeder failed: ${err.message}`),
       );
-    }, 8_000);
+    }, 3_000);
   }
 
   private async runSeeders() {
     const count = await this.topicRepo.count();
     if (count === 0) await this.seedMissing();
+    // Always ensure generated topic records exist so findBySlug never returns 404
+    // even when the generated_lessons directory is unavailable (e.g. on first deploy).
+    await this.seedGeneratedTopicMeta();
     await this.seedGeneratedLessons();
+  }
+
+  /**
+   * Ensure every slug in GENERATED_TOPIC_META has a Topic row in the DB.
+   * Does NOT require the generated_lessons directory — creates stubs so the
+   * learn page can render immediately; lesson content is generated on-demand.
+   */
+  private async seedGeneratedTopicMeta(): Promise<void> {
+    let seeded = 0;
+    for (const [slug, meta] of Object.entries(GENERATED_TOPIC_META)) {
+      const existing = await this.topicRepo.findOne({ where: { slug } });
+      if (existing) continue;
+      await this.topicRepo.save(
+        this.topicRepo.create({
+          ...meta,
+          slug,
+          rating: 4.7 + Math.random() * 0.3,
+          enrolledCount: Math.floor(Math.random() * 5000) + 500,
+        } as Topic),
+      );
+      seeded++;
+    }
+    if (seeded > 0) this.logger.log(`Seeded ${seeded} generated topic metadata record(s)`);
   }
 
   async seedMissing() {
