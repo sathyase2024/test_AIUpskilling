@@ -6,6 +6,18 @@ import { GlobalExceptionFilter } from './filters/http-exception.filter';
 import cookieParser = require('cookie-parser');
 import helmet from 'helmet';
 
+// Catch anything that escapes NestJS's error handling so Render logs always
+// show the reason before the process exits.  Node 15+ throws on unhandled
+// rejections by default; this makes the exit visible and intentional.
+process.on('unhandledRejection', (reason) => {
+  console.error('[Fatal] Unhandled Promise Rejection:', reason);
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[Fatal] Uncaught Exception:', err);
+  process.exit(1);
+});
+
 async function bootstrap() {
   // ── Guard: insecure JWT secret in production ─────────────────────────────────
   const jwtSecret = process.env.JWT_SECRET ?? '';
