@@ -68,6 +68,15 @@ export class AiService implements OnApplicationBootstrap {
 
   /** Auto-trigger pre-generation 15 s after startup so topic seeding finishes first */
   onApplicationBootstrap() {
+    // Skip if no real AI worker is configured — localhost is not reachable on deployed infra.
+    // On-demand generation (getLessonContent) handles individual lesson requests instead.
+    if (!this.workerUrl || /localhost|127\.0\.0\.1/.test(this.workerUrl)) {
+      this.logger.warn(
+        `AI_WORKER_URL is "${this.workerUrl}" — skipping startup pre-generation. ` +
+        'Set AI_WORKER_URL to enable background lesson generation.',
+      );
+      return;
+    }
     setTimeout(() => {
       this.pregenerateAll().catch(err =>
         this.logger.error(`Startup pre-generation failed: ${err.message}`)

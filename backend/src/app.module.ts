@@ -43,8 +43,8 @@ import { CodingSubmission } from './entities/coding-submission.entity';
         entities: [User, Topic, Lesson, LearningPath, UserProgress, CodingSubmission],
         synchronize: cfg.get('NODE_ENV') !== 'production' || cfg.get('DB_SYNC') === 'true',
         logging: cfg.get('NODE_ENV') === 'development' ? ['error'] : false,
-        retryAttempts: 10,   // retry DB connection up to 10 times on startup
-        retryDelay: 3000,    // 3 s between retries
+        retryAttempts: 20,   // retry DB connection up to 20 times on startup (100 s window for Render cold starts)
+        retryDelay: 5000,    // 5 s between retries
       }),
       inject: [ConfigService],
     }),

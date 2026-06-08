@@ -74,4 +74,7 @@ async function bootstrap() {
   logger.log(`📚 API docs available at http://localhost:${port}/api/docs`);
   logger.log(`🔓 CORS enabled for: *.onrender.com, localhost${configured.length ? ', ' + configured.join(', ') : ''}`);
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('[Fatal] Bootstrap failed — server could not start:', err);
+  process.exit(1);
+});
