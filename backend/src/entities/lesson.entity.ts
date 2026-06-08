@@ -4,14 +4,16 @@ import {
   Column,
   CreateDateColumn,
   ManyToOne,
-  OneToMany,
   JoinColumn,
   Index,
+  Unique,
 } from 'typeorm';
 import { Topic } from './topic.entity';
 
 @Entity('lessons')
 @Index(['topicId'])
+@Index(['isGenerated'])
+@Unique(['topicId', 'orderIndex'])
 export class Lesson {
   @PrimaryGeneratedColumn('uuid')
   id: string;

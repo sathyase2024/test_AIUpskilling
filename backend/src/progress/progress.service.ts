@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { UserProgress } from '../entities/user-progress.entity';
 import { Lesson } from '../entities/lesson.entity';
 import { User } from '../entities/user.entity';
@@ -13,23 +13,43 @@ export class ProgressService {
     @InjectRepository(Lesson) private lessonRepo: Repository<Lesson>,
     @InjectRepository(User) private userRepo: Repository<User>,
     private usersService: UsersService,
+    private dataSource: DataSource,
   ) {}
 
   async markLessonComplete(userId: string, lessonId: string) {
     const lesson = await this.lessonRepo.findOne({ where: { id: lessonId } });
     if (!lesson) return { error: 'Lesson not found' };
-    let progress = await this.progressRepo.findOne({ where: { userId, lessonId } });
-    if (progress?.completed) return { alreadyCompleted: true, xpEarned: 0 };
-    if (!progress) {
-      progress = this.progressRepo.create({ userId, lessonId, topicId: lesson.topicId });
-    }
-    progress.completed = true;
-    progress.completionPercent = 100;
-    progress.xpEarned = lesson.xpReward;
-    progress.completedAt = new Date();
-    await this.progressRepo.save(progress);
-    await this.usersService.addXp(userId, lesson.xpReward);
-    return { success: true, xpEarned: lesson.xpReward, lessonId };
+
+    return this.dataSource.transaction(async (em) => {
+      let progress = await em.findOne(UserProgress, { where: { userId, lessonId } });
+      if (progress?.completed) return { alreadyCompleted: true, xpEarned: 0 };
+
+      if (!progress) {
+        progress = em.create(UserProgress, { userId, lessonId, topicId: lesson.topicId });
+      }
+      progress.completed = true;
+      progress.completionPercent = 100;
+      progress.xpEarned = lesson.xpReward;
+      progress.completedAt = new Date();
+
+      try {
+        await em.save(UserProgress, progress);
+      } catch (err: any) {
+        // Unique constraint violation — another request completed this lesson concurrently
+        if (err.code === '23505') return { alreadyCompleted: true, xpEarned: 0 };
+        throw err;
+      }
+
+      // Atomic XP increment — safe under concurrent requests
+      await em.increment(User, { id: userId }, 'xp', lesson.xpReward);
+      const user = await em.findOne(User, { where: { id: userId } });
+      if (user) {
+        user.level = Math.floor(user.xp / 1000) + 1;
+        await em.save(User, user);
+      }
+
+      return { success: true, xpEarned: lesson.xpReward, lessonId };
+    });
   }
 
   async getTopicProgress(userId: string, topicId: string) {
@@ -51,7 +71,6 @@ export class ProgressService {
     since.setDate(since.getDate() - 29);
     since.setHours(0, 0, 0, 0);
 
-    // Single query: active dates in the last 30 days
     const rows: { date: string }[] = await this.progressRepo
       .createQueryBuilder('p')
       .select("DATE(p.completedAt)", 'date')
@@ -88,9 +107,8 @@ export class ProgressService {
   }
 
   async getSkillProgress(userId: string) {
-    const categories = ['programming', 'frontend', 'backend', 'devops', 'ai-ml', 'databases'];
+    const categories = ['programming', 'frontend', 'backend', 'cloud', 'devops', 'ai-ml', 'databases', 'software-engineering', 'mobile'];
 
-    // Single query: total lessons per category
     const totals: { category: string; total: string }[] = await this.lessonRepo
       .createQueryBuilder('l')
       .innerJoin('l.topic', 't')
@@ -100,7 +118,6 @@ export class ProgressService {
       .groupBy('t.category')
       .getRawMany();
 
-    // Single query: completed lessons per category for this user
     const dones: { category: string; done: string }[] = await this.progressRepo
       .createQueryBuilder('p')
       .innerJoin('p.lesson', 'l')

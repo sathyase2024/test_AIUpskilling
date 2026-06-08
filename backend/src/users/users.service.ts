@@ -52,9 +52,10 @@ export class UsersService {
   }
 
   async addXp(userId: string, xp: number): Promise<User> {
+    // Atomic increment prevents lost updates under concurrent requests
+    await this.userRepo.increment({ id: userId }, 'xp', xp);
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
-    user.xp = (user.xp || 0) + xp;
     user.level = Math.floor(user.xp / 1000) + 1;
     return this.userRepo.save(user);
   }
@@ -62,7 +63,7 @@ export class UsersService {
   async updateStreak(userId: string, streak: number): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
-    user.streak = streak;
+    user.streak = Math.max(0, streak);
     user.lastActiveAt = new Date();
     return this.userRepo.save(user);
   }
