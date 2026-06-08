@@ -41,10 +41,22 @@ import { CodingSubmission } from './entities/coding-submission.entity';
           ? { rejectUnauthorized: false }       // managed DBs (Railway, Render, Supabase)
           : false,
         entities: [User, Topic, Lesson, LearningPath, UserProgress, CodingSubmission],
-        synchronize: cfg.get('NODE_ENV') !== 'production' || cfg.get('DB_SYNC') === 'true',
+        // Synchronize is ON unless DB_SYNC=false is explicitly set.
+        // This prevents schema drift when new columns are added during active development.
+        // Set DB_SYNC=false only after the schema is stable and you have migrations in place.
+        synchronize: cfg.get('DB_SYNC') !== 'false',
         logging: cfg.get('NODE_ENV') === 'development' ? ['error'] : false,
-        retryAttempts: 10,   // retry DB connection up to 10 times on startup
-        retryDelay: 3000,    // 3 s between retries
+        retryAttempts: 20,   // retry DB connection up to 20 times on startup (100 s window for Render cold starts)
+        retryDelay: 5000,    // 5 s between retries
+        // pg connection-pool settings — prevents stale connections after Render free-tier
+        // spin-down/spin-up and keeps the pool healthy during long idle periods.
+        extra: {
+          max: 10,
+          idleTimeoutMillis: 30_000,       // drop idle connections after 30 s
+          connectionTimeoutMillis: 5_000,  // fail fast if pool is exhausted
+          keepAlive: true,                 // TCP keepalive — prevents NAT/firewall from killing idle conns
+          keepAliveInitialDelayMillis: 10_000,
+        },
       }),
       inject: [ConfigService],
     }),

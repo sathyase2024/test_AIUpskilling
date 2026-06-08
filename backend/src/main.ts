@@ -6,17 +6,29 @@ import { GlobalExceptionFilter } from './filters/http-exception.filter';
 import cookieParser = require('cookie-parser');
 import helmet from 'helmet';
 
+// Catch anything that escapes NestJS's error handling so Render logs always
+// show the reason before the process exits.  Node 15+ throws on unhandled
+// rejections by default; this makes the exit visible and intentional.
+process.on('unhandledRejection', (reason) => {
+  console.error('[Fatal] Unhandled Promise Rejection:', reason);
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[Fatal] Uncaught Exception:', err);
+  process.exit(1);
+});
+
 async function bootstrap() {
   // ── Guard: insecure JWT secret in production ─────────────────────────────────
   const jwtSecret = process.env.JWT_SECRET ?? '';
   const insecureDefault = 'skillforge-dev-secret-change-in-production';
-  if (process.env.NODE_ENV === 'production' && (!jwtSecret || jwtSecret === insecureDefault)) {
-    // Warn loudly but don't crash — a missing secret is better than a dead server.
-    // Auth endpoints will fail for users but the app stays up.
-    console.warn(
-      '[SECURITY] JWT_SECRET is not set or uses the insecure default. ' +
-      'Set a strong JWT_SECRET environment variable in your deployment platform.',
-    );
+  if (!jwtSecret || jwtSecret === insecureDefault) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[FATAL] JWT_SECRET is not set or uses the insecure default. Set a strong JWT_SECRET env var.');
+      process.exit(1);
+    } else {
+      console.warn('[SECURITY] JWT_SECRET is using the dev default — set a real secret before deploying.');
+    }
   }
 
   const app = await NestFactory.create(AppModule);
@@ -74,4 +86,7 @@ async function bootstrap() {
   logger.log(`📚 API docs available at http://localhost:${port}/api/docs`);
   logger.log(`🔓 CORS enabled for: *.onrender.com, localhost${configured.length ? ', ' + configured.join(', ') : ''}`);
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('[Fatal] Bootstrap failed — server could not start:', err);
+  process.exit(1);
+});
