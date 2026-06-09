@@ -64,6 +64,23 @@ function toEditorLang(raw?: string): string | null {
   return null;
 }
 
+// Heavy Python libraries the sandbox can't install. Code importing any of
+// these can't run, so we don't preload it into the playground.
+const UNAVAILABLE_PY_LIBS = new Set([
+  "torch", "tensorflow", "keras", "transformers", "sentence_transformers",
+  "datasets", "peft", "faiss", "langchain", "anthropic", "openai",
+  "pydantic", "accelerate", "bitsandbytes", "trl", "vllm",
+]);
+
+function pythonNeedsUnavailableLib(code: string): boolean {
+  const re = /^\s*(?:import|from)\s+([a-zA-Z0-9_]+)/gm;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code)) !== null) {
+    if (UNAVAILABLE_PY_LIBS.has(m[1])) return true;
+  }
+  return false;
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function LearnClient({ topic }: { topic: string }) {
@@ -241,16 +258,27 @@ export default function LearnClient({ topic }: { topic: string }) {
 
   const lessonContent = currentLesson?.contentJson ?? null;
 
-  // Preload the playground with the first runnable code block per language.
+  // Preload the playground with the first *runnable* code block per language.
+  // Python blocks that import unavailable libraries (torch, tensorflow, …) are
+  // skipped so the compiler never auto-fails on a missing import.
   const lessonSnippets: Record<string, string> = {};
+  let hasEditorCode = false;
   if (Array.isArray(lessonContent?.sections)) {
     for (const s of lessonContent.sections) {
       if (s?.type === "code" && typeof s.content === "string" && s.content.trim()) {
         const lang = toEditorLang(s.language);
-        if (lang && !lessonSnippets[lang]) lessonSnippets[lang] = s.content;
+        if (!lang) continue;
+        hasEditorCode = true;
+        if (lang === "python" && pythonNeedsUnavailableLib(s.content)) continue;
+        if (!lessonSnippets[lang]) lessonSnippets[lang] = s.content;
       }
     }
   }
+  const hasRunnableLessonCode = Object.keys(lessonSnippets).length > 0;
+  // Hide the playground only when the lesson is code-centric but none of that
+  // code can run here (e.g. a pure PyTorch lesson). Theory lessons with no code
+  // still get the generic scratchpad.
+  const showPlayground = !(hasEditorCode && !hasRunnableLessonCode);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
@@ -387,11 +415,13 @@ export default function LearnClient({ topic }: { topic: string }) {
             )}
 
             {/* ── Embedded Code Playground ── */}
-            <EmbeddedEditor
-              topicSlug={topic}
-              lessonId={currentLesson?.id}
-              lessonSnippets={lessonSnippets}
-            />
+            {showPlayground && (
+              <EmbeddedEditor
+                topicSlug={topic}
+                lessonId={currentLesson?.id}
+                lessonSnippets={lessonSnippets}
+              />
+            )}
 
             {/* Mark complete */}
             {currentLesson && (
