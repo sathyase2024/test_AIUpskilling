@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { Play, ChevronDown, ChevronUp, Terminal, Code2, CheckCircle, XCircle, RotateCcw, Sparkles } from 'lucide-react'
 
@@ -183,12 +183,15 @@ async function runOnBackend(language: string, code: string): Promise<ExecResult>
 
 interface Props {
   topicSlug: string
+  // Identifies the current lesson; when it changes we reload the playground
+  // with that lesson's code WITHOUT remounting (remounting Monaco can crash).
+  lessonId?: string
   // Code blocks pulled from the current lesson, keyed by editor language.
   // When present for a language, they preload instead of the generic starter.
   lessonSnippets?: Record<string, string>
 }
 
-export default function EmbeddedEditor({ topicSlug, lessonSnippets }: Props) {
+export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets }: Props) {
   // Lesson code takes precedence; fall back to the generic starter per language.
   const starterFor = (l: Language): string => lessonSnippets?.[l] ?? LANGUAGES[l].starter
 
@@ -213,6 +216,17 @@ export default function EmbeddedEditor({ topicSlug, lessonSnippets }: Props) {
     setOutput(null)
     setExecError(null)
   }
+
+  // Reload the playground with the new lesson's code when navigating lessons.
+  // Keeps the editor mounted (no key remount) so Monaco isn't disposed/recreated.
+  useEffect(() => {
+    const next = pickInitialLang()
+    setLang(next)
+    setCode(starterFor(next))
+    setOutput(null)
+    setExecError(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonId])
 
   const handleRun = useCallback(async () => {
     if (running) return

@@ -393,8 +393,8 @@ export default function LearnClient({ topic }: { topic: string }) {
 
             {/* ── Embedded Code Playground ── */}
             <EmbeddedEditor
-              key={currentLesson?.id ?? topic}
               topicSlug={topic}
+              lessonId={currentLesson?.id}
               lessonSnippets={lessonSnippets}
             />
 
