@@ -37,7 +37,9 @@ import { CodingSubmission } from './entities/coding-submission.entity';
         username: cfg.get('DB_USERNAME', 'postgres'),
         password: cfg.get('DB_PASSWORD', 'postgres'),
         database: cfg.get('DB_NAME', 'skillforge'),
-        ssl: cfg.get('DATABASE_URL')
+        ssl: cfg.get('DB_SSL') === 'false'
+          ? false
+          : cfg.get('DATABASE_URL')
           ? { rejectUnauthorized: false }       // managed DBs (Railway, Render, Supabase)
           : false,
         entities: [User, Topic, Lesson, LearningPath, UserProgress, CodingSubmission],
