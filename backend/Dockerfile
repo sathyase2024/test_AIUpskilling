@@ -8,8 +8,11 @@ RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
-# Install language runtimes for the code execution sandbox
-RUN apk add --no-cache python3 openjdk21-jdk g++ go
+# Install language runtimes for the code execution sandbox.
+# Python scientific libs come from Alpine's prebuilt py3-* packages (musl
+# wheels) — pip would compile numpy/scipy/pandas from source on Alpine.
+RUN apk add --no-cache python3 openjdk21-jdk g++ go \
+    py3-numpy py3-pandas py3-scikit-learn py3-scipy py3-matplotlib
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./

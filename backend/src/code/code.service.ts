@@ -66,7 +66,16 @@ export class CodeService {
       const { stdout, stderr } = await execFileAsync('python3', [file], EXEC_OPTS);
       return { stdout, stderr, exitCode: 0 };
     } catch (err: any) {
-      return handleError(err);
+      const res = handleError(err);
+      // Many lessons import heavy frameworks (torch, tensorflow, transformers)
+      // that aren't in the sandbox. Make that explicit instead of a bare trace.
+      if (/ModuleNotFoundError|No module named/.test(res.stderr)) {
+        res.stderr +=
+          '\n\n[sandbox] This library isn\'t available here. The playground includes ' +
+          'numpy, pandas, scikit-learn, scipy and matplotlib. Heavy frameworks like ' +
+          'torch, tensorflow and transformers are not installed — that lesson code is for reference.';
+      }
+      return res;
     } finally {
       unlink(file).catch(() => {});
     }
