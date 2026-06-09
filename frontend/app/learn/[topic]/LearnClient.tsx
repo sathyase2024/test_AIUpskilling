@@ -22,6 +22,13 @@ import Link from "next/link";
 import LessonRenderer from "@/components/LessonRenderer";
 import EmbeddedEditor from "@/components/EmbeddedEditor";
 import { apiGet, apiPost, isAuthenticated, getStoredUser, setStoredUser } from "@/lib/api";
+import {
+  fetchCapabilities,
+  toEditorLang,
+  pythonNeedsUnavailableLib,
+  DEFAULT_CAPABILITIES,
+  type SandboxCapabilities,
+} from "@/lib/sandbox";
 import { matchFAQ, QUICK_REPLIES, DEFLECTION_REPLY, type QuickReply } from "@/lib/course-faq";
 
 // ─── Types (shape returned by the backend) ───────────────────────────────────
@@ -52,38 +59,10 @@ interface ChatMessage {
   chips?: QuickReply[];
 }
 
-// ─── Map a lesson code-block language to an editor language key ───────────────
-function toEditorLang(raw?: string): string | null {
-  const l = (raw ?? "").toLowerCase().trim();
-  if (["python", "py", "python3"].includes(l)) return "python";
-  if (["javascript", "js", "node", "nodejs"].includes(l)) return "javascript";
-  if (["typescript", "ts"].includes(l)) return "typescript";
-  if (l === "java") return "java";
-  if (["cpp", "c++", "cxx", "cc"].includes(l)) return "cpp";
-  if (["go", "golang"].includes(l)) return "go";
-  return null;
-}
-
-// Heavy Python libraries the sandbox can't install. Code importing any of
-// these can't run, so we don't preload it into the playground.
-const UNAVAILABLE_PY_LIBS = new Set([
-  "torch", "tensorflow", "keras", "transformers", "sentence_transformers",
-  "datasets", "peft", "faiss", "langchain", "anthropic", "openai",
-  "pydantic", "accelerate", "bitsandbytes", "trl", "vllm",
-]);
-
-function pythonNeedsUnavailableLib(code: string): boolean {
-  const re = /^\s*(?:import|from)\s+([a-zA-Z0-9_]+)/gm;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(code)) !== null) {
-    if (UNAVAILABLE_PY_LIBS.has(m[1])) return true;
-  }
-  return false;
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function LearnClient({ topic }: { topic: string }) {
+  const [capabilities, setCapabilities] = useState<SandboxCapabilities>(DEFAULT_CAPABILITIES);
   const [topicData, setTopicData] = useState<ApiTopic | null>(null);
   const [lessons, setLessons] = useState<ApiLesson[]>([]);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
@@ -103,6 +82,15 @@ export default function LearnClient({ topic }: { topic: string }) {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const decodedTopic = decodeURIComponent(topic).replace(/-/g, " ");
+
+  // ── Load sandbox capabilities (single source of truth = backend) ─────────────
+  useEffect(() => {
+    let cancelled = false;
+    fetchCapabilities().then((caps) => {
+      if (!cancelled) setCapabilities(caps);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Fetch the topic + its lessons (public endpoint) ──────────────────────────
   useEffect(() => {
@@ -266,9 +254,9 @@ export default function LearnClient({ topic }: { topic: string }) {
   if (Array.isArray(lessonContent?.sections)) {
     for (const s of lessonContent.sections) {
       if (s?.type === "code" && typeof s.content === "string" && s.content.trim()) {
-        const lang = toEditorLang(s.language);
+        const lang = toEditorLang(s.language, capabilities);
         if (!lang) continue;
-        if (lang === "python" && pythonNeedsUnavailableLib(s.content)) continue;
+        if (lang === "python" && pythonNeedsUnavailableLib(s.content, capabilities)) continue;
         if (!lessonSnippets[lang]) lessonSnippets[lang] = s.content;
       }
     }

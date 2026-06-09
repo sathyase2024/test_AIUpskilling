@@ -1,12 +1,19 @@
-import { Controller, Post, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, HttpException, HttpStatus } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CodeService } from './code.service';
+import { getCapabilities } from './sandbox.config';
 
 @ApiTags('code')
 @Controller('code')
 export class CodeController {
   constructor(private readonly codeService: CodeService) {}
+
+  @Get('capabilities')
+  @ApiOperation({ summary: 'Languages and Python libraries the sandbox can run' })
+  capabilities() {
+    return getCapabilities();
+  }
 
   @Post('execute')
   @Throttle({ global: { limit: 20, ttl: 60_000 } }) // 20 executions/min per IP

@@ -4,6 +4,12 @@ import { writeFile, unlink, mkdir, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
+import {
+  LANGUAGES,
+  PYTHON_AVAILABLE_LIBRARIES,
+  PYTHON_UNAVAILABLE_LIBRARIES,
+  resolveLanguageId,
+} from './sandbox.config';
 
 const execFileAsync = promisify(execFile);
 
@@ -18,7 +24,6 @@ const EXEC_OPTS = {
 };
 
 const MAX_CODE_BYTES = 50 * 1024; // 50 KB
-const ALLOWED_LANGUAGES = new Set(['python', 'java', 'javascript', 'typescript', 'cpp', 'go']);
 
 export interface ExecResult { stdout: string; stderr: string; exitCode: number }
 
@@ -37,26 +42,32 @@ function handleError(err: any): ExecResult {
 export class CodeService {
   private readonly logger = new Logger(CodeService.name);
 
+  // Dispatch table: canonical language id → runner. Register new languages here
+  // (the language itself is declared in sandbox.config.ts).
+  private readonly runners: Record<string, (code: string) => Promise<ExecResult>> = {
+    python:     (c) => this.runPython(c),
+    java:       (c) => this.runJava(c),
+    javascript: (c) => this.runNode(c),
+    typescript: (c) => this.runTypeScript(c),
+    cpp:        (c) => this.runCpp(c),
+    go:         (c) => this.runGo(c),
+  };
+
   async execute(language: string, code: string): Promise<ExecResult> {
-    if (!ALLOWED_LANGUAGES.has(language)) {
+    const id = resolveLanguageId(language);
+    const runner = id ? this.runners[id] : undefined;
+    if (!id || !runner) {
+      const names = LANGUAGES.filter((l) => l.available).map((l) => l.label).join(', ');
       return {
         stdout: '',
-        stderr: `${language} execution is not yet available. Use Python, JavaScript, TypeScript, Java, C++, or Go.`,
+        stderr: `${language} execution is not available. Supported languages: ${names}.`,
         exitCode: 1,
       };
     }
     if (Buffer.byteLength(code, 'utf8') > MAX_CODE_BYTES) {
       return { stdout: '', stderr: 'Code exceeds the 50 KB size limit.', exitCode: 1 };
     }
-    switch (language) {
-      case 'python':     return this.runPython(code);
-      case 'java':       return this.runJava(code);
-      case 'javascript': return this.runNode(code);
-      case 'typescript': return this.runTypeScript(code);
-      case 'cpp':        return this.runCpp(code);
-      case 'go':         return this.runGo(code);
-      default:           return { stdout: '', stderr: 'Unsupported language.', exitCode: 1 };
-    }
+    return runner(code);
   }
 
   private async runPython(code: string): Promise<ExecResult> {
@@ -71,9 +82,10 @@ export class CodeService {
       // that aren't in the sandbox. Make that explicit instead of a bare trace.
       if (/ModuleNotFoundError|No module named/.test(res.stderr)) {
         res.stderr +=
-          '\n\n[sandbox] This library isn\'t available here. The playground includes ' +
-          'numpy, pandas, scikit-learn, scipy and matplotlib. Heavy frameworks like ' +
-          'torch, tensorflow and transformers are not installed — that lesson code is for reference.';
+          `\n\n[sandbox] This library isn't available here. The playground includes ` +
+          `${PYTHON_AVAILABLE_LIBRARIES.join(', ')}. Heavy frameworks like ` +
+          `${PYTHON_UNAVAILABLE_LIBRARIES.slice(0, 3).join(', ')} are not installed — ` +
+          `that lesson code is for reference.`;
       }
       return res;
     } finally {
