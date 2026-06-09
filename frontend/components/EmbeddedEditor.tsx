@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
-import { Play, ChevronDown, ChevronUp, Terminal, Code2, CheckCircle, XCircle, RotateCcw } from 'lucide-react'
+import { Play, ChevronDown, ChevronUp, Terminal, Code2, CheckCircle, XCircle, RotateCcw, Sparkles } from 'lucide-react'
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -183,19 +183,33 @@ async function runOnBackend(language: string, code: string): Promise<ExecResult>
 
 interface Props {
   topicSlug: string
+  // Code blocks pulled from the current lesson, keyed by editor language.
+  // When present for a language, they preload instead of the generic starter.
+  lessonSnippets?: Record<string, string>
 }
 
-export default function EmbeddedEditor({ topicSlug }: Props) {
+export default function EmbeddedEditor({ topicSlug, lessonSnippets }: Props) {
+  // Lesson code takes precedence; fall back to the generic starter per language.
+  const starterFor = (l: Language): string => lessonSnippets?.[l] ?? LANGUAGES[l].starter
+
+  // Open in the lesson's language if it ships runnable code, else detect from the slug.
+  const pickInitialLang = (): Language => {
+    const detected = detectLanguage(topicSlug)
+    if (lessonSnippets?.[detected]) return detected
+    const firstWithSnippet = (Object.keys(LANGUAGES) as Language[]).find((l) => lessonSnippets?.[l])
+    return firstWithSnippet ?? detected
+  }
+
   const [open, setOpen] = useState(true)
-  const [lang, setLang] = useState<Language>(() => detectLanguage(topicSlug))
-  const [code, setCode] = useState<string>(() => LANGUAGES[detectLanguage(topicSlug)].starter)
+  const [lang, setLang] = useState<Language>(pickInitialLang)
+  const [code, setCode] = useState<string>(() => starterFor(pickInitialLang()))
   const [running, setRunning] = useState(false)
   const [output, setOutput] = useState<{ stdout: string; stderr: string; exitCode: number } | null>(null)
   const [execError, setExecError] = useState<string | null>(null)
 
   const handleLangChange = (next: Language) => {
     setLang(next)
-    setCode(LANGUAGES[next].starter)
+    setCode(starterFor(next))
     setOutput(null)
     setExecError(null)
   }
@@ -223,7 +237,7 @@ export default function EmbeddedEditor({ topicSlug }: Props) {
   }, [running, lang, code])
 
   const reset = () => {
-    setCode(LANGUAGES[lang].starter)
+    setCode(starterFor(lang))
     setOutput(null)
     setExecError(null)
   }
@@ -282,13 +296,21 @@ export default function EmbeddedEditor({ topicSlug }: Props) {
               ))}
             </div>
 
+            {/* Lesson-code indicator */}
+            {lessonSnippets?.[lang] && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-[10px] font-semibold text-cyan-300">
+                <Sparkles className="w-2.5 h-2.5" />
+                From this lesson
+              </span>
+            )}
+
             <div className="flex-1" />
 
             {/* Reset */}
             <button
               onClick={reset}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
-              title="Reset to starter code"
+              title={lessonSnippets?.[lang] ? 'Reset to the lesson code' : 'Reset to starter code'}
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Reset

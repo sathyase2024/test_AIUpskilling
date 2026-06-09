@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -50,6 +50,18 @@ interface ChatMessage {
   role: "user" | "ai";
   text: string;
   chips?: QuickReply[];
+}
+
+// ─── Map a lesson code-block language to an editor language key ───────────────
+function toEditorLang(raw?: string): string | null {
+  const l = (raw ?? "").toLowerCase().trim();
+  if (["python", "py", "python3"].includes(l)) return "python";
+  if (["javascript", "js", "node", "nodejs"].includes(l)) return "javascript";
+  if (["typescript", "ts"].includes(l)) return "typescript";
+  if (l === "java") return "java";
+  if (["cpp", "c++", "cxx", "cc"].includes(l)) return "cpp";
+  if (["go", "golang"].includes(l)) return "go";
+  return null;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -229,6 +241,22 @@ export default function LearnClient({ topic }: { topic: string }) {
 
   const lessonContent = currentLesson?.contentJson ?? null;
 
+  // Preload the playground with the first runnable code block per language
+  // found in this lesson's content.
+  const lessonSnippets = useMemo(() => {
+    const out: Record<string, string> = {};
+    const sections = lessonContent?.sections;
+    if (Array.isArray(sections)) {
+      for (const s of sections) {
+        if (s?.type === "code" && typeof s.content === "string" && s.content.trim()) {
+          const lang = toEditorLang(s.language);
+          if (lang && !out[lang]) out[lang] = s.content;
+        }
+      }
+    }
+    return out;
+  }, [lessonContent]);
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
       {/* ── Top Bar ── */}
@@ -364,7 +392,11 @@ export default function LearnClient({ topic }: { topic: string }) {
             )}
 
             {/* ── Embedded Code Playground ── */}
-            <EmbeddedEditor topicSlug={topic} />
+            <EmbeddedEditor
+              key={currentLesson?.id ?? topic}
+              topicSlug={topic}
+              lessonSnippets={lessonSnippets}
+            />
 
             {/* Mark complete */}
             {currentLesson && (
