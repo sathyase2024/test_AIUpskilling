@@ -18,7 +18,7 @@ const EXEC_OPTS = {
 };
 
 const MAX_CODE_BYTES = 50 * 1024; // 50 KB
-const ALLOWED_LANGUAGES = new Set(['python', 'java', 'javascript', 'typescript']);
+const ALLOWED_LANGUAGES = new Set(['python', 'java', 'javascript', 'typescript', 'cpp', 'go']);
 
 export interface ExecResult { stdout: string; stderr: string; exitCode: number }
 
@@ -41,7 +41,7 @@ export class CodeService {
     if (!ALLOWED_LANGUAGES.has(language)) {
       return {
         stdout: '',
-        stderr: `${language} execution is not yet available. Use Python, JavaScript, TypeScript, or Java.`,
+        stderr: `${language} execution is not yet available. Use Python, JavaScript, TypeScript, Java, C++, or Go.`,
         exitCode: 1,
       };
     }
@@ -53,6 +53,8 @@ export class CodeService {
       case 'java':       return this.runJava(code);
       case 'javascript': return this.runNode(code);
       case 'typescript': return this.runTypeScript(code);
+      case 'cpp':        return this.runCpp(code);
+      case 'go':         return this.runGo(code);
       default:           return { stdout: '', stderr: 'Unsupported language.', exitCode: 1 };
     }
   }
@@ -117,6 +119,52 @@ export class CodeService {
       return handleError(err);
     } finally {
       unlink(file).catch(() => {});
+    }
+  }
+
+  private async runCpp(code: string): Promise<ExecResult> {
+    const dir = join(tmpdir(), `cpp_${tag()}`);
+    const src = join(dir, 'main.cpp');
+    const bin = join(dir, 'main');
+    try {
+      await mkdir(dir, { recursive: true });
+      await writeFile(src, code, 'utf8');
+      try {
+        await execFileAsync('g++', ['-O2', '-std=c++17', src, '-o', bin], { ...EXEC_OPTS, timeout: 20_000 });
+      } catch (err: any) {
+        return { stdout: '', stderr: err.stderr ?? err.message, exitCode: 1 };
+      }
+      try {
+        const { stdout, stderr } = await execFileAsync(bin, [], EXEC_OPTS);
+        return { stdout, stderr, exitCode: 0 };
+      } catch (err: any) {
+        return handleError(err);
+      }
+    } finally {
+      rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+
+  private async runGo(code: string): Promise<ExecResult> {
+    // A minimal go.mod lets `go run .` work in module mode regardless of the
+    // toolchain's default. GOCACHE must point at a writable dir for the build.
+    const dir = join(tmpdir(), `go_${tag()}`);
+    const file = join(dir, 'main.go');
+    try {
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, 'go.mod'), 'module playground\n\ngo 1.21\n', 'utf8');
+      await writeFile(file, code, 'utf8');
+      const { stdout, stderr } = await execFileAsync('go', ['run', '.'], {
+        ...EXEC_OPTS,
+        timeout: 30_000,
+        cwd: dir,
+        env: { ...EXEC_OPTS.env, GOCACHE: '/tmp/go-cache', GOPATH: '/tmp/go-path' },
+      });
+      return { stdout, stderr, exitCode: 0 };
+    } catch (err: any) {
+      return handleError(err);
+    } finally {
+      rm(dir, { recursive: true, force: true }).catch(() => {});
     }
   }
 }
