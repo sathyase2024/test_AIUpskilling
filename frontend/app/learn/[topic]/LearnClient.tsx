@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -241,21 +241,16 @@ export default function LearnClient({ topic }: { topic: string }) {
 
   const lessonContent = currentLesson?.contentJson ?? null;
 
-  // Preload the playground with the first runnable code block per language
-  // found in this lesson's content.
-  const lessonSnippets = useMemo(() => {
-    const out: Record<string, string> = {};
-    const sections = lessonContent?.sections;
-    if (Array.isArray(sections)) {
-      for (const s of sections) {
-        if (s?.type === "code" && typeof s.content === "string" && s.content.trim()) {
-          const lang = toEditorLang(s.language);
-          if (lang && !out[lang]) out[lang] = s.content;
-        }
+  // Preload the playground with the first runnable code block per language.
+  const lessonSnippets: Record<string, string> = {};
+  if (Array.isArray(lessonContent?.sections)) {
+    for (const s of lessonContent.sections) {
+      if (s?.type === "code" && typeof s.content === "string" && s.content.trim()) {
+        const lang = toEditorLang(s.language);
+        if (lang && !lessonSnippets[lang]) lessonSnippets[lang] = s.content;
       }
     }
-    return out;
-  }, [lessonContent]);
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
