@@ -46,8 +46,8 @@ fi
 # ── 4. Environment file ────────────────────────────────────────────────────────
 echo "[4/6] Setting up environment..."
 if [ ! -f "$APP_DIR/.env" ]; then
-  DB_PASSWORD=$(openssl rand -base64 32)
-  JWT_SECRET=$(openssl rand -base64 48)
+  DB_PASSWORD=$(openssl rand -hex 32)
+  JWT_SECRET=$(openssl rand -hex 48)
   cat > "$APP_DIR/.env" << EOF
 DB_PASSWORD=$DB_PASSWORD
 JWT_SECRET=$JWT_SECRET
