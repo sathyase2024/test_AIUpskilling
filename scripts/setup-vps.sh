@@ -46,17 +46,19 @@ fi
 # ── 4. Environment file ────────────────────────────────────────────────────────
 echo "[4/6] Setting up environment..."
 if [ ! -f "$APP_DIR/.env" ]; then
-  cp "$APP_DIR/.env.production.example" "$APP_DIR/.env"
-  sed -i "s/yourdomain.com/$DOMAIN/" "$APP_DIR/.env"
+  DB_PASSWORD=$(openssl rand -base64 32)
+  JWT_SECRET=$(openssl rand -base64 48)
+  cat > "$APP_DIR/.env" << EOF
+DB_PASSWORD=$DB_PASSWORD
+JWT_SECRET=$JWT_SECRET
+DOMAIN=$DOMAIN
+ANTHROPIC_API_KEY=
+EOF
   echo ""
-  echo "⚠️  Edit $APP_DIR/.env with real values before continuing:"
-  echo "   DB_PASSWORD  — strong random password"
-  echo "   JWT_SECRET   — long random string"
-  echo "   ANTHROPIC_API_KEY — optional, for AI lesson generation"
+  echo "Auto-generated secrets written to $APP_DIR/.env — SAVE THESE:"
+  echo "  DB_PASSWORD=$DB_PASSWORD"
+  echo "  JWT_SECRET=$JWT_SECRET"
   echo ""
-  echo "   Generate secrets with: openssl rand -base64 48"
-  echo ""
-  read -p "Press Enter once you've edited .env..."
 fi
 
 # ── 5. Nginx ───────────────────────────────────────────────────────────────────
