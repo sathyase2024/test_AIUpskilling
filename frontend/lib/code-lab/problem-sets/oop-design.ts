@@ -151,4 +151,149 @@ _t(_c2.get(2),99,'update in place');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'implement-trie', title:'Implement Trie (Prefix Tree)', difficulty:'Intermediate', category:'OOP & Design',
+    description:'A trie (pronounced as "try") or prefix tree is a tree data structure used to efficiently store and retrieve keys in a set of strings. Implement the Trie class: Trie() initializes the trie object; insert(word) inserts the string word into the trie; search(word) returns true if the string word is in the trie (i.e. was inserted before), and false otherwise; starts_with(prefix) (startsWith in JavaScript) returns true if there is a previously inserted string word that has the prefix prefix, and false otherwise. Each operation runs in O(L) time where L is the length of the word or prefix.',
+    examples:[
+      {input:'insert("apple"); search("apple"); search("app"); startsWith("app"); insert("app"); search("app")',output:'[true, false, true, true]',explanation:'search("apple") → true; search("app") → false (only "apple" inserted so far); startsWith("app") → true; after insert("app"), search("app") → true.'},
+    ],
+    constraints:['1 <= word.length, prefix.length <= 2000','word and prefix consist only of lowercase English letters','At most 3·10⁴ calls in total to insert, search and starts_with'],
+    hints:['Each node holds a map from a character to a child node plus a flag marking the end of a word','insert walks/creates nodes for each character, then sets the end-of-word flag on the last node','search must also verify the end-of-word flag; starts_with only needs the path to exist'],
+    tags:['trie','tree','design','hash-map'], timeComplexity:'O(L) per op', spaceComplexity:'O(total characters)',
+    starterCode:{
+      python:`class Trie:
+    def __init__(self):
+        pass
+
+    def insert(self, word):
+        pass
+
+    def search(self, word):
+        pass
+
+    def starts_with(self, prefix):
+        pass
+`,
+      javascript:`class Trie {
+  constructor() {
+
+  }
+
+  insert(word) {
+
+  }
+
+  search(word) {
+
+  }
+
+  startsWith(prefix) {
+
+  }
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_tr=Trie()
+_tr.insert('apple')
+_t(_tr.search('apple'),True,'inserted word found')
+_t(_tr.search('app'),False,'prefix is not a word yet')
+_t(_tr.starts_with('app'),True,'prefix exists')
+_tr.insert('app')
+_t(_tr.search('app'),True,'now a full word')
+_t(_tr.starts_with('appl'),True,'longer prefix exists')
+_t(_tr.search('banana'),False,'never inserted')
+_t(_tr.starts_with('b'),False,'no such prefix')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+const _tr=new Trie();
+_tr.insert('apple');
+_t(_tr.search('apple'),true,'inserted word found');
+_t(_tr.search('app'),false,'prefix is not a word yet');
+_t(_tr.startsWith('app'),true,'prefix exists');
+_tr.insert('app');
+_t(_tr.search('app'),true,'now a full word');
+_t(_tr.startsWith('appl'),true,'longer prefix exists');
+_t(_tr.search('banana'),false,'never inserted');
+_t(_tr.startsWith('b'),false,'no such prefix');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'queue-using-stacks', title:'Implement Queue using Stacks', difficulty:'Beginner', category:'OOP & Design',
+    description:'Implement a first-in-first-out (FIFO) queue using only two stacks. The implemented queue should support all the functions of a normal queue: push, peek, pop, and empty. Implement the MyQueue class: push(x) pushes element x to the back of the queue; pop() removes the element from the front of the queue and returns it; peek() returns the element at the front of the queue; empty() returns true if the queue is empty, false otherwise. You must use only standard stack operations (push to top, peek/pop from top, size, is-empty). Follow-up: can you implement the queue such that each operation is amortized O(1) time complexity? Even though pop or peek may occasionally take O(n), the average over a sequence of operations is O(1) by moving elements between an input and output stack only when the output stack is empty.',
+    examples:[
+      {input:'push(1); push(2); peek(); pop(); empty()',output:'[1, 1, false]',explanation:'peek() → 1 (front); pop() → 1 (removes front); empty() → false (2 still queued).'},
+    ],
+    constraints:['1 <= x <= 9','At most 100 calls will be made to push, pop, peek, and empty','All the calls to pop and peek are valid (the queue is non-empty)'],
+    hints:['Use one stack for incoming pushes and another for outgoing pops','When you need the front and the output stack is empty, pour the entire input stack into the output stack to reverse the order','Each element moves between stacks at most once, giving amortized O(1) per operation'],
+    tags:['stack','queue','design'], timeComplexity:'O(1) amortized per op', spaceComplexity:'O(n)',
+    starterCode:{
+      python:`class MyQueue:
+    def __init__(self):
+        pass
+
+    def push(self, x):
+        pass
+
+    def pop(self):
+        pass
+
+    def peek(self):
+        pass
+
+    def empty(self):
+        pass
+`,
+      javascript:`class MyQueue {
+  constructor() {
+
+  }
+
+  push(x) {
+
+  }
+
+  pop() {
+
+  }
+
+  peek() {
+
+  }
+
+  empty() {
+
+  }
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_q=MyQueue()
+_q.push(1);_q.push(2)
+_t(_q.peek(),1,'front is 1')
+_t(_q.pop(),1,'pop returns front')
+_t(_q.empty(),False,'still has 2')
+_t(_q.pop(),2,'pop returns 2')
+_t(_q.empty(),True,'now empty')
+_q.push(3);_q.push(4);_q.push(5)
+_t(_q.pop(),3,'fifo order maintained')
+_t(_q.peek(),4,'next front is 4')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+const _q=new MyQueue();
+_q.push(1);_q.push(2);
+_t(_q.peek(),1,'front is 1');
+_t(_q.pop(),1,'pop returns front');
+_t(_q.empty(),false,'still has 2');
+_t(_q.pop(),2,'pop returns 2');
+_t(_q.empty(),true,'now empty');
+_q.push(3);_q.push(4);_q.push(5);
+_t(_q.pop(),3,'fifo order maintained');
+_t(_q.peek(),4,'next front is 4');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]

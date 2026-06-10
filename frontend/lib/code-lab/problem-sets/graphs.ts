@@ -115,4 +115,122 @@ _t(ladderLength('hot','dot',['dot']),2,'direct neighbor');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'rotting-oranges', title:'Rotting Oranges', difficulty:'Intermediate', category:'Graphs',
+    description:'You are given an m x n grid where each cell can have one of three values: 0 representing an empty cell, 1 representing a fresh orange, or 2 representing a rotten orange. Every minute, any fresh orange that is 4-directionally adjacent (up, down, left, right) to a rotten orange becomes rotten. Return the minimum number of minutes that must elapse until no cell has a fresh orange. If this is impossible (some fresh orange can never become rotten), return -1. Diagonal adjacency does NOT spread rot.',
+    examples:[
+      {input:'grid = [[2,1,1],[1,1,0],[0,1,1]]',output:'4'},
+      {input:'grid = [[2,1,1],[0,1,1],[1,0,1]]',output:'-1',explanation:'The orange in the bottom-left corner (row 2, column 0) is never adjacent to a rotten orange, so it can never rot.'},
+      {input:'grid = [[0,2]]',output:'0',explanation:'There are no fresh oranges at minute 0, so the answer is 0.'},
+    ],
+    constraints:['m == grid.length, n == grid[i].length','1 <= m, n <= 10','grid[i][j] is 0, 1, or 2'],
+    hints:['This is a multi-source BFS — enqueue every rotten orange as a level-0 source','Process the queue level by level; each level is one elapsed minute','After the BFS, if any fresh orange remains, return -1; otherwise return the number of elapsed minutes'],
+    tags:['graph','bfs','matrix'], timeComplexity:'O(m·n)', spaceComplexity:'O(m·n)',
+    starterCode:{
+      python:`from collections import deque
+
+def oranges_rotting(grid):
+    pass
+`,
+      javascript:`function orangesRotting(grid) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(oranges_rotting([[2,1,1],[1,1,0],[0,1,1]]),4,'example 1')
+_t(oranges_rotting([[2,1,1],[0,1,1],[1,0,1]]),-1,'unreachable fresh orange')
+_t(oranges_rotting([[0,2]]),0,'no fresh oranges')
+_t(oranges_rotting([[0]]),0,'single empty cell')
+_t(oranges_rotting([[1]]),-1,'single fresh orange never rots')
+_t(oranges_rotting([[2,2],[1,1]]),1,'two sources one minute')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(orangesRotting([[2,1,1],[1,1,0],[0,1,1]]),4,'example 1');
+_t(orangesRotting([[2,1,1],[0,1,1],[1,0,1]]),-1,'unreachable fresh orange');
+_t(orangesRotting([[0,2]]),0,'no fresh oranges');
+_t(orangesRotting([[0]]),0,'single empty cell');
+_t(orangesRotting([[1]]),-1,'single fresh orange never rots');
+_t(orangesRotting([[2,2],[1,1]]),1,'two sources one minute');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'pacific-atlantic', title:'Pacific Atlantic Water Flow', difficulty:'Intermediate', category:'Graphs',
+    description:'There is an m x n rectangular island that borders both the Pacific Ocean and the Atlantic Ocean. The Pacific Ocean touches the island\'s left and top edges, and the Atlantic Ocean touches the island\'s right and bottom edges. The island is partitioned into a grid of square cells; heights[r][c] represents the height above sea level of the cell at coordinate (r, c). Rain water can flow to neighboring cells directly north, south, east, and west if the neighboring cell\'s height is less than or equal to the current cell\'s height. Water can flow from any cell adjacent to an ocean into that ocean. Return a list of grid coordinates [r, c] such that rain water can flow from cell (r, c) to BOTH the Pacific and Atlantic oceans. The result may be returned in any order; tests compare the coordinate set after sorting.',
+    examples:[
+      {input:'heights = [[1,2,2,3,5],[3,2,3,4,4],[2,4,5,3,1],[6,7,1,4,5],[5,1,1,2,4]]',output:'[[0,4],[1,3],[1,4],[2,2],[3,0],[3,1],[4,0]]'},
+      {input:'heights = [[1]]',output:'[[0,0]]',explanation:'A single cell touches all four edges, so it reaches both oceans.'},
+    ],
+    constraints:['m == heights.length, n == heights[r].length','1 <= m, n <= 200','0 <= heights[r][c] <= 10⁵'],
+    hints:['Do not flood from each cell — instead flood inward from the ocean borders','Run a reverse BFS/DFS from the Pacific border (top + left) where you may step to a neighbor with height >= current, marking reachable cells','Do the same from the Atlantic border (bottom + right); the answer is the intersection of the two reachable sets'],
+    tags:['graph','dfs','bfs','matrix'], timeComplexity:'O(m·n)', spaceComplexity:'O(m·n)',
+    starterCode:{
+      python:`def pacific_atlantic(heights):
+    pass
+`,
+      javascript:`function pacificAtlantic(heights) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+def _norm(x): return sorted([list(c) for c in x])
+_t(_norm(pacific_atlantic([[1,2,2,3,5],[3,2,3,4,4],[2,4,5,3,1],[6,7,1,4,5],[5,1,1,2,4]])),_norm([[0,4],[1,3],[1,4],[2,2],[3,0],[3,1],[4,0]]),'example 1')
+_t(_norm(pacific_atlantic([[1]])),[[0,0]],'single cell')
+_t(_norm(pacific_atlantic([[2,1],[1,2]])),_norm([[0,0],[0,1],[1,0],[1,1]]),'all reach both')
+_t(_norm(pacific_atlantic([[1,2,3],[8,9,4],[7,6,5]])),_norm([[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]])," spiral")
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+const _norm=x=>x.map(c=>[c[0],c[1]]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+_t(_norm(pacificAtlantic([[1,2,2,3,5],[3,2,3,4,4],[2,4,5,3,1],[6,7,1,4,5],[5,1,1,2,4]])),_norm([[0,4],[1,3],[1,4],[2,2],[3,0],[3,1],[4,0]]),'example 1');
+_t(_norm(pacificAtlantic([[1]])),[[0,0]],'single cell');
+_t(_norm(pacificAtlantic([[2,1],[1,2]])),_norm([[0,0],[0,1],[1,0],[1,1]]),'all reach both');
+_t(_norm(pacificAtlantic([[1,2,3],[8,9,4],[7,6,5]])),_norm([[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]]),'spiral');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'alien-dictionary', title:'Alien Dictionary', difficulty:'Expert', category:'Graphs',
+    description:'There is a new alien language that uses the lowercase English alphabet, but the order of the letters is unknown. You are given a list of strings words from the alien language\'s dictionary. The strings in words are sorted lexicographically by the rules of this new language. Derive the order of letters in this language and return it as a string. If there is no valid letter ordering that is consistent with the given words, return "". The dictionary order is determined by comparing adjacent words: the first position where they differ dictates that the earlier word\'s letter precedes the later word\'s letter. If a word is a prefix of a previous longer word (e.g. ["abc","ab"]), the ordering is invalid because a longer word cannot precede its own prefix. Each test is designed so that a consistent ordering, when it exists, is unique.',
+    examples:[
+      {input:'words = ["wrt","wrf","er","ett","rftt"]',output:'"wertf"',explanation:'From the adjacencies: w < e, t < f, r < t, e < r, giving the total order w < e < r < t < f.'},
+      {input:'words = ["z","x","z"]',output:'""',explanation:'The constraints imply z < x and x < z, a cycle, so no valid ordering exists.'},
+      {input:'words = ["abc","ab"]',output:'""',explanation:'"abc" precedes its own prefix "ab", which is impossible — invalid input.'},
+    ],
+    constraints:['1 <= words.length <= 100','1 <= words[i].length <= 100','words[i] consists of only lowercase English letters','Each solvable test has a unique valid ordering'],
+    hints:['Build a graph: for each adjacent pair of words, the first differing character gives an edge "earlier < later"','Watch the prefix case: if word i is longer than word i+1 and word i+1 is a prefix of word i, the input is invalid','Topologically sort the letters; if a cycle exists (cannot order all letters) return ""'],
+    tags:['graph','topological-sort','string','bfs','dfs'], timeComplexity:'O(C)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`from collections import deque
+
+def alien_order(words):
+    pass
+`,
+      javascript:`function alienOrder(words) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(alien_order(['wrt','wrf','er','ett','rftt']),'wertf','classic unique order')
+_t(alien_order(['z','x','z']),'','cycle is invalid')
+_t(alien_order(['abc','ab']),'','prefix violation')
+_t(alien_order(['w','x','y','z']),'wxyz','total order from single letters')
+_t(alien_order(['a']),'a','single letter')
+_t(alien_order(['c','cb','b','ba','a']),'cba','prefix-then-branch chain')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(alienOrder(['wrt','wrf','er','ett','rftt']),'wertf','classic unique order');
+_t(alienOrder(['z','x','z']),'','cycle is invalid');
+_t(alienOrder(['abc','ab']),'','prefix violation');
+_t(alienOrder(['w','x','y','z']),'wxyz','total order from single letters');
+_t(alienOrder(['a']),'a','single letter');
+_t(alienOrder(['c','cb','b','ba','a']),'cba','prefix-then-branch chain');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]

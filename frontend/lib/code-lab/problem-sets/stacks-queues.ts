@@ -117,4 +117,125 @@ _t(largestRectangleArea([0,9]),9,'zero-height bar');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'evaluate-rpn', title:'Evaluate Reverse Polish Notation', difficulty:'Intermediate', category:'Stacks & Queues',
+    description:'You are given an array of strings tokens that represents an arithmetic expression in Reverse Polish Notation. Evaluate the expression and return an integer that represents its value. The valid operators are "+", "-", "*", and "/". Each operand may be an integer or another expression. Division between two integers always truncates toward zero (so -7 / 2 = -3 and 10 / -3 = -3, not toward negative infinity). There will be no division by zero. The expression is always valid, and every intermediate result and the final answer fit in a signed 32-bit integer.',
+    examples:[
+      {input:'tokens = ["2","1","+","3","*"]',output:'9',explanation:'((2 + 1) * 3) = 9.'},
+      {input:'tokens = ["4","13","5","/","+"]',output:'6',explanation:'(4 + (13 / 5)) = (4 + 2) = 6.'},
+      {input:'tokens = ["10","-3","/"]',output:'-3',explanation:'10 / -3 = -3.33..., which truncates toward zero to -3.'},
+    ],
+    constraints:['1 <= tokens.length <= 10⁴','tokens[i] is either an operator: "+", "-", "*", "/", or an integer in the range [-200, 200]','Division truncates toward zero','No division by zero'],
+    hints:['Push operands onto a stack; on an operator, pop the top two and apply it','Order matters for "-" and "/": the second-popped value is the left operand','Use truncation toward zero, not floor division — in Python prefer int(a / b) and in JS use Math.trunc(a / b)'],
+    tags:['array','math','stack'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
+    starterCode:{
+      python:`def eval_rpn(tokens):
+    pass
+`,
+      javascript:`function evalRPN(tokens) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(eval_rpn(['2','1','+','3','*']),9,'example 1')
+_t(eval_rpn(['4','13','5','/','+']),6,'example 2')
+_t(eval_rpn(['10','-3','/']),-3,'negative division truncates toward zero')
+_t(eval_rpn(['7','2','/']),3,'positive truncation')
+_t(eval_rpn(['-7','2','/']),-3,'negative numerator truncates toward zero')
+_t(eval_rpn(['5']),5,'single operand')
+_t(eval_rpn(['10','6','9','3','+','-11','*','/','*','17','+','5','+']),22,'complex expression')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(evalRPN(['2','1','+','3','*']),9,'example 1');
+_t(evalRPN(['4','13','5','/','+']),6,'example 2');
+_t(evalRPN(['10','-3','/']),-3,'negative division truncates toward zero');
+_t(evalRPN(['7','2','/']),3,'positive truncation');
+_t(evalRPN(['-7','2','/']),-3,'negative numerator truncates toward zero');
+_t(evalRPN(['5']),5,'single operand');
+_t(evalRPN(['10','6','9','3','+','-11','*','/','*','17','+','5','+']),22,'complex expression');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'decode-string', title:'Decode String', difficulty:'Intermediate', category:'Stacks & Queues',
+    description:'Given an encoded string, return its decoded string. The encoding rule is k[encoded_string], where the encoded_string inside the square brackets is repeated exactly k times. You may assume that the input string is always valid: there are no extra white spaces, the square brackets are well-formed, and so on. Furthermore, you may assume that the original data does not contain any digits and that digits are only used to indicate the repeat count k. Encodings may be nested, e.g. 3[a2[c]] decodes to "accaccacc".',
+    examples:[
+      {input:'s = "3[a]2[bc]"',output:'"aaabcbc"'},
+      {input:'s = "3[a2[c]]"',output:'"accaccacc"',explanation:'The inner 2[c] expands to "cc", then a+"cc" repeated 3 times.'},
+      {input:'s = "2[abc]3[cd]ef"',output:'"abcabccdcdcdef"'},
+    ],
+    constraints:['1 <= s.length <= 30','s consists of lowercase English letters, digits, and square brackets "[]"','s is guaranteed to be a valid input','All the integers in s are in the range [1, 300]'],
+    hints:['Use a stack to remember the string built so far and the repeat count when entering a bracket','On "[" push the current string and the parsed number, then reset the current string','On "]" pop the count and the previous string, and append current*count to it'],
+    tags:['string','stack','recursion'], timeComplexity:'O(n·k)', spaceComplexity:'O(n·k)',
+    starterCode:{
+      python:`def decode_string(s):
+    pass
+`,
+      javascript:`function decodeString(s) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(decode_string('3[a]2[bc]'),'aaabcbc','example 1')
+_t(decode_string('3[a2[c]]'),'accaccacc','nested')
+_t(decode_string('2[abc]3[cd]ef'),'abcabccdcdcdef','multiple groups')
+_t(decode_string('abc'),'abc','no encoding')
+_t(decode_string('10[a]'),'aaaaaaaaaa','multi-digit count')
+_t(decode_string('2[2[b]c]'),'bbcbbc','nested with suffix')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(decodeString('3[a]2[bc]'),'aaabcbc','example 1');
+_t(decodeString('3[a2[c]]'),'accaccacc','nested');
+_t(decodeString('2[abc]3[cd]ef'),'abcabccdcdcdef','multiple groups');
+_t(decodeString('abc'),'abc','no encoding');
+_t(decodeString('10[a]'),'aaaaaaaaaa','multi-digit count');
+_t(decodeString('2[2[b]c]'),'bbcbbc','nested with suffix');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'longest-valid-parentheses', title:'Longest Valid Parentheses', difficulty:'Expert', category:'Stacks & Queues',
+    description:'Given a string s containing just the characters "(" and ")", return the length of the longest valid (well-formed) parentheses substring. A valid substring is one in which every opening bracket has a matching closing bracket in the correct order and vice versa. The substring must be contiguous.',
+    examples:[
+      {input:'s = "(()"',output:'2',explanation:'The longest valid substring is "()", whose length is 2.'},
+      {input:'s = ")()())"',output:'4',explanation:'The longest valid substring is "()()", whose length is 4.'},
+      {input:'s = ""',output:'0'},
+    ],
+    constraints:['0 <= s.length <= 3·10⁴','s[i] is "(" or ")"'],
+    hints:['A stack of indices works: seed it with -1 as a base; push indices of "("','On ")" pop; if the stack becomes empty push the current index as a new base, otherwise the length is current index minus the new stack top','An O(1)-space alternative counts opens and closes left-to-right and again right-to-left'],
+    tags:['string','stack','dynamic-programming'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
+    starterCode:{
+      python:`def longest_valid_parentheses(s):
+    pass
+`,
+      javascript:`function longestValidParentheses(s) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(longest_valid_parentheses('(()'),2,'example 1')
+_t(longest_valid_parentheses(')()())'),4,'example 2')
+_t(longest_valid_parentheses(''),0,'empty string')
+_t(longest_valid_parentheses('()(()'),2,'reset in middle')
+_t(longest_valid_parentheses('()(())'),6,'fully matched')
+_t(longest_valid_parentheses('((((('),0,'all opens')
+_t(longest_valid_parentheses(')))))'),0,'all closes')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(longestValidParentheses('(()'),2,'example 1');
+_t(longestValidParentheses(')()())'),4,'example 2');
+_t(longestValidParentheses(''),0,'empty string');
+_t(longestValidParentheses('()(()'),2,'reset in middle');
+_t(longestValidParentheses('()(())'),6,'fully matched');
+_t(longestValidParentheses('((((('),0,'all opens');
+_t(longestValidParentheses(')))))'),0,'all closes');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]

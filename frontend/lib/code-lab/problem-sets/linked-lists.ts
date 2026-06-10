@@ -134,4 +134,120 @@ _t(_toList(mergeKLists([_build([-2,-1]),_build([]),_build([-3])])),[-3,-2,-1],'n
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'middle-of-linked-list', title:'Middle of the Linked List', difficulty:'Beginner', category:'Linked Lists',
+    description:'Given the head of a singly linked list, return the middle node of the linked list. If there are two middle nodes (i.e. the list has an even number of nodes), return the second middle node. The ListNode class is provided by the runner. The returned node is the head of the remaining sublist, so a comparison of its values from that point onward identifies it uniquely.',
+    examples:[
+      {input:'head = [1,2,3,4,5]',output:'[3,4,5]',explanation:'The middle node is the one with value 3.'},
+      {input:'head = [1,2,3,4,5,6]',output:'[4,5,6]',explanation:'Since the list has two middle nodes (3 and 4), the second one (4) is returned.'},
+    ],
+    constraints:['The number of nodes in the list is in the range [1, 100]','1 <= Node.val <= 100'],
+    hints:['Two pointers: slow moves one step, fast moves two steps','When fast reaches the end (or null past it), slow is at the middle','For an even length, this lands slow on the second middle automatically'],
+    tags:['linked-list','two-pointers'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`${PY_LIST_DOC}
+def middle_node(head):
+    pass
+`,
+      javascript:`${JS_LIST_DOC}
+function middleNode(head) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_LIST}${PY_HARNESS}
+_t(_to_list(middle_node(_build([1,2,3,4,5]))),[3,4,5],'odd length')
+_t(_to_list(middle_node(_build([1,2,3,4,5,6]))),[4,5,6],'even length picks second middle')
+_t(_to_list(middle_node(_build([1]))),[1],'single node')
+_t(_to_list(middle_node(_build([1,2]))),[2],'two nodes')
+_t(_to_list(middle_node(_build([1,2,3]))),[2,3],'three nodes')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_LIST}${JS_HARNESS}
+_t(_toList(middleNode(_build([1,2,3,4,5]))),[3,4,5],'odd length');
+_t(_toList(middleNode(_build([1,2,3,4,5,6]))),[4,5,6],'even length picks second middle');
+_t(_toList(middleNode(_build([1]))),[1],'single node');
+_t(_toList(middleNode(_build([1,2]))),[2],'two nodes');
+_t(_toList(middleNode(_build([1,2,3]))),[2,3],'three nodes');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'remove-nth-from-end', title:'Remove Nth Node From End of List', difficulty:'Intermediate', category:'Linked Lists',
+    description:'Given the head of a linked list, remove the n-th node from the end of the list and return its head. The ListNode class is provided by the runner. It is guaranteed that 1 <= n <= the length of the list. Follow-up: could you do this in one pass?',
+    examples:[
+      {input:'head = [1,2,3,4,5], n = 2',output:'[1,2,3,5]',explanation:'The 2nd node from the end (value 4) is removed.'},
+      {input:'head = [1], n = 1',output:'[]'},
+      {input:'head = [1,2], n = 1',output:'[1]'},
+    ],
+    constraints:['The number of nodes in the list is sz','1 <= sz <= 30','0 <= Node.val <= 100','1 <= n <= sz'],
+    hints:['Use a dummy node before the head so removing the first node is uniform','Advance a fast pointer n steps ahead, then move fast and slow together until fast reaches the end','slow now sits just before the target node — unlink it with slow.next = slow.next.next'],
+    tags:['linked-list','two-pointers'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`${PY_LIST_DOC}
+def remove_nth_from_end(head, n):
+    pass
+`,
+      javascript:`${JS_LIST_DOC}
+function removeNthFromEnd(head, n) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_LIST}${PY_HARNESS}
+_t(_to_list(remove_nth_from_end(_build([1,2,3,4,5]),2)),[1,2,3,5],'example 1')
+_t(_to_list(remove_nth_from_end(_build([1]),1)),[],'single node removed')
+_t(_to_list(remove_nth_from_end(_build([1,2]),1)),[1],'remove last of two')
+_t(_to_list(remove_nth_from_end(_build([1,2]),2)),[2],'remove head of two')
+_t(_to_list(remove_nth_from_end(_build([1,2,3,4,5]),5)),[2,3,4,5],'remove head')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_LIST}${JS_HARNESS}
+_t(_toList(removeNthFromEnd(_build([1,2,3,4,5]),2)),[1,2,3,5],'example 1');
+_t(_toList(removeNthFromEnd(_build([1]),1)),[],'single node removed');
+_t(_toList(removeNthFromEnd(_build([1,2]),1)),[1],'remove last of two');
+_t(_toList(removeNthFromEnd(_build([1,2]),2)),[2],'remove head of two');
+_t(_toList(removeNthFromEnd(_build([1,2,3,4,5]),5)),[2,3,4,5],'remove head');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'add-two-numbers', title:'Add Two Numbers', difficulty:'Intermediate', category:'Linked Lists',
+    description:'You are given two non-empty linked lists representing two non-negative integers. The digits are stored in reverse order, and each of their nodes contains a single digit. Add the two numbers and return the sum as a linked list, also with digits stored in reverse order. The ListNode class is provided by the runner. You may assume the two numbers do not contain any leading zeros, except the number 0 itself.',
+    examples:[
+      {input:'l1 = [2,4,3], l2 = [5,6,4]',output:'[7,0,8]',explanation:'342 + 465 = 807, stored in reverse as [7,0,8].'},
+      {input:'l1 = [0], l2 = [0]',output:'[0]'},
+      {input:'l1 = [9,9,9,9,9,9,9], l2 = [9,9,9,9]',output:'[8,9,9,9,0,0,0,1]',explanation:'9999999 + 9999 = 10009998.'},
+    ],
+    constraints:['The number of nodes in each list is in the range [1, 100]','0 <= Node.val <= 9','It is guaranteed that the list represents a number that does not have leading zeros'],
+    hints:['Walk both lists together, summing digits plus a carry from the previous position','Each output digit is sum % 10 and the next carry is sum // 10','Continue while either list has nodes left or a final carry of 1 remains'],
+    tags:['linked-list','math','recursion'], timeComplexity:'O(max(m, n))', spaceComplexity:'O(max(m, n))',
+    starterCode:{
+      python:`${PY_LIST_DOC}
+def add_two_numbers(l1, l2):
+    pass
+`,
+      javascript:`${JS_LIST_DOC}
+function addTwoNumbers(l1, l2) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_LIST}${PY_HARNESS}
+_t(_to_list(add_two_numbers(_build([2,4,3]),_build([5,6,4]))),[7,0,8],'example 1')
+_t(_to_list(add_two_numbers(_build([0]),_build([0]))),[0],'zero plus zero')
+_t(_to_list(add_two_numbers(_build([9,9,9,9,9,9,9]),_build([9,9,9,9]))),[8,9,9,9,0,0,0,1],'carry out new digit')
+_t(_to_list(add_two_numbers(_build([5]),_build([5]))),[0,1],'single digit carry')
+_t(_to_list(add_two_numbers(_build([1,8]),_build([0]))),[1,8],'different lengths')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_LIST}${JS_HARNESS}
+_t(_toList(addTwoNumbers(_build([2,4,3]),_build([5,6,4]))),[7,0,8],'example 1');
+_t(_toList(addTwoNumbers(_build([0]),_build([0]))),[0],'zero plus zero');
+_t(_toList(addTwoNumbers(_build([9,9,9,9,9,9,9]),_build([9,9,9,9]))),[8,9,9,9,0,0,0,1],'carry out new digit');
+_t(_toList(addTwoNumbers(_build([5]),_build([5]))),[0,1],'single digit carry');
+_t(_toList(addTwoNumbers(_build([1,8]),_build([0]))),[1,8],'different lengths');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]
