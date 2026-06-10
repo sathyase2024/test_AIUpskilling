@@ -457,7 +457,7 @@ _t(max_coins([1,5]),10,'two balloons')
 _t(max_coins([5]),5,'single balloon')
 _t(max_coins([7]),7,'single seven')
 _t(max_coins([1,2,3,4,5]),110,'ascending')
-_t(max_coins([9,76,64]),20384,'three values')
+_t(max_coins([9,76,64]),44416,'three values')
 print(f'{_p}/{_n} tests passed')`,
       javascript:`${JS_HARNESS}
 _t(maxCoins([3,1,5,8]),167,'example 1');
@@ -465,7 +465,7 @@ _t(maxCoins([1,5]),10,'two balloons');
 _t(maxCoins([5]),5,'single balloon');
 _t(maxCoins([7]),7,'single seven');
 _t(maxCoins([1,2,3,4,5]),110,'ascending');
-_t(maxCoins([9,76,64]),20384,'three values');
+_t(maxCoins([9,76,64]),44416,'three values');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
