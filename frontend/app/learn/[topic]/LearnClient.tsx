@@ -23,7 +23,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import LessonRenderer from "@/components/LessonRenderer";
-import EmbeddedEditor from "@/components/EmbeddedEditor";
+import ModuleChallengeCard from "@/components/ModuleChallengeCard";
+import { getModuleChallenge } from "@/lib/module-challenges";
 import {
   apiGet,
   apiPost,
@@ -38,13 +39,6 @@ import {
   type SubmitResult,
 } from "@/lib/api";
 import { groupLessonsIntoModules } from "@/lib/modules";
-import {
-  fetchCapabilities,
-  toEditorLang,
-  pythonNeedsUnavailableLib,
-  DEFAULT_CAPABILITIES,
-  type SandboxCapabilities,
-} from "@/lib/sandbox";
 import { matchFAQ, QUICK_REPLIES, DEFLECTION_REPLY, type QuickReply } from "@/lib/course-faq";
 
 // ─── Types (shape returned by the backend) ───────────────────────────────────
@@ -78,7 +72,6 @@ interface ChatMessage {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function LearnClient({ topic }: { topic: string }) {
-  const [capabilities, setCapabilities] = useState<SandboxCapabilities>(DEFAULT_CAPABILITIES);
   const [topicData, setTopicData] = useState<ApiTopic | null>(null);
   const [lessons, setLessons] = useState<ApiLesson[]>([]);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
@@ -117,15 +110,6 @@ export default function LearnClient({ topic }: { topic: string }) {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const decodedTopic = decodeURIComponent(topic).replace(/-/g, " ");
-
-  // ── Load sandbox capabilities ─────────────────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false;
-    fetchCapabilities().then((caps) => {
-      if (!cancelled) setCapabilities(caps);
-    });
-    return () => { cancelled = true; };
-  }, []);
 
   // ── Fetch topic + lessons ────────────────────────────────────────────────────
   useEffect(() => {
@@ -404,17 +388,17 @@ export default function LearnClient({ topic }: { topic: string }) {
 
   const lessonContent = currentLesson?.contentJson ?? null;
 
-  const lessonSnippets: Record<string, string> = {};
-  if (Array.isArray(lessonContent?.sections)) {
-    for (const s of lessonContent.sections) {
-      if (s?.type === "code" && typeof s.content === "string" && s.content.trim()) {
-        const lang = toEditorLang(s.language, capabilities);
-        if (!lang) continue;
-        if (lang === "python" && pythonNeedsUnavailableLib(s.content, capabilities)) continue;
-        if (!lessonSnippets[lang]) lessonSnippets[lang] = s.content;
-      }
-    }
-  }
+  // ── Module challenge for last lesson in module ───────────────────────────────
+  const currentModuleIndex = modules.findIndex((m) =>
+    m.lessons.some((l) => l.id === selectedLessonId),
+  );
+  const currentModule = currentModuleIndex >= 0 ? modules[currentModuleIndex] : null;
+  const isLastInModule =
+    currentModule?.lessons[currentModule.lessons.length - 1]?.id === selectedLessonId;
+  const moduleChallenge =
+    isLastInModule && currentModule
+      ? getModuleChallenge(topic, currentModule.title)
+      : null;
 
   // ── Quiz question list (derived at render time) ──────────────────────────────
   const quizQuestions = quizOpen && assessment
@@ -648,11 +632,14 @@ export default function LearnClient({ topic }: { topic: string }) {
               </div>
             )}
 
-            <EmbeddedEditor
-              topicSlug={topic}
-              lessonId={currentLesson?.id}
-              lessonSnippets={lessonSnippets}
-            />
+            {moduleChallenge && currentModule && (
+              <ModuleChallengeCard
+                challenge={moduleChallenge}
+                topicSlug={topic}
+                moduleIndex={currentModuleIndex}
+                moduleName={currentModule.title}
+              />
+            )}
 
             {/* Mark complete */}
             {currentLesson && (

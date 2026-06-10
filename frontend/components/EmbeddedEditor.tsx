@@ -184,15 +184,12 @@ async function runOnBackend(language: string, code: string): Promise<ExecResult>
 
 interface Props {
   topicSlug: string
-  // Identifies the current lesson; when it changes we reload the playground
-  // with that lesson's code WITHOUT remounting (remounting Monaco can crash).
   lessonId?: string
-  // Code blocks pulled from the current lesson, keyed by editor language.
-  // When present for a language, they preload instead of the generic starter.
   lessonSnippets?: Record<string, string>
+  snippetLabel?: string
 }
 
-export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets }: Props) {
+export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, snippetLabel }: Props) {
   // Lesson code takes precedence; fall back to the generic starter per language.
   const starterFor = (l: Language): string => lessonSnippets?.[l] ?? LANGUAGES[l].starter
 
@@ -320,7 +317,7 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets }: 
             {lessonSnippets?.[lang] && (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-[10px] font-semibold text-cyan-300">
                 <Sparkles className="w-2.5 h-2.5" />
-                From this lesson
+                {snippetLabel ?? 'From this lesson'}
               </span>
             )}
 
