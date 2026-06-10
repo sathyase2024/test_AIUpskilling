@@ -103,6 +103,7 @@ export default function LearnClient({ topic }: { topic: string }) {
   const [quizAnswers, setQuizAnswers] = useState<(number | null)[]>([]);
   const [quizResult, setQuizResult] = useState<SubmitResult | null>(null);
   const [quizSubmitting, setQuizSubmitting] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
   const [moduleResults, setModuleResults] = useState<
     Record<number, { score: number; passed: boolean }>
   >({});
@@ -282,16 +283,40 @@ export default function LearnClient({ topic }: { topic: string }) {
   const closeQuiz = useCallback(() => {
     setQuizOpen(null);
     setQuizResult(null);
+    setQuizError(null);
   }, []);
 
   const submitQuiz = useCallback(async () => {
     if (!quizOpen || !assessment) return;
     const answers = quizAnswers as number[];
     setQuizSubmitting(true);
+    setQuizError(null);
     try {
       let result: SubmitResult;
-      if (quizOpen.type === "module") {
+
+      if (!isAuthenticated()) {
+        // Grade locally — not persisted (user not signed in)
+        const questions = quizOpen.type === "module"
+          ? (assessment.modules.find((m) => m.index === quizOpen.moduleIndex)?.questions ?? [])
+          : (assessment.finalExam?.questions ?? []);
+        const threshold = assessment.passThreshold ?? 80;
+        let correct = 0;
+        const wrongLessonOrders: number[] = [];
+        for (let i = 0; i < questions.length; i++) {
+          if (answers[i] === questions[i].answer) correct++;
+          else wrongLessonOrders.push(questions[i].lessonOrder);
+        }
+        const total = questions.length;
+        const score = Math.round((correct / total) * 100);
+        result = { score, passed: score >= threshold, correct, total, wrongLessonOrders };
+      } else if (quizOpen.type === "module") {
         result = await submitModuleAssessment(topic, quizOpen.moduleIndex, answers);
+      } else {
+        result = await submitFinalAssessment(topic, answers);
+      }
+
+      // Update local UI state regardless of auth
+      if (quizOpen.type === "module") {
         setModuleResults((prev) => ({
           ...prev,
           [quizOpen.moduleIndex]: { score: result.score, passed: result.passed },
@@ -305,12 +330,10 @@ export default function LearnClient({ topic }: { topic: string }) {
           }
         }
       } else {
-        result = await submitFinalAssessment(topic, answers);
         setFinalResult({ score: result.score, passed: result.passed });
-        if (result.passed) {
-          setCompletedLessons(lessons.map((l) => l.id));
-        }
+        if (result.passed) setCompletedLessons(lessons.map((l) => l.id));
       }
+
       setNeedsReview((prev) => {
         const next = new Set(prev);
         for (const ord of result.wrongLessonOrders) next.add(ord);
@@ -320,6 +343,7 @@ export default function LearnClient({ topic }: { topic: string }) {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error("Quiz submission failed", err);
+      setQuizError("Submission failed. Please try again.");
     } finally {
       setQuizSubmitting(false);
     }
@@ -906,7 +930,7 @@ export default function LearnClient({ topic }: { topic: string }) {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/75 backdrop-blur-sm"
-            onClick={quizResult ? closeQuiz : undefined}
+            onClick={closeQuiz}
           />
           <div className="relative w-full max-w-2xl max-h-[88vh] bg-[#0d0d18] border border-white/15 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
@@ -927,11 +951,9 @@ export default function LearnClient({ topic }: { topic: string }) {
                   </p>
                 )}
               </div>
-              {quizResult && (
-                <button onClick={closeQuiz} className="text-white/40 hover:text-white transition-colors shrink-0">
-                  <X size={18} />
-                </button>
-              )}
+              <button onClick={closeQuiz} className="text-white/40 hover:text-white transition-colors shrink-0">
+                <X size={18} />
+              </button>
             </div>
 
             {/* Taking the quiz */}
@@ -1000,7 +1022,11 @@ export default function LearnClient({ topic }: { topic: string }) {
                     >
                       Back
                     </button>
-                    <div className="flex-1" />
+                    <div className="flex-1">
+                      {quizError && (
+                        <p className="text-xs text-red-400 text-center">{quizError}</p>
+                      )}
+                    </div>
                     {quizCurrentQ < totalQ - 1 ? (
                       <button
                         onClick={() => setQuizCurrentQ((q) => q + 1)}
