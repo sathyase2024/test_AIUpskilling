@@ -1,9 +1,19 @@
 import { PY_HARNESS, JS_HARNESS, PY_LIST, JS_LIST, type ProblemDef } from './harness'
 
+const PY_LIST_DOC = `# Definition for a singly-linked list node (provided by the runner):
+# class ListNode:
+#     def __init__(self, val=0, next=None):
+#         self.val, self.next = val, next
+`
+
+const JS_LIST_DOC = `// Definition for a singly-linked list node (provided by the runner):
+// class ListNode { constructor(val=0, next=null) { this.val = val; this.next = next; } }
+`
+
 export const LINKED_LISTS: ProblemDef[] = [
   {
     id:'reverse-linked-list', title:'Reverse Linked List', difficulty:'Beginner', category:'Linked Lists',
-    description:'Given the head of a singly linked list, reverse the list, and return the new head. The ListNode class is provided in the starter code. Follow-up: a linked list can be reversed either iteratively or recursively — could you implement both?',
+    description:'Given the head of a singly linked list, reverse the list, and return the new head. The ListNode class is provided by the runner. Follow-up: a linked list can be reversed either iteratively or recursively — could you implement both?',
     examples:[
       {input:'head = [1,2,3,4,5]',output:'[5,4,3,2,1]'},
       {input:'head = [1,2]',output:'[2,1]'},
@@ -13,22 +23,24 @@ export const LINKED_LISTS: ProblemDef[] = [
     hints:['Iterate with three pointers: prev, cur, next','At each step point cur.next back to prev, then advance all three','When cur becomes null, prev is the new head'],
     tags:['linked-list','recursion'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
-      python:`${PY_LIST}
+      python:`${PY_LIST_DOC}
 def reverse_list(head):
-    # TODO: Reverse the list and return the new head
     pass
-${PY_HARNESS}
+`,
+      javascript:`${JS_LIST_DOC}
+function reverseList(head) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_LIST}${PY_HARNESS}
 _t(_to_list(reverse_list(_build([1,2,3,4,5]))),[5,4,3,2,1],'five nodes')
 _t(_to_list(reverse_list(_build([1,2]))),[2,1],'two nodes')
 _t(_to_list(reverse_list(_build([]))),[],'empty list')
 _t(_to_list(reverse_list(_build([7]))),[7],'single node')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`${JS_LIST}
-function reverseList(head) {
-  // TODO: Reverse the list and return the new head
-  return null;
-}
-${JS_HARNESS}
+      javascript:`${JS_LIST}${JS_HARNESS}
 _t(_toList(reverseList(_build([1,2,3,4,5]))),[5,4,3,2,1],'five nodes');
 _t(_toList(reverseList(_build([1,2]))),[2,1],'two nodes');
 _t(_toList(reverseList(_build([]))),[],'empty list');
@@ -48,11 +60,18 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     hints:['A visited-set works but costs O(n) space','Floyd\'s algorithm: a slow pointer moves 1 step, a fast pointer moves 2','If they ever meet, there is a cycle; if fast reaches null, there is none'],
     tags:['linked-list','two-pointers','floyd-cycle'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
-      python:`${PY_LIST}
+      python:`${PY_LIST_DOC}
 def has_cycle(head):
-    # TODO: Return True if the list contains a cycle
     pass
-${PY_HARNESS}
+`,
+      javascript:`${JS_LIST_DOC}
+function hasCycle(head) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_LIST}${PY_HARNESS}
 _h=_build([3,2,0,-4]);_tail=_h
 while _tail.next: _tail=_tail.next
 _tail.next=_h.next
@@ -62,12 +81,7 @@ _t(has_cycle(_build([])),False,'empty list')
 _s=_build([1]);_s.next=_s
 _t(has_cycle(_s),True,'self loop')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`${JS_LIST}
-function hasCycle(head) {
-  // TODO: Return true if the list contains a cycle
-  return false;
-}
-${JS_HARNESS}
+      javascript:`${JS_LIST}${JS_HARNESS}
 const _h=_build([3,2,0,-4]);let _tail=_h;
 while(_tail.next)_tail=_tail.next;
 _tail.next=_h.next;
@@ -91,23 +105,27 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     hints:['A min-heap keyed on node values always pops the global smallest head','After popping a node, push its successor if it exists','Alternatively merge lists pairwise like merge sort: k lists take log k rounds'],
     tags:['linked-list','heap','divide-and-conquer','merge-sort'], timeComplexity:'O(N log k)', spaceComplexity:'O(k)',
     starterCode:{
-      python:`${PY_LIST}
+      python:`import heapq
+
+${PY_LIST_DOC}
 def merge_k_lists(lists):
-    # TODO: Merge k sorted linked lists into one sorted list and return its head
     pass
-${PY_HARNESS}
+`,
+      javascript:`${JS_LIST_DOC}
+function mergeKLists(lists) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_LIST}${PY_HARNESS}
 _t(_to_list(merge_k_lists([_build(l) for l in [[1,4,5],[1,3,4],[2,6]]])),[1,1,2,3,4,4,5,6],'example 1')
 _t(_to_list(merge_k_lists([])),[],'no lists')
 _t(_to_list(merge_k_lists([_build([])])),[],'one empty list')
 _t(_to_list(merge_k_lists([_build([1]),_build([0])])),[0,1],'two singletons')
 _t(_to_list(merge_k_lists([_build([-2,-1]),_build([]),_build([-3])])),[-3,-2,-1],'negatives and empty')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`${JS_LIST}
-function mergeKLists(lists) {
-  // TODO: Merge k sorted linked lists into one sorted list and return its head
-  return null;
-}
-${JS_HARNESS}
+      javascript:`${JS_LIST}${JS_HARNESS}
 _t(_toList(mergeKLists([[1,4,5],[1,3,4],[2,6]].map(_build))),[1,1,2,3,4,4,5,6],'example 1');
 _t(_toList(mergeKLists([])),[],'no lists');
 _t(_toList(mergeKLists([_build([])])),[],'one empty list');

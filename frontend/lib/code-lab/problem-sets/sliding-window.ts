@@ -14,9 +14,15 @@ export const SLIDING_WINDOW: ProblemDef[] = [
     tags:['string','sliding-window','hash-map'], timeComplexity:'O(n)', spaceComplexity:'O(min(n, charset))',
     starterCode:{
       python:`def length_of_longest_substring(s):
-    # TODO: Return the length of the longest substring without repeating characters
     pass
-${PY_HARNESS}
+`,
+      javascript:`function lengthOfLongestSubstring(s) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(length_of_longest_substring('abcabcbb'),3,'example 1')
 _t(length_of_longest_substring('bbbbb'),1,'all same char')
 _t(length_of_longest_substring('pwwkew'),3,'example 3')
@@ -25,11 +31,7 @@ _t(length_of_longest_substring('au'),2,'two distinct')
 _t(length_of_longest_substring('dvdf'),3,'window left jump')
 _t(length_of_longest_substring('abba'),2,'stale index trap')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function lengthOfLongestSubstring(s) {
-  // TODO: Return the length of the longest substring without repeating characters
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(lengthOfLongestSubstring('abcabcbb'),3,'example 1');
 _t(lengthOfLongestSubstring('bbbbb'),1,'all same char');
 _t(lengthOfLongestSubstring('pwwkew'),3,'example 3');
@@ -51,10 +53,18 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     hints:['Keep a deque of indices whose values are in decreasing order','Before pushing index i, pop indices whose values are <= nums[i] — they can never be a future maximum','Pop from the front when the front index falls out of the window; the front is always the current maximum'],
     tags:['array','sliding-window','monotonic-deque','heap'], timeComplexity:'O(n)', spaceComplexity:'O(k)',
     starterCode:{
-      python:`def max_sliding_window(nums, k):
-    # TODO: Return the maximum of each window of size k
+      python:`from collections import deque
+
+def max_sliding_window(nums, k):
     pass
-${PY_HARNESS}
+`,
+      javascript:`function maxSlidingWindow(nums, k) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(max_sliding_window([1,3,-1,-3,5,3,6,7],3),[3,3,5,5,6,7],'example 1')
 _t(max_sliding_window([1],1),[1],'single element')
 _t(max_sliding_window([1,-1],1),[1,-1],'window of one')
@@ -62,11 +72,7 @@ _t(max_sliding_window([9,11],2),[11],'increasing pair')
 _t(max_sliding_window([4,-2],2),[4],'decreasing pair')
 _t(max_sliding_window([7,2,4],2),[7,4],'leading max expires')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function maxSlidingWindow(nums, k) {
-  // TODO: Return the maximum of each window of size k
-  return [];
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(maxSlidingWindow([1,3,-1,-3,5,3,6,7],3),[3,3,5,5,6,7],'example 1');
 _t(maxSlidingWindow([1],1),[1],'single element');
 _t(maxSlidingWindow([1,-1],1),[1,-1],'window of one');
@@ -88,10 +94,18 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     hints:['Count the required frequency of each character of t','Expand the right edge until the window covers all requirements, then shrink from the left while it stays valid','Track how many distinct characters are currently fully satisfied to make validity checks O(1)'],
     tags:['string','sliding-window','hash-map'], timeComplexity:'O(m + n)', spaceComplexity:'O(charset)',
     starterCode:{
-      python:`def min_window(s, t):
-    # TODO: Return the smallest substring of s containing all characters of t (with multiplicity)
+      python:`from collections import Counter
+
+def min_window(s, t):
     pass
-${PY_HARNESS}
+`,
+      javascript:`function minWindow(s, t) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(min_window('ADOBECODEBANC','ABC'),'BANC','example 1')
 _t(min_window('a','a'),'a','single char match')
 _t(min_window('a','aa'),'','not enough chars')
@@ -99,11 +113,7 @@ _t(min_window('ab','b'),'b','suffix window')
 _t(min_window('bba','ab'),'ba','duplicates in s')
 _t(min_window('aaflslflsldkalskaaa','aaa'),'aaa','repeated requirement')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function minWindow(s, t) {
-  // TODO: Return the smallest substring of s containing all characters of t (with multiplicity)
-  return '';
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(minWindow('ADOBECODEBANC','ABC'),'BANC','example 1');
 _t(minWindow('a','a'),'a','single char match');
 _t(minWindow('a','aa'),'','not enough chars');

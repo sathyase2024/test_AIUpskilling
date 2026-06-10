@@ -91,6 +91,7 @@ export default function CodeLabPage() {
   const [langOpen,     setLangOpen]     = useState(false)
   const [hintsOpen,    setHintsOpen]    = useState(false)
   const [revealedHints,setRevealedHints]= useState(0)
+  const [mobilePane,   setMobilePane]   = useState<'problem'|'code'|'tests'>('problem')
 
   const filtered = useMemo(() => PROBLEMS.filter(p => {
     if (category !== 'All' && p.category !== category) return false
@@ -112,7 +113,7 @@ export default function CodeLabPage() {
     const lang: Language = (p.starterCode.python ? 'python' : Object.keys(p.starterCode)[0]) as Language
     setProblem(p); setLanguage(lang); setCode(p.starterCode[lang] ?? '')
     setValidation(null); setRawOutput(null); setRevealedHints(0)
-    setHintsOpen(false); setView('editor')
+    setHintsOpen(false); setMobilePane('problem'); setView('editor')
   }
 
   function handleLangChange(lang: Language) {
@@ -124,12 +125,15 @@ export default function CodeLabPage() {
 
   const handleRun = useCallback(async () => {
     if (!code || isRunning) return
-    setIsRunning(true); setActiveTab('results')
+    setIsRunning(true); setActiveTab('results'); setMobilePane('tests')
     try {
+      // The visible editor holds only the user's solution; the hidden test
+      // harness for the problem is appended at execution time.
+      const tests = problem?.testCode?.[language] ?? ''
       const res = await fetch(`${API_URL}/code/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language, code }),
+        body: JSON.stringify({ language, code: tests ? `${code}\n${tests}` : code }),
       })
       const data = await res.json()
       setRawOutput({ stdout: data.stdout ?? '', stderr: data.stderr ?? '' })
@@ -141,7 +145,7 @@ export default function CodeLabPage() {
     } finally {
       setIsRunning(false)
     }
-  }, [code, language, isRunning])
+  }, [code, language, isRunning, problem])
 
   // ── List View ──────────────────────────────────────────────────────────────
   if (view === 'list') {
@@ -192,6 +196,27 @@ export default function CodeLabPage() {
                 )
               })}
             </div>
+          </div>
+
+          {/* Mobile category chips (sidebar is hidden below sm) */}
+          <div className="sm:hidden max-w-5xl mx-auto px-4 mb-4 flex gap-2 overflow-x-auto pb-1.5 [-webkit-overflow-scrolling:touch]">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap shrink-0 transition-colors ${
+                  category === cat
+                    ? 'bg-purple-500/15 border-purple-500/40 text-purple-300'
+                    : 'bg-white/[0.03] border-white/10 text-white/50'
+                }`}
+              >
+                <CategoryIcon cat={cat} />
+                {cat}
+                <span className={category === cat ? 'text-purple-400/70' : 'text-white/25'}>
+                  {categoryCounts[cat] ?? 0}
+                </span>
+              </button>
+            ))}
           </div>
 
           {/* Sidebar + grid */}
@@ -279,7 +304,7 @@ export default function CodeLabPage() {
   const scoreBg    = score >= 80 ? 'bg-emerald-500'  : score >= 50 ? 'bg-amber-500'   : 'bg-red-500'
 
   return (
-    <div className="flex flex-col h-screen bg-[#0a0a0f] overflow-hidden">
+    <div className="flex flex-col h-[100dvh] bg-[#0a0a0f] overflow-hidden">
       <Navbar />
 
       {/* Toolbar */}
@@ -338,11 +363,26 @@ export default function CodeLabPage() {
         </button>
       </div>
 
-      {/* Three-column layout */}
+      {/* Mobile pane switcher (three columns collapse into tabs below lg) */}
+      <div className="flex lg:hidden border-b border-white/10 bg-black/30 flex-shrink-0">
+        {([['problem','Problem'],['code','Code'],['tests','Tests']] as const).map(([pane, label]) => (
+          <button
+            key={pane}
+            onClick={() => setMobilePane(pane)}
+            className={`flex-1 py-2.5 text-xs font-medium transition-colors border-b-2 ${
+              mobilePane === pane ? 'text-white border-purple-500' : 'text-white/40 border-transparent'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Three-column layout (tabbed panes on mobile) */}
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left: description ── */}
-        <aside className="w-[280px] flex-shrink-0 border-r border-white/10 bg-[#0d0d18] flex flex-col overflow-y-auto">
+        <aside className={`${mobilePane === 'problem' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[280px] flex-shrink-0 lg:border-r border-white/10 bg-[#0d0d18] flex-col overflow-y-auto`}>
           <div className="p-4 border-b border-white/[0.06]">
             <p className="text-xs text-white/65 leading-relaxed">{problem.description}</p>
           </div>
@@ -410,7 +450,7 @@ export default function CodeLabPage() {
         </aside>
 
         {/* ── Middle: editor ── */}
-        <div className="flex-1 flex flex-col min-w-0 border-r border-white/10">
+        <div className={`${mobilePane === 'code' ? 'flex' : 'hidden'} lg:flex w-full flex-1 flex-col min-w-0 lg:border-r border-white/10`}>
           <div className="flex-1 overflow-hidden">
             <MonacoEditor
               height="100%"
@@ -444,7 +484,7 @@ export default function CodeLabPage() {
         </div>
 
         {/* ── Right: results / output ── */}
-        <aside className="w-[300px] flex-shrink-0 flex flex-col bg-[#0d0d18]">
+        <aside className={`${mobilePane === 'tests' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[300px] flex-shrink-0 flex-col bg-[#0d0d18]`}>
           {/* Tabs */}
           <div className="flex border-b border-white/10 shrink-0">
             {(['results','output'] as const).map(tab => (

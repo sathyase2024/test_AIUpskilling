@@ -13,9 +13,15 @@ export const DYNAMIC_PROGRAMMING: ProblemDef[] = [
     tags:['dynamic-programming','fibonacci','memoization'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def climb_stairs(n):
-    # TODO: Return the number of distinct ways to climb n steps (1 or 2 at a time)
     pass
-${PY_HARNESS}
+`,
+      javascript:`function climbStairs(n) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(climb_stairs(2),2,'example 1')
 _t(climb_stairs(3),3,'example 2')
 _t(climb_stairs(1),1,'one step')
@@ -23,11 +29,7 @@ _t(climb_stairs(5),8,'five steps')
 _t(climb_stairs(10),89,'ten steps')
 _t(climb_stairs(45),1836311903,'large n needs O(n)')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function climbStairs(n) {
-  // TODO: Return the number of distinct ways to climb n steps (1 or 2 at a time)
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(climbStairs(2),2,'example 1');
 _t(climbStairs(3),3,'example 2');
 _t(climbStairs(1),1,'one step');
@@ -49,9 +51,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['dynamic-programming','array'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def rob(nums):
-    # TODO: Return the max loot without robbing two adjacent houses
     pass
-${PY_HARNESS}
+`,
+      javascript:`function rob(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(rob([1,2,3,1]),4,'example 1')
 _t(rob([2,7,9,3,1]),12,'example 2')
 _t(rob([5]),5,'single house')
@@ -59,11 +67,7 @@ _t(rob([2,1,1,2]),4,'skip two in a row')
 _t(rob([2,100,3,100,4]),200,'alternating riches')
 _t(rob([0,0,0]),0,'nothing to steal')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function rob(nums) {
-  // TODO: Return the max loot without robbing two adjacent houses
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(rob([1,2,3,1]),4,'example 1');
 _t(rob([2,7,9,3,1]),12,'example 2');
 _t(rob([5]),5,'single house');
@@ -86,9 +90,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['dynamic-programming','bfs'], timeComplexity:'O(amount · coins)', spaceComplexity:'O(amount)',
     starterCode:{
       python:`def coin_change(coins, amount):
-    # TODO: Return the minimum number of coins to make amount, or -1
     pass
-${PY_HARNESS}
+`,
+      javascript:`function coinChange(coins, amount) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(coin_change([1,2,5],11),3,'example 1')
 _t(coin_change([2],3),-1,'impossible')
 _t(coin_change([1],0),0,'zero amount')
@@ -96,11 +106,7 @@ _t(coin_change([1,3,4],6),2,'greedy fails here')
 _t(coin_change([2,5,10,1],27),4,'27 = 10+10+5+2')
 _t(coin_change([186,419,83,408],6249),20,'large stress case')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function coinChange(coins, amount) {
-  // TODO: Return the minimum number of coins to make amount, or -1
-  return -1;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(coinChange([1,2,5],11),3,'example 1');
 _t(coinChange([2],3),-1,'impossible');
 _t(coinChange([1],0),0,'zero amount');
@@ -122,10 +128,18 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     hints:['O(n²) DP: dp[i] = 1 + max(dp[j]) over j < i with nums[j] < nums[i]','For O(n log n): keep an array of the smallest possible tail for each subsequence length','Binary-search the tails array for the first element >= num and replace it (or append)'],
     tags:['dynamic-programming','binary-search','patience-sorting'], timeComplexity:'O(n log n)', spaceComplexity:'O(n)',
     starterCode:{
-      python:`def length_of_lis(nums):
-    # TODO: Return the length of the longest strictly increasing subsequence
+      python:`import bisect
+
+def length_of_lis(nums):
     pass
-${PY_HARNESS}
+`,
+      javascript:`function lengthOfLIS(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(length_of_lis([10,9,2,5,3,7,101,18]),4,'example 1')
 _t(length_of_lis([0,1,0,3,2,3]),4,'example 2')
 _t(length_of_lis([7,7,7,7,7,7,7]),1,'all equal')
@@ -133,11 +147,7 @@ _t(length_of_lis([4,10,4,3,8,9]),3,'[4,8,9]')
 _t(length_of_lis([1]),1,'single element')
 _t(length_of_lis([5,4,3,2,1]),1,'strictly decreasing')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function lengthOfLIS(nums) {
-  // TODO: Return the length of the longest strictly increasing subsequence
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(lengthOfLIS([10,9,2,5,3,7,101,18]),4,'example 1');
 _t(lengthOfLIS([0,1,0,3,2,3]),4,'example 2');
 _t(lengthOfLIS([7,7,7,7,7,7,7]),1,'all equal');
@@ -159,9 +169,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['dynamic-programming','string','levenshtein'], timeComplexity:'O(m·n)', spaceComplexity:'O(m·n)',
     starterCode:{
       python:`def min_distance(word1, word2):
-    # TODO: Return the minimum number of insert/delete/replace operations
     pass
-${PY_HARNESS}
+`,
+      javascript:`function minDistance(word1, word2) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(min_distance('horse','ros'),3,'example 1')
 _t(min_distance('intention','execution'),5,'example 2')
 _t(min_distance('','abc'),3,'all inserts')
@@ -169,11 +185,7 @@ _t(min_distance('abc',''),3,'all deletes')
 _t(min_distance('abc','abc'),0,'identical')
 _t(min_distance('park','spake'),3,'mixed operations')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function minDistance(word1, word2) {
-  // TODO: Return the minimum number of insert/delete/replace operations
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(minDistance('horse','ros'),3,'example 1');
 _t(minDistance('intention','execution'),5,'example 2');
 _t(minDistance('','abc'),3,'all inserts');
@@ -196,9 +208,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['dynamic-programming','string','recursion'], timeComplexity:'O(m·n)', spaceComplexity:'O(m·n)',
     starterCode:{
       python:`def is_match(s, p):
-    # TODO: Return True if pattern p (with . and *) matches ALL of s
     pass
-${PY_HARNESS}
+`,
+      javascript:`function isMatch(s, p) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(is_match('aa','a'),False,'example 1')
 _t(is_match('aa','a*'),True,'star expands')
 _t(is_match('ab','.*'),True,'dot star')
@@ -207,11 +225,7 @@ _t(is_match('mississippi','mis*is*p*.'),False,'classic false case')
 _t(is_match('','c*'),True,'empty string vs star')
 _t(is_match('ab','.*c'),False,'trailing literal unmatched')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function isMatch(s, p) {
-  // TODO: Return true if pattern p (with . and *) matches ALL of s
-  return false;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(isMatch('aa','a'),false,'example 1');
 _t(isMatch('aa','a*'),true,'star expands');
 _t(isMatch('ab','.*'),true,'dot star');

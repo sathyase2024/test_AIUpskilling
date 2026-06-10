@@ -12,10 +12,18 @@ export const ML_ALGORITHMS: ProblemDef[] = [
     hints:['Euclidean distance: sqrt(Σ (a_i - b_i)²) — for ranking you can skip the sqrt','Sort (distance, label) pairs and take the first k','Count label frequencies among those k and return the most common'],
     tags:['ml','classification','distance-metrics'], timeComplexity:'O(n·d + n log n)', spaceComplexity:'O(n)',
     starterCode:{
-      python:`def knn_predict(X_train, y_train, x, k):
-    # TODO: Return the majority label among the k nearest training points to x
+      python:`from collections import Counter
+
+def knn_predict(X_train, y_train, x, k):
     pass
-${PY_HARNESS}
+`,
+      javascript:`function knnPredict(XTrain, yTrain, x, k) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _X=[[1,1],[2,2],[8,8],[9,9]];_y=[0,0,1,1]
 _t(knn_predict(_X,_y,[1.5,1.5],3),0,'near cluster 0')
 _t(knn_predict(_X,_y,[8.5,8.5],3),1,'near cluster 1')
@@ -23,11 +31,7 @@ _t(knn_predict(_X,_y,[2,2],1),0,'exact match k=1')
 _t(knn_predict([[0],[1],[2],[10]],[0,0,0,1],[9],1),1,'1D nearest outlier')
 _t(knn_predict([[1,1],[1,2],[2,1],[5,5],[5,6]],[0,0,0,1,1],[4.5,5],3),1,'five points k=3')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function knnPredict(XTrain, yTrain, x, k) {
-  // TODO: Return the majority label among the k nearest training points to x
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 const _X=[[1,1],[2,2],[8,8],[9,9]],_y=[0,0,1,1];
 _t(knnPredict(_X,_y,[1.5,1.5],3),0,'near cluster 0');
 _t(knnPredict(_X,_y,[8.5,8.5],3),1,'near cluster 1');
@@ -48,9 +52,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['ml','regression','optimization','gradient-descent'], timeComplexity:'O(epochs·n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def gradient_descent(X, y, lr=0.01, epochs=5000):
-    # TODO: Fit y = w*x + b by batch gradient descent; return [w, b]
     pass
-${PY_HARNESS}
+`,
+      javascript:`function gradientDescent(X, y, lr=0.01, epochs=5000) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _w,_b=gradient_descent([1,2,3,4],[3,5,7,9],0.01,5000)
 _t(round(_w*5+_b),11,'predict x=5 on y=2x+1')
 _t(round(_w*10+_b),21,'predict x=10 on y=2x+1')
@@ -59,11 +69,7 @@ _t(round(_w2*7+_b2),1,'flat data learns w=0 b=1')
 _w3,_b3=gradient_descent([1,2,3],[-2,-4,-6],0.01,5000)
 _t(round(_w3*4+_b3),-8,'negative slope y=-2x')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function gradientDescent(X, y, lr=0.01, epochs=5000) {
-  // TODO: Fit y = w*x + b by batch gradient descent; return [w, b]
-  return [0, 0];
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 const [_w,_b]=gradientDescent([1,2,3,4],[3,5,7,9],0.01,5000);
 _t(Math.round(_w*5+_b),11,'predict x=5 on y=2x+1');
 _t(Math.round(_w*10+_b),21,'predict x=10 on y=2x+1');

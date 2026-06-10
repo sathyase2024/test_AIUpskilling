@@ -13,25 +13,45 @@ export const OOP_DESIGN: ProblemDef[] = [
     starterCode:{
       python:`class MinStack:
     def __init__(self):
-        # TODO: Initialize your data structure
         pass
 
     def push(self, val):
-        # TODO
         pass
 
     def pop(self):
-        # TODO
         pass
 
     def top(self):
-        # TODO: Return the top element
         pass
 
     def get_min(self):
-        # TODO: Return the minimum element in O(1)
         pass
-${PY_HARNESS}
+`,
+      javascript:`class MinStack {
+  constructor() {
+
+  }
+
+  push(val) {
+
+  }
+
+  pop() {
+
+  }
+
+  top() {
+
+  }
+
+  getMin() {
+
+  }
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _s=MinStack()
 _s.push(-2);_s.push(0);_s.push(-3)
 _t(_s.get_min(),-3,'min after pushes')
@@ -44,24 +64,7 @@ _t(_s2.get_min(),5,'duplicate minimums')
 _s2.push(3);_s2.push(7)
 _t(_s2.get_min(),3,'min not at top')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`class MinStack {
-  constructor() {
-    // TODO: Initialize your data structure
-  }
-  push(val) {
-    // TODO
-  }
-  pop() {
-    // TODO
-  }
-  top() {
-    // TODO: Return the top element
-  }
-  getMin() {
-    // TODO: Return the minimum element in O(1)
-  }
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 const _s=new MinStack();
 _s.push(-2);_s.push(0);_s.push(-3);
 _t(_s.getMin(),-3,'min after pushes');
@@ -86,19 +89,35 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     hints:['A hash map gives O(1) lookup; a doubly linked list gives O(1) reordering and eviction','Map keys to list nodes; move a node to the front on every access','In Python, collections.OrderedDict (move_to_end / popitem) implements exactly this; in JS the built-in Map preserves insertion order'],
     tags:['hash-map','linked-list','design'], timeComplexity:'O(1) per op', spaceComplexity:'O(capacity)',
     starterCode:{
-      python:`class LRUCache:
+      python:`from collections import OrderedDict
+
+class LRUCache:
     def __init__(self, capacity):
-        # TODO: Initialize cache with given capacity
         pass
 
     def get(self, key):
-        # TODO: Return value (refreshing recency) or -1
         pass
 
     def put(self, key, value):
-        # TODO: Insert/update key, evicting the least recently used if over capacity
         pass
-${PY_HARNESS}
+`,
+      javascript:`class LRUCache {
+  constructor(capacity) {
+
+  }
+
+  get(key) {
+
+  }
+
+  put(key, value) {
+
+  }
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _c=LRUCache(2)
 _c.put(1,1);_c.put(2,2)
 _t(_c.get(1),1,'get refreshes key 1')
@@ -114,19 +133,7 @@ _t(_c2.get(2),1,'capacity one')
 _c2.put(2,99)
 _t(_c2.get(2),99,'update in place')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`class LRUCache {
-  constructor(capacity) {
-    // TODO: Initialize cache with given capacity
-  }
-  get(key) {
-    // TODO: Return value (refreshing recency) or -1
-    return -1;
-  }
-  put(key, value) {
-    // TODO: Insert/update key, evicting the least recently used if over capacity
-  }
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 const _c=new LRUCache(2);
 _c.put(1,1);_c.put(2,2);
 _t(_c.get(1),1,'get refreshes key 1');

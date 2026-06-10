@@ -14,20 +14,22 @@ export const BIT_MANIPULATION: ProblemDef[] = [
     tags:['bit-manipulation','xor','array'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def single_number(nums):
-    # TODO: Return the element that appears exactly once (O(1) space)
     pass
-${PY_HARNESS}
+`,
+      javascript:`function singleNumber(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(single_number([2,2,1]),1,'example 1')
 _t(single_number([4,1,2,1,2]),4,'example 2')
 _t(single_number([1]),1,'single element')
 _t(single_number([-1,-1,7]),7,'negative pairs')
 _t(single_number([0,1,0]),1,'zero pair')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function singleNumber(nums) {
-  // TODO: Return the element that appears exactly once (O(1) space)
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(singleNumber([2,2,1]),1,'example 1');
 _t(singleNumber([4,1,2,1,2]),4,'example 2');
 _t(singleNumber([1]),1,'single element');
@@ -48,19 +50,21 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['bit-manipulation','dynamic-programming'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
     starterCode:{
       python:`def count_bits(n):
-    # TODO: Return list where ans[i] = number of 1 bits in i, for i in 0..n
     pass
-${PY_HARNESS}
+`,
+      javascript:`function countBits(n) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(count_bits(2),[0,1,1],'example 1')
 _t(count_bits(5),[0,1,1,2,1,2],'example 2')
 _t(count_bits(0),[0],'just zero')
 _t(count_bits(8),[0,1,1,2,1,2,2,3,1],'powers of two reset')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function countBits(n) {
-  // TODO: Return array where ans[i] = number of 1 bits in i, for i in 0..n
-  return [];
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(countBits(2),[0,1,1],'example 1');
 _t(countBits(5),[0,1,1,2,1,2],'example 2');
 _t(countBits(0),[0],'just zero');

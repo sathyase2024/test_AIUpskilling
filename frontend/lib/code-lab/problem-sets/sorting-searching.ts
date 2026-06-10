@@ -13,9 +13,15 @@ export const SORTING_SEARCHING: ProblemDef[] = [
     tags:['array','binary-search'], timeComplexity:'O(log n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def search(nums, target):
-    # TODO: Return the index of target in sorted nums, or -1
     pass
-${PY_HARNESS}
+`,
+      javascript:`function search(nums, target) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(search([-1,0,3,5,9,12],9),4,'example 1')
 _t(search([-1,0,3,5,9,12],2),-1,'not found')
 _t(search([5],5),0,'single element hit')
@@ -23,11 +29,7 @@ _t(search([5],-5),-1,'single element miss')
 _t(search([1,3],3),1,'two elements right')
 _t(search([1,3],1),0,'two elements left')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function search(nums, target) {
-  // TODO: Return the index of target in sorted nums, or -1
-  return -1;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(search([-1,0,3,5,9,12],9),4,'example 1');
 _t(search([-1,0,3,5,9,12],2),-1,'not found');
 _t(search([5],5),0,'single element hit');
@@ -50,9 +52,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','binary-search'], timeComplexity:'O(log n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def search_rotated(nums, target):
-    # TODO: Return the index of target in the rotated sorted array, or -1
     pass
-${PY_HARNESS}
+`,
+      javascript:`function searchRotated(nums, target) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(search_rotated([4,5,6,7,0,1,2],0),4,'example 1')
 _t(search_rotated([4,5,6,7,0,1,2],3),-1,'not present')
 _t(search_rotated([1],0),-1,'single miss')
@@ -60,11 +68,7 @@ _t(search_rotated([3,1],1),1,'two rotated')
 _t(search_rotated([5,1,3],5),0,'target at pivot start')
 _t(search_rotated([1,2,3,4,5],4),3,'no rotation')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function searchRotated(nums, target) {
-  // TODO: Return the index of target in the rotated sorted array, or -1
-  return -1;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(searchRotated([4,5,6,7,0,1,2],0),4,'example 1');
 _t(searchRotated([4,5,6,7,0,1,2],3),-1,'not present');
 _t(searchRotated([1],0),-1,'single miss');
@@ -85,21 +89,25 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     hints:['Full sort is O(n log n) — fine as a first pass, but you can do better','Keep a min-heap of the k largest seen so far; its root is the answer','Quickselect: partition like quicksort but recurse into only one side'],
     tags:['array','heap','quickselect','sorting'], timeComplexity:'O(n) average', spaceComplexity:'O(k)',
     starterCode:{
-      python:`def find_kth_largest(nums, k):
-    # TODO: Return the k-th largest element (duplicates count)
+      python:`import heapq
+
+def find_kth_largest(nums, k):
     pass
-${PY_HARNESS}
+`,
+      javascript:`function findKthLargest(nums, k) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(find_kth_largest([3,2,1,5,6,4],2),5,'example 1')
 _t(find_kth_largest([3,2,3,1,2,4,5,5,6],4),4,'with duplicates')
 _t(find_kth_largest([1],1),1,'single element')
 _t(find_kth_largest([7,6,5,4,3,2,1],5),3,'descending input')
 _t(find_kth_largest([2,1],2),1,'k equals length')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function findKthLargest(nums, k) {
-  // TODO: Return the k-th largest element (duplicates count)
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(findKthLargest([3,2,1,5,6,4],2),5,'example 1');
 _t(findKthLargest([3,2,3,1,2,4,5,5,6],4),4,'with duplicates');
 _t(findKthLargest([1],1),1,'single element');
@@ -120,9 +128,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','binary-search','divide-and-conquer'], timeComplexity:'O(log min(m,n))', spaceComplexity:'O(1)',
     starterCode:{
       python:`def find_median_sorted_arrays(nums1, nums2):
-    # TODO: Return the median of the two sorted arrays as a float, in O(log(m+n))
     pass
-${PY_HARNESS}
+`,
+      javascript:`function findMedianSortedArrays(nums1, nums2) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(find_median_sorted_arrays([1,3],[2]),2.0,'example 1')
 _t(find_median_sorted_arrays([1,2],[3,4]),2.5,'example 2')
 _t(find_median_sorted_arrays([0,0],[0,0]),0.0,'all zeros')
@@ -130,11 +144,7 @@ _t(find_median_sorted_arrays([],[1]),1.0,'first empty')
 _t(find_median_sorted_arrays([2],[]),2.0,'second empty')
 _t(find_median_sorted_arrays([1,2],[-1,3]),1.5,'interleaved')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function findMedianSortedArrays(nums1, nums2) {
-  // TODO: Return the median of the two sorted arrays, in O(log(m+n))
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(findMedianSortedArrays([1,3],[2]),2,'example 1');
 _t(findMedianSortedArrays([1,2],[3,4]),2.5,'example 2');
 _t(findMedianSortedArrays([0,0],[0,0]),0,'all zeros');

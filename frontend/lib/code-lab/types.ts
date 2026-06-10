@@ -28,7 +28,8 @@ export interface CodeLabProblem {
   description: string   // markdown-lite (bold **x**, code `x`)
   examples: Array<{ input: string; output: string; explanation?: string }>
   constraints: string[]
-  starterCode: Partial<Record<Language, string>>  // includes embedded test harness
+  starterCode: Partial<Record<Language, string>>  // minimal scaffold shown in the editor (imports + empty signature)
+  testCode: Partial<Record<Language, string>>     // hidden harness + test cases, appended at run time
   hints: string[]
   tags: string[]
   timeComplexity?: string

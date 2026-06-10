@@ -14,9 +14,15 @@ export const MATH_NUMBERS: ProblemDef[] = [
     tags:['math'], timeComplexity:'O(log₁₀ x)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def is_palindrome_number(x):
-    # TODO: Return True if x reads the same forwards and backwards
     pass
-${PY_HARNESS}
+`,
+      javascript:`function isPalindromeNumber(x) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(is_palindrome_number(121),True,'example 1')
 _t(is_palindrome_number(-121),False,'negative')
 _t(is_palindrome_number(10),False,'trailing zero')
@@ -24,11 +30,7 @@ _t(is_palindrome_number(0),True,'zero')
 _t(is_palindrome_number(1221),True,'even digits')
 _t(is_palindrome_number(1234567899),False,'large number')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function isPalindromeNumber(x) {
-  // TODO: Return true if x reads the same forwards and backwards
-  return false;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(isPalindromeNumber(121),true,'example 1');
 _t(isPalindromeNumber(-121),false,'negative');
 _t(isPalindromeNumber(10),false,'trailing zero');
@@ -51,9 +53,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['math','stack','string','parsing'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
     starterCode:{
       python:`def calculate(s):
-    # TODO: Evaluate the expression with +, -, parentheses and unary minus (no eval)
     pass
-${PY_HARNESS}
+`,
+      javascript:`function calculate(s) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(calculate('1 + 1'),2,'example 1')
 _t(calculate(' 2-1 + 2 '),3,'example 2')
 _t(calculate('(1+(4+5+2)-3)+(6+8)'),23,'nested parens')
@@ -61,11 +69,7 @@ _t(calculate('-2+ 1'),-1,'unary minus')
 _t(calculate('- (3 + (4 + 5))'),-12,'unary minus on group')
 _t(calculate('2147483647'),2147483647,'single big number')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function calculate(s) {
-  // TODO: Evaluate the expression with +, -, parentheses and unary minus (no eval)
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(calculate('1 + 1'),2,'example 1');
 _t(calculate(' 2-1 + 2 '),3,'example 2');
 _t(calculate('(1+(4+5+2)-3)+(6+8)'),23,'nested parens');
