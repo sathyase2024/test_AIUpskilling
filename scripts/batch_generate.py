@@ -43,6 +43,46 @@ INPUT_COST_PER_MTOK = 0.80
 OUTPUT_COST_PER_MTOK = 4.00
 
 # ---------------------------------------------------------------------------
+# Tool-use schema — the API serialises all strings (including multi-line code)
+# so there's no risk of unescaped newlines corrupting the JSON payload.
+# ---------------------------------------------------------------------------
+
+LESSON_TOOL = {
+    "name": "create_lesson",
+    "description": "Output the complete structured lesson content",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "lessonId":         {"type": "string"},
+            "title":            {"type": "string"},
+            "type":             {"type": "string"},
+            "topicName":        {"type": "string"},
+            "estimatedMinutes": {"type": "integer"},
+            "xpReward":         {"type": "integer"},
+            "generated":        {"type": "boolean"},
+            "sections": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "type":        {"type": "string"},
+                        "content":     {"type": "string"},
+                        "language":    {"type": "string"},
+                        "level":       {"type": "integer"},
+                        "items":       {"type": "array", "items": {"type": "string"}},
+                        "answer":      {"type": "integer"},
+                        "explanation": {"type": "string"},
+                    },
+                    "required": ["type"],
+                },
+            },
+        },
+        "required": ["lessonId", "title", "type", "topicName",
+                     "estimatedMinutes", "xpReward", "sections"],
+    },
+}
+
+# ---------------------------------------------------------------------------
 # Rate limiter — org limit is 50 RPM; stay at 40 to leave headroom
 # ---------------------------------------------------------------------------
 
@@ -97,19 +137,10 @@ class _FakeLessonRequest:
 
 
 def _inline_schema() -> str:
+    # Note: raw JSON schema removed — output structure is enforced by LESSON_TOOL.
+    # Keep only the content guidance so the model knows what goes in each section.
     return (
-        "Return a JSON object with this exact schema:\n"
-        "{\n"
-        '  "lessonId": "<provided lessonId>",\n'
-        '  "title": "<lesson title>",\n'
-        '  "type": "<lesson type>",\n'
-        '  "topicName": "<topic name>",\n'
-        '  "estimatedMinutes": <integer>,\n'
-        '  "xpReward": <integer>,\n'
-        '  "generated": true,\n'
-        '  "sections": [ { "type": "...", "content": "...", "language": "...", "level": 2, "items": [], "answer": -1, "explanation": "" } ]\n'
-        "}\n\n"
-        "Section types and their required fields:\n"
+        "Section types to fill in via the create_lesson tool:\n"
         '- "heading": content=heading text, level=2 or 3\n'
         '- "paragraph": content=rich explanatory text (minimum 80 words per paragraph, explain WHY not just WHAT)\n'
         '- "analogy": content=interest-based analogy starting with "🏏 Think of it like [interest]:" that maps the concept just explained to the learner\'s interest domain. Only used when a hobby is specified.\n'
@@ -124,7 +155,6 @@ def _inline_schema() -> str:
         "- Include real-world context: where is this used in production, why does it matter\n"
         "- Do NOT use vague phrases like 'this is important' — explain WHY with specifics\n"
         "- Use precise technical language appropriate for the difficulty level\n\n"
-        "Return only valid JSON. No markdown fences. No text outside the JSON.\n\n"
     )
 
 
@@ -668,8 +698,8 @@ async def generate_single_lesson(
     """
     lesson_id = f"{course['slug']}-{lesson_idx:02d}"
     system_prompt = (
-        "You are an expert technical educator. Generate structured lesson content as valid JSON only. "
-        "No markdown outside JSON."
+        "You are an expert technical educator. Generate structured lesson content "
+        "by calling the create_lesson tool."
     )
     user_prompt = build_lesson_prompt(
         lesson_id=lesson_id,
@@ -680,32 +710,26 @@ async def generate_single_lesson(
         difficulty=course["difficulty"],
         hobby=HOBBY,
     )
-    json_reminder = "\n\nReturn ONLY valid JSON"
-    # Prompt suffix used when the model hits the token limit (output truncated)
+    # Used when the model hits max_tokens before completing the tool call
     brevity_suffix = (
         "\n\nCRITICAL: Your previous response was cut off at the token limit. "
-        "You MUST include ALL sections (Overview, Core Concepts, How It Works Under the Hood, "
-        "Common Patterns & Best Practices, Real-World Application, and 2 quiz sections) — "
-        "do NOT drop any section. Instead, make each section MORE CONCISE: "
+        "Include ALL required sections but make each MORE CONCISE: "
         "paragraphs under 80 words, analogies under 60 words, code blocks under 10 lines, "
-        "key_points max 5 bullets. Return ONLY valid JSON."
+        "key_points max 5 bullets."
     )
 
     last_exc = None
     truncated = False
     for attempt in range(5):
-        if attempt == 0:
-            current_prompt = user_prompt
-        elif truncated:
-            current_prompt = user_prompt + brevity_suffix
-        else:
-            current_prompt = user_prompt + json_reminder
+        current_prompt = user_prompt + (brevity_suffix if truncated else "")
         try:
             await rate_limiter.acquire()
             async with sem:
                 response = await client.messages.create(
                     model=MODEL,
                     max_tokens=MAX_TOKENS,
+                    tools=[LESSON_TOOL],
+                    tool_choice={"type": "tool", "name": "create_lesson"},
                     system=[
                         {
                             "type": "text",
@@ -716,25 +740,20 @@ async def generate_single_lesson(
                     messages=[{"role": "user", "content": current_prompt}],
                 )
 
-            raw = response.content[0].text.strip()
             in_tok = response.usage.input_tokens
             out_tok = response.usage.output_tokens
-            truncated = out_tok >= MAX_TOKENS - 10
+            truncated = response.stop_reason == "max_tokens"
 
-            try:
-                lesson_data = _parse_json_response(raw)
-                if not isinstance(lesson_data, dict):
-                    raise json.JSONDecodeError(
-                        f"Expected JSON object, got {type(lesson_data).__name__}", raw, 0
-                    )
-            except json.JSONDecodeError as exc:
+            tool_block = next((b for b in response.content if b.type == "tool_use"), None)
+            if tool_block is None:
                 if attempt < 4:
-                    reason = "output truncated (hit token limit)" if truncated else str(exc)
-                    print(f"    [lesson {lesson_idx}] JSON parse error ({reason}), retrying{'  with brevity hint' if truncated else ''}...")
+                    reason = "hit token limit before completing tool call" if truncated else "no tool_use block in response"
+                    print(f"    [lesson {lesson_idx}] {reason}, retrying{'  with brevity hint' if truncated else ''}...")
                     await asyncio.sleep(2 ** attempt * 2)
-                    last_exc = exc
                     continue
-                raise
+                raise ValueError(f"Model did not call create_lesson tool after {attempt + 1} attempts")
+
+            lesson_data = tool_block.input
 
             # Normalise defaults
             lesson_data.setdefault("lessonId", lesson_id)

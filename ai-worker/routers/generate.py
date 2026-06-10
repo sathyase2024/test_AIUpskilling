@@ -1,10 +1,46 @@
-import json
 import anthropic
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 
 from config import MODEL, MAX_TOKENS, get_client
+
+# Tool-use schema — the API serialises all strings (including multi-line code)
+# so there's no risk of unescaped newlines corrupting the JSON payload.
+LESSON_TOOL = {
+    "name": "create_lesson",
+    "description": "Output the complete structured lesson content",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "lessonId":         {"type": "string"},
+            "title":            {"type": "string"},
+            "type":             {"type": "string"},
+            "topicName":        {"type": "string"},
+            "estimatedMinutes": {"type": "integer"},
+            "xpReward":         {"type": "integer"},
+            "generated":        {"type": "boolean"},
+            "sections": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "type":        {"type": "string"},
+                        "content":     {"type": "string"},
+                        "language":    {"type": "string"},
+                        "level":       {"type": "integer"},
+                        "items":       {"type": "array", "items": {"type": "string"}},
+                        "answer":      {"type": "integer"},
+                        "explanation": {"type": "string"},
+                    },
+                    "required": ["type"],
+                },
+            },
+        },
+        "required": ["lessonId", "title", "type", "topicName",
+                     "estimatedMinutes", "xpReward", "sections"],
+    },
+}
 
 router = APIRouter(prefix="/generate", tags=["generate"])
 
@@ -66,19 +102,9 @@ class CurriculumResponse(BaseModel):
 
 
 def _schema() -> str:
+    # Note: raw JSON schema removed — output structure is enforced by LESSON_TOOL.
     return (
-        "Return a JSON object with this exact schema:\n"
-        "{\n"
-        '  "lessonId": "<provided lessonId>",\n'
-        '  "title": "<lesson title>",\n'
-        '  "type": "<lesson type>",\n'
-        '  "topicName": "<topic name>",\n'
-        '  "estimatedMinutes": <integer>,\n'
-        '  "xpReward": <integer>,\n'
-        '  "generated": true,\n'
-        '  "sections": [ { "type": "...", "content": "...", "language": "...", "level": 2, "items": [], "answer": -1, "explanation": "" } ]\n'
-        "}\n\n"
-        "Section types and their required fields:\n"
+        "Section types to fill in via the create_lesson tool:\n"
         '- "heading": content=heading text, level=2 or 3\n'
         '- "paragraph": content=rich explanatory text (minimum 80 words per paragraph, explain WHY not just WHAT)\n'
         '- "analogy": content=interest-based analogy starting with "🏏 Think of it like [interest]:" that maps the concept just explained to the learner\'s interest domain. Only used when a hobby is specified.\n'
@@ -93,7 +119,6 @@ def _schema() -> str:
         "- Include real-world context: where is this used in production, why does it matter\n"
         "- Do NOT use vague phrases like 'this is important' — explain WHY with specifics\n"
         "- Use precise technical language appropriate for the difficulty level\n\n"
-        "Return only valid JSON. No markdown fences. No text outside the JSON.\n\n"
     )
 
 
@@ -362,10 +387,10 @@ Set estimatedMinutes to 20. Set xpReward to 50."""
 
 @router.post("/lesson", response_model=LessonContentResponse)
 async def generate_lesson(req: LessonRequest) -> LessonContentResponse:
-    """Generate structured lesson content as JSON using Claude with prompt caching."""
+    """Generate structured lesson content using Claude tool-use for guaranteed valid JSON."""
     system_prompt = (
-        "You are an expert technical educator. Generate structured lesson content as valid JSON only. "
-        "No markdown outside JSON."
+        "You are an expert technical educator. Generate structured lesson content "
+        "by calling the create_lesson tool."
     )
 
     user_prompt = _build_lesson_prompt(req)
@@ -374,30 +399,23 @@ async def generate_lesson(req: LessonRequest) -> LessonContentResponse:
         response = get_client().messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
+            tools=[LESSON_TOOL],
+            tool_choice={"type": "tool", "name": "create_lesson"},
             system=[
                 {
                     "type": "text",
                     "text": system_prompt,
-                    # Cache the system prompt since it's reused across many lessons
                     "cache_control": {"type": "ephemeral"},
                 }
             ],
             messages=[{"role": "user", "content": user_prompt}],
         )
 
-        raw_text = ""
-        for block in response.content:
-            if block.type == "text":
-                raw_text = block.text.strip()
-                break
+        tool_block = next((b for b in response.content if b.type == "tool_use"), None)
+        if tool_block is None:
+            raise ValueError("Model did not call create_lesson tool")
 
-        # Strip markdown fences if present
-        if raw_text.startswith("```"):
-            lines = raw_text.split("\n")
-            # Remove first line (```json or ```) and last line (```)
-            raw_text = "\n".join(lines[1:-1]) if len(lines) > 2 else raw_text
-
-        lesson_data = json.loads(raw_text)
+        lesson_data = tool_block.input
 
         # Ensure required fields are present
         lesson_data.setdefault("lessonId", req.lessonId)
@@ -420,8 +438,8 @@ async def generate_lesson(req: LessonRequest) -> LessonContentResponse:
 
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse lesson JSON from Claude: {str(e)}")
+    except (ValueError, KeyError) as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected model response: {str(e)}")
     except anthropic.AuthenticationError:
         raise HTTPException(status_code=401, detail="Invalid Anthropic API key")
     except anthropic.RateLimitError:

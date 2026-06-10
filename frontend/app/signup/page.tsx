@@ -81,6 +81,7 @@ export default function SignupPage() {
   const router = useRouter()
 
   const [name, setName]               = useState('')
+  const [username, setUsername]       = useState('')
   const [email, setEmail]             = useState('')
   const [password, setPassword]       = useState('')
   const [confirmPassword, setConfirm] = useState('')
@@ -131,6 +132,7 @@ export default function SignupPage() {
     try {
       await register({
         name,
+        username,
         email,
         password,
         hobbies: [...selectedHobbies],
@@ -256,6 +258,32 @@ export default function SignupPage() {
                 onBlur={inputBlur}
               />
             </div>
+          </div>
+
+          {/* Username */}
+          <div>
+            <label htmlFor="username" className="block text-sm font-medium text-white/70 mb-1.5">
+              Username
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none text-sm">@</span>
+              <input
+                id="username"
+                type="text"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
+                placeholder="johndoe"
+                minLength={3}
+                maxLength={30}
+                className="w-full pl-10 pr-4 py-3 rounded-xl text-white placeholder-white/30 text-sm outline-none transition-all"
+                style={inputStyle}
+                onFocus={inputFocus}
+                onBlur={inputBlur}
+              />
+            </div>
+            <p className="mt-1 text-xs text-white/30">Letters, numbers, _ and - only</p>
           </div>
 
           {/* Email */}

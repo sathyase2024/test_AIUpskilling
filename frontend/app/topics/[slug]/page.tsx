@@ -25,6 +25,7 @@ import {
   CheckCircle,
   Sparkles,
 } from 'lucide-react'
+import { groupLessonsIntoModules } from '@/lib/modules'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,11 +39,6 @@ interface Lesson {
   type: LessonType
   xp: number
   locked: boolean
-}
-
-interface Module {
-  title: string
-  lessons: Lesson[]
 }
 
 interface TopicDetail {
@@ -184,19 +180,6 @@ function difficultyStyle(d: Difficulty) {
   return 'text-red-400 bg-red-500/10 border-red-500/30'
 }
 
-function groupIntoModules(lessons: Lesson[]): Module[] {
-  const LESSONS_PER_MODULE = 5
-  const modules: Module[] = []
-  for (let i = 0; i < lessons.length; i += LESSONS_PER_MODULE) {
-    const modIndex = Math.floor(i / LESSONS_PER_MODULE) + 1
-    modules.push({
-      title: `Module ${modIndex}`,
-      lessons: lessons.slice(i, i + LESSONS_PER_MODULE),
-    })
-  }
-  return modules
-}
-
 function generateBulletPoints(topicName: string): string[] {
   return [
     `Core concepts and fundamentals of ${topicName}`,
@@ -264,7 +247,7 @@ export default function TopicDetailPage() {
   if (loading) return <PageSkeleton />
   if (!topic) return null
 
-  const modules = groupIntoModules(topic.lessons)
+  const modules = groupLessonsIntoModules(topic.lessons)
   const totalLessons = topic.lessons.length
   const totalXp = topic.lessons.reduce((sum, l) => sum + l.xp, 0)
   const bulletPoints = generateBulletPoints(topic.name)
@@ -372,11 +355,22 @@ export default function TopicDetailPage() {
               >
                 {/* Module header */}
                 <div
-                  className="px-5 py-3.5 flex items-center justify-between"
+                  className="px-5 py-3.5 flex items-center justify-between gap-3"
                   style={{ background: 'rgba(124,58,237,0.08)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
                 >
-                  <h3 className="text-sm font-bold text-white/80">{mod.title}</h3>
-                  <span className="text-xs text-white/40">{mod.lessons.length} lessons</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-purple-200 shrink-0"
+                      style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.4)' }}
+                    >
+                      {modIdx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-white/85 truncate">{mod.title}</h3>
+                      <p className="text-xs text-white/40 truncate">{mod.subtitle}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-white/40 shrink-0">{mod.lessons.length} lessons</span>
                 </div>
 
                 {/* Lesson rows */}

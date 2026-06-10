@@ -14,7 +14,13 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column({ select: false })
+  // Nullable so existing user rows (pre-username) survive schema sync; new
+  // signups always supply one (enforced in RegisterDto). Postgres allows
+  // multiple NULLs under a unique constraint.
+  @Column({ unique: true, nullable: true })
+  username: string;
+
+  @Column({ select: false, nullable: true })
   password: string;
 
   @Column()
