@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,11 +17,13 @@ import {
   Brain,
   AlertCircle,
   Menu,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import LessonRenderer from "@/components/LessonRenderer";
 import EmbeddedEditor from "@/components/EmbeddedEditor";
 import { apiGet, apiPost, isAuthenticated, getStoredUser, setStoredUser } from "@/lib/api";
+import { groupLessonsIntoModules } from "@/lib/modules";
 import {
   fetchCapabilities,
   toEditorLang,
@@ -127,6 +129,27 @@ export default function LearnClient({ topic }: { topic: string }) {
       cancelled = true;
     };
   }, [topic]);
+
+  // ── Group lessons into named modules (Udacity-style), shared with the
+  //    course detail page via lib/modules so the two never drift. ────────────
+  const modules = useMemo(() => groupLessonsIntoModules(lessons), [lessons]);
+  const [openModules, setOpenModules] = useState<Set<number>>(new Set([0]));
+
+  const toggleModule = (i: number) =>
+    setOpenModules((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+
+  // Keep the module that holds the active lesson expanded.
+  useEffect(() => {
+    if (!selectedLessonId) return;
+    const idx = modules.findIndex((m) => m.lessons.some((l) => l.id === selectedLessonId));
+    if (idx >= 0) {
+      setOpenModules((prev) => (prev.has(idx) ? prev : new Set(prev).add(idx)));
+    }
+  }, [selectedLessonId, modules]);
 
   // Derived current-lesson info
   const currentIndex = lessons.findIndex((l) => l.id === selectedLessonId);
@@ -262,6 +285,79 @@ export default function LearnClient({ topic }: { topic: string }) {
     }
   }
 
+  // Module accordion, shared between the desktop sidebar and mobile drawer.
+  const renderModuleNav = (onPick: (id: string) => void) => (
+    <>
+      {modules.map((mod, mIdx) => {
+        const open = openModules.has(mIdx);
+        const doneCount = mod.lessons.filter((l) => completedLessons.includes(l.id)).length;
+        const allDone = doneCount === mod.lessons.length;
+        const hasCurrent = mod.lessons.some((l) => l.id === selectedLessonId);
+        return (
+          <div key={mIdx} className="mb-1">
+            <button
+              onClick={() => toggleModule(mIdx)}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all ${
+                hasCurrent ? "bg-white/[0.04]" : "hover:bg-white/[0.03]"
+              }`}
+            >
+              <span
+                className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                  allDone
+                    ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                    : "bg-purple-500/15 text-purple-300 border border-purple-500/30"
+                }`}
+              >
+                {mIdx + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-white/80 truncate">{mod.title}</p>
+                <p className="text-[10px] text-white/35">{doneCount}/{mod.lessons.length} done</p>
+              </div>
+              <ChevronDown
+                size={14}
+                className={`text-white/30 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {open && (
+              <div className="mt-0.5 ml-2 pl-2 border-l border-white/10 space-y-0.5">
+                {mod.lessons.map((lesson, j) => {
+                  const globalIdx = mod.startIndex + j;
+                  const isDone = completedLessons.includes(lesson.id);
+                  const isCurrent = selectedLessonId === lesson.id;
+                  return (
+                    <button
+                      key={lesson.id}
+                      onClick={() => onPick(lesson.id)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all text-xs ${
+                        isCurrent
+                          ? "bg-purple-600/20 border border-purple-500/40 text-white"
+                          : isDone
+                          ? "text-white/50 hover:bg-white/5"
+                          : "text-white/60 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      {isDone ? (
+                        <CheckCircle2 size={13} className="text-green-400 shrink-0" />
+                      ) : isCurrent ? (
+                        <Play size={13} className="text-purple-400 shrink-0 fill-purple-400" />
+                      ) : (
+                        <span className="w-[13px] text-center text-white/30 shrink-0 font-mono">{globalIdx + 1}</span>
+                      )}
+                      <span className="flex-1 leading-tight">{lesson.title}</span>
+                      {isCurrent && <span className="text-purple-400 text-[10px] font-medium shrink-0">Now</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
       {/* ── Top Bar ── */}
@@ -326,34 +422,8 @@ export default function LearnClient({ topic }: { topic: string }) {
             </div>
           </div>
 
-          <nav className="flex-1 p-3 space-y-0.5">
-            {lessons.map((lesson, i) => {
-              const isDone = completedLessons.includes(lesson.id);
-              const isCurrent = selectedLessonId === lesson.id;
-              return (
-                <button
-                  key={lesson.id}
-                  onClick={() => selectLesson(lesson.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all text-xs ${
-                    isCurrent
-                      ? "bg-purple-600/20 border border-purple-500/40 text-white"
-                      : isDone
-                      ? "text-white/50 hover:bg-white/5"
-                      : "text-white/60 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  {isDone ? (
-                    <CheckCircle2 size={13} className="text-green-400 shrink-0" />
-                  ) : isCurrent ? (
-                    <Play size={13} className="text-purple-400 shrink-0 fill-purple-400" />
-                  ) : (
-                    <span className="w-[13px] text-center text-white/30 shrink-0 font-mono">{i + 1}</span>
-                  )}
-                  <span className="flex-1 leading-tight">{lesson.title}</span>
-                  {isCurrent && <span className="text-purple-400 text-[10px] font-medium shrink-0">Now</span>}
-                </button>
-              );
-            })}
+          <nav className="flex-1 p-3">
+            {renderModuleNav(selectLesson)}
           </nav>
         </aside>
 
@@ -467,34 +537,8 @@ export default function LearnClient({ topic }: { topic: string }) {
                 />
               </div>
             </div>
-            <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
-              {lessons.map((lesson, i) => {
-                const isDone = completedLessons.includes(lesson.id);
-                const isCurrent = selectedLessonId === lesson.id;
-                return (
-                  <button
-                    key={lesson.id}
-                    onClick={() => { selectLesson(lesson.id); setMobileNavOpen(false); }}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all text-xs ${
-                      isCurrent
-                        ? "bg-purple-600/20 border border-purple-500/40 text-white"
-                        : isDone
-                        ? "text-white/50 hover:bg-white/5"
-                        : "text-white/60 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    {isDone ? (
-                      <CheckCircle2 size={13} className="text-green-400 shrink-0" />
-                    ) : isCurrent ? (
-                      <Play size={13} className="text-purple-400 shrink-0 fill-purple-400" />
-                    ) : (
-                      <span className="w-[13px] text-center text-white/30 shrink-0 font-mono">{i + 1}</span>
-                    )}
-                    <span className="flex-1 leading-tight">{lesson.title}</span>
-                    {isCurrent && <span className="text-purple-400 text-[10px] shrink-0">Now</span>}
-                  </button>
-                );
-              })}
+            <nav className="flex-1 overflow-y-auto p-2">
+              {renderModuleNav((id) => { selectLesson(id); setMobileNavOpen(false); })}
             </nav>
           </div>
         </div>
