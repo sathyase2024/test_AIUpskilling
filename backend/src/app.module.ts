@@ -13,12 +13,15 @@ import { ProgressModule } from './progress/progress.module';
 import { LearningPathsModule } from './learning-paths/learning-paths.module';
 import { AiModule } from './ai/ai.module';
 import { CodeModule } from './code/code.module';
+import { AssessmentModule } from './assessment/assessment.module';
 import { User } from './entities/user.entity';
 import { Topic } from './entities/topic.entity';
 import { Lesson } from './entities/lesson.entity';
 import { LearningPath } from './entities/learning-path.entity';
 import { UserProgress } from './entities/user-progress.entity';
 import { CodingSubmission } from './entities/coding-submission.entity';
+import { EmailOtp } from './entities/email-otp.entity';
+import { CourseAssessmentResult } from './entities/course-assessment-result.entity';
 
 @Module({
   imports: [
@@ -42,7 +45,7 @@ import { CodingSubmission } from './entities/coding-submission.entity';
           : cfg.get('DATABASE_URL')
           ? { rejectUnauthorized: false }       // managed DBs (Railway, Render, Supabase)
           : false,
-        entities: [User, Topic, Lesson, LearningPath, UserProgress, CodingSubmission],
+        entities: [User, Topic, Lesson, LearningPath, UserProgress, CodingSubmission, EmailOtp, CourseAssessmentResult],
         // Synchronize is ON unless DB_SYNC=false is explicitly set.
         // This prevents schema drift when new columns are added during active development.
         // Set DB_SYNC=false only after the schema is stable and you have migrations in place.
@@ -70,6 +73,7 @@ import { CodingSubmission } from './entities/coding-submission.entity';
     LearningPathsModule,
     AiModule,
     CodeModule,
+    AssessmentModule,
   ],
   controllers: [AppController],
   providers: [

@@ -9,6 +9,7 @@ const USER_KEY = 'skillforge_user';
 export interface StoredUser {
   id: number | string;
   name: string;
+  username?: string;
   email: string;
   xp?: number;
   level?: number;
@@ -83,6 +84,7 @@ export async function login(email: string, password: string): Promise<StoredUser
 /** Register, persist the token + user, and return the user. */
 export async function register(payload: {
   name: string;
+  username: string;
   email: string;
   password: string;
   hobbies?: string[];
@@ -91,6 +93,86 @@ export async function register(payload: {
   setToken(data.accessToken);
   setStoredUser(data.user);
   return data.user;
+}
+
+/** Request a one-time sign-in code by email. */
+export async function requestOtp(email: string): Promise<{ message: string }> {
+  return apiPost<{ message: string }>('/auth/otp/request', { email });
+}
+
+/** Verify a one-time code, persist the token + user, and return the user. */
+export async function verifyOtp(email: string, code: string): Promise<StoredUser> {
+  const data = await apiPost<AuthResponse>('/auth/otp/verify', { email, code });
+  setToken(data.accessToken);
+  setStoredUser(data.user);
+  return data.user;
+}
+
+// ─── Assessment types ────────────────────────────────────────────────────────
+
+export interface AssessmentQuestion {
+  question: string;
+  options: string[];
+  answer: number;
+  explanation: string;
+  lessonOrder: number;
+  moduleIndex?: number;
+}
+
+export interface AssessmentModuleBank {
+  index: number;
+  title: string;
+  lessonOrders: number[];
+  questions: AssessmentQuestion[];
+}
+
+export interface Assessment {
+  courseSlug: string;
+  passThreshold: number;
+  modules: AssessmentModuleBank[];
+  finalExam: {
+    passThreshold: number;
+    questions: AssessmentQuestion[];
+  };
+}
+
+export interface SubmitResult {
+  score: number;
+  passed: boolean;
+  correct: number;
+  total: number;
+  wrongLessonOrders: number[];
+}
+
+export interface AssessmentResultsResponse {
+  moduleResults: Record<number, { score: number; passed: boolean; wrongLessonOrders: number[] }>;
+  finalResult: { score: number; passed: boolean; wrongLessonOrders: number[] } | null;
+  wrongLessonOrders: number[];
+}
+
+// ─── Assessment actions ──────────────────────────────────────────────────────
+
+export async function getAssessment(courseSlug: string): Promise<Assessment> {
+  return apiGet<Assessment>(`/assessment/${courseSlug}`);
+}
+
+export async function getAssessmentResults(courseSlug: string): Promise<AssessmentResultsResponse> {
+  return apiGet<AssessmentResultsResponse>(`/assessment/${courseSlug}/results`);
+}
+
+export async function submitModuleAssessment(
+  courseSlug: string,
+  moduleIndex: number,
+  answers: number[],
+): Promise<SubmitResult> {
+  return apiPost<SubmitResult>(`/assessment/${courseSlug}/module/${moduleIndex}/submit`, { answers });
+}
+
+export async function submitFinalAssessment(
+  courseSlug: string,
+  answers: number[],
+): Promise<SubmitResult> {
+  return apiPost<SubmitResult>(`/assessment/${courseSlug}/final/submit`, { answers });
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
