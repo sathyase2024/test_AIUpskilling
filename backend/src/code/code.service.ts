@@ -72,8 +72,10 @@ export class CodeService {
 
   private async runPython(code: string): Promise<ExecResult> {
     const file = join(tmpdir(), `py_${tag()}.py`);
+    // Strip stray markdown fences that lesson JSON may include
+    const clean = code.replace(/^```[a-z]*\n?/gm, '').replace(/^```$/gm, '');
     try {
-      await writeFile(file, code, 'utf8');
+      await writeFile(file, clean, 'utf8');
       const { stdout, stderr } = await execFileAsync('python3', [file], EXEC_OPTS);
       return { stdout, stderr, exitCode: 0 };
     } catch (err: any) {

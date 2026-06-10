@@ -45,7 +45,7 @@ export const LANGUAGES: LanguageConfig[] = [
  * `py3-*` packages in backend/Dockerfile).
  */
 export const PYTHON_AVAILABLE_LIBRARIES = [
-  'numpy', 'pandas', 'sklearn', 'scipy', 'matplotlib',
+  'numpy', 'pandas', 'sklearn', 'scipy', 'matplotlib', 'seaborn', 'psutil',
 ];
 
 /**

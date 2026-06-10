@@ -21,7 +21,7 @@ export const DEFAULT_CAPABILITIES: SandboxCapabilities = {
     { id: 'go',         label: 'Go',         aliases: ['go', 'golang'],                       available: true },
   ],
   python: {
-    available: ['numpy', 'pandas', 'sklearn', 'scipy', 'matplotlib'],
+    available: ['numpy', 'pandas', 'sklearn', 'scipy', 'matplotlib', 'seaborn', 'psutil'],
     unavailable: [
       'torch', 'tensorflow', 'keras', 'transformers', 'sentence_transformers',
       'datasets', 'peft', 'faiss', 'langchain', 'anthropic', 'openai',
