@@ -14,9 +14,15 @@ export const TWO_POINTERS: ProblemDef[] = [
     tags:['string','two-pointers'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def is_palindrome(s):
-    # TODO: Return True if s is a palindrome considering only alphanumerics, case-insensitive
     pass
-${PY_HARNESS}
+`,
+      javascript:`function isPalindrome(s) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(is_palindrome('A man, a plan, a canal: Panama'),True,'example 1')
 _t(is_palindrome('race a car'),False,'example 2')
 _t(is_palindrome(' '),True,'whitespace only')
@@ -24,11 +30,7 @@ _t(is_palindrome('0P'),False,'digit vs letter')
 _t(is_palindrome('ab_a'),True,'underscore ignored')
 _t(is_palindrome('a'),True,'single char')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function isPalindrome(s) {
-  // TODO: Return true if s is a palindrome considering only alphanumerics, case-insensitive
-  return false;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(isPalindrome('A man, a plan, a canal: Panama'),true,'example 1');
 _t(isPalindrome('race a car'),false,'example 2');
 _t(isPalindrome(' '),true,'whitespace only');
@@ -51,9 +53,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','two-pointers','sorting'], timeComplexity:'O(n²)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def three_sum(nums):
-    # TODO: Return all unique triplets that sum to zero
     pass
-_norm=lambda a:sorted(sorted(t) for t in a)
+`,
+      javascript:`function threeSum(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`_norm=lambda a:sorted(sorted(t) for t in a)
 ${PY_HARNESS}
 _t(_norm(three_sum([-1,0,1,2,-1,-4])),[[-1,-1,2],[-1,0,1]],'example 1')
 _t(_norm(three_sum([0,1,1])),[],'no solution')
@@ -61,11 +69,7 @@ _t(_norm(three_sum([0,0,0])),[[0,0,0]],'all zeros')
 _t(_norm(three_sum([-2,0,1,1,2])),[[-2,0,2],[-2,1,1]],'two triplets')
 _t(_norm(three_sum([0,0,0,0])),[[0,0,0]],'extra zeros deduped')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function threeSum(nums) {
-  // TODO: Return all unique triplets that sum to zero
-  return [];
-}
-const _norm=a=>a.map(t=>[...t].sort((x,y)=>x-y)).sort((x,y)=>x[0]-y[0]||x[1]-y[1]||x[2]-y[2]);
+      javascript:`const _norm=a=>a.map(t=>[...t].sort((x,y)=>x-y)).sort((x,y)=>x[0]-y[0]||x[1]-y[1]||x[2]-y[2]);
 ${JS_HARNESS}
 _t(_norm(threeSum([-1,0,1,2,-1,-4])),[[-1,-1,2],[-1,0,1]],'example 1');
 _t(_norm(threeSum([0,1,1])),[],'no solution');
@@ -87,20 +91,22 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','two-pointers','greedy'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def max_area(height):
-    # TODO: Return the maximum water area between two lines
     pass
-${PY_HARNESS}
+`,
+      javascript:`function maxArea(height) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(max_area([1,8,6,2,5,4,8,3,7]),49,'example 1')
 _t(max_area([1,1]),1,'two lines')
 _t(max_area([4,3,2,1,4]),16,'equal ends')
 _t(max_area([1,2,1]),2,'small peak')
 _t(max_area([2,3,4,5,18,17,6]),17,'tall middle pair')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function maxArea(height) {
-  // TODO: Return the maximum water area between two lines
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(maxArea([1,8,6,2,5,4,8,3,7]),49,'example 1');
 _t(maxArea([1,1]),1,'two lines');
 _t(maxArea([4,3,2,1,4]),16,'equal ends');
@@ -121,9 +127,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','two-pointers','stack','dynamic-programming'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def trap(height):
-    # TODO: Return total units of trapped rain water
     pass
-${PY_HARNESS}
+`,
+      javascript:`function trap(height) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(trap([0,1,0,2,1,0,1,3,2,1,2,1]),6,'example 1')
 _t(trap([4,2,0,3,2,5]),9,'example 2')
 _t(trap([1,2,3]),0,'monotonic — traps nothing')
@@ -131,11 +143,7 @@ _t(trap([3]),0,'single bar')
 _t(trap([5,4,1,2]),1,'shallow right wall')
 _t(trap([2,0,2]),2,'simple valley')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function trap(height) {
-  // TODO: Return total units of trapped rain water
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(trap([0,1,0,2,1,0,1,3,2,1,2,1]),6,'example 1');
 _t(trap([4,2,0,3,2,5]),9,'example 2');
 _t(trap([1,2,3]),0,'monotonic — traps nothing');

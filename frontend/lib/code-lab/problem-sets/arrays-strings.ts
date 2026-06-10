@@ -14,20 +14,22 @@ export const ARRAYS_STRINGS: ProblemDef[] = [
     tags:['array','hash-map'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
     starterCode:{
       python:`def two_sum(nums, target):
-    # TODO: Return indices [i, j] (i < j) of the two numbers adding to target
     pass
-${PY_HARNESS}
+`,
+      javascript:`function twoSum(nums, target) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(two_sum([2,7,11,15],9),[0,1],'example 1')
 _t(two_sum([3,2,4],6),[1,2],'example 2')
 _t(two_sum([3,3],6),[0,1],'duplicate values')
 _t(two_sum([-1,-2,-3,-4,-5],-8),[2,4],'negative numbers')
 _t(two_sum([0,4,3,0],0),[0,3],'zeros sum to zero')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function twoSum(nums, target) {
-  // TODO: Return indices [i, j] (i < j) of the two numbers adding to target
-  return [];
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(twoSum([2,7,11,15],9),[0,1],'example 1');
 _t(twoSum([3,2,4],6),[1,2],'example 2');
 _t(twoSum([3,3],6),[0,1],'duplicate values');
@@ -48,9 +50,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','greedy','dynamic-programming'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def max_profit(prices):
-    # TODO: Return the maximum profit from one buy-sell transaction (0 if none)
     pass
-${PY_HARNESS}
+`,
+      javascript:`function maxProfit(prices) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(max_profit([7,1,5,3,6,4]),5,'example 1')
 _t(max_profit([7,6,4,3,1]),0,'strictly decreasing')
 _t(max_profit([1,2]),1,'two days')
@@ -58,11 +66,7 @@ _t(max_profit([2,4,1]),2,'peak before valley')
 _t(max_profit([3,2,6,5,0,3]),4,'buy at 2 sell at 6')
 _t(max_profit([5]),0,'single day')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function maxProfit(prices) {
-  // TODO: Return the maximum profit from one buy-sell transaction (0 if none)
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(maxProfit([7,1,5,3,6,4]),5,'example 1');
 _t(maxProfit([7,6,4,3,1]),0,'strictly decreasing');
 _t(maxProfit([1,2]),1,'two days');
@@ -84,20 +88,22 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','prefix-sum'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def product_except_self(nums):
-    # TODO: Return array where each element is the product of all others (no division)
     pass
-${PY_HARNESS}
+`,
+      javascript:`function productExceptSelf(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(product_except_self([1,2,3,4]),[24,12,8,6],'example 1')
 _t(product_except_self([-1,1,0,-3,3]),[0,0,9,0,0],'contains zero')
 _t(product_except_self([2,3]),[3,2],'two elements')
 _t(product_except_self([1,1,1,1]),[1,1,1,1],'all ones')
 _t(product_except_self([0,0]),[0,0],'two zeros')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function productExceptSelf(nums) {
-  // TODO: Return array where each element is the product of all others (no division)
-  return [];
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(productExceptSelf([1,2,3,4]),[24,12,8,6],'example 1');
 _t(productExceptSelf([-1,1,0,-3,3]),[0,0,9,0,0],'contains zero');
 _t(productExceptSelf([2,3]),[3,2],'two elements');
@@ -119,9 +125,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','dynamic-programming','divide-and-conquer','kadane'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def max_subarray(nums):
-    # TODO: Return the sum of the contiguous subarray with the largest sum
     pass
-${PY_HARNESS}
+`,
+      javascript:`function maxSubarray(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(max_subarray([-2,1,-3,4,-1,2,1,-5,4]),6,'example 1')
 _t(max_subarray([1]),1,'single element')
 _t(max_subarray([5,4,-1,7,8]),23,'whole array')
@@ -129,11 +141,7 @@ _t(max_subarray([-1]),-1,'single negative')
 _t(max_subarray([-2,-1]),-1,'all negative')
 _t(max_subarray([8,-19,5,-4,20]),21,'restart mid-array')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function maxSubarray(nums) {
-  // TODO: Return the sum of the contiguous subarray with the largest sum
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(maxSubarray([-2,1,-3,4,-1,2,1,-5,4]),6,'example 1');
 _t(maxSubarray([1]),1,'single element');
 _t(maxSubarray([5,4,-1,7,8]),23,'whole array');
@@ -155,9 +163,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','sorting','intervals'], timeComplexity:'O(n log n)', spaceComplexity:'O(n)',
     starterCode:{
       python:`def merge_intervals(intervals):
-    # TODO: Merge all overlapping intervals and return them sorted by start
     pass
-${PY_HARNESS}
+`,
+      javascript:`function mergeIntervals(intervals) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(merge_intervals([[1,3],[2,6],[8,10],[15,18]]),[[1,6],[8,10],[15,18]],'example 1')
 _t(merge_intervals([[1,4],[4,5]]),[[1,5]],'touching intervals')
 _t(merge_intervals([[1,4],[2,3]]),[[1,4]],'fully contained')
@@ -165,11 +179,7 @@ _t(merge_intervals([[5,6],[1,2]]),[[1,2],[5,6]],'unsorted input')
 _t(merge_intervals([[1,4],[0,4]]),[[0,4]],'same end')
 _t(merge_intervals([[2,2]]),[[2,2]],'single point interval')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function mergeIntervals(intervals) {
-  // TODO: Merge all overlapping intervals and return them sorted by start
-  return [];
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(mergeIntervals([[1,3],[2,6],[8,10],[15,18]]),[[1,6],[8,10],[15,18]],'example 1');
 _t(mergeIntervals([[1,4],[4,5]]),[[1,5]],'touching intervals');
 _t(mergeIntervals([[1,4],[2,3]]),[[1,4]],'fully contained');
@@ -192,9 +202,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','in-place','cyclic-sort'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
     starterCode:{
       python:`def first_missing_positive(nums):
-    # TODO: Return the smallest missing positive integer in O(n) time, O(1) space
     pass
-${PY_HARNESS}
+`,
+      javascript:`function firstMissingPositive(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(first_missing_positive([1,2,0]),3,'example 1')
 _t(first_missing_positive([3,4,-1,1]),2,'example 2')
 _t(first_missing_positive([7,8,9,11,12]),1,'no small positives')
@@ -203,11 +219,7 @@ _t(first_missing_positive([2,1]),3,'complete pair')
 _t(first_missing_positive([1,1]),2,'duplicates')
 _t(first_missing_positive([-5]),1,'only negative')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function firstMissingPositive(nums) {
-  // TODO: Return the smallest missing positive integer in O(n) time, O(1) space
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(firstMissingPositive([1,2,0]),3,'example 1');
 _t(firstMissingPositive([3,4,-1,1]),2,'example 2');
 _t(firstMissingPositive([7,8,9,11,12]),1,'no small positives');

@@ -13,20 +13,22 @@ export const GRAPHS: ProblemDef[] = [
     tags:['graph','dfs','bfs','matrix','flood-fill'], timeComplexity:'O(m·n)', spaceComplexity:'O(m·n)',
     starterCode:{
       python:`def num_islands(grid):
-    # TODO: Return the number of 4-directionally connected islands of '1's
     pass
-${PY_HARNESS}
+`,
+      javascript:`function numIslands(grid) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(num_islands([['1','1','1','1','0'],['1','1','0','1','0'],['1','1','0','0','0'],['0','0','0','0','0']]),1,'one island')
 _t(num_islands([['1','1','0','0','0'],['1','1','0','0','0'],['0','0','1','0','0'],['0','0','0','1','1']]),3,'three islands')
 _t(num_islands([['1']]),1,'single land cell')
 _t(num_islands([['0']]),0,'single water cell')
 _t(num_islands([['1','0','1'],['0','1','0'],['1','0','1']]),5,'diagonals do not connect')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function numIslands(grid) {
-  // TODO: Return the number of 4-directionally connected islands of '1's
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(numIslands([['1','1','1','1','0'],['1','1','0','1','0'],['1','1','0','0','0'],['0','0','0','0','0']]),1,'one island');
 _t(numIslands([['1','1','0','0','0'],['1','1','0','0','0'],['0','0','1','0','0'],['0','0','0','1','1']]),3,'three islands');
 _t(numIslands([['1']]),1,'single land cell');
@@ -46,10 +48,18 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     hints:['Build an adjacency list and detect a cycle','Kahn\'s algorithm: repeatedly remove nodes with in-degree 0; if you remove all of them, there is no cycle','Or DFS with three colors: unvisited / in-progress / done; hitting an in-progress node means a cycle'],
     tags:['graph','topological-sort','dfs','bfs'], timeComplexity:'O(V + E)', spaceComplexity:'O(V + E)',
     starterCode:{
-      python:`def can_finish(num_courses, prerequisites):
-    # TODO: Return True if all courses can be completed (no prerequisite cycle)
+      python:`from collections import deque
+
+def can_finish(num_courses, prerequisites):
     pass
-${PY_HARNESS}
+`,
+      javascript:`function canFinish(numCourses, prerequisites) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(can_finish(2,[[1,0]]),True,'simple chain')
 _t(can_finish(2,[[1,0],[0,1]]),False,'two-node cycle')
 _t(can_finish(5,[[1,4],[2,4],[3,1],[3,2]]),True,'diamond DAG')
@@ -57,11 +67,7 @@ _t(can_finish(1,[]),True,'no prerequisites')
 _t(can_finish(3,[[0,1],[1,2],[2,0]]),False,'three-node cycle')
 _t(can_finish(4,[[1,0],[2,1],[3,2]]),True,'long chain')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function canFinish(numCourses, prerequisites) {
-  // TODO: Return true if all courses can be completed (no prerequisite cycle)
-  return false;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(canFinish(2,[[1,0]]),true,'simple chain');
 _t(canFinish(2,[[1,0],[0,1]]),false,'two-node cycle');
 _t(canFinish(5,[[1,4],[2,4],[3,1],[3,2]]),true,'diamond DAG');
@@ -82,21 +88,25 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     hints:['Model words as graph nodes with edges between words differing by one letter','BFS from beginWord, tracking depth; the first time you reach endWord is the answer','Generating all 26 single-letter mutations of the current word and checking set membership beats comparing every pair'],
     tags:['graph','bfs','string'], timeComplexity:'O(n·L·26)', spaceComplexity:'O(n·L)',
     starterCode:{
-      python:`def ladder_length(begin_word, end_word, word_list):
-    # TODO: Return the length of the shortest transformation sequence (0 if impossible)
+      python:`from collections import deque
+
+def ladder_length(begin_word, end_word, word_list):
     pass
-${PY_HARNESS}
+`,
+      javascript:`function ladderLength(beginWord, endWord, wordList) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(ladder_length('hit','cog',['hot','dot','dog','lot','log','cog']),5,'example 1')
 _t(ladder_length('hit','cog',['hot','dot','dog','lot','log']),0,'endWord missing')
 _t(ladder_length('a','c',['a','b','c']),2,'single letter words')
 _t(ladder_length('hot','dog',['hot','dog']),0,'no bridge word')
 _t(ladder_length('hot','dot',['dot']),2,'direct neighbor')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function ladderLength(beginWord, endWord, wordList) {
-  // TODO: Return the length of the shortest transformation sequence (0 if impossible)
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(ladderLength('hit','cog',['hot','dot','dog','lot','log','cog']),5,'example 1');
 _t(ladderLength('hit','cog',['hot','dot','dog','lot','log']),0,'endWord missing');
 _t(ladderLength('a','c',['a','b','c']),2,'single letter words');

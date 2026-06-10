@@ -13,19 +13,21 @@ export const RECURSION_BACKTRACKING: ProblemDef[] = [
     tags:['backtracking','recursion','bit-manipulation'], timeComplexity:'O(n·2ⁿ)', spaceComplexity:'O(n)',
     starterCode:{
       python:`def subsets(nums):
-    # TODO: Return all 2^n subsets of nums
     pass
-_norm=lambda a:sorted(sorted(s) for s in a)
+`,
+      javascript:`function subsets(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`_norm=lambda a:sorted(sorted(s) for s in a)
 ${PY_HARNESS}
 _t(_norm(subsets([1,2,3])),[[],[1],[1,2],[1,2,3],[1,3],[2],[2,3],[3]],'example 1')
 _t(_norm(subsets([0])),[[],[0]],'single element')
 _t(len(subsets([1,2,3,4,5])),32,'2^5 subsets')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function subsets(nums) {
-  // TODO: Return all 2^n subsets of nums
-  return [];
-}
-const _norm=a=>a.map(s=>[...s].sort((x,y)=>x-y)).sort((x,y)=>{const m=Math.min(x.length,y.length);for(let i=0;i<m;i++){if(x[i]!==y[i])return x[i]-y[i];}return x.length-y.length;});
+      javascript:`const _norm=a=>a.map(s=>[...s].sort((x,y)=>x-y)).sort((x,y)=>{const m=Math.min(x.length,y.length);for(let i=0;i<m;i++){if(x[i]!==y[i])return x[i]-y[i];}return x.length-y.length;});
 ${JS_HARNESS}
 _t(_norm(subsets([1,2,3])),[[],[1],[1,2],[1,2,3],[1,3],[2],[2,3],[3]],'example 1');
 _t(_norm(subsets([0])),[[],[0]],'single element');
@@ -46,20 +48,22 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['backtracking','recursion','array'], timeComplexity:'O(branches^depth)', spaceComplexity:'O(target)',
     starterCode:{
       python:`def combination_sum(candidates, target):
-    # TODO: Return all unique combinations (with reuse) summing to target
     pass
-_norm=lambda a:sorted(sorted(c) for c in a)
+`,
+      javascript:`function combinationSum(candidates, target) {
+
+}
+`,
+    },
+    testCode:{
+      python:`_norm=lambda a:sorted(sorted(c) for c in a)
 ${PY_HARNESS}
 _t(_norm(combination_sum([2,3,6,7],7)),[[2,2,3],[7]],'example 1')
 _t(_norm(combination_sum([2,3,5],8)),[[2,2,2,2],[2,3,3],[3,5]],'example 2')
 _t(_norm(combination_sum([2],1)),[],'impossible')
 _t(_norm(combination_sum([3],9)),[[3,3,3]],'single candidate reused')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function combinationSum(candidates, target) {
-  // TODO: Return all unique combinations (with reuse) summing to target
-  return [];
-}
-const _norm=a=>a.map(c=>[...c].sort((x,y)=>x-y)).sort((x,y)=>{const m=Math.min(x.length,y.length);for(let i=0;i<m;i++){if(x[i]!==y[i])return x[i]-y[i];}return x.length-y.length;});
+      javascript:`const _norm=a=>a.map(c=>[...c].sort((x,y)=>x-y)).sort((x,y)=>{const m=Math.min(x.length,y.length);for(let i=0;i<m;i++){if(x[i]!==y[i])return x[i]-y[i];}return x.length-y.length;});
 ${JS_HARNESS}
 _t(_norm(combinationSum([2,3,6,7],7)),[[2,2,3],[7]],'example 1');
 _t(_norm(combinationSum([2,3,5],8)),[[2,2,2,2],[2,3,3],[3,5]],'example 2');
@@ -80,9 +84,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['backtracking','recursion'], timeComplexity:'O(n!)', spaceComplexity:'O(n)',
     starterCode:{
       python:`def solve_n_queens(n):
-    # TODO: Return all boards (lists of strings) with n non-attacking queens
     pass
-${PY_HARNESS}
+`,
+      javascript:`function solveNQueens(n) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(sorted(solve_n_queens(4)),[['..Q.','Q...','...Q','.Q..'],['.Q..','...Q','Q...','..Q.']],'n=4 both solutions')
 _t(solve_n_queens(1),[['Q']],'n=1')
 _t(solve_n_queens(2),[],'n=2 impossible')
@@ -90,11 +100,7 @@ _t(solve_n_queens(3),[],'n=3 impossible')
 _t(len(solve_n_queens(5)),10,'n=5 has 10 solutions')
 _t(len(solve_n_queens(6)),4,'n=6 has 4 solutions')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function solveNQueens(n) {
-  // TODO: Return all boards (arrays of strings) with n non-attacking queens
-  return [];
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(solveNQueens(4).sort(),[['..Q.','Q...','...Q','.Q..'],['.Q..','...Q','Q...','..Q.']],'n=4 both solutions');
 _t(solveNQueens(1),[['Q']],'n=1');
 _t(solveNQueens(2),[],'n=2 impossible');

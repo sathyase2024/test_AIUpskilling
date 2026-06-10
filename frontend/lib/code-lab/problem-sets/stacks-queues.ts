@@ -15,9 +15,15 @@ export const STACKS_QUEUES: ProblemDef[] = [
     tags:['string','stack'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
     starterCode:{
       python:`def is_valid(s):
-    # TODO: Return True if all brackets are matched and properly nested
     pass
-${PY_HARNESS}
+`,
+      javascript:`function isValid(s) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(is_valid('()'),True,'simple pair')
 _t(is_valid('()[]{}'),True,'three pairs')
 _t(is_valid('(]'),False,'wrong type')
@@ -26,11 +32,7 @@ _t(is_valid('{[]}'),True,'nested')
 _t(is_valid('('),False,'unclosed opener')
 _t(is_valid(']'),False,'closer without opener')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function isValid(s) {
-  // TODO: Return true if all brackets are matched and properly nested
-  return false;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(isValid('()'),true,'simple pair');
 _t(isValid('()[]{}'),true,'three pairs');
 _t(isValid('(]'),false,'wrong type');
@@ -53,20 +55,22 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','stack','monotonic-stack'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
     starterCode:{
       python:`def daily_temperatures(temperatures):
-    # TODO: For each day, return how many days until a warmer temperature (0 if never)
     pass
-${PY_HARNESS}
+`,
+      javascript:`function dailyTemperatures(temperatures) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(daily_temperatures([73,74,75,71,69,72,76,73]),[1,1,4,2,1,1,0,0],'example 1')
 _t(daily_temperatures([30,40,50,60]),[1,1,1,0],'increasing')
 _t(daily_temperatures([90,60,30]),[0,0,0],'decreasing')
 _t(daily_temperatures([50]),[0],'single day')
 _t(daily_temperatures([70,70,75]),[2,1,0],'equal temps wait')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function dailyTemperatures(temperatures) {
-  // TODO: For each day, return how many days until a warmer temperature (0 if never)
-  return [];
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(dailyTemperatures([73,74,75,71,69,72,76,73]),[1,1,4,2,1,1,0,0],'example 1');
 _t(dailyTemperatures([30,40,50,60]),[1,1,1,0],'increasing');
 _t(dailyTemperatures([90,60,30]),[0,0,0],'decreasing');
@@ -87,9 +91,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','stack','monotonic-stack'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
     starterCode:{
       python:`def largest_rectangle_area(heights):
-    # TODO: Return the area of the largest rectangle that fits in the histogram
     pass
-${PY_HARNESS}
+`,
+      javascript:`function largestRectangleArea(heights) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(largest_rectangle_area([2,1,5,6,2,3]),10,'example 1')
 _t(largest_rectangle_area([2,4]),4,'two bars')
 _t(largest_rectangle_area([1]),1,'single bar')
@@ -97,11 +107,7 @@ _t(largest_rectangle_area([2,2,2]),6,'flat histogram')
 _t(largest_rectangle_area([5,4,1,2]),8,'descending then rise')
 _t(largest_rectangle_area([0,9]),9,'zero-height bar')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function largestRectangleArea(heights) {
-  // TODO: Return the area of the largest rectangle that fits in the histogram
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(largestRectangleArea([2,1,5,6,2,3]),10,'example 1');
 _t(largestRectangleArea([2,4]),4,'two bars');
 _t(largestRectangleArea([1]),1,'single bar');

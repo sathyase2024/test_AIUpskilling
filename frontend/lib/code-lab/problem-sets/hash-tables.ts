@@ -13,10 +13,18 @@ export const HASH_TABLES: ProblemDef[] = [
     hints:['Two strings are anagrams iff their sorted characters are equal','Use the sorted string (or a 26-count signature) as a hash-map key','Sorting each key is O(k log k); a character-count key makes grouping O(n·k)'],
     tags:['string','hash-map','sorting'], timeComplexity:'O(n·k log k)', spaceComplexity:'O(n·k)',
     starterCode:{
-      python:`def group_anagrams(strs):
-    # TODO: Group strings that are anagrams of each other
+      python:`from collections import defaultdict
+
+def group_anagrams(strs):
     pass
-_norm=lambda a:sorted(sorted(g) for g in a)
+`,
+      javascript:`function groupAnagrams(strs) {
+
+}
+`,
+    },
+    testCode:{
+      python:`_norm=lambda a:sorted(sorted(g) for g in a)
 ${PY_HARNESS}
 _t(_norm(group_anagrams(['eat','tea','tan','ate','nat','bat'])),[['ate','eat','tea'],['bat'],['nat','tan']],'example 1')
 _t(_norm(group_anagrams([''])),[['']],'empty string')
@@ -24,11 +32,7 @@ _t(_norm(group_anagrams(['a'])),[['a']],'single string')
 _t(_norm(group_anagrams(['ab','ba','ab'])),[['ab','ab','ba']],'duplicate words')
 _t(_norm(group_anagrams(['abc','def'])),[['abc'],['def']],'no anagrams')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function groupAnagrams(strs) {
-  // TODO: Group strings that are anagrams of each other
-  return [];
-}
-const _norm=a=>a.map(g=>[...g].sort()).sort((x,y)=>JSON.stringify(x)<JSON.stringify(y)?-1:1);
+      javascript:`const _norm=a=>a.map(g=>[...g].sort()).sort((x,y)=>JSON.stringify(x)<JSON.stringify(y)?-1:1);
 ${JS_HARNESS}
 _t(_norm(groupAnagrams(['eat','tea','tan','ate','nat','bat'])),[['ate','eat','tea'],['bat'],['nat','tan']],'example 1');
 _t(_norm(groupAnagrams([''])),[['']],'empty string');
@@ -49,21 +53,25 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     hints:['Count frequencies with a hash map first','A heap of size k gives O(n log k)','Bucket sort by frequency (index = count) achieves O(n): walk buckets from highest count down'],
     tags:['array','hash-map','heap','bucket-sort'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
     starterCode:{
-      python:`def top_k_frequent(nums, k):
-    # TODO: Return the k most frequent elements (any order)
+      python:`from collections import Counter
+
+def top_k_frequent(nums, k):
     pass
-${PY_HARNESS}
+`,
+      javascript:`function topKFrequent(nums, k) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(sorted(top_k_frequent([1,1,1,2,2,3],2)),[1,2],'example 1')
 _t(sorted(top_k_frequent([1],1)),[1],'single element')
 _t(sorted(top_k_frequent([4,4,4,5,5,6],1)),[4],'top one')
 _t(sorted(top_k_frequent([1,2],2)),[1,2],'all elements')
 _t(sorted(top_k_frequent([-1,-1,2,2,2],2)),[-1,2],'negatives')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function topKFrequent(nums, k) {
-  // TODO: Return the k most frequent elements (any order)
-  return [];
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(topKFrequent([1,1,1,2,2,3],2).sort((a,b)=>a-b),[1,2],'example 1');
 _t(topKFrequent([1],1).sort((a,b)=>a-b),[1],'single element');
 _t(topKFrequent([4,4,4,5,5,6],1).sort((a,b)=>a-b),[4],'top one');
@@ -84,9 +92,15 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
     tags:['array','hash-set','union-find'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
     starterCode:{
       python:`def longest_consecutive(nums):
-    # TODO: Return the length of the longest run of consecutive integers
     pass
-${PY_HARNESS}
+`,
+      javascript:`function longestConsecutive(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
 _t(longest_consecutive([100,4,200,1,3,2]),4,'example 1')
 _t(longest_consecutive([0,3,7,2,5,8,4,6,0,1]),9,'example 2')
 _t(longest_consecutive([]),0,'empty array')
@@ -94,11 +108,7 @@ _t(longest_consecutive([1,2,0,1]),3,'duplicates')
 _t(longest_consecutive([5]),1,'single element')
 _t(longest_consecutive([-2,-1,0,1]),4,'negative run')
 print(f'{_p}/{_n} tests passed')`,
-      javascript:`function longestConsecutive(nums) {
-  // TODO: Return the length of the longest run of consecutive integers
-  return 0;
-}
-${JS_HARNESS}
+      javascript:`${JS_HARNESS}
 _t(longestConsecutive([100,4,200,1,3,2]),4,'example 1');
 _t(longestConsecutive([0,3,7,2,5,8,4,6,0,1]),9,'example 2');
 _t(longestConsecutive([]),0,'empty array');
