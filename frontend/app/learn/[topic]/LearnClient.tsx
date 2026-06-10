@@ -20,6 +20,7 @@ import {
   ChevronDown,
   GraduationCap,
   Trophy,
+  FlaskConical,
 } from "lucide-react";
 import Link from "next/link";
 import LessonRenderer from "@/components/LessonRenderer";
@@ -105,6 +106,9 @@ export default function LearnClient({ topic }: { topic: string }) {
     passed: boolean;
   } | null>(null);
   const [needsReview, setNeedsReview] = useState<Set<number>>(new Set());
+
+  // ── Module challenge navigation ──────────────────────────────────────────────
+  const [challengeModuleIndex, setChallengeModuleIndex] = useState<number | null>(null);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -219,6 +223,15 @@ export default function LearnClient({ topic }: { topic: string }) {
 
   const selectLesson = (id: string) => {
     setSelectedLessonId(id);
+    setChallengeModuleIndex(null);
+    setScrollProgress(0);
+    setShowXpWidget(false);
+    contentRef.current?.scrollTo({ top: 0 });
+  };
+
+  const selectChallenge = (moduleIndex: number) => {
+    setChallengeModuleIndex(moduleIndex);
+    setSelectedLessonId(null);
     setScrollProgress(0);
     setShowXpWidget(false);
     contentRef.current?.scrollTo({ top: 0 });
@@ -388,16 +401,10 @@ export default function LearnClient({ topic }: { topic: string }) {
 
   const lessonContent = currentLesson?.contentJson ?? null;
 
-  // ── Module challenge for last lesson in module ───────────────────────────────
-  const currentModuleIndex = modules.findIndex((m) =>
-    m.lessons.some((l) => l.id === selectedLessonId),
-  );
-  const currentModule = currentModuleIndex >= 0 ? modules[currentModuleIndex] : null;
-  const isLastInModule =
-    currentModule?.lessons[currentModule.lessons.length - 1]?.id === selectedLessonId;
-  const moduleChallenge =
-    isLastInModule && currentModule
-      ? getModuleChallenge(topic, currentModule.title)
+  // ── Active challenge (when sidebar challenge item is selected) ───────────────
+  const activeChallenge =
+    challengeModuleIndex !== null && modules[challengeModuleIndex]
+      ? getModuleChallenge(topic, modules[challengeModuleIndex].title)
       : null;
 
   // ── Quiz question list (derived at render time) ──────────────────────────────
@@ -408,7 +415,7 @@ export default function LearnClient({ topic }: { topic: string }) {
     : [];
 
   // ── Module accordion nav ─────────────────────────────────────────────────────
-  const renderModuleNav = (onPick: (id: string) => void) => (
+  const renderModuleNav = (onPick: (id: string) => void, onChallengePick: (idx: number) => void) => (
     <>
       {modules.map((mod, mIdx) => {
         const open = openModules.has(mIdx);
@@ -499,6 +506,24 @@ export default function LearnClient({ topic }: { topic: string }) {
                     </button>
                   );
                 })}
+
+                {/* Module challenge item — separate nav entry after the last lesson */}
+                {getModuleChallenge(topic, mod.title) && (
+                  <button
+                    onClick={() => onChallengePick(mIdx)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all text-xs ${
+                      challengeModuleIndex === mIdx
+                        ? "bg-orange-500/15 border border-orange-500/35 text-orange-200"
+                        : "text-orange-400/60 hover:bg-orange-500/8 hover:text-orange-300"
+                    }`}
+                  >
+                    <FlaskConical size={13} className="shrink-0" />
+                    <span className="flex-1 leading-tight">Module Challenge</span>
+                    {challengeModuleIndex === mIdx && (
+                      <span className="text-orange-400 text-[10px] font-medium shrink-0">Now</span>
+                    )}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -571,7 +596,7 @@ export default function LearnClient({ topic }: { topic: string }) {
           </div>
 
           <nav className="flex-1 p-3">
-            {renderModuleNav(selectLesson)}
+            {renderModuleNav(selectLesson, selectChallenge)}
           </nav>
 
           {/* Final exam / course complete */}
@@ -598,100 +623,115 @@ export default function LearnClient({ topic }: { topic: string }) {
         {/* ── Main Content ── */}
         <main ref={contentRef} className="flex-1 overflow-y-auto h-[calc(100vh-57px)]">
           <div className="max-w-3xl mx-auto px-6 py-10">
-            {/* Lesson Meta */}
-            <div className="flex flex-wrap items-center gap-3 mb-3">
-              <span className="flex items-center gap-1.5 text-xs text-white/40 bg-white/5 px-3 py-1 rounded-full border border-white/10">
-                <Clock size={12} />
-                {currentLesson?.durationMinutes ?? 15} min
-              </span>
-              <span className="text-xs px-3 py-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 capitalize">
-                {topicData.difficulty}
-              </span>
-              <span className="flex items-center gap-1.5 text-xs text-purple-300 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/30">
-                <Zap size={12} />
-                {currentLesson?.xpReward ?? 50} XP
-              </span>
-            </div>
 
-            <h1 className="text-3xl font-bold mb-8 leading-tight">
-              {currentLesson?.title ?? topicData.name}
-            </h1>
-
-            {lessonContent ? (
-              <LessonRenderer content={lessonContent} />
-            ) : (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center space-y-4">
-                  <div className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center mx-auto">
-                    <Brain className="w-6 h-6 text-purple-400" />
-                  </div>
-                  <p className="text-white/50 text-sm">
-                    Content for this lesson hasn&apos;t been generated yet.
-                  </p>
+            {/* ── Challenge view ── */}
+            {activeChallenge && challengeModuleIndex !== null ? (
+              <>
+                <div className="flex flex-wrap items-center gap-3 mb-6">
+                  <span className="flex items-center gap-1.5 text-xs text-orange-300 bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/30">
+                    <FlaskConical size={12} />
+                    Module Challenge
+                  </span>
+                  <span className="text-xs text-white/40 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                    {modules[challengeModuleIndex]?.title}
+                  </span>
                 </div>
-              </div>
-            )}
+                <ModuleChallengeCard
+                  challenge={activeChallenge}
+                  topicSlug={topic}
+                  moduleIndex={challengeModuleIndex}
+                  moduleName={modules[challengeModuleIndex]?.title ?? ""}
+                />
+              </>
+            ) : (
+              <>
+                {/* ── Lesson view ── */}
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                  <span className="flex items-center gap-1.5 text-xs text-white/40 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                    <Clock size={12} />
+                    {currentLesson?.durationMinutes ?? 15} min
+                  </span>
+                  <span className="text-xs px-3 py-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 capitalize">
+                    {topicData.difficulty}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs text-purple-300 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/30">
+                    <Zap size={12} />
+                    {currentLesson?.xpReward ?? 50} XP
+                  </span>
+                </div>
 
-            {moduleChallenge && currentModule && (
-              <ModuleChallengeCard
-                challenge={moduleChallenge}
-                topicSlug={topic}
-                moduleIndex={currentModuleIndex}
-                moduleName={currentModule.title}
-              />
-            )}
+                <h1 className="text-3xl font-bold mb-8 leading-tight">
+                  {currentLesson?.title ?? topicData.name}
+                </h1>
 
-            {/* Mark complete */}
-            {currentLesson && (
-              <button
-                onClick={markComplete}
-                className="mt-10 w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-semibold hover:opacity-90 transition-all shadow-lg shadow-purple-500/20"
-              >
-                {completedLessons.includes(currentLesson.id)
-                  ? nextLesson
-                    ? "Next Lesson"
-                    : "Completed"
-                  : "Mark Complete & Continue"}
-              </button>
-            )}
+                {lessonContent ? (
+                  <LessonRenderer content={lessonContent} />
+                ) : (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center space-y-4">
+                      <div className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center mx-auto">
+                        <Brain className="w-6 h-6 text-purple-400" />
+                      </div>
+                      <p className="text-white/50 text-sm">
+                        Content for this lesson hasn&apos;t been generated yet.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-            {/* Final exam prompt on last lesson */}
-            {!nextLesson && assessment?.finalExam && !finalResult?.passed && (
-              <button
-                onClick={openFinalExam}
-                className="mt-4 w-full py-3 rounded-xl border border-purple-500/40 text-purple-300 text-sm font-semibold hover:bg-purple-500/10 transition-all flex items-center justify-center gap-2"
-              >
-                <GraduationCap size={16} />
-                Take Final Exam
-              </button>
-            )}
-            {!nextLesson && finalResult?.passed && (
-              <div className="mt-4 flex items-center justify-center gap-2 text-green-400 font-semibold py-2">
-                <Trophy size={18} />
-                Course Complete!
-              </div>
-            )}
+                {/* Mark complete */}
+                {currentLesson && (
+                  <button
+                    onClick={markComplete}
+                    className="mt-10 w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-semibold hover:opacity-90 transition-all shadow-lg shadow-purple-500/20"
+                  >
+                    {completedLessons.includes(currentLesson.id)
+                      ? nextLesson
+                        ? "Next Lesson"
+                        : "Completed"
+                      : "Mark Complete & Continue"}
+                  </button>
+                )}
 
-            {/* Bottom Navigation */}
-            <div className="mt-12 pt-6 border-t border-white/10 flex items-center justify-between gap-4">
-              <button
-                onClick={() => prevLesson && selectLesson(prevLesson.id)}
-                disabled={!prevLesson}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-sm text-white/60 hover:bg-white/5 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed max-w-[45%]"
-              >
-                <ArrowLeft size={15} className="shrink-0" />
-                <span className="truncate">{prevLesson ? prevLesson.title : "Previous"}</span>
-              </button>
+                {/* Final exam prompt on last lesson */}
+                {!nextLesson && assessment?.finalExam && !finalResult?.passed && (
+                  <button
+                    onClick={openFinalExam}
+                    className="mt-4 w-full py-3 rounded-xl border border-purple-500/40 text-purple-300 text-sm font-semibold hover:bg-purple-500/10 transition-all flex items-center justify-center gap-2"
+                  >
+                    <GraduationCap size={16} />
+                    Take Final Exam
+                  </button>
+                )}
+                {!nextLesson && finalResult?.passed && (
+                  <div className="mt-4 flex items-center justify-center gap-2 text-green-400 font-semibold py-2">
+                    <Trophy size={18} />
+                    Course Complete!
+                  </div>
+                )}
 
-              <button
-                onClick={() => nextLesson && selectLesson(nextLesson.id)}
-                disabled={!nextLesson}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-sm font-medium hover:opacity-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed max-w-[45%]"
-              >
-                <span className="truncate">{nextLesson ? nextLesson.title : "Next"}</span>
-                <ArrowRight size={15} className="shrink-0" />
-              </button>
-            </div>
+                {/* Bottom Navigation */}
+                <div className="mt-12 pt-6 border-t border-white/10 flex items-center justify-between gap-4">
+                  <button
+                    onClick={() => prevLesson && selectLesson(prevLesson.id)}
+                    disabled={!prevLesson}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-sm text-white/60 hover:bg-white/5 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed max-w-[45%]"
+                  >
+                    <ArrowLeft size={15} className="shrink-0" />
+                    <span className="truncate">{prevLesson ? prevLesson.title : "Previous"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => nextLesson && selectLesson(nextLesson.id)}
+                    disabled={!nextLesson}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-sm font-medium hover:opacity-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed max-w-[45%]"
+                  >
+                    <span className="truncate">{nextLesson ? nextLesson.title : "Next"}</span>
+                    <ArrowRight size={15} className="shrink-0" />
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -723,7 +763,10 @@ export default function LearnClient({ topic }: { topic: string }) {
               </div>
             </div>
             <nav className="flex-1 overflow-y-auto p-2">
-              {renderModuleNav((id) => { selectLesson(id); setMobileNavOpen(false); })}
+              {renderModuleNav(
+                (id) => { selectLesson(id); setMobileNavOpen(false); },
+                (idx) => { selectChallenge(idx); setMobileNavOpen(false); },
+              )}
             </nav>
             {assessment?.finalExam && (
               <div className="p-3 border-t border-white/10 shrink-0">
