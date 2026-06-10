@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import dynamic from 'next/dynamic'
-import { Play, ChevronDown, ChevronUp, Terminal, Code2, CheckCircle, XCircle, RotateCcw, Sparkles } from 'lucide-react'
+import { Play, ChevronDown, ChevronUp, Terminal, Code2, CheckCircle, XCircle, RotateCcw, Sparkles, Lightbulb } from 'lucide-react'
+import { matchErrorHint } from '@/lib/error-hints'
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
@@ -259,6 +260,11 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets }: 
   const succeeded = output && output.exitCode === 0 && !output.stderr
   const failed = output && (output.exitCode !== 0 || !!output.stderr)
 
+  const hint = useMemo(
+    () => matchErrorHint((output?.stderr ?? '') || (execError ?? '')),
+    [output?.stderr, execError],
+  )
+
   return (
     <div className="mt-10 rounded-2xl overflow-hidden bg-[#0d0d18]"
       style={{ border: '1px solid transparent', backgroundClip: 'padding-box', boxShadow: '0 0 0 1px rgba(139,92,246,0.35), 0 4px 24px rgba(139,92,246,0.12)' }}
@@ -418,6 +424,31 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets }: 
               )}
             </div>
           </div>
+
+          {/* ── Error hint card ── */}
+          {hint && (
+            <div className="border-t border-amber-500/20 bg-amber-500/5 px-4 py-3">
+              <div className="flex items-start gap-2.5">
+                <div className="mt-0.5 shrink-0 w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-amber-300 mb-1">{hint.title}</p>
+                  <p className="text-[11px] text-white/55 leading-relaxed mb-1.5">
+                    <span className="text-white/35 font-medium">Why: </span>{hint.cause}
+                  </p>
+                  <p className="text-[11px] text-white/65 leading-relaxed">
+                    <span className="text-white/35 font-medium">Fix: </span>{hint.fix}
+                  </p>
+                  {hint.example && (
+                    <pre className="mt-2 text-[10px] leading-relaxed text-cyan-300/70 bg-black/30 border border-white/5 rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap">
+                      {hint.example}
+                    </pre>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
