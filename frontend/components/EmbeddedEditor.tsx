@@ -187,9 +187,11 @@ interface Props {
   lessonId?: string
   lessonSnippets?: Record<string, string>
   snippetLabel?: string
+  /** When true, renders without the outer card/toggle wrapper (for embedding inside another card) */
+  embedded?: boolean
 }
 
-export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, snippetLabel }: Props) {
+export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, snippetLabel, embedded }: Props) {
   // Lesson code takes precedence; fall back to the generic starter per language.
   const starterFor = (l: Language): string => lessonSnippets?.[l] ?? LANGUAGES[l].starter
 
@@ -262,12 +264,168 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
     [output?.stderr, execError],
   )
 
+  // ── Shared inner sections (toolbar + editor + output + hint) ─────────────────
+
+  const toolbar = (
+    <div className="flex items-center gap-2 px-4 py-2 border-t border-white/10 bg-black/30">
+      <div className="flex gap-1 flex-wrap">
+        {(Object.keys(LANGUAGES) as Language[]).map((l) => (
+          <button
+            key={l}
+            onClick={() => handleLangChange(l)}
+            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
+              lang === l
+                ? 'bg-purple-600/40 border border-purple-500/50 text-purple-200'
+                : 'bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80'
+            }`}
+          >
+            {LANGUAGES[l].label}
+          </button>
+        ))}
+      </div>
+      {lessonSnippets?.[lang] && (
+        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-[10px] font-semibold text-cyan-300">
+          <Sparkles className="w-2.5 h-2.5" />
+          {snippetLabel ?? 'From this lesson'}
+        </span>
+      )}
+      <div className="flex-1" />
+      <button
+        onClick={reset}
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+        title={lessonSnippets?.[lang] ? 'Reset to the lesson code' : 'Reset to starter code'}
+      >
+        <RotateCcw className="w-3.5 h-3.5" />
+        Reset
+      </button>
+      <button
+        onClick={handleRun}
+        disabled={running}
+        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all shadow-md shadow-green-900/30"
+      >
+        {running ? (
+          <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+        ) : (
+          <Play className="w-3.5 h-3.5 fill-white" />
+        )}
+        {running ? 'Running…' : 'Run'}
+      </button>
+    </div>
+  )
+
+  const editorPane = (
+    <div className="h-[280px] border-t border-white/10">
+      <MonacoEditor
+        height="100%"
+        language={LANGUAGES[lang].monacoId}
+        theme="vs-dark"
+        value={code}
+        onChange={(val) => setCode(val ?? '')}
+        options={{
+          fontSize: 13,
+          fontFamily: '"Fira Code", "Cascadia Code", "JetBrains Mono", monospace',
+          fontLigatures: true,
+          lineNumbers: 'on',
+          minimap: { enabled: false },
+          scrollBeyondLastLine: false,
+          wordWrap: 'on',
+          padding: { top: 12, bottom: 12 },
+          renderLineHighlight: 'gutter',
+          smoothScrolling: true,
+          cursorBlinking: 'smooth',
+          tabSize: 4,
+          bracketPairColorization: { enabled: true },
+          suggest: { showKeywords: true },
+        }}
+      />
+    </div>
+  )
+
+  const outputPane = (
+    <div className="border-t border-white/10 bg-black/40">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
+        <Terminal className="w-3.5 h-3.5 text-white/30" />
+        <span className="text-[11px] text-white/40 font-medium uppercase tracking-wider">Output</span>
+        {succeeded && (
+          <span className="ml-auto flex items-center gap-1 text-[11px] text-green-400">
+            <CheckCircle className="w-3 h-3" /> Exit 0
+          </span>
+        )}
+        {failed && (
+          <span className="ml-auto flex items-center gap-1 text-[11px] text-red-400">
+            <XCircle className="w-3 h-3" /> Exit {output?.exitCode}
+          </span>
+        )}
+      </div>
+      <div className="min-h-[80px] max-h-[160px] overflow-y-auto px-4 py-3 font-mono text-xs leading-relaxed">
+        {running && (
+          <div className="flex items-center gap-2 text-white/40">
+            <div className="w-3 h-3 border border-green-500/40 border-t-green-500 rounded-full animate-spin" />
+            Executing…
+          </div>
+        )}
+        {!running && !output && !execError && (
+          <span className="text-white/25">Press Run to execute your code</span>
+        )}
+        {execError && <span className="text-red-400">{execError}</span>}
+        {output && (
+          <>
+            {output.stdout && (
+              <pre className="whitespace-pre-wrap text-green-300">{output.stdout}</pre>
+            )}
+            {output.stderr && (
+              <pre className="whitespace-pre-wrap text-red-300 mt-1">{output.stderr}</pre>
+            )}
+            {!output.stdout && !output.stderr && (
+              <span className="text-white/30">(no output)</span>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+
+  const hintCard = hint ? (
+    <div className="border-t border-amber-500/20 bg-amber-500/5 px-4 py-3">
+      <div className="flex items-start gap-2.5">
+        <div className="mt-0.5 shrink-0 w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
+          <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-amber-300 mb-1">{hint.title}</p>
+          <p className="text-[11px] text-white/55 leading-relaxed mb-1.5">
+            <span className="text-white/35 font-medium">Why: </span>{hint.cause}
+          </p>
+          <p className="text-[11px] text-white/65 leading-relaxed">
+            <span className="text-white/35 font-medium">Fix: </span>{hint.fix}
+          </p>
+          {hint.example && (
+            <pre className="mt-2 text-[10px] leading-relaxed text-cyan-300/70 bg-black/30 border border-white/5 rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap">
+              {hint.example}
+            </pre>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null
+
+  // ── Embedded mode: flat render inside a parent card (no own wrapper/toggle) ──
+  if (embedded) {
+    return (
+      <div className="overflow-hidden bg-[#0d0d18]">
+        {toolbar}
+        {editorPane}
+        {outputPane}
+        {hintCard}
+      </div>
+    )
+  }
+
+  // ── Standalone mode: own card with collapsible toggle ─────────────────────────
   return (
     <div className="mt-10 rounded-2xl overflow-hidden bg-[#0d0d18]"
       style={{ border: '1px solid transparent', backgroundClip: 'padding-box', boxShadow: '0 0 0 1px rgba(139,92,246,0.35), 0 4px 24px rgba(139,92,246,0.12)' }}
     >
-
-      {/* ── Header / toggle ── */}
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-3 px-5 py-4 hover:bg-white/5 transition-colors text-left bg-gradient-to-r from-purple-900/30 to-cyan-900/10"
@@ -294,158 +452,10 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
 
       {open && (
         <>
-          {/* ── Toolbar ── */}
-          <div className="flex items-center gap-2 px-4 py-2 border-t border-white/10 bg-black/30">
-            {/* Language selector */}
-            <div className="flex gap-1 flex-wrap">
-              {(Object.keys(LANGUAGES) as Language[]).map((l) => (
-                <button
-                  key={l}
-                  onClick={() => handleLangChange(l)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
-                    lang === l
-                      ? 'bg-purple-600/40 border border-purple-500/50 text-purple-200'
-                      : 'bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80'
-                  }`}
-                >
-                  {LANGUAGES[l].label}
-                </button>
-              ))}
-            </div>
-
-            {/* Lesson-code indicator */}
-            {lessonSnippets?.[lang] && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-[10px] font-semibold text-cyan-300">
-                <Sparkles className="w-2.5 h-2.5" />
-                {snippetLabel ?? 'From this lesson'}
-              </span>
-            )}
-
-            <div className="flex-1" />
-
-            {/* Reset */}
-            <button
-              onClick={reset}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
-              title={lessonSnippets?.[lang] ? 'Reset to the lesson code' : 'Reset to starter code'}
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Reset
-            </button>
-
-            {/* Run */}
-            <button
-              onClick={handleRun}
-              disabled={running}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all shadow-md shadow-green-900/30"
-            >
-              {running ? (
-                <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Play className="w-3.5 h-3.5 fill-white" />
-              )}
-              {running ? 'Running…' : 'Run'}
-            </button>
-          </div>
-
-          {/* ── Editor ── */}
-          <div className="h-[280px] border-t border-white/10">
-            <MonacoEditor
-              height="100%"
-              language={LANGUAGES[lang].monacoId}
-              theme="vs-dark"
-              value={code}
-              onChange={(val) => setCode(val ?? '')}
-              options={{
-                fontSize: 13,
-                fontFamily: '"Fira Code", "Cascadia Code", "JetBrains Mono", monospace',
-                fontLigatures: true,
-                lineNumbers: 'on',
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                wordWrap: 'on',
-                padding: { top: 12, bottom: 12 },
-                renderLineHighlight: 'gutter',
-                smoothScrolling: true,
-                cursorBlinking: 'smooth',
-                tabSize: 4,
-                bracketPairColorization: { enabled: true },
-                suggest: { showKeywords: true },
-              }}
-            />
-          </div>
-
-          {/* ── Output panel ── */}
-          <div className="border-t border-white/10 bg-black/40">
-            {/* Status bar */}
-            <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
-              <Terminal className="w-3.5 h-3.5 text-white/30" />
-              <span className="text-[11px] text-white/40 font-medium uppercase tracking-wider">Output</span>
-              {succeeded && (
-                <span className="ml-auto flex items-center gap-1 text-[11px] text-green-400">
-                  <CheckCircle className="w-3 h-3" /> Exit 0
-                </span>
-              )}
-              {failed && (
-                <span className="ml-auto flex items-center gap-1 text-[11px] text-red-400">
-                  <XCircle className="w-3 h-3" /> Exit {output?.exitCode}
-                </span>
-              )}
-            </div>
-
-            <div className="min-h-[80px] max-h-[160px] overflow-y-auto px-4 py-3 font-mono text-xs leading-relaxed">
-              {running && (
-                <div className="flex items-center gap-2 text-white/40">
-                  <div className="w-3 h-3 border border-green-500/40 border-t-green-500 rounded-full animate-spin" />
-                  Executing…
-                </div>
-              )}
-              {!running && !output && !execError && (
-                <span className="text-white/25">Press Run to execute your code</span>
-              )}
-              {execError && (
-                <span className="text-red-400">{execError}</span>
-              )}
-              {output && (
-                <>
-                  {output.stdout && (
-                    <pre className="whitespace-pre-wrap text-green-300">{output.stdout}</pre>
-                  )}
-                  {output.stderr && (
-                    <pre className="whitespace-pre-wrap text-red-300 mt-1">{output.stderr}</pre>
-                  )}
-                  {!output.stdout && !output.stderr && (
-                    <span className="text-white/30">(no output)</span>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* ── Error hint card ── */}
-          {hint && (
-            <div className="border-t border-amber-500/20 bg-amber-500/5 px-4 py-3">
-              <div className="flex items-start gap-2.5">
-                <div className="mt-0.5 shrink-0 w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-amber-300 mb-1">{hint.title}</p>
-                  <p className="text-[11px] text-white/55 leading-relaxed mb-1.5">
-                    <span className="text-white/35 font-medium">Why: </span>{hint.cause}
-                  </p>
-                  <p className="text-[11px] text-white/65 leading-relaxed">
-                    <span className="text-white/35 font-medium">Fix: </span>{hint.fix}
-                  </p>
-                  {hint.example && (
-                    <pre className="mt-2 text-[10px] leading-relaxed text-cyan-300/70 bg-black/30 border border-white/5 rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap">
-                      {hint.example}
-                    </pre>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+          {toolbar}
+          {editorPane}
+          {outputPane}
+          {hintCard}
         </>
       )}
     </div>

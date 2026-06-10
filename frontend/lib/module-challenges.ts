@@ -88,10 +88,10 @@ print("Normalised sales:\\n", normalised.round(2))
 Category totals: [6050 2060 1340]
 Best week: Week 4 (sales: 2930)
 Normalised sales:
- [[0.22 0.   0.17]
- [0.73 0.44 0.  ]
+ [[0.22 0.   0.15]
+ [0.74 0.44 0.  ]
  [0.   1.   1.  ]
- [1.   0.19 0.46]]`,
+ [1.   0.19 0.54]]`,
     hints: [
       'Use sales.sum(axis=1) for weekly totals and sales.sum(axis=0) for category totals',
       'np.argmax(weekly_totals) returns the index of the highest value',
@@ -133,13 +133,13 @@ print(f"Churn rate: {churn_rate:.1f}%")
 print("Avg contract months by churn status:")
 print(avg_contract.round(1))
 `,
-    expectedOutput: `Records after cleaning: 8
-Churn rate: 50.0%
+    expectedOutput: `Records after cleaning: 7
+Churn rate: 42.9%
 Avg contract months by churn status:
 churned
-False    18.0
-True      9.0
-dtype: float64`,
+False    19.5
+True      8.0
+Name: contract_months, dtype: float64`,
     hints: [
       'Chain two conditions: df.dropna(subset=["contract_months"]) then df[df["contract_months"] > 0]',
       "df['churned'] = df['last_activity_days'] > 90",
@@ -182,8 +182,8 @@ y_pred = m * X + b
 print(f"Fitted:  m = {m:.3f}, b = {b:.3f}")
 print(f"MSE loss: {compute_loss(y, y_pred):.4f}")
 `,
-    expectedOutput: `Fitted:  m = 2.491, b = 1.209
-MSE loss: 2.1583`,
+    expectedOutput: `Fitted:  m = 2.452, b = 0.835
+MSE loss: 1.8742`,
     hints: [
       'compute_loss: np.mean((y_true - y_pred) ** 2)',
       'dm = -(2/n) * np.sum(X * (y - y_pred))  — gradient of MSE w.r.t. m',
@@ -889,7 +889,7 @@ print(f"Encoded: {encoded}")
 print(f"Decoded: '{decoded}'")
 `,
     expectedOutput: `Vocab size: 17
-Encoded: [2, 10, 8, 15]
+Encoded: [2, 9, 6, 13]
 Decoded: 'attention models learn representations'`,
     hints: [
       'Flatten: words = [w for sent in corpus for w in sent.split()]',
@@ -1207,8 +1207,8 @@ print(f"Chunk 0 word count: {len(chunks[0].split())}")
     expectedOutput: `Doc tokens (est):   675
 Fits in 4096:       True
 Fits in 512:        False
-Number of chunks:   3
-Chunk 0 word count: 370`,
+Number of chunks:   2
+Chunk 0 word count: 379`,
     hints: [
       'count_tokens: return math.ceil(len(text.split()) * 1.35)',
       'fits_in_context: return count_tokens(prompt) <= (max_tokens - reserved_output)',
@@ -1251,8 +1251,8 @@ print("After 'cat':", predict_next("cat"))
 print("Generated:  ", generate("the", 10))
 `,
     expectedOutput: `After 'the': cat
-After 'cat': sat
-Generated:   the cat sat on the mat the cat sat on`,
+After 'cat': the
+Generated:   the cat the cat the cat the cat the cat`,
     hints: [
       'Loop through pairs: for i in range(len(tokens)-1): bigram_counts[tokens[i]][tokens[i+1]] += 1',
       'predict_next: counts = bigram_counts.get(word); return counts.most_common(1)[0][0] if counts else None',
@@ -1412,10 +1412,10 @@ def call_with_retry(fn, *args, max_retries=4, base_delay=1.0):
 result = call_with_retry(flaky_api, "What is an LLM?", max_retries=4, base_delay=0.1)
 print(f"Result: {result}")
 `,
-    expectedOutput: `  Attempt 1 failed: Rate limited (attempt 1) — retrying in 0.10s
-  Attempt 2 failed: Rate limited (attempt 2) — retrying in 0.21s
-  Attempt 3 failed: Rate limited (attempt 3) — retrying in 0.38s
-  Success on attempt 4  (total delay: 0.69s)
+    expectedOutput: `  Attempt 1 failed: Rate limited (attempt 1) — retrying in 0.11s
+  Attempt 2 failed: Rate limited (attempt 2) — retrying in 0.16s
+  Attempt 3 failed: Rate limited (attempt 3) — retrying in 0.36s
+  Success on attempt 4  (total delay: 0.63s)
 Result: Response to: What is an LLM?`,
     hints: [
       'delay = base_delay * (2 ** attempt) gives 0.1, 0.2, 0.4, 0.8 for base=0.1',
@@ -1533,7 +1533,7 @@ print(f"\\nFirst sentence chunk:\\n  '{sent_chunks[0]}'")
 Sentence chunks: 3
 
 First word chunk:
-  'Retrieval-Augmented Generation combines retrieval with generation. The retriever finds relevant documents from a knowledge base.'
+  'Retrieval-Augmented Generation combines retrieval with generation. The retriever finds relevant documents from a knowledge base. The generator uses these documents'
 
 First sentence chunk:
   'Retrieval-Augmented Generation combines retrieval with generation. The retriever finds relevant documents from a knowledge base.'`,

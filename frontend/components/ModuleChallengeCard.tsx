@@ -70,6 +70,7 @@ export default function ModuleChallengeCard({
           lessonId={`module-challenge-${moduleIndex}`}
           lessonSnippets={{ [challenge.language]: challenge.starterCode }}
           snippetLabel="Challenge starter"
+          embedded
         />
       </div>
 
