@@ -46,6 +46,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-skillforge-dev-secret-change-in-production}
       PORT: 3001
       AI_WORKER_URL: http://ai-worker:8000
+      CODE_RUNNER_URL: http://code-runner:8001
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       GENERATED_LESSONS_DIR: /app/generated_lessons
@@ -55,6 +56,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      code-runner:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
       interval: 10s
@@ -63,11 +66,20 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  # Piston (code execution sandbox) is NOT included here because Render cannot
-  # pull external registry images via docker-compose. Deploy it separately:
-  #   Render → New Web Service → "Deploy an existing image" → ghcr.io/engineer-man/piston
-  #   Port: 2000  |  Then set PISTON_URL on the backend service.
-  # For local development run: docker run -p 2000:2000 --privileged ghcr.io/engineer-man/piston
+  code-runner:
+    build:
+      context: ./code-runner
+      dockerfile: Dockerfile
+    container_name: skillforge-code-runner
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health').status < 500 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   ai-worker:
     build:

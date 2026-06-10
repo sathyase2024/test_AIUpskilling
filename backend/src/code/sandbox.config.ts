@@ -41,22 +41,29 @@ export const LANGUAGES: LanguageConfig[] = [
 ];
 
 /**
- * Python libraries installed in the sandbox (keep in sync with the
- * `py3-*` packages in backend/Dockerfile).
+ * Python libraries installed in the backend sandbox image (py3-* Alpine packages).
+ * Used as fallback when CODE_RUNNER_URL is not set.
  */
 export const PYTHON_AVAILABLE_LIBRARIES = [
   'numpy', 'pandas', 'sklearn', 'scipy', 'matplotlib', 'seaborn', 'psutil',
 ];
 
 /**
- * Heavy Python libraries we deliberately do NOT install (too large / unusable
- * inside a short-lived sandbox). Lessons importing these can't run; the UI uses
- * this list to avoid preloading their code into the playground.
+ * Additional Python libraries available only in the code-runner service.
+ * When CODE_RUNNER_URL is configured, these are added to the available list.
+ */
+export const CODE_RUNNER_EXTRA_LIBRARIES = [
+  'torch', 'tensorflow', 'keras', 'transformers', 'datasets',
+  'sentence_transformers', 'pydantic',
+];
+
+/**
+ * Libraries that remain unavailable even with the code-runner (API keys,
+ * network access, or incompatible with a short-lived sandbox).
  */
 export const PYTHON_UNAVAILABLE_LIBRARIES = [
-  'torch', 'tensorflow', 'keras', 'transformers', 'sentence_transformers',
-  'datasets', 'peft', 'faiss', 'langchain', 'anthropic', 'openai',
-  'pydantic', 'accelerate', 'bitsandbytes', 'trl', 'vllm',
+  'faiss', 'langchain', 'anthropic', 'openai',
+  'accelerate', 'bitsandbytes', 'trl', 'vllm', 'peft',
 ];
 
 const ALIAS_TO_ID = new Map<string, string>(
@@ -70,12 +77,16 @@ export function resolveLanguageId(raw?: string): string | null {
 }
 
 /** Capabilities payload returned by GET /code/capabilities. */
-export function getCapabilities() {
+export function getCapabilities(codeRunnerActive = false) {
+  const available = codeRunnerActive
+    ? [...PYTHON_AVAILABLE_LIBRARIES, ...CODE_RUNNER_EXTRA_LIBRARIES]
+    : PYTHON_AVAILABLE_LIBRARIES;
   return {
-    languages: LANGUAGES.map(({ id, label, aliases, available }) => ({ id, label, aliases, available })),
+    languages: LANGUAGES.map(({ id, label, aliases, available: avail }) => ({ id, label, aliases, available: avail })),
     python: {
-      available: PYTHON_AVAILABLE_LIBRARIES,
+      available,
       unavailable: PYTHON_UNAVAILABLE_LIBRARIES,
     },
+    codeRunnerActive,
   };
 }

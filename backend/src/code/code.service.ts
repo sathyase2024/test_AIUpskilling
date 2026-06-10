@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { execFile } from 'child_process';
 import { writeFile, unlink, mkdir, rm } from 'fs/promises';
 import { tmpdir } from 'os';
@@ -8,6 +9,7 @@ import {
   LANGUAGES,
   PYTHON_AVAILABLE_LIBRARIES,
   PYTHON_UNAVAILABLE_LIBRARIES,
+  getCapabilities,
   resolveLanguageId,
 } from './sandbox.config';
 
@@ -42,6 +44,8 @@ function handleError(err: any): ExecResult {
 export class CodeService {
   private readonly logger = new Logger(CodeService.name);
 
+  constructor(private readonly config: ConfigService) {}
+
   // Dispatch table: canonical language id → runner. Register new languages here
   // (the language itself is declared in sandbox.config.ts).
   private readonly runners: Record<string, (code: string) => Promise<ExecResult>> = {
@@ -52,6 +56,33 @@ export class CodeService {
     cpp:        (c) => this.runCpp(c),
     go:         (c) => this.runGo(c),
   };
+
+  getCapabilities() {
+    return getCapabilities(!!this.codeRunnerUrl());
+  }
+
+  private codeRunnerUrl(): string | null {
+    return this.config.get<string>('CODE_RUNNER_URL') || null;
+  }
+
+  private async tryCodeRunner(language: string, code: string): Promise<ExecResult | null> {
+    const base = this.codeRunnerUrl();
+    if (!base) return null;
+    try {
+      const res = await fetch(`${base}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language, code }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) return null;
+      const data = await res.json() as ExecResult;
+      return data;
+    } catch (err: any) {
+      this.logger.warn(`code-runner proxy failed, falling back to local: ${err.message}`);
+      return null;
+    }
+  }
 
   async execute(language: string, code: string): Promise<ExecResult> {
     const id = resolveLanguageId(language);
@@ -66,6 +97,11 @@ export class CodeService {
     }
     if (Buffer.byteLength(code, 'utf8') > MAX_CODE_BYTES) {
       return { stdout: '', stderr: 'Code exceeds the 50 KB size limit.', exitCode: 1 };
+    }
+    // For Python (and JS/TS), try the code-runner service first — it has all ML libs.
+    if (id === 'python' || id === 'javascript' || id === 'typescript') {
+      const proxied = await this.tryCodeRunner(id, code);
+      if (proxied) return proxied;
     }
     return runner(code);
   }

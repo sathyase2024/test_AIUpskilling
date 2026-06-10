@@ -2,7 +2,6 @@ import { Controller, Post, Get, Body, HttpException, HttpStatus } from '@nestjs/
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CodeService } from './code.service';
-import { getCapabilities } from './sandbox.config';
 
 @ApiTags('code')
 @Controller('code')
@@ -12,7 +11,7 @@ export class CodeController {
   @Get('capabilities')
   @ApiOperation({ summary: 'Languages and Python libraries the sandbox can run' })
   capabilities() {
-    return getCapabilities();
+    return this.codeService.getCapabilities();
   }
 
   @Post('execute')
