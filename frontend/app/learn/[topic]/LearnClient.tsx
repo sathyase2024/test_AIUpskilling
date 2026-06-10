@@ -1093,45 +1093,95 @@ export default function LearnClient({ topic }: { topic: string }) {
                     </p>
                   </div>
 
-                  {/* Per-question review */}
-                  <div className="space-y-2">
-                    {quizQuestions.map((q: any, i: number) => {
-                      const userAns = quizAnswers[i] as number;
-                      const correct = userAns === q.answer;
-                      return (
-                        <div
-                          key={i}
-                          className={`p-3.5 rounded-xl border text-sm ${
-                            correct
-                              ? "border-green-500/20 bg-green-500/5"
-                              : "border-red-500/20 bg-red-500/5"
-                          }`}
-                        >
-                          <div className="flex items-start gap-2.5">
-                            {correct ? (
-                              <CheckCircle2 size={14} className="text-green-400 shrink-0 mt-0.5" />
-                            ) : (
-                              <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
-                            )}
-                            <p className="text-white/75 leading-relaxed">{q.question}</p>
-                          </div>
-                          {!correct && (
-                            <div className="mt-2 ml-6 space-y-1">
-                              <p className="text-[11px] text-red-400/70">
-                                Your answer: {q.options[userAns]}
-                              </p>
-                              <p className="text-[11px] text-green-400/80">
-                                Correct: {q.options[q.answer]}
-                              </p>
-                              <p className="text-[11px] text-white/35 leading-relaxed">
-                                {q.explanation}
-                              </p>
+                  {/* Per-question review (module) / Areas of improvement (final) */}
+                  {quizOpen.type === "module" ? (
+                    <div className="space-y-2">
+                      {quizQuestions.map((q: any, i: number) => {
+                        const userAns = quizAnswers[i] as number;
+                        const correct = userAns === q.answer;
+                        return (
+                          <div
+                            key={i}
+                            className={`p-3.5 rounded-xl border text-sm ${
+                              correct
+                                ? "border-green-500/20 bg-green-500/5"
+                                : "border-red-500/20 bg-red-500/5"
+                            }`}
+                          >
+                            <div className="flex items-start gap-2.5">
+                              {correct ? (
+                                <CheckCircle2 size={14} className="text-green-400 shrink-0 mt-0.5" />
+                              ) : (
+                                <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                              )}
+                              <p className="text-white/75 leading-relaxed">{q.question}</p>
                             </div>
-                          )}
+                            {!correct && (
+                              <div className="mt-2 ml-6 space-y-1">
+                                <p className="text-[11px] text-red-400/70">
+                                  Your answer: {q.options[userAns]}
+                                </p>
+                                <p className="text-[11px] text-green-400/80">
+                                  Correct: {q.options[q.answer]}
+                                </p>
+                                <p className="text-[11px] text-white/35 leading-relaxed">
+                                  {q.explanation}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (() => {
+                    // Final exam: group wrong answers by module → show areas of improvement
+                    const byModule = new Map<number, { title: string; lessonTitles: string[] }>();
+                    quizQuestions.forEach((q: any, i: number) => {
+                      if (quizAnswers[i] !== q.answer) {
+                        const modIdx = typeof q.moduleIndex === "number" ? q.moduleIndex : -1;
+                        const modTitle =
+                          assessment?.modules.find((m) => m.index === modIdx)?.title ??
+                          "General";
+                        if (!byModule.has(modIdx))
+                          byModule.set(modIdx, { title: modTitle, lessonTitles: [] });
+                        const lessonTitle =
+                          lessons.find((l) => l.orderIndex === q.lessonOrder)?.title ??
+                          `Lesson ${q.lessonOrder}`;
+                        const entry = byModule.get(modIdx)!;
+                        if (!entry.lessonTitles.includes(lessonTitle))
+                          entry.lessonTitles.push(lessonTitle);
+                      }
+                    });
+                    const areas = Array.from(byModule.values());
+                    if (areas.length === 0) return null;
+                    return (
+                      <div>
+                        <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">
+                          Areas to revisit
+                        </p>
+                        <div className="space-y-3">
+                          {areas.map((area, i) => (
+                            <div
+                              key={i}
+                              className="p-3.5 rounded-xl border border-orange-500/25 bg-orange-500/5"
+                            >
+                              <p className="text-sm font-semibold text-orange-300 mb-2">
+                                {area.title}
+                              </p>
+                              <ul className="space-y-1">
+                                {area.lessonTitles.map((title, j) => (
+                                  <li key={j} className="flex items-start gap-2 text-xs text-white/55">
+                                    <span className="text-orange-400/60 shrink-0 mt-0.5">·</span>
+                                    {title}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="px-5 py-4 border-t border-white/10 flex justify-end shrink-0">
