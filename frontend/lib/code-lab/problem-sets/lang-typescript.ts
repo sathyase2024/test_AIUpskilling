@@ -248,4 +248,247 @@ function maxPathSum(root: TreeNode | null): number {
 
 }
 ` },
+  'rotate-array': { starter: `function rotate(nums: number[], k: number): number[] {
+
+}
+` },
+  'longest-common-prefix': { starter: `function longestCommonPrefix(strs: string[]): string {
+
+}
+` },
+  'spiral-matrix': { starter: `function spiralOrder(matrix: number[][]): number[] {
+
+}
+` },
+  'set-matrix-zeroes': { starter: `function setZeroes(matrix: number[][]): number[][] {
+
+}
+` },
+  'insert-interval': { starter: `function insert(intervals: number[][], newInterval: number[]): number[][] {
+
+}
+` },
+  'candy': { starter: `function candy(ratings: number[]): number {
+
+}
+` },
+  'number-of-1-bits': { starter: `function hammingWeight(n: number): number {
+
+}
+` },
+  'missing-number': { starter: `function missingNumber(nums: number[]): number {
+
+}
+` },
+  'unique-paths': { starter: `function uniquePaths(m: number, n: number): number {
+
+}
+` },
+  'word-break': { starter: `function wordBreak(s: string, wordDict: string[]): boolean {
+
+}
+` },
+  'longest-common-subsequence': { starter: `function longestCommonSubsequence(text1: string, text2: string): number {
+
+}
+` },
+  'decode-ways': { starter: `function numDecodings(s: string): number {
+
+}
+` },
+  'partition-equal-subset-sum': { starter: `function canPartition(nums: number[]): boolean {
+
+}
+` },
+  'burst-balloons': { starter: `function maxCoins(nums: number[]): number {
+
+}
+` },
+  'rotting-oranges': { starter: `function orangesRotting(grid: number[][]): number {
+
+}
+` },
+  'pacific-atlantic': { starter: `function pacificAtlantic(heights: number[][]): number[][] {
+
+}
+` },
+  'alien-dictionary': { starter: `function alienOrder(words: string[]): string {
+
+}
+` },
+  'valid-anagram': { starter: `function isAnagram(s: string, t: string): boolean {
+
+}
+` },
+  'subarray-sum-equals-k': { starter: `function subarraySum(nums: number[], k: number): number {
+
+}
+` },
+  'four-sum-ii': { starter: `function fourSumCount(nums1: number[], nums2: number[], nums3: number[], nums4: number[]): number {
+
+}
+` },
+  'middle-of-linked-list': { starter: `${LIST_DOC}
+function middleNode(head: ListNode | null): ListNode | null {
+
+}
+` },
+  'remove-nth-from-end': { starter: `${LIST_DOC}
+function removeNthFromEnd(head: ListNode | null, n: number): ListNode | null {
+
+}
+` },
+  'add-two-numbers': { starter: `${LIST_DOC}
+function addTwoNumbers(l1: ListNode | null, l2: ListNode | null): ListNode | null {
+
+}
+` },
+  'happy-number': { starter: `function isHappy(n: number): boolean {
+
+}
+` },
+  'pow-x-n': { starter: `function myPow(x: number, n: number): number {
+
+}
+` },
+  'perceptron': { starter: `function perceptron(X: number[][], y: number[], lr: number = 0.1, epochs: number = 20): number[] {
+
+}
+` },
+  'cosine-similarity': { starter: `function cosineSimilarity(a: number[], b: number[]): number {
+
+}
+` },
+  'implement-trie': { starter: `class Trie {
+  constructor() {
+
+  }
+
+  insert(word: string): void {
+
+  }
+
+  search(word: string): boolean {
+    return false
+  }
+
+  startsWith(prefix: string): boolean {
+    return false
+  }
+}
+` },
+  'queue-using-stacks': { starter: `class MyQueue {
+  constructor() {
+
+  }
+
+  push(x: number): void {
+
+  }
+
+  pop(): number {
+    return 0
+  }
+
+  peek(): number {
+    return 0
+  }
+
+  empty(): boolean {
+    return false
+  }
+}
+` },
+  'permutations': { starter: `function permute(nums: number[]): number[][] {
+
+}
+` },
+  'generate-parentheses': { starter: `function generateParenthesis(n: number): string[] {
+
+}
+` },
+  'sudoku-solver': { starter: `function solveSudoku(board: string[][]): string[][] {
+
+}
+` },
+  'find-all-anagrams': { starter: `function findAnagrams(s: string, p: string): number[] {
+
+}
+` },
+  'longest-repeating-replacement': { starter: `function characterReplacement(s: string, k: number): number {
+
+}
+` },
+  'max-consecutive-ones-iii': { starter: `function longestOnes(nums: number[], k: number): number {
+
+}
+` },
+  'find-min-rotated': { starter: `function findMin(nums: number[]): number {
+
+}
+` },
+  'search-2d-matrix': { starter: `function searchMatrix(matrix: number[][], target: number): boolean {
+
+}
+` },
+  'koko-eating-bananas': { starter: `function minEatingSpeed(piles: number[], h: number): number {
+
+}
+` },
+  'count-smaller-after-self': { starter: `function countSmaller(nums: number[]): number[] {
+
+}
+` },
+  'evaluate-rpn': { starter: `function evalRPN(tokens: string[]): number {
+
+}
+` },
+  'decode-string': { starter: `function decodeString(s: string): string {
+
+}
+` },
+  'longest-valid-parentheses': { starter: `function longestValidParentheses(s: string): number {
+
+}
+` },
+  'invert-binary-tree': { starter: `${TREE_DOC}
+function invertTree(root: TreeNode | null): TreeNode | null {
+
+}
+` },
+  'diameter-of-binary-tree': { starter: `${TREE_DOC}
+function diameterOfBinaryTree(root: TreeNode | null): number {
+
+}
+` },
+  'lowest-common-ancestor-bst': { starter: `${TREE_DOC}
+function lowestCommonAncestor(root: TreeNode | null, p: number, q: number): TreeNode | null {
+
+}
+` },
+  'serialize-deserialize-tree': { starter: `${TREE_DOC}
+function serialize(root: TreeNode | null): string {
+
+}
+
+function deserialize(data: string): TreeNode | null {
+
+}
+` },
+  'move-zeroes': { starter: `function moveZeroes(nums: number[]): number[] {
+
+}
+` },
+  'remove-duplicates-sorted': { starter: `function removeDuplicates(nums: number[]): number[] {
+
+}
+` },
+  'sort-colors': { starter: `function sortColors(nums: number[]): number[] {
+
+}
+` },
+  'three-sum-closest': { starter: `function threeSumClosest(nums: number[], target: number): number {
+
+}
+` },
 }
