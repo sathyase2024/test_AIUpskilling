@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { RequestOtpDto, VerifyOtpDto } from './dto/otp.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import type { Response } from 'express';
 
@@ -36,6 +37,22 @@ export class AuthController {
   @ApiOperation({ summary: 'Login' })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
+    res.cookie('access_token', result.accessToken, cookieOptions());
+    return result;
+  }
+
+  @Post('otp/request')
+  @Throttle({ auth: { ttl: 60_000, limit: 5 } })
+  @ApiOperation({ summary: 'Email a one-time sign-in code' })
+  async requestOtp(@Body() dto: RequestOtpDto) {
+    return this.authService.requestOtp(dto.email);
+  }
+
+  @Post('otp/verify')
+  @Throttle({ auth: { ttl: 60_000, limit: 10 } })
+  @ApiOperation({ summary: 'Verify a one-time code and sign in' })
+  async verifyOtp(@Body() dto: VerifyOtpDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.verifyOtp(dto.email, dto.code);
     res.cookie('access_token', result.accessToken, cookieOptions());
     return result;
   }

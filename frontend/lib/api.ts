@@ -9,6 +9,7 @@ const USER_KEY = 'skillforge_user';
 export interface StoredUser {
   id: number | string;
   name: string;
+  username?: string;
   email: string;
   xp?: number;
   level?: number;
@@ -83,11 +84,25 @@ export async function login(email: string, password: string): Promise<StoredUser
 /** Register, persist the token + user, and return the user. */
 export async function register(payload: {
   name: string;
+  username: string;
   email: string;
   password: string;
   hobbies?: string[];
 }): Promise<StoredUser> {
   const data = await apiPost<AuthResponse>('/auth/register', payload);
+  setToken(data.accessToken);
+  setStoredUser(data.user);
+  return data.user;
+}
+
+/** Request a one-time sign-in code by email. */
+export async function requestOtp(email: string): Promise<{ message: string }> {
+  return apiPost<{ message: string }>('/auth/otp/request', { email });
+}
+
+/** Verify a one-time code, persist the token + user, and return the user. */
+export async function verifyOtp(email: string, code: string): Promise<StoredUser> {
+  const data = await apiPost<AuthResponse>('/auth/otp/verify', { email, code });
   setToken(data.accessToken);
   setStoredUser(data.user);
   return data.user;
