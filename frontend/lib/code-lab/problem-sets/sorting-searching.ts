@@ -258,7 +258,7 @@ console.log(\`\${_p}/\${_n} tests passed\`);`,
 _t(min_eating_speed([3,6,7,11],8),4,'example 1')
 _t(min_eating_speed([30,11,23,4,20],5),30,'one pile per hour')
 _t(min_eating_speed([30,11,23,4,20],6),23,'six hours')
-_t(min_eating_speed([1,1,1,999],1000),1,'plenty of time')
+_t(min_eating_speed([1,1,1,999],1002),1,'plenty of time')
 _t(min_eating_speed([312884470],968709470),1,'single huge pile, slow ok')
 _t(min_eating_speed([3],3),1,'single pile slow')
 print(f'{_p}/{_n} tests passed')`,
@@ -266,7 +266,7 @@ print(f'{_p}/{_n} tests passed')`,
 _t(minEatingSpeed([3,6,7,11],8),4,'example 1');
 _t(minEatingSpeed([30,11,23,4,20],5),30,'one pile per hour');
 _t(minEatingSpeed([30,11,23,4,20],6),23,'six hours');
-_t(minEatingSpeed([1,1,1,999],1000),1,'plenty of time');
+_t(minEatingSpeed([1,1,1,999],1002),1,'plenty of time');
 _t(minEatingSpeed([312884470],968709470),1,'single huge pile, slow ok');
 _t(minEatingSpeed([3],3),1,'single pile slow');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
