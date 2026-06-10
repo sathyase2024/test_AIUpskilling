@@ -1374,4 +1374,1327 @@ func main() {
     fmt.Printf("%d/%d tests passed\\n", _p, _n)
 }`,
   },
+  'rotate-array': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func rotate(nums []int, k int) []int {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(rotate([]int{1, 2, 3, 4, 5, 6, 7}, 3), []int{5, 6, 7, 1, 2, 3, 4}, "example 1")
+    _t(rotate([]int{-1, -100, 3, 99}, 2), []int{3, 99, -1, -100}, "example 2")
+    _t(rotate([]int{1, 2}, 3), []int{2, 1}, "k exceeds length")
+    _t(rotate([]int{1, 2, 3}, 0), []int{1, 2, 3}, "zero rotation")
+    _t(rotate([]int{1}, 100), []int{1}, "single element")
+    _t(rotate([]int{1, 2, 3, 4}, 4), []int{1, 2, 3, 4}, "full rotation unchanged")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'longest-common-prefix': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func longestCommonPrefix(strs []string) string {
+	return ""
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(longestCommonPrefix([]string{"flower", "flow", "flight"}), "fl", "example 1")
+    _t(longestCommonPrefix([]string{"dog", "racecar", "car"}), "", "no common prefix")
+    _t(longestCommonPrefix([]string{"a"}), "a", "single string")
+    _t(longestCommonPrefix([]string{"ab", "abc", "abcd"}), "ab", "shortest is prefix")
+    _t(longestCommonPrefix([]string{"", "abc"}), "", "empty string present")
+    _t(longestCommonPrefix([]string{"interspecies", "interstellar", "interstate"}), "inters", "long prefix")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'spiral-matrix': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func spiralOrder(matrix [][]int) []int {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(spiralOrder([][]int{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}), []int{1, 2, 3, 6, 9, 8, 7, 4, 5}, "example 1")
+    _t(spiralOrder([][]int{{1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}}), []int{1, 2, 3, 4, 8, 12, 11, 10, 9, 5, 6, 7}, "example 2")
+    _t(spiralOrder([][]int{{1}}), []int{1}, "single cell")
+    _t(spiralOrder([][]int{{1, 2, 3}}), []int{1, 2, 3}, "single row")
+    _t(spiralOrder([][]int{{1}, {2}, {3}}), []int{1, 2, 3}, "single column")
+    _t(spiralOrder([][]int{{1, 2}, {3, 4}}), []int{1, 2, 4, 3}, "two by two")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'set-matrix-zeroes': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func setZeroes(matrix [][]int) [][]int {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(setZeroes([][]int{{1, 1, 1}, {1, 0, 1}, {1, 1, 1}}), [][]int{{1, 0, 1}, {0, 0, 0}, {1, 0, 1}}, "example 1")
+    _t(setZeroes([][]int{{0, 1, 2, 0}, {3, 4, 5, 2}, {1, 3, 1, 5}}), [][]int{{0, 0, 0, 0}, {0, 4, 5, 0}, {0, 3, 1, 0}}, "example 2")
+    _t(setZeroes([][]int{{1, 2, 3}}), [][]int{{1, 2, 3}}, "no zeros")
+    _t(setZeroes([][]int{{0}}), [][]int{{0}}, "single zero")
+    _t(setZeroes([][]int{{1, 0}, {1, 1}}), [][]int{{0, 0}, {1, 0}}, "two by two")
+    _t(setZeroes([][]int{{5, 0, 5}, {5, 5, 5}}), [][]int{{0, 0, 0}, {5, 0, 5}}, "column zeroed")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'insert-interval': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func insert(intervals [][]int, newInterval []int) [][]int {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(insert([][]int{{1, 3}, {6, 9}}, []int{2, 5}), [][]int{{1, 5}, {6, 9}}, "example 1")
+    _t(insert([][]int{{1, 2}, {3, 5}, {6, 7}, {8, 10}, {12, 16}}, []int{4, 8}), [][]int{{1, 2}, {3, 10}, {12, 16}}, "example 2")
+    _t(insert([][]int{}, []int{5, 7}), [][]int{{5, 7}}, "empty list")
+    _t(insert([][]int{{1, 5}}, []int{2, 3}), [][]int{{1, 5}}, "contained interval")
+    _t(insert([][]int{{3, 5}, {8, 10}}, []int{1, 2}), [][]int{{1, 2}, {3, 5}, {8, 10}}, "insert at front")
+    _t(insert([][]int{{1, 2}, {5, 6}}, []int{2, 5}), [][]int{{1, 6}}, "touching merge")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'candy': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func candy(ratings []int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(candy([]int{1, 0, 2}), 5, "example 1")
+    _t(candy([]int{1, 2, 2}), 4, "example 2")
+    _t(candy([]int{1}), 1, "single child")
+    _t(candy([]int{1, 2, 3, 4}), 10, "strictly increasing")
+    _t(candy([]int{4, 3, 2, 1}), 10, "strictly decreasing")
+    _t(candy([]int{1, 3, 2, 2, 1}), 7, "peak then plateau")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'number-of-1-bits': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func hammingWeight(n int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(hammingWeight(11), 3, "example 1")
+    _t(hammingWeight(128), 1, "single bit")
+    _t(hammingWeight(0), 0, "zero")
+    _t(hammingWeight(7), 3, "three low bits")
+    _t(hammingWeight(2147483647), 31, "all 31 bits set")
+    _t(hammingWeight(1), 1, "one")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'missing-number': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func missingNumber(nums []int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(missingNumber([]int{3, 0, 1}), 2, "example 1")
+    _t(missingNumber([]int{0, 1}), 2, "missing at end")
+    _t(missingNumber([]int{9, 6, 4, 2, 3, 5, 7, 0, 1}), 8, "example 3")
+    _t(missingNumber([]int{0}), 1, "missing one of [0,1]")
+    _t(missingNumber([]int{1}), 0, "missing zero")
+    _t(missingNumber([]int{0, 2}), 1, "missing middle")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'unique-paths': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func uniquePaths(m int, n int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(uniquePaths(3, 7), 28, "example 1")
+    _t(uniquePaths(3, 2), 3, "example 2")
+    _t(uniquePaths(1, 1), 1, "single cell")
+    _t(uniquePaths(1, 10), 1, "single row")
+    _t(uniquePaths(10, 10), 48620, "square grid")
+    _t(uniquePaths(23, 12), 193536720, "large but int32-safe")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'word-break': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func wordBreak(s string, wordDict []string) bool {
+	return false
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(wordBreak("leetcode", []string{"leet", "code"}), true, "example 1")
+    _t(wordBreak("applepenapple", []string{"apple", "pen"}), true, "reuse a word")
+    _t(wordBreak("catsandog", []string{"cats", "dog", "sand", "and", "cat"}), false, "cannot segment")
+    _t(wordBreak("a", []string{"a"}), true, "single letter")
+    _t(wordBreak("aaaaaaa", []string{"aaaa", "aaa"}), true, "overlap split")
+    _t(wordBreak("cars", []string{"car", "ca", "rs"}), true, "ca + rs")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'longest-common-subsequence': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func longestCommonSubsequence(text1 string, text2 string) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(longestCommonSubsequence("abcde", "ace"), 3, "example 1")
+    _t(longestCommonSubsequence("abc", "abc"), 3, "identical")
+    _t(longestCommonSubsequence("abc", "def"), 0, "no overlap")
+    _t(longestCommonSubsequence("bsbininm", "jmjkbkjkv"), 1, "single shared char")
+    _t(longestCommonSubsequence("ezupkr", "ubmrapg"), 2, "mixed")
+    _t(longestCommonSubsequence("a", "a"), 1, "single char match")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'decode-ways': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func numDecodings(s string) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(numDecodings("12"), 2, "example 1")
+    _t(numDecodings("226"), 3, "example 2")
+    _t(numDecodings("06"), 0, "leading zero")
+    _t(numDecodings("0"), 0, "just zero")
+    _t(numDecodings("10"), 1, "ten only")
+    _t(numDecodings("100"), 0, "invalid trailing zero")
+    _t(numDecodings("11106"), 2, "classic multi")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'partition-equal-subset-sum': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func canPartition(nums []int) bool {
+	return false
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(canPartition([]int{1, 5, 11, 5}), true, "example 1")
+    _t(canPartition([]int{1, 2, 3, 5}), false, "odd-ish no split")
+    _t(canPartition([]int{1, 1}), true, "two equal")
+    _t(canPartition([]int{1}), false, "single element")
+    _t(canPartition([]int{2, 2, 3, 5}), false, "sum is even but no subset")
+    _t(canPartition([]int{3, 3, 3, 4, 5}), true, "sum 18 -> 9 each")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'burst-balloons': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func maxCoins(nums []int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(maxCoins([]int{3, 1, 5, 8}), 167, "example 1")
+    _t(maxCoins([]int{1, 5}), 10, "two balloons")
+    _t(maxCoins([]int{5}), 5, "single balloon")
+    _t(maxCoins([]int{7}), 7, "single seven")
+    _t(maxCoins([]int{1, 2, 3, 4, 5}), 110, "ascending")
+    _t(maxCoins([]int{9, 76, 64}), 44416, "three values")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'rotting-oranges': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func orangesRotting(grid [][]int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(orangesRotting([][]int{{2, 1, 1}, {1, 1, 0}, {0, 1, 1}}), 4, "example 1")
+    _t(orangesRotting([][]int{{2, 1, 1}, {0, 1, 1}, {1, 0, 1}}), -1, "unreachable fresh orange")
+    _t(orangesRotting([][]int{{0, 2}}), 0, "no fresh oranges")
+    _t(orangesRotting([][]int{{0}}), 0, "single empty cell")
+    _t(orangesRotting([][]int{{1}}), -1, "single fresh orange never rots")
+    _t(orangesRotting([][]int{{2, 2}, {1, 1}}), 1, "two sources one minute")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'pacific-atlantic': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import (
+	"fmt"
+	"sort"
+)
+var _ = sort.Slice
+
+func pacificAtlantic(heights [][]int) [][]int {
+	return nil
+}
+`,
+    tests: `var _ = sort.Slice
+
+${GO_HARNESS}
+
+func _norm(a [][]int) [][]int {
+    out := make([][]int, len(a))
+    for i, p := range a {
+        out[i] = []int{p[0], p[1]}
+    }
+    sort.Slice(out, func(i, j int) bool {
+        if out[i][0] != out[j][0] {
+            return out[i][0] < out[j][0]
+        }
+        return out[i][1] < out[j][1]
+    })
+    return out
+}
+
+func main() {
+    _t(_norm(pacificAtlantic([][]int{{1, 2, 2, 3, 5}, {3, 2, 3, 4, 4}, {2, 4, 5, 3, 1}, {6, 7, 1, 4, 5}, {5, 1, 1, 2, 4}})), _norm([][]int{{0, 4}, {1, 3}, {1, 4}, {2, 2}, {3, 0}, {3, 1}, {4, 0}}), "example 1")
+    _t(_norm(pacificAtlantic([][]int{{1}})), [][]int{{0, 0}}, "single cell")
+    _t(_norm(pacificAtlantic([][]int{{2, 1}, {1, 2}})), _norm([][]int{{0, 0}, {0, 1}, {1, 0}, {1, 1}}), "all reach both")
+    _t(_norm(pacificAtlantic([][]int{{1, 2, 3}, {8, 9, 4}, {7, 6, 5}})), _norm([][]int{{0, 2}, {1, 0}, {1, 1}, {1, 2}, {2, 0}, {2, 1}, {2, 2}}), "spiral")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'alien-dictionary': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func alienOrder(words []string) string {
+	return ""
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(alienOrder([]string{"wrt", "wrf", "er", "ett", "rftt"}), "wertf", "classic unique order")
+    _t(alienOrder([]string{"z", "x", "z"}), "", "cycle is invalid")
+    _t(alienOrder([]string{"abc", "ab"}), "", "prefix violation")
+    _t(alienOrder([]string{"w", "x", "y", "z"}), "wxyz", "total order from single letters")
+    _t(alienOrder([]string{"a"}), "a", "single letter")
+    _t(alienOrder([]string{"c", "cb", "b", "ba", "a"}), "cba", "prefix-then-branch chain")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'valid-anagram': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func isAnagram(s string, t string) bool {
+	return false
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(isAnagram("anagram", "nagaram"), true, "example 1")
+    _t(isAnagram("rat", "car"), false, "example 2")
+    _t(isAnagram("a", "a"), true, "single char match")
+    _t(isAnagram("ab", "a"), false, "different lengths")
+    _t(isAnagram("aacc", "ccac"), false, "same length different counts")
+    _t(isAnagram("listen", "silent"), true, "classic anagram")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'subarray-sum-equals-k': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func subarraySum(nums []int, k int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(subarraySum([]int{1, 1, 1}, 2), 2, "example 1")
+    _t(subarraySum([]int{1, 2, 3}, 3), 2, "example 2")
+    _t(subarraySum([]int{1, -1, 0}, 0), 3, "negatives and zero")
+    _t(subarraySum([]int{3, 4, 7, 2, -3, 1, 4, 2}, 7), 4, "mixed signs")
+    _t(subarraySum([]int{0, 0, 0}, 0), 6, "all zeros")
+    _t(subarraySum([]int{1}, 0), 0, "no subarray sums to k")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'four-sum-ii': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func fourSumCount(nums1 []int, nums2 []int, nums3 []int, nums4 []int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(fourSumCount([]int{1, 2}, []int{-2, -1}, []int{-1, 2}, []int{0, 2}), 2, "example 1")
+    _t(fourSumCount([]int{0}, []int{0}, []int{0}, []int{0}), 1, "example 2")
+    _t(fourSumCount([]int{1}, []int{1}, []int{1}, []int{1}), 0, "no tuple sums to zero")
+    _t(fourSumCount([]int{-1, 1}, []int{-1, 1}, []int{-1, 1}, []int{-1, 1}), 6, "symmetric arrays")
+    _t(fourSumCount([]int{0, 0}, []int{0, 0}, []int{0, 0}, []int{0, 0}), 16, "all zeros")
+    _t(fourSumCount([]int{1, 2, 3}, []int{-1, -2, -3}, []int{0, 0, 0}, []int{0, 0, 0}), 27, "many combinations")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'middle-of-linked-list': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+// Provided: type ListNode struct { Val int; Next *ListNode }
+func middleNode(head *ListNode) *ListNode {
+	return nil
+}
+`,
+    tests: `${GO_LIST}
+
+${GO_HARNESS}
+
+func main() {
+    _t(_toList(middleNode(_build([]int{1, 2, 3, 4, 5}))), []int{3, 4, 5}, "odd length")
+    _t(_toList(middleNode(_build([]int{1, 2, 3, 4, 5, 6}))), []int{4, 5, 6}, "even length picks second middle")
+    _t(_toList(middleNode(_build([]int{1}))), []int{1}, "single node")
+    _t(_toList(middleNode(_build([]int{1, 2}))), []int{2}, "two nodes")
+    _t(_toList(middleNode(_build([]int{1, 2, 3}))), []int{2, 3}, "three nodes")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'remove-nth-from-end': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+// Provided: type ListNode struct { Val int; Next *ListNode }
+func removeNthFromEnd(head *ListNode, n int) *ListNode {
+	return nil
+}
+`,
+    tests: `${GO_LIST}
+
+${GO_HARNESS}
+
+func main() {
+    _t(_toList(removeNthFromEnd(_build([]int{1, 2, 3, 4, 5}), 2)), []int{1, 2, 3, 5}, "example 1")
+    _t(_toList(removeNthFromEnd(_build([]int{1}), 1)), []int{}, "single node removed")
+    _t(_toList(removeNthFromEnd(_build([]int{1, 2}), 1)), []int{1}, "remove last of two")
+    _t(_toList(removeNthFromEnd(_build([]int{1, 2}), 2)), []int{2}, "remove head of two")
+    _t(_toList(removeNthFromEnd(_build([]int{1, 2, 3, 4, 5}), 5)), []int{2, 3, 4, 5}, "remove head")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'add-two-numbers': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+// Provided: type ListNode struct { Val int; Next *ListNode }
+func addTwoNumbers(l1 *ListNode, l2 *ListNode) *ListNode {
+	return nil
+}
+`,
+    tests: `${GO_LIST}
+
+${GO_HARNESS}
+
+func main() {
+    _t(_toList(addTwoNumbers(_build([]int{2, 4, 3}), _build([]int{5, 6, 4}))), []int{7, 0, 8}, "example 1")
+    _t(_toList(addTwoNumbers(_build([]int{0}), _build([]int{0}))), []int{0}, "zero plus zero")
+    _t(_toList(addTwoNumbers(_build([]int{9, 9, 9, 9, 9, 9, 9}), _build([]int{9, 9, 9, 9}))), []int{8, 9, 9, 9, 0, 0, 0, 1}, "carry out new digit")
+    _t(_toList(addTwoNumbers(_build([]int{5}), _build([]int{5}))), []int{0, 1}, "single digit carry")
+    _t(_toList(addTwoNumbers(_build([]int{1, 8}), _build([]int{0}))), []int{1, 8}, "different lengths")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'happy-number': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func isHappy(n int) bool {
+	return false
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(isHappy(19), true, "example 1")
+    _t(isHappy(2), false, "example 2")
+    _t(isHappy(1), true, "one is happy")
+    _t(isHappy(7), true, "seven is happy")
+    _t(isHappy(4), false, "four enters the cycle")
+    _t(isHappy(100), true, "power of ten")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'pow-x-n': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import (
+	"fmt"
+	"math"
+)
+var _ = math.Round
+
+func myPow(x float64, n int) float64 {
+	return 0
+}
+`,
+    tests: `var _ = math.Round
+
+${GO_HARNESS}
+
+func main() {
+    _t(int(math.Round(myPow(2.0, 10))), 1024, "two to the tenth")
+    _t(int(math.Round(myPow(2.0, 0))), 1, "exponent zero")
+    _t(int(math.Round(myPow(2.0, -2)*10000)), 2500, "negative exponent reciprocal")
+    _t(int(math.Round(myPow(3.0, 5))), 243, "three to the fifth")
+    _t(int(math.Round(myPow(0.5, 4)*10000)), 625, "fractional base")
+    _t(int(math.Round(myPow(2.1, 3)*100000)), 926100, "non-integer base")
+    _t(int(math.Round(myPow(1.0, 2147483647))), 1, "one to a huge power")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'perceptron': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func perceptron(X [][]float64, y []int, lr float64, epochs int) []int {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(perceptron([][]float64{{0, 0}, {0, 1}, {1, 0}, {1, 1}}, []int{0, 0, 0, 1}, 0.1, 20), []int{0, 0, 0, 1}, "AND gate")
+    _t(perceptron([][]float64{{0, 0}, {0, 1}, {1, 0}, {1, 1}}, []int{0, 1, 1, 1}, 0.1, 20), []int{0, 1, 1, 1}, "OR gate")
+    _t(perceptron([][]float64{{0, 0}, {0, 1}, {1, 0}, {1, 1}}, []int{0, 0, 0, 0}, 0.1, 20), []int{0, 0, 0, 0}, "all zeros stay zero")
+    _t(perceptron([][]float64{{2, 2}, {3, 3}, {-1, -1}, {-2, -2}}, []int{1, 1, 0, 0}, 0.1, 20), []int{1, 1, 0, 0}, "separable diagonal")
+    _t(perceptron([][]float64{{1, 1}}, []int{1}, 0.1, 20), []int{1}, "single positive point")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'cosine-similarity': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import (
+	"fmt"
+	"math"
+)
+var _ = math.Round
+
+func cosineSimilarity(a []float64, b []float64) float64 {
+	return 0
+}
+`,
+    tests: `var _ = math.Round
+
+${GO_HARNESS}
+
+func main() {
+    _t(int(math.Round(cosineSimilarity([]float64{1, 0}, []float64{0, 1})*10000)), 0, "orthogonal")
+    _t(int(math.Round(cosineSimilarity([]float64{1, 2, 3}, []float64{1, 2, 3})*10000)), 10000, "identical")
+    _t(int(math.Round(cosineSimilarity([]float64{1, 2, 3}, []float64{-1, -2, -3})*10000)), -10000, "opposite")
+    _t(int(math.Round(cosineSimilarity([]float64{1, 2, 3}, []float64{4, 5, 6})*10000)), 9746, "known case")
+    _t(int(math.Round(cosineSimilarity([]float64{2, 0}, []float64{3, 0})*10000)), 10000, "same direction scaled")
+    _t(int(math.Round(cosineSimilarity([]float64{1, 1}, []float64{1, 0})*10000)), 7071, "45 degrees")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'implement-trie': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+type Trie struct {
+}
+
+func NewTrie() *Trie { return &Trie{} }
+
+func (t *Trie) Insert(word string) {}
+
+func (t *Trie) Search(word string) bool { return false }
+
+func (t *Trie) StartsWith(prefix string) bool { return false }
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    tr := NewTrie()
+    tr.Insert("apple")
+    _t(tr.Search("apple"), true, "inserted word found")
+    _t(tr.Search("app"), false, "prefix is not a word yet")
+    _t(tr.StartsWith("app"), true, "prefix exists")
+    tr.Insert("app")
+    _t(tr.Search("app"), true, "now a full word")
+    _t(tr.StartsWith("appl"), true, "longer prefix exists")
+    _t(tr.Search("banana"), false, "never inserted")
+    _t(tr.StartsWith("b"), false, "no such prefix")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'queue-using-stacks': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+type MyQueue struct {
+}
+
+func NewMyQueue() *MyQueue { return &MyQueue{} }
+
+func (q *MyQueue) Push(x int) {}
+
+func (q *MyQueue) Pop() int { return 0 }
+
+func (q *MyQueue) Peek() int { return 0 }
+
+func (q *MyQueue) Empty() bool { return false }
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    q := NewMyQueue()
+    q.Push(1)
+    q.Push(2)
+    _t(q.Peek(), 1, "front is 1")
+    _t(q.Pop(), 1, "pop returns front")
+    _t(q.Empty(), false, "still has 2")
+    _t(q.Pop(), 2, "pop returns 2")
+    _t(q.Empty(), true, "now empty")
+    q.Push(3)
+    q.Push(4)
+    q.Push(5)
+    _t(q.Pop(), 3, "fifo order maintained")
+    _t(q.Peek(), 4, "next front is 4")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'permutations': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import (
+	"fmt"
+	"sort"
+)
+var _ = sort.Slice
+
+func permute(nums []int) [][]int {
+	return nil
+}
+`,
+    tests: `var _ = sort.Slice
+
+${GO_HARNESS}
+
+func _normP(a [][]int) [][]int {
+    sort.Slice(a, func(i, j int) bool {
+        x, y := a[i], a[j]
+        m := len(x)
+        if len(y) < m {
+            m = len(y)
+        }
+        for k := 0; k < m; k++ {
+            if x[k] != y[k] {
+                return x[k] < y[k]
+            }
+        }
+        return len(x) < len(y)
+    })
+    return a
+}
+
+func main() {
+    _t(_normP(permute([]int{1, 2, 3})), [][]int{{1, 2, 3}, {1, 3, 2}, {2, 1, 3}, {2, 3, 1}, {3, 1, 2}, {3, 2, 1}}, "example 1")
+    _t(_normP(permute([]int{0, 1})), [][]int{{0, 1}, {1, 0}}, "two elements")
+    _t(_normP(permute([]int{1})), [][]int{{1}}, "single element")
+    _t(len(permute([]int{1, 2, 3, 4})), 24, "4! permutations")
+    _t(_normP(permute([]int{7, 8, 9})), [][]int{{7, 8, 9}, {7, 9, 8}, {8, 7, 9}, {8, 9, 7}, {9, 7, 8}, {9, 8, 7}}, "distinct values")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'generate-parentheses': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import (
+	"fmt"
+	"sort"
+)
+var _ = sort.Strings
+
+func generateParenthesis(n int) []string {
+	return nil
+}
+`,
+    tests: `var _ = sort.Strings
+
+${GO_HARNESS}
+
+func _sortS(a []string) []string {
+    c := append([]string(nil), a...)
+    sort.Strings(c)
+    return c
+}
+
+func main() {
+    _t(_sortS(generateParenthesis(3)), _sortS([]string{"((()))", "(()())", "(())()", "()(())", "()()()"}), "example 1")
+    _t(_sortS(generateParenthesis(1)), []string{"()"}, "single pair")
+    _t(_sortS(generateParenthesis(2)), _sortS([]string{"(())", "()()"}), "two pairs")
+    _t(len(generateParenthesis(4)), 14, "catalan number 14")
+    _t(len(generateParenthesis(5)), 42, "catalan number 42")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'sudoku-solver': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func solveSudoku(board [][]string) [][]string {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(solveSudoku([][]string{{"5", "3", ".", ".", "7", ".", ".", ".", "."}, {"6", ".", ".", "1", "9", "5", ".", ".", "."}, {".", "9", "8", ".", ".", ".", ".", "6", "."}, {"8", ".", ".", ".", "6", ".", ".", ".", "3"}, {"4", ".", ".", "8", ".", "3", ".", ".", "1"}, {"7", ".", ".", ".", "2", ".", ".", ".", "6"}, {".", "6", ".", ".", ".", ".", "2", "8", "."}, {".", ".", ".", "4", "1", "9", ".", ".", "5"}, {".", ".", ".", ".", "8", ".", ".", "7", "9"}}), [][]string{{"5", "3", "4", "6", "7", "8", "9", "1", "2"}, {"6", "7", "2", "1", "9", "5", "3", "4", "8"}, {"1", "9", "8", "3", "4", "2", "5", "6", "7"}, {"8", "5", "9", "7", "6", "1", "4", "2", "3"}, {"4", "2", "6", "8", "5", "3", "7", "9", "1"}, {"7", "1", "3", "9", "2", "4", "8", "5", "6"}, {"9", "6", "1", "5", "3", "7", "2", "8", "4"}, {"2", "8", "7", "4", "1", "9", "6", "3", "5"}, {"3", "4", "5", "2", "8", "6", "1", "7", "9"}}, "classic puzzle solved")
+    _t(solveSudoku([][]string{{"5", "3", "4", "6", "7", "8", "9", "1", "2"}, {"6", "7", "2", "1", "9", "5", "3", "4", "8"}, {"1", "9", "8", "3", "4", "2", "5", "6", "7"}, {"8", "5", "9", "7", "6", "1", "4", "2", "3"}, {"4", "2", "6", "8", "5", "3", "7", "9", "1"}, {"7", "1", "3", "9", "2", "4", "8", "5", "6"}, {"9", "6", "1", "5", "3", "7", "2", "8", "4"}, {"2", "8", "7", "4", "1", "9", "6", "3", "5"}, {"3", "4", "5", "2", "8", "6", "1", "7", "."}}), [][]string{{"5", "3", "4", "6", "7", "8", "9", "1", "2"}, {"6", "7", "2", "1", "9", "5", "3", "4", "8"}, {"1", "9", "8", "3", "4", "2", "5", "6", "7"}, {"8", "5", "9", "7", "6", "1", "4", "2", "3"}, {"4", "2", "6", "8", "5", "3", "7", "9", "1"}, {"7", "1", "3", "9", "2", "4", "8", "5", "6"}, {"9", "6", "1", "5", "3", "7", "2", "8", "4"}, {"2", "8", "7", "4", "1", "9", "6", "3", "5"}, {"3", "4", "5", "2", "8", "6", "1", "7", "9"}}, "one empty cell")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'find-all-anagrams': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func findAnagrams(s string, p string) []int {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(findAnagrams("cbaebabacd", "abc"), []int{0, 6}, "example 1")
+    _t(findAnagrams("abab", "ab"), []int{0, 1, 2}, "example 2")
+    _t(findAnagrams("aa", "bb"), []int{}, "no anagrams")
+    _t(findAnagrams("a", "ab"), []int{}, "p longer than s")
+    _t(findAnagrams("aaaa", "a"), []int{0, 1, 2, 3}, "single char p")
+    _t(findAnagrams("baa", "aa"), []int{1}, "one match")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'longest-repeating-replacement': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func characterReplacement(s string, k int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(characterReplacement("ABAB", 2), 4, "example 1")
+    _t(characterReplacement("AABABBA", 1), 4, "example 2")
+    _t(characterReplacement("A", 0), 1, "single char no ops")
+    _t(characterReplacement("AAAA", 0), 4, "all same")
+    _t(characterReplacement("ABCDE", 1), 2, "distinct chars")
+    _t(characterReplacement("AAAB", 0), 3, "no replacements allowed")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'max-consecutive-ones-iii': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func longestOnes(nums []int, k int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(longestOnes([]int{1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0}, 2), 6, "example 1")
+    _t(longestOnes([]int{0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1}, 3), 10, "example 2")
+    _t(longestOnes([]int{0, 0, 0}, 0), 0, "no flips all zeros")
+    _t(longestOnes([]int{1, 1, 1}, 0), 3, "all ones")
+    _t(longestOnes([]int{0, 0, 0}, 3), 3, "flip everything")
+    _t(longestOnes([]int{1, 0, 1, 0, 1}, 1), 3, "single flip")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'find-min-rotated': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func findMin(nums []int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(findMin([]int{3, 4, 5, 1, 2}), 1, "example 1")
+    _t(findMin([]int{4, 5, 6, 7, 0, 1, 2}), 0, "example 2")
+    _t(findMin([]int{11, 13, 15, 17}), 11, "no effective rotation")
+    _t(findMin([]int{2, 1}), 1, "two elements")
+    _t(findMin([]int{1}), 1, "single element")
+    _t(findMin([]int{5, 1, 2, 3, 4}), 1, "pivot near start")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'search-2d-matrix': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func searchMatrix(matrix [][]int, target int) bool {
+	return false
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    m := [][]int{{1, 3, 5, 7}, {10, 11, 16, 20}, {23, 30, 34, 60}}
+    _t(searchMatrix(m, 3), true, "example 1")
+    _t(searchMatrix(m, 13), false, "example 2")
+    _t(searchMatrix(m, 1), true, "top-left corner")
+    _t(searchMatrix(m, 60), true, "bottom-right corner")
+    _t(searchMatrix([][]int{{1}}, 1), true, "single hit")
+    _t(searchMatrix([][]int{{1}}, 2), false, "single miss")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'koko-eating-bananas': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func minEatingSpeed(piles []int, h int) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(minEatingSpeed([]int{3, 6, 7, 11}, 8), 4, "example 1")
+    _t(minEatingSpeed([]int{30, 11, 23, 4, 20}, 5), 30, "one pile per hour")
+    _t(minEatingSpeed([]int{30, 11, 23, 4, 20}, 6), 23, "six hours")
+    _t(minEatingSpeed([]int{1, 1, 1, 999}, 1002), 1, "plenty of time")
+    _t(minEatingSpeed([]int{312884470}, 968709470), 1, "single huge pile, slow ok")
+    _t(minEatingSpeed([]int{3}, 3), 1, "single pile slow")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'count-smaller-after-self': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func countSmaller(nums []int) []int {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(countSmaller([]int{5, 2, 6, 1}), []int{2, 1, 1, 0}, "example 1")
+    _t(countSmaller([]int{-1, -1}), []int{0, 0}, "equal values, none strictly smaller")
+    _t(countSmaller([]int{-1}), []int{0}, "single element")
+    _t(countSmaller([]int{1, 2, 3, 4}), []int{0, 0, 0, 0}, "ascending")
+    _t(countSmaller([]int{4, 3, 2, 1}), []int{3, 2, 1, 0}, "descending")
+    _t(countSmaller([]int{2, 0, 1}), []int{2, 0, 0}, "mixed")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'evaluate-rpn': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import (
+	"fmt"
+	"strconv"
+)
+var _ = strconv.Atoi
+
+func evalRPN(tokens []string) int {
+	return 0
+}
+`,
+    tests: `var _ = strconv.Atoi
+
+${GO_HARNESS}
+
+func main() {
+    _t(evalRPN([]string{"2", "1", "+", "3", "*"}), 9, "example 1")
+    _t(evalRPN([]string{"4", "13", "5", "/", "+"}), 6, "example 2")
+    _t(evalRPN([]string{"10", "-3", "/"}), -3, "negative division truncates toward zero")
+    _t(evalRPN([]string{"7", "2", "/"}), 3, "positive truncation")
+    _t(evalRPN([]string{"-7", "2", "/"}), -3, "negative numerator truncates toward zero")
+    _t(evalRPN([]string{"5"}), 5, "single operand")
+    _t(evalRPN([]string{"10", "6", "9", "3", "+", "-11", "*", "/", "*", "17", "+", "5", "+"}), 22, "complex expression")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'decode-string': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import (
+	"fmt"
+	"strings"
+)
+var _ = strings.Repeat
+
+func decodeString(s string) string {
+	return ""
+}
+`,
+    tests: `var _ = strings.Repeat
+
+${GO_HARNESS}
+
+func main() {
+    _t(decodeString("3[a]2[bc]"), "aaabcbc", "example 1")
+    _t(decodeString("3[a2[c]]"), "accaccacc", "nested")
+    _t(decodeString("2[abc]3[cd]ef"), "abcabccdcdcdef", "multiple groups")
+    _t(decodeString("abc"), "abc", "no encoding")
+    _t(decodeString("10[a]"), "aaaaaaaaaa", "multi-digit count")
+    _t(decodeString("2[2[b]c]"), "bbcbbc", "nested with suffix")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'longest-valid-parentheses': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func longestValidParentheses(s string) int {
+	return 0
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(longestValidParentheses("(()"), 2, "example 1")
+    _t(longestValidParentheses(")()())"), 4, "example 2")
+    _t(longestValidParentheses(""), 0, "empty string")
+    _t(longestValidParentheses("()(()"), 2, "reset in middle")
+    _t(longestValidParentheses("()(())"), 6, "fully matched")
+    _t(longestValidParentheses("((((("), 0, "all opens")
+    _t(longestValidParentheses(")))))"), 0, "all closes")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'invert-binary-tree': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+// Provided: type TreeNode struct { Val int; Left, Right *TreeNode }
+func invertTree(root *TreeNode) *TreeNode {
+	return nil
+}
+`,
+    tests: `${GO_TREE}
+
+${GO_HARNESS}
+
+func _dump(root *TreeNode) []interface{} {
+    out := []interface{}{}
+    q := []*TreeNode{root}
+    for len(q) > 0 {
+        n := q[0]
+        q = q[1:]
+        if n == nil {
+            out = append(out, nil)
+            continue
+        }
+        out = append(out, n.Val)
+        q = append(q, n.Left, n.Right)
+    }
+    for len(out) > 0 && out[len(out)-1] == nil {
+        out = out[:len(out)-1]
+    }
+    return out
+}
+
+func main() {
+    _t(_dump(invertTree(_tree([]interface{}{4, 2, 7, 1, 3, 6, 9}))), []interface{}{4, 7, 2, 9, 6, 3, 1}, "example 1")
+    _t(_dump(invertTree(_tree([]interface{}{2, 1, 3}))), []interface{}{2, 3, 1}, "example 2")
+    _t(_dump(invertTree(_tree([]interface{}{}))), []interface{}{}, "empty tree")
+    _t(_dump(invertTree(_tree([]interface{}{1}))), []interface{}{1}, "single node")
+    _t(_dump(invertTree(_tree([]interface{}{1, 2, nil, 3}))), []interface{}{1, nil, 2, nil, 3}, "left chain becomes right")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'diameter-of-binary-tree': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+// Provided: type TreeNode struct { Val int; Left, Right *TreeNode }
+func diameterOfBinaryTree(root *TreeNode) int {
+	return 0
+}
+`,
+    tests: `${GO_TREE}
+
+${GO_HARNESS}
+
+func main() {
+    _t(diameterOfBinaryTree(_tree([]interface{}{1, 2, 3, 4, 5})), 3, "example 1")
+    _t(diameterOfBinaryTree(_tree([]interface{}{1, 2})), 1, "two nodes")
+    _t(diameterOfBinaryTree(_tree([]interface{}{1})), 0, "single node")
+    _t(diameterOfBinaryTree(_tree([]interface{}{1, 2, nil, 3, nil, 4})), 3, "left skewed chain")
+    _t(diameterOfBinaryTree(_tree([]interface{}{4, 2, 7, 1, 3, 6, 9})), 4, "balanced tree")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'lowest-common-ancestor-bst': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+// Provided: type TreeNode struct { Val int; Left, Right *TreeNode }
+func lowestCommonAncestor(root *TreeNode, p int, q int) *TreeNode {
+	return nil
+}
+`,
+    tests: `${GO_TREE}
+
+${GO_HARNESS}
+
+func main() {
+    b := _tree([]interface{}{6, 2, 8, 0, 4, 7, 9, nil, nil, 3, 5})
+    _t(lowestCommonAncestor(b, 2, 8).Val, 6, "split at root")
+    _t(lowestCommonAncestor(b, 2, 4).Val, 2, "ancestor is one of the nodes")
+    _t(lowestCommonAncestor(b, 3, 5).Val, 4, "lca deeper in tree")
+    _t(lowestCommonAncestor(b, 7, 9).Val, 8, "right subtree")
+    _t(lowestCommonAncestor(_tree([]interface{}{2, 1}), 1, 2).Val, 2, "two node tree")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'serialize-deserialize-tree': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+var _ = strconv.Atoi
+var _ = strings.Split
+
+// Provided: type TreeNode struct { Val int; Left, Right *TreeNode }
+func serialize(root *TreeNode) string {
+	return ""
+}
+
+func deserialize(data string) *TreeNode {
+	return nil
+}
+`,
+    tests: `var _ = strconv.Atoi
+var _ = strings.Split
+
+${GO_TREE}
+
+${GO_HARNESS}
+
+func _dump(root *TreeNode) []interface{} {
+    out := []interface{}{}
+    q := []*TreeNode{root}
+    for len(q) > 0 {
+        n := q[0]
+        q = q[1:]
+        if n == nil {
+            out = append(out, nil)
+            continue
+        }
+        out = append(out, n.Val)
+        q = append(q, n.Left, n.Right)
+    }
+    for len(out) > 0 && out[len(out)-1] == nil {
+        out = out[:len(out)-1]
+    }
+    return out
+}
+
+func main() {
+    _t(_dump(deserialize(serialize(_tree([]interface{}{1, 2, 3, nil, nil, 4, 5})))), []interface{}{1, 2, 3, nil, nil, 4, 5}, "example 1")
+    _t(_dump(deserialize(serialize(_tree([]interface{}{})))), []interface{}{}, "empty tree")
+    _t(_dump(deserialize(serialize(_tree([]interface{}{1})))), []interface{}{1}, "single node")
+    _t(_dump(deserialize(serialize(_tree([]interface{}{1, 2, 3, 4, 5, 6, 7})))), []interface{}{1, 2, 3, 4, 5, 6, 7}, "perfect tree")
+    _t(_dump(deserialize(serialize(_tree([]interface{}{-1, -2, -3})))), []interface{}{-1, -2, -3}, "negative values")
+    _t(_dump(deserialize(serialize(_tree([]interface{}{5, 4, 7, 3, nil, 2, nil, -1, nil, 9})))), []interface{}{5, 4, 7, 3, nil, 2, nil, -1, nil, 9}, "irregular shape")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'move-zeroes': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func moveZeroes(nums []int) []int {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(moveZeroes([]int{0, 1, 0, 3, 12}), []int{1, 3, 12, 0, 0}, "example 1")
+    _t(moveZeroes([]int{0}), []int{0}, "single zero")
+    _t(moveZeroes([]int{1, 2, 3}), []int{1, 2, 3}, "no zeros")
+    _t(moveZeroes([]int{0, 0, 1}), []int{1, 0, 0}, "leading zeros")
+    _t(moveZeroes([]int{1, 0, 2, 0, 3}), []int{1, 2, 3, 0, 0}, "interleaved zeros")
+    _t(moveZeroes([]int{0, 0, 0}), []int{0, 0, 0}, "all zeros")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'remove-duplicates-sorted': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func removeDuplicates(nums []int) []int {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(removeDuplicates([]int{1, 1, 2}), []int{1, 2}, "example 1")
+    _t(removeDuplicates([]int{0, 0, 1, 1, 1, 2, 2, 3, 3, 4}), []int{0, 1, 2, 3, 4}, "example 2")
+    _t(removeDuplicates([]int{1}), []int{1}, "single element")
+    _t(removeDuplicates([]int{1, 2, 3}), []int{1, 2, 3}, "already unique")
+    _t(removeDuplicates([]int{2, 2, 2, 2}), []int{2}, "all duplicates")
+    _t(removeDuplicates([]int{-3, -3, -1, 0, 0}), []int{-3, -1, 0}, "negatives")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'sort-colors': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import "fmt"
+
+func sortColors(nums []int) []int {
+	return nil
+}
+`,
+    tests: `${GO_HARNESS}
+
+func main() {
+    _t(sortColors([]int{2, 0, 2, 1, 1, 0}), []int{0, 0, 1, 1, 2, 2}, "example 1")
+    _t(sortColors([]int{2, 0, 1}), []int{0, 1, 2}, "example 2")
+    _t(sortColors([]int{0}), []int{0}, "single element")
+    _t(sortColors([]int{1, 1, 1}), []int{1, 1, 1}, "all same")
+    _t(sortColors([]int{2, 2, 0, 0, 1, 1}), []int{0, 0, 1, 1, 2, 2}, "reverse grouped")
+    _t(sortColors([]int{1, 0, 2, 0}), []int{0, 0, 1, 2}, "mixed")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
+
+  'three-sum-closest': {
+    starter: `package main
+
+// imports used by the hidden test runner
+import (
+	"fmt"
+	"sort"
+)
+var _ = sort.Ints
+
+func threeSumClosest(nums []int, target int) int {
+	return 0
+}
+`,
+    tests: `var _ = sort.Ints
+
+${GO_HARNESS}
+
+func main() {
+    _t(threeSumClosest([]int{-1, 2, 1, -4}, 1), 2, "example 1")
+    _t(threeSumClosest([]int{0, 0, 0}, 1), 0, "all zeros")
+    _t(threeSumClosest([]int{1, 1, 0}, -100), 2, "far below target")
+    _t(threeSumClosest([]int{1, 2, 4, 8, 16, 32, 64, 128}, 82), 82, "exact match")
+    _t(threeSumClosest([]int{-3, -2, -5, 3, -4}, -1), -2, "negatives")
+    fmt.Printf("%d/%d tests passed\\n", _p, _n)
+}`,
+  },
 }
