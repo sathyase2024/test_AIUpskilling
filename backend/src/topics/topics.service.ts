@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { Topic } from '../entities/topic.entity';
 import { Lesson } from '../entities/lesson.entity';
 
@@ -223,7 +224,12 @@ export class TopicsService implements OnApplicationBootstrap {
   /**
    * Seed topics whose lessons have rich, pre-generated content stored as JSON.
    * Each slug in GENERATED_TOPIC_META maps to a directory of lesson_*.json files.
-   * Safe to call repeatedly: slugs that already exist are skipped.
+   *
+   * On every boot:
+   *  - New lessons (orderIndex not in DB) are inserted.
+   *  - Existing lessons whose file content has changed (different SHA-256) are
+   *    updated in place — same ID, same user progress, fresh content.
+   *  - Unchanged lessons are left alone (fast path).
    */
   async seedGeneratedLessons() {
     const baseDir = this.resolveGeneratedDir();
@@ -235,9 +241,7 @@ export class TopicsService implements OnApplicationBootstrap {
       return;
     }
 
-    let seeded = 0;
     for (const [slug, meta] of Object.entries(GENERATED_TOPIC_META)) {
-      // Directory listing is cheap — just filenames, no file reads yet
       const dir = path.join(baseDir, slug);
       if (!fs.existsSync(dir)) {
         this.logger.warn(`Generated content for "${slug}" not found at ${dir} — skipping`);
@@ -253,19 +257,7 @@ export class TopicsService implements OnApplicationBootstrap {
         continue;
       }
 
-      // Compare file count vs DB count — skip only when fully in sync
       const topic = await this.topicRepo.findOne({ where: { slug } });
-      const existingCount = topic
-        ? await this.lessonRepo.count({ where: { topicId: topic.id, isGenerated: true } })
-        : 0;
-
-      if (existingCount >= lessonFiles.length) {
-        this.logger.log(`Topic "${slug}" up to date (${existingCount}/${lessonFiles.length} lessons) — skipping`);
-        continue;
-      }
-
-      this.logger.log(`Topic "${slug}": ${existingCount} in DB, ${lessonFiles.length} files — seeding ${lessonFiles.length - existingCount} new lesson(s)`);
-
       const savedTopic = topic ?? (await this.topicRepo.save(
         this.topicRepo.create({
           ...meta,
@@ -275,49 +267,78 @@ export class TopicsService implements OnApplicationBootstrap {
         } as Topic),
       )) as Topic;
 
-      // Only process files that don't have a DB row yet (by orderIndex)
-      const existingOrders = new Set(
-        (await this.lessonRepo.find({ where: { topicId: savedTopic.id }, select: { orderIndex: true } }))
-          .map((l) => l.orderIndex),
+      // Build a map of orderIndex → existing DB row for fast lookup
+      const existingByOrder = new Map(
+        (await this.lessonRepo.find({ where: { topicId: savedTopic.id } }))
+          .map((l) => [l.orderIndex, l]),
       );
 
+      let inserted = 0;
+      let updated = 0;
       let order = 1;
+
       for (const file of lessonFiles) {
-        if (existingOrders.has(order)) { order++; continue; } // already written
+        const filePath = path.join(dir, file);
+        let raw: string;
         let contentJson: Record<string, any>;
         try {
-          contentJson = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf-8'));
+          raw = fs.readFileSync(filePath, 'utf-8');
+          contentJson = JSON.parse(raw);
         } catch (err: any) {
           this.logger.error(`Failed to parse ${file}: ${err.message}`);
+          order++;
           continue;
         }
 
+        const fileHash = crypto.createHash('sha256').update(raw).digest('hex');
         const rawType = String(contentJson.type ?? 'reading');
         const type = (LESSON_TYPES as readonly string[]).includes(rawType) ? rawType : 'reading';
         const title = String(contentJson.title ?? `Lesson ${order}`);
+        const existing = existingByOrder.get(order);
 
-        await this.lessonRepo.save(
-          this.lessonRepo.create({
-            topicId: savedTopic.id,
-            title,
-            slug: `${slug}-lesson-${order}`,
-            orderIndex: order,
-            type: type as Lesson['type'],
-            durationMinutes: Number(contentJson.estimatedMinutes) || 30,
-            xpReward: Number(contentJson.xpReward) || 50,
-            content: JSON.stringify(contentJson),
-            contentJson,
-            isGenerated: true,
-          }),
-        );
+        if (!existing) {
+          // New lesson — insert
+          await this.lessonRepo.save(
+            this.lessonRepo.create({
+              topicId: savedTopic.id,
+              title,
+              slug: `${slug}-lesson-${order}`,
+              orderIndex: order,
+              type: type as Lesson['type'],
+              durationMinutes: Number(contentJson.estimatedMinutes) || 30,
+              xpReward: Number(contentJson.xpReward) || 50,
+              content: JSON.stringify(contentJson),
+              contentJson,
+              isGenerated: true,
+            }),
+          );
+          inserted++;
+        } else if ((existing as any).contentHash !== fileHash) {
+          // Content changed — update in place, preserve ID and user progress
+          await this.lessonRepo.save(
+            Object.assign(existing, {
+              title,
+              type: type as Lesson['type'],
+              durationMinutes: Number(contentJson.estimatedMinutes) || existing.durationMinutes,
+              xpReward: Number(contentJson.xpReward) || existing.xpReward,
+              content: JSON.stringify(contentJson),
+              contentJson,
+              isGenerated: true,
+              contentHash: fileHash,
+            }),
+          );
+          updated++;
+        }
+
         order++;
       }
 
-      seeded++;
-      this.logger.log(`✅ "${slug}" — wrote ${lessonFiles.length - existingCount} new lesson(s)`);
+      if (inserted + updated > 0) {
+        this.logger.log(`✅ "${slug}" — ${inserted} inserted, ${updated} updated`);
+      } else {
+        this.logger.log(`"${slug}" up to date — no changes`);
+      }
     }
-
-    if (seeded > 0) this.logger.log(`✅ Seeded ${seeded} pre-generated topic(s) for the first time`);
   }
 
   async findAll(query: { category?: string; difficulty?: string; search?: string; page?: number; limit?: number }) {

@@ -54,6 +54,9 @@ export class Lesson {
   @Column({ default: false })
   isGenerated: boolean;
 
+  @Column({ type: 'text', nullable: true })
+  contentHash: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
