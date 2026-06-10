@@ -30,8 +30,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT   = SCRIPT_DIR.parent
 GEN         = REPO_ROOT / "generated_lessons"
 
-MODEL       = "claude-haiku-4-5-20251001"
-MAX_TOKENS  = 4096
+MODEL       = "claude-haiku-4-5-20251001"  # all batch scripts run Haiku for cost
+MAX_TOKENS  = 2048   # one code block fits comfortably; caps output cost per call
 CONCURRENCY = 5
 
 INPUT_COST  = 0.80 / 1_000_000
@@ -236,8 +236,10 @@ async def main() -> None:
                         local_n += 1
                     else:
                         regen_n += 1
-        print(f"\n{local_n} local reconstructions (free), {regen_n} need model regeneration")
-        print(f"Estimated API cost: ~${regen_n * 0.0003:.2f}  ({regen_n} calls × ~$0.0003 each)")
+        # Haiku 4.5: output $4.00/Mtok dominates. ~MAX_TOKENS output + ~1.5k input per call.
+        per_call = (MAX_TOKENS * 4.00 + 1500 * 0.80) / 1_000_000
+        print(f"\n{local_n} local reconstructions (free), {regen_n} need model regeneration (Haiku)")
+        print(f"Estimated API cost: ~${regen_n * per_call:.2f}  ({regen_n} calls × ~${per_call:.4f} each)")
         print("\nRun with --fix to apply.")
         return
 
