@@ -924,6 +924,7 @@ func main() {
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 func solveNQueens(n int) [][]string {
@@ -931,6 +932,7 @@ func solveNQueens(n int) [][]string {
 }
 `,
     tests: `var _ = sort.Strings
+var _ = strings.Join
 
 ${GO_NORM_STR2D}
 
