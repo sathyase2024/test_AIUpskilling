@@ -741,7 +741,7 @@ function SidebarFilters({
     <aside className="hidden lg:block w-56 shrink-0 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-amber-600" />
+          <Filter className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           <h3 className="text-slate-900 dark:text-white font-semibold text-sm">Filters</h3>
         </div>
         {hasFilters && (
@@ -986,7 +986,7 @@ export default function TopicsPage() {
         <div className="max-w-7xl mx-auto relative">
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-sm text-slate-600 dark:text-white/70 mb-5">
-              <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+              <TrendingUp className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
               {availableCount} courses live · {baseTopics.length} total in catalogue
             </div>
             <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 dark:text-white mb-3">
@@ -1003,7 +1003,7 @@ export default function TopicsPage() {
           {/* Search */}
           <div className="max-w-2xl mx-auto">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-white/40" />
               <input
                 type="text"
                 value={searchQuery}

@@ -26,10 +26,10 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
 type View = 'list' | 'editor'
 
 const DIFFICULTY_COLORS: Record<Difficulty, string> = {
-  Beginner:     'text-emerald-700 bg-emerald-50 border-emerald-200',
-  Intermediate: 'text-blue-700    bg-blue-50    border-blue-200',
-  Advanced:     'text-amber-700   bg-amber-50   border-amber-200',
-  Expert:       'text-red-700     bg-red-50     border-red-200',
+  Beginner:     'text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-500/15 dark:border-emerald-500/30',
+  Intermediate: 'text-blue-700    bg-blue-50    border-blue-200    dark:text-blue-300    dark:bg-blue-500/15    dark:border-blue-500/30',
+  Advanced:     'text-amber-700   bg-amber-50   border-amber-200   dark:text-amber-300   dark:bg-amber-500/15   dark:border-amber-500/30',
+  Expert:       'text-red-700     bg-red-50     border-red-200     dark:text-red-300     dark:bg-red-500/15     dark:border-red-500/30',
 }
 
 const CATEGORIES: Array<Category | 'All'> = [
@@ -150,19 +150,19 @@ export default function CodeLabPage() {
   // ── List View ──────────────────────────────────────────────────────────────
   if (view === 'list') {
     return (
-      <div className="min-h-screen bg-[#f7f8fa]">
+      <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent">
         <Navbar />
         <div className="pt-20 pb-12">
           {/* Hero */}
           <div className="text-center px-4 py-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs text-amber-700 mb-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-xs text-amber-700 dark:text-amber-300 mb-4">
               <Cpu className="w-3 h-3" /> {PROBLEMS.length} Problems · 15 Categories
             </div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-3">
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-3">
               Code{' '}
               <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">Lab</span>
             </h1>
-            <p className="text-slate-600 text-sm max-w-md mx-auto leading-relaxed">
+            <p className="text-slate-600 dark:text-white/70 text-sm max-w-md mx-auto leading-relaxed">
               Sharpen your skills with curated challenges — algorithms, data structures, ML and more.
               From beginner to expert, across 6 languages.
             </p>
@@ -171,13 +171,13 @@ export default function CodeLabPage() {
           {/* Search + difficulty */}
           <div className="max-w-5xl mx-auto px-4 mb-6 flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/40" />
               <input
                 type="text"
                 placeholder="Search problems or tags…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-slate-300 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-500 transition-colors"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-slate-300 dark:border-white/15 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:outline-none focus:border-amber-500 transition-colors"
               />
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -185,12 +185,12 @@ export default function CodeLabPage() {
                 const active = difficulty === d
                 const base = 'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors'
                 const col = active
-                  ? d === 'All'          ? 'bg-slate-100 border-slate-400 text-slate-800'
-                  : d === 'Beginner'     ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                  : d === 'Intermediate' ? 'bg-blue-50    border-blue-300    text-blue-700'
-                  : d === 'Advanced'     ? 'bg-amber-50   border-amber-300   text-amber-700'
-                  :                        'bg-red-50     border-red-300     text-red-700'
-                  : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                  ? d === 'All'          ? 'bg-slate-100 dark:bg-white/10 border-slate-400 dark:border-white/25 text-slate-800 dark:text-white/90'
+                  : d === 'Beginner'     ? 'bg-emerald-50 dark:bg-emerald-500/15 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                  : d === 'Intermediate' ? 'bg-blue-50    dark:bg-blue-500/15    border-blue-300    dark:border-blue-500/30    text-blue-700    dark:text-blue-300'
+                  : d === 'Advanced'     ? 'bg-amber-50   dark:bg-amber-500/15   border-amber-300   dark:border-amber-500/30   text-amber-700   dark:text-amber-300'
+                  :                        'bg-red-50     dark:bg-red-500/15     border-red-300     dark:border-red-500/30     text-red-700     dark:text-red-300'
+                  : 'bg-white dark:bg-[#12121a] border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/50 hover:bg-slate-50 dark:hover:bg-white/10'
                 return (
                   <button key={d} onClick={() => setDifficulty(d)} className={`${base} ${col}`}>{d}</button>
                 )
@@ -206,13 +206,13 @@ export default function CodeLabPage() {
                 onClick={() => setCategory(cat)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap shrink-0 transition-colors ${
                   category === cat
-                    ? 'bg-amber-50 border-amber-300 text-amber-600'
-                    : 'bg-white border-slate-200 text-slate-500'
+                    ? 'bg-amber-50 dark:bg-amber-500/15 border-amber-300 dark:border-amber-500/30 text-amber-600 dark:text-amber-400'
+                    : 'bg-white dark:bg-[#12121a] border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/50'
                 }`}
               >
                 <CategoryIcon cat={cat} />
                 {cat}
-                <span className={category === cat ? 'text-amber-500' : 'text-slate-400'}>
+                <span className={category === cat ? 'text-amber-500' : 'text-slate-400 dark:text-white/40'}>
                   {categoryCounts[cat] ?? 0}
                 </span>
               </button>
@@ -223,22 +223,22 @@ export default function CodeLabPage() {
           <div className="max-w-5xl mx-auto px-4 flex gap-5">
             {/* Sidebar */}
             <aside className="w-52 flex-shrink-0 hidden sm:block">
-              <div className="sticky top-24 rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+              <div className="sticky top-24 rounded-xl bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10 shadow-sm overflow-hidden">
                 {CATEGORIES.map(cat => (
                   <button
                     key={cat}
                     onClick={() => setCategory(cat)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-xs transition-colors ${
                       category === cat
-                        ? 'bg-amber-50 text-amber-600 border-r-2 border-amber-500'
-                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                        ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border-r-2 border-amber-500'
+                        : 'text-slate-500 dark:text-white/50 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-800 dark:hover:text-white/90'
                     }`}
                   >
-                    <span className={category === cat ? 'text-amber-600' : 'text-slate-400'}>
+                    <span className={category === cat ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-white/40'}>
                       <CategoryIcon cat={cat} />
                     </span>
                     <span className="flex-1 truncate font-medium">{cat}</span>
-                    <span className={`text-[10px] tabular-nums ${category === cat ? 'text-amber-500' : 'text-slate-400'}`}>
+                    <span className={`text-[10px] tabular-nums ${category === cat ? 'text-amber-500' : 'text-slate-400 dark:text-white/40'}`}>
                       {categoryCounts[cat] ?? 0}
                     </span>
                   </button>
@@ -248,9 +248,9 @@ export default function CodeLabPage() {
 
             {/* Grid */}
             <main className="flex-1 min-w-0">
-              <p className="text-xs text-slate-500 mb-3">{filtered.length} problem{filtered.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-slate-500 dark:text-white/50 mb-3">{filtered.length} problem{filtered.length !== 1 ? 's' : ''}</p>
               {filtered.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 py-20 text-slate-400">
+                <div className="flex flex-col items-center gap-3 py-20 text-slate-400 dark:text-white/40">
                   <Search className="w-8 h-8 opacity-30" />
                   <p className="text-sm">No problems match your filters.</p>
                 </div>
@@ -260,27 +260,27 @@ export default function CodeLabPage() {
                     <button
                       key={p.id}
                       onClick={() => openProblem(p)}
-                      className="text-left rounded-xl bg-white border border-slate-200 shadow-sm hover:border-amber-300 hover:shadow-md p-4 transition-all group"
+                      className="text-left rounded-xl bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10 shadow-sm hover:border-amber-300 dark:hover:border-amber-500/30 hover:shadow-md p-4 transition-all group"
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[10px] font-bold text-slate-400 font-mono tabular-nums">#{p.num}</span>
+                        <span className="text-[10px] font-bold text-slate-400 dark:text-white/40 font-mono tabular-nums">#{p.num}</span>
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${DIFFICULTY_COLORS[p.difficulty]}`}>
                           {p.difficulty}
                         </span>
                       </div>
-                      <h3 className="text-sm font-semibold text-slate-800 group-hover:text-slate-900 transition-colors leading-snug mb-2">
+                      <h3 className="text-sm font-semibold text-slate-800 dark:text-white/90 group-hover:text-slate-900 dark:group-hover:text-white transition-colors leading-snug mb-2">
                         {p.title}
                       </h3>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-500">
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/50">
                           {p.category}
                         </span>
                         {p.tags.slice(0, 2).map(tag => (
-                          <span key={tag} className="text-[10px] text-slate-400">{tag}</span>
+                          <span key={tag} className="text-[10px] text-slate-400 dark:text-white/40">{tag}</span>
                         ))}
                       </div>
                       {p.timeComplexity && (
-                        <div className="mt-2.5 flex gap-3 text-[10px] font-mono text-slate-400">
+                        <div className="mt-2.5 flex gap-3 text-[10px] font-mono text-slate-400 dark:text-white/40">
                           <span>T: {p.timeComplexity}</span>
                           {p.spaceComplexity && <span>S: {p.spaceComplexity}</span>}
                         </div>
@@ -300,26 +300,26 @@ export default function CodeLabPage() {
   if (!problem) return null
   const availLangs = Object.keys(problem.starterCode) as Language[]
   const score = validation?.score ?? 0
-  const scoreColor = score >= 80 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-red-600'
+  const scoreColor = score >= 80 ? 'text-emerald-600 dark:text-emerald-400' : score >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
   const scoreBg    = score >= 80 ? 'bg-emerald-500'  : score >= 50 ? 'bg-amber-500'   : 'bg-red-500'
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#f7f8fa] overflow-hidden">
+    <div className="flex flex-col h-[100dvh] bg-[#f7f8fa] dark:bg-transparent overflow-hidden">
       <Navbar />
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-200 bg-white mt-16 flex-shrink-0">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#12121a] mt-16 flex-shrink-0">
         <button
           onClick={() => { setView('list'); setValidation(null) }}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 text-sm transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-white/50 hover:text-slate-900 dark:hover:text-white text-sm transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span className="hidden sm:block">Problems</span>
         </button>
-        <div className="w-px h-5 bg-slate-200" />
+        <div className="w-px h-5 bg-slate-200 dark:bg-white/10" />
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-xs text-slate-400 font-mono shrink-0">#{problem.num}</span>
-          <span className="text-sm font-semibold text-slate-900 truncate">{problem.title}</span>
+          <span className="text-xs text-slate-400 dark:text-white/40 font-mono shrink-0">#{problem.num}</span>
+          <span className="text-sm font-semibold text-slate-900 dark:text-white truncate">{problem.title}</span>
           <span className={`hidden sm:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${DIFFICULTY_COLORS[problem.difficulty]}`}>
             {problem.difficulty}
           </span>
@@ -329,19 +329,19 @@ export default function CodeLabPage() {
         <div className="relative">
           <button
             onClick={() => setLangOpen(v => !v)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-sm text-slate-700 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-white/5 border border-slate-300 dark:border-white/15 hover:bg-slate-50 dark:hover:bg-white/10 text-sm text-slate-700 dark:text-white/90 transition-colors"
           >
-            <Code2 className="w-3.5 h-3.5 text-amber-600" />
+            <Code2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             {LANG_LABELS[language]}
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
           </button>
           {langOpen && (
-            <div className="absolute top-full right-0 mt-1 w-36 rounded-xl bg-white border border-slate-200 shadow-xl z-50 overflow-hidden">
+            <div className="absolute top-full right-0 mt-1 w-36 rounded-xl bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10 shadow-xl z-50 overflow-hidden">
               {availLangs.map(l => (
                 <button
                   key={l}
                   onClick={() => handleLangChange(l)}
-                  className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-50 ${language === l ? 'text-amber-600 bg-amber-50' : 'text-slate-600'}`}
+                  className={`w-full text-left px-4 py-2 text-sm transition-colors hover:bg-slate-50 dark:hover:bg-white/10 ${language === l ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/15' : 'text-slate-600 dark:text-white/70'}`}
                 >
                   {LANG_LABELS[l]}
                 </button>
@@ -364,13 +364,13 @@ export default function CodeLabPage() {
       </div>
 
       {/* Mobile pane switcher (three columns collapse into tabs below lg) */}
-      <div className="flex lg:hidden border-b border-slate-200 bg-white flex-shrink-0">
+      <div className="flex lg:hidden border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#12121a] flex-shrink-0">
         {([['problem','Problem'],['code','Code'],['tests','Tests']] as const).map(([pane, label]) => (
           <button
             key={pane}
             onClick={() => setMobilePane(pane)}
             className={`flex-1 py-2.5 text-xs font-medium transition-colors border-b-2 ${
-              mobilePane === pane ? 'text-amber-600 border-amber-500' : 'text-slate-400 border-transparent'
+              mobilePane === pane ? 'text-amber-600 dark:text-amber-400 border-amber-500' : 'text-slate-400 dark:text-white/40 border-transparent'
             }`}
           >
             {label}
@@ -382,55 +382,55 @@ export default function CodeLabPage() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left: description ── */}
-        <aside className={`${mobilePane === 'problem' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[280px] flex-shrink-0 lg:border-r border-slate-200 bg-white flex-col overflow-y-auto`}>
-          <div className="p-4 border-b border-slate-100">
-            <p className="text-xs text-slate-600 leading-relaxed">{problem.description}</p>
+        <aside className={`${mobilePane === 'problem' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[280px] flex-shrink-0 lg:border-r border-slate-200 dark:border-white/10 bg-white dark:bg-[#12121a] flex-col overflow-y-auto`}>
+          <div className="p-4 border-b border-slate-100 dark:border-white/10">
+            <p className="text-xs text-slate-600 dark:text-white/70 leading-relaxed">{problem.description}</p>
           </div>
 
-          <div className="p-4 border-b border-slate-100 space-y-2.5">
-            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Examples</h3>
+          <div className="p-4 border-b border-slate-100 dark:border-white/10 space-y-2.5">
+            <h3 className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase tracking-wider">Examples</h3>
             {problem.examples.map((ex, i) => (
-              <div key={i} className="rounded-lg bg-slate-50 border border-slate-200 p-2.5 text-xs font-mono space-y-1 break-all">
-                <div><span className="text-slate-400">In: </span><span className="text-emerald-600">{ex.input}</span></div>
-                <div><span className="text-slate-400">Out: </span><span className="text-amber-700">{ex.output}</span></div>
-                {ex.explanation && <div className="text-slate-400 text-[10px]">{ex.explanation}</div>}
+              <div key={i} className="rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-2.5 text-xs font-mono space-y-1 break-all">
+                <div><span className="text-slate-400 dark:text-white/40">In: </span><span className="text-emerald-600 dark:text-emerald-400">{ex.input}</span></div>
+                <div><span className="text-slate-400 dark:text-white/40">Out: </span><span className="text-amber-700 dark:text-amber-300">{ex.output}</span></div>
+                {ex.explanation && <div className="text-slate-400 dark:text-white/40 text-[10px]">{ex.explanation}</div>}
               </div>
             ))}
           </div>
 
-          <div className="p-4 border-b border-slate-100 space-y-1.5">
-            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Constraints</h3>
+          <div className="p-4 border-b border-slate-100 dark:border-white/10 space-y-1.5">
+            <h3 className="text-[10px] font-bold text-slate-400 dark:text-white/40 uppercase tracking-wider">Constraints</h3>
             {problem.constraints.map((c, i) => (
-              <div key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
+              <div key={i} className="flex items-start gap-1.5 text-xs text-slate-600 dark:text-white/70">
                 <span className="text-amber-500 mt-0.5 shrink-0">•</span>{c}
               </div>
             ))}
           </div>
 
           {/* Hints – amber accordion */}
-          <div className="border-t border-slate-100">
+          <div className="border-t border-slate-100 dark:border-white/10">
             <button
               onClick={() => setHintsOpen(v => !v)}
-              className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-white/10 transition-colors"
             >
               <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="text-xs font-medium text-slate-600">Hints ({problem.hints.length})</span>
+              <span className="text-xs font-medium text-slate-600 dark:text-white/70">Hints ({problem.hints.length})</span>
               {hintsOpen
-                ? <ChevronUp   className="w-3.5 h-3.5 text-slate-400 ml-auto" />
-                : <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-auto" />}
+                ? <ChevronUp   className="w-3.5 h-3.5 text-slate-400 dark:text-white/40 ml-auto" />
+                : <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-white/40 ml-auto" />}
             </button>
             {hintsOpen && (
               <div className="px-4 pb-4 space-y-2">
                 {problem.hints.slice(0, revealedHints).map((hint, i) => (
-                  <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200">
-                    <span className="text-[10px] font-bold text-amber-600 mt-0.5 shrink-0">{i + 1}</span>
-                    <code className="text-xs text-amber-800 leading-relaxed font-mono">{hint}</code>
+                  <div key={i} className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30">
+                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-0.5 shrink-0">{i + 1}</span>
+                    <code className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed font-mono">{hint}</code>
                   </div>
                 ))}
                 {revealedHints < problem.hints.length && (
                   <button
                     onClick={() => setRevealedHints(n => n + 1)}
-                    className="mt-1 text-xs text-amber-600 hover:text-amber-700 transition-colors flex items-center gap-1"
+                    className="mt-1 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors flex items-center gap-1"
                   >
                     <Lightbulb className="w-3 h-3" />
                     {revealedHints === 0 ? 'Show first hint' : 'Show next hint'}
@@ -439,7 +439,7 @@ export default function CodeLabPage() {
                 {revealedHints === problem.hints.length && revealedHints > 0 && (
                   <button
                     onClick={() => setRevealedHints(0)}
-                    className="mt-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                    className="mt-1 text-xs text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white/70 transition-colors"
                   >
                     Hide hints
                   </button>
@@ -450,7 +450,7 @@ export default function CodeLabPage() {
         </aside>
 
         {/* ── Middle: editor ── */}
-        <div className={`${mobilePane === 'code' ? 'flex' : 'hidden'} lg:flex w-full flex-1 flex-col min-w-0 lg:border-r border-slate-200`}>
+        <div className={`${mobilePane === 'code' ? 'flex' : 'hidden'} lg:flex w-full flex-1 flex-col min-w-0 lg:border-r border-slate-200 dark:border-white/10`}>
           <div className="flex-1 overflow-hidden">
             <MonacoEditor
               height="100%"
@@ -475,25 +475,25 @@ export default function CodeLabPage() {
               }}
             />
           </div>
-          <div className="flex items-center gap-3 px-4 py-1.5 bg-white border-t border-slate-200 text-xs text-slate-500 shrink-0">
+          <div className="flex items-center gap-3 px-4 py-1.5 bg-white dark:bg-[#12121a] border-t border-slate-200 dark:border-white/10 text-xs text-slate-500 dark:text-white/50 shrink-0">
             <span>{code.split('\n').length} lines</span>
             <div className="flex-1" />
-            <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200 font-medium">
+            <span className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30 font-medium">
               {LANG_LABELS[language]}
             </span>
           </div>
         </div>
 
         {/* ── Right: results / output ── */}
-        <aside className={`${mobilePane === 'tests' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[300px] flex-shrink-0 flex-col bg-white`}>
+        <aside className={`${mobilePane === 'tests' ? 'flex' : 'hidden'} lg:flex w-full lg:w-[300px] flex-shrink-0 flex-col bg-white dark:bg-[#12121a]`}>
           {/* Tabs */}
-          <div className="flex border-b border-slate-200 shrink-0">
+          <div className="flex border-b border-slate-200 dark:border-white/10 shrink-0">
             {(['results','output'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`flex-1 py-2.5 text-xs font-medium transition-colors border-b-2 capitalize ${
-                  activeTab === tab ? 'text-amber-600 border-amber-500' : 'text-slate-400 border-transparent hover:text-slate-600'
+                  activeTab === tab ? 'text-amber-600 dark:text-amber-400 border-amber-500' : 'text-slate-400 dark:text-white/40 border-transparent hover:text-slate-600 dark:hover:text-white/70'
                 }`}
               >
                 {tab === 'results' ? 'Test Results' : 'Output'}
@@ -506,14 +506,14 @@ export default function CodeLabPage() {
             {activeTab === 'results' && (
               <div className="p-3 space-y-3">
                 {!validation && !isRunning && (
-                  <div className="flex flex-col items-center gap-3 py-14 text-slate-400">
+                  <div className="flex flex-col items-center gap-3 py-14 text-slate-400 dark:text-white/40">
                     <Play className="w-8 h-8 opacity-25" />
                     <p className="text-xs text-center">Run your code to see test results</p>
                   </div>
                 )}
 
                 {isRunning && (
-                  <div className="flex flex-col items-center gap-3 py-14 text-slate-500">
+                  <div className="flex flex-col items-center gap-3 py-14 text-slate-500 dark:text-white/50">
                     <div className="w-8 h-8 border-2 border-green-500/30 border-t-green-500 rounded-full animate-spin" />
                     <p className="text-xs">Running tests…</p>
                   </div>
@@ -522,17 +522,17 @@ export default function CodeLabPage() {
                 {validation && !isRunning && (
                   <>
                     {/* Score */}
-                    <div className="rounded-xl bg-white border border-slate-200 shadow-sm p-3 space-y-2">
+                    <div className="rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm p-3 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500">Score</span>
+                        <span className="text-xs text-slate-500 dark:text-white/50">Score</span>
                         <span className={`text-2xl font-bold tabular-nums ${scoreColor}`}>
-                          {score}<span className="text-xs font-normal text-slate-400">/100</span>
+                          {score}<span className="text-xs font-normal text-slate-400 dark:text-white/40">/100</span>
                         </span>
                       </div>
-                      <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                      <div className="h-1.5 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
                         <div className={`h-full rounded-full transition-all duration-700 ${scoreBg}`} style={{ width: `${score}%` }} />
                       </div>
-                      <p className="text-xs text-slate-600 leading-relaxed">{validation.feedback}</p>
+                      <p className="text-xs text-slate-600 dark:text-white/70 leading-relaxed">{validation.feedback}</p>
                     </div>
 
                     {/* Test rows */}
@@ -543,14 +543,14 @@ export default function CodeLabPage() {
                             key={i}
                             className={`flex items-start gap-2 p-2.5 rounded-lg text-xs ${
                               r.passed
-                                ? 'bg-emerald-50 border border-emerald-200'
-                                : 'bg-red-50 border border-red-200'
+                                ? 'bg-emerald-50 border border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20'
+                                : 'bg-red-50 border border-red-200 dark:bg-red-500/10 dark:border-red-500/20'
                             }`}
                           >
                             {r.passed
-                              ? <CheckCircle className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
-                              : <XCircle    className="w-3.5 h-3.5 text-red-600    mt-0.5 shrink-0" />}
-                            <span className={r.passed ? 'text-emerald-700' : 'text-red-700'}>
+                              ? <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+                              : <XCircle    className="w-3.5 h-3.5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />}
+                            <span className={r.passed ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}>
                               {r.description || `Test ${r.num}`}
                             </span>
                           </div>
@@ -560,26 +560,26 @@ export default function CodeLabPage() {
 
                     {/* All passed banner */}
                     {validation.passed && (
-                      <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div className="rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 p-3 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                         <div>
-                          <p className="text-xs font-semibold text-emerald-700">All tests passed!</p>
-                          <p className="text-[10px] text-emerald-600 mt-0.5">{validation.passedTests}/{validation.totalTests} test cases</p>
+                          <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">All tests passed!</p>
+                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">{validation.passedTests}/{validation.totalTests} test cases</p>
                         </div>
                       </div>
                     )}
 
                     {/* Amber hint card */}
                     {validation.errorHint && (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 overflow-hidden">
+                      <div className="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 overflow-hidden">
                         <div className="flex items-start gap-2.5 px-3 py-3">
                           <Lightbulb className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
                           <div>
-                            <p className="text-xs font-semibold text-amber-700">{validation.errorHint.title}</p>
-                            <p className="text-xs text-amber-700 mt-0.5">{validation.errorHint.cause}</p>
-                            <p className="text-xs text-amber-800 mt-1">{validation.errorHint.fix}</p>
+                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">{validation.errorHint.title}</p>
+                            <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">{validation.errorHint.cause}</p>
+                            <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">{validation.errorHint.fix}</p>
                             {validation.errorHint.example && (
-                              <code className="text-[11px] text-amber-800 font-mono mt-1.5 block bg-amber-100 rounded px-2 py-1">
+                              <code className="text-[11px] text-amber-800 dark:text-amber-200 font-mono mt-1.5 block bg-amber-100 dark:bg-amber-500/20 rounded px-2 py-1">
                                 {validation.errorHint.example}
                               </code>
                             )}
@@ -597,7 +597,7 @@ export default function CodeLabPage() {
               <div className="p-3 space-y-2">
                 {rawOutput?.stdout && (
                   <div>
-                    <p className="text-[10px] font-semibold uppercase text-slate-400 mb-1.5">stdout</p>
+                    <p className="text-[10px] font-semibold uppercase text-slate-400 dark:text-white/40 mb-1.5">stdout</p>
                     <pre className="text-xs font-mono text-green-300/75 leading-relaxed whitespace-pre-wrap bg-[#0a0a14] rounded-lg p-3 border border-slate-700">
                       {rawOutput.stdout}
                     </pre>
@@ -612,7 +612,7 @@ export default function CodeLabPage() {
                   </div>
                 )}
                 {!rawOutput && !isRunning && (
-                  <div className="flex flex-col items-center gap-2 py-14 text-slate-400">
+                  <div className="flex flex-col items-center gap-2 py-14 text-slate-400 dark:text-white/40">
                     <Terminal className="w-8 h-8 opacity-25" />
                     <p className="text-xs">Run your code to see output</p>
                   </div>
