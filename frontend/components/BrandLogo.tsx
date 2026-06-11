@@ -60,10 +60,10 @@ export function BrandWordmark({
     <span className="flex flex-col leading-none select-none">
       <span className={`font-bold ${text} tracking-tight`}>
         <span style={{ color: '#F59E0B' }}>Skill</span>
-        <span className="text-white">Veris</span>
+        <span className="text-slate-700">Veris</span>
       </span>
       {tagline && (
-        <span className="text-[9px] text-white/45 font-normal tracking-wide mt-1">
+        <span className="text-[9px] text-slate-500 font-normal tracking-wide mt-1">
           powered by Sri Hayavadhana
         </span>
       )}
