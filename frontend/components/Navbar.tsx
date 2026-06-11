@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useRef, useEffect } from 'react'
 import { getStoredUser, logout, type StoredUser } from '@/lib/api'
+import BrandLogo from '@/components/BrandLogo'
 import {
   Sparkles,
   Menu,
@@ -190,38 +191,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
 
           {/* ---- Logo ---- */}
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 group flex-shrink-0"
-            aria-label="SkillForge AI — home"
-          >
-            <div
-              className="relative p-2 rounded-xl transition-all duration-300 group-hover:scale-105"
-              style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}
-            >
-              <Sparkles className="w-5 h-5 text-white" aria-hidden="true" />
-              {/* Glow ring on hover */}
-              <div
-                className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                style={{ boxShadow: '0 0 20px rgba(124,58,237,0.6)' }}
-                aria-hidden="true"
-              />
-            </div>
-            <span className="font-bold text-lg tracking-tight select-none">
-              <span className="text-white">Skill</span>
-              <span
-                style={{
-                  background: 'linear-gradient(135deg, #a78bfa 0%, #22d3ee 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                }}
-              >
-                Forge
-              </span>
-              <span className="text-white/60 font-normal text-sm ml-1">AI</span>
-            </span>
-          </Link>
+          <BrandLogo />
 
           {/* ---- Desktop nav links ---- */}
           <div className="hidden md:flex items-center gap-1" role="menubar">

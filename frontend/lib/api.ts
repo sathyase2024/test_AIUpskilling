@@ -110,13 +110,19 @@ export async function verifyOtp(email: string, code: string): Promise<StoredUser
 
 // ─── Assessment types ────────────────────────────────────────────────────────
 
+// Correct answers and explanations are never sent with the questions — they
+// arrive per-question in SubmitResult.review after an attempt is graded.
 export interface AssessmentQuestion {
   question: string;
   options: string[];
-  answer: number;
-  explanation: string;
   lessonOrder: number;
   moduleIndex?: number;
+}
+
+export interface QuestionReview {
+  correctAnswer: number;
+  explanation: string;
+  correct: boolean;
 }
 
 export interface AssessmentModuleBank {
@@ -142,6 +148,7 @@ export interface SubmitResult {
   correct: number;
   total: number;
   wrongLessonOrders: number[];
+  review: QuestionReview[];
 }
 
 export interface AssessmentResultsResponse {
@@ -173,6 +180,16 @@ export async function submitFinalAssessment(
   answers: number[],
 ): Promise<SubmitResult> {
   return apiPost<SubmitResult>(`/assessment/${courseSlug}/final/submit`, { answers });
+}
+
+/** Grade an attempt without persisting it (signed-out users). */
+export async function gradeAssessment(
+  courseSlug: string,
+  type: 'module' | 'final',
+  answers: number[],
+  moduleIndex?: number,
+): Promise<SubmitResult> {
+  return apiPost<SubmitResult>(`/assessment/${courseSlug}/grade`, { type, moduleIndex, answers });
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

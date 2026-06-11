@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Req, UseGuards, ParseIntPipe } from
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AssessmentService } from './assessment.service';
 import { SubmitAssessmentDto } from './dto/submit-assessment.dto';
+import { GradeAssessmentDto } from './dto/grade-assessment.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('assessment')
@@ -12,6 +13,12 @@ export class AssessmentController {
   @Get(':courseSlug')
   getAssessment(@Param('courseSlug') courseSlug: string) {
     return this.assessmentService.getAssessment(courseSlug);
+  }
+
+  /** Anonymous grading — returns the result without persisting an attempt. */
+  @Post(':courseSlug/grade')
+  gradeAttempt(@Param('courseSlug') courseSlug: string, @Body() dto: GradeAssessmentDto) {
+    return this.assessmentService.gradeAttempt(courseSlug, dto.type, dto.moduleIndex, dto.answers);
   }
 
   @Get(':courseSlug/results')

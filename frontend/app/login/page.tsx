@@ -3,7 +3,8 @@
 import { useState, FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Sparkles, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, Users, KeyRound } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, Users, KeyRound } from 'lucide-react'
+import BrandLogo from '@/components/BrandLogo'
 import { login, requestOtp, verifyOtp } from '@/lib/api'
 
 type Mode = 'password' | 'otp'
@@ -122,32 +123,7 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 group mb-6"
-            aria-label="SkillForge AI — home"
-          >
-            <div
-              className="p-2.5 rounded-xl transition-all duration-300 group-hover:scale-105"
-              style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}
-            >
-              <Sparkles className="w-5 h-5 text-white" aria-hidden="true" />
-            </div>
-            <span className="font-bold text-xl tracking-tight select-none">
-              <span className="text-white">Skill</span>
-              <span
-                style={{
-                  background: 'linear-gradient(135deg, #a78bfa 0%, #22d3ee 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                }}
-              >
-                Forge
-              </span>
-              <span className="text-white/60 font-normal text-base ml-1">AI</span>
-            </span>
-          </Link>
+          <BrandLogo size="lg" tagline className="mb-6" />
 
           <h1 className="text-2xl font-bold text-white">Welcome back</h1>
           <p className="text-white/50 text-sm mt-1">Sign in to continue your learning journey</p>
@@ -368,7 +344,7 @@ export default function LoginPage() {
           <p className="text-white/40 text-xs">
             Join{' '}
             <span className="text-white/70 font-semibold">10K+</span>{' '}
-            learners already on SkillForge
+            learners already on SkillVeris
           </p>
         </div>
       </div>

@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { register } from '@/lib/api'
 import {
-  Sparkles,
   Mail,
   Lock,
   Eye,
@@ -22,6 +21,7 @@ import {
   UtensilsCrossed,
   Trophy,
 } from 'lucide-react'
+import BrandLogo from '@/components/BrandLogo'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -189,32 +189,7 @@ export default function SignupPage() {
       >
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 group mb-6"
-            aria-label="SkillForge AI — home"
-          >
-            <div
-              className="p-2.5 rounded-xl transition-all duration-300 group-hover:scale-105"
-              style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}
-            >
-              <Sparkles className="w-5 h-5 text-white" aria-hidden="true" />
-            </div>
-            <span className="font-bold text-xl tracking-tight select-none">
-              <span className="text-white">Skill</span>
-              <span
-                style={{
-                  background: 'linear-gradient(135deg, #a78bfa 0%, #22d3ee 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                }}
-              >
-                Forge
-              </span>
-              <span className="text-white/60 font-normal text-base ml-1">AI</span>
-            </span>
-          </Link>
+          <BrandLogo size="lg" tagline className="mb-6" />
 
           <h1 className="text-2xl font-bold text-white">Start learning today</h1>
           <p className="text-white/50 text-sm mt-1">Join 10,000+ developers upskilling with AI</p>

@@ -26,11 +26,11 @@ const firaCode = Fira_Code({
 ------------------------------------------------------- */
 export const metadata: Metadata = {
   title: {
-    default: "SkillForge AI — Personalized Upskilling Platform",
-    template: "%s | SkillForge AI",
+    default: "SkillVeris — Personalized Upskilling Platform",
+    template: "%s | SkillVeris",
   },
   description:
-    "SkillForge AI is an AI-powered personalized upskilling platform that crafts custom learning paths in programming, cloud, AI/ML, and more — tailored to your career goals and learning style.",
+    "SkillVeris, powered by Sri Hayavadhana, is an AI-powered personalized upskilling platform that crafts custom learning paths in programming, cloud, AI/ML, and more — tailored to your career goals and learning style.",
   keywords: [
     "AI learning",
     "personalized upskilling",
@@ -41,21 +41,21 @@ export const metadata: Metadata = {
     "DevOps",
     "cloud computing",
     "skill development",
-    "SkillForge AI",
+    "SkillVeris",
   ],
-  authors: [{ name: "SkillForge AI Team" }],
-  creator: "SkillForge AI",
+  authors: [{ name: "SkillVeris Team" }],
+  creator: "SkillVeris",
   openGraph: {
     type: "website",
     locale: "en_US",
-    title: "SkillForge AI — Personalized Upskilling Platform",
+    title: "SkillVeris — Personalized Upskilling Platform",
     description:
       "AI-powered learning paths tailored to your career goals. Master programming, cloud, AI/ML, and more.",
-    siteName: "SkillForge AI",
+    siteName: "SkillVeris",
   },
   twitter: {
     card: "summary_large_image",
-    title: "SkillForge AI — Personalized Upskilling Platform",
+    title: "SkillVeris — Personalized Upskilling Platform",
     description:
       "AI-powered learning paths tailored to your career goals. Master programming, cloud, AI/ML, and more.",
   },
