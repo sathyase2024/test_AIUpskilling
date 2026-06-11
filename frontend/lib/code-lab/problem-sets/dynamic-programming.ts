@@ -236,4 +236,237 @@ _t(isMatch('ab','.*c'),false,'trailing literal unmatched');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'unique-paths', title:'Unique Paths', difficulty:'Intermediate', category:'Dynamic Programming',
+    description:'There is a robot on an m x n grid. The robot is initially located at the top-left corner (grid[0][0]). The robot tries to move to the bottom-right corner (grid[m-1][n-1]). The robot can only move either down or right at any point in time. Given the two integers m and n, return the number of possible unique paths that the robot can take to reach the bottom-right corner. The answer is guaranteed to be at most the order of 2·10⁹ and fits in a signed 32-bit integer for the given test cases.',
+    examples:[
+      {input:'m = 3, n = 7',output:'28',explanation:'There are 28 distinct paths from the top-left to the bottom-right of a 3 x 7 grid.'},
+      {input:'m = 3, n = 2',output:'3',explanation:'From the top-left there are 3 ways to reach the bottom-right: Right→Down→Down, Down→Down→Right, Down→Right→Down.'},
+    ],
+    constraints:['1 <= m, n <= 100','The answer fits in a signed 32-bit integer for these inputs'],
+    hints:['Every cell can only be reached from the cell above it or the cell to its left','dp[i][j] = dp[i-1][j] + dp[i][j-1], with the first row and first column all equal to 1','A single rolling row of length n reduces the space to O(n)'],
+    tags:['dynamic-programming','combinatorics','math'], timeComplexity:'O(m·n)', spaceComplexity:'O(n)',
+    starterCode:{
+      python:`def unique_paths(m, n):
+    pass
+`,
+      javascript:`function uniquePaths(m, n) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(unique_paths(3,7),28,'example 1')
+_t(unique_paths(3,2),3,'example 2')
+_t(unique_paths(1,1),1,'single cell')
+_t(unique_paths(1,10),1,'single row')
+_t(unique_paths(10,10),48620,'square grid')
+_t(unique_paths(23,12),193536720,'large but int32-safe')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(uniquePaths(3,7),28,'example 1');
+_t(uniquePaths(3,2),3,'example 2');
+_t(uniquePaths(1,1),1,'single cell');
+_t(uniquePaths(1,10),1,'single row');
+_t(uniquePaths(10,10),48620,'square grid');
+_t(uniquePaths(23,12),193536720,'large but int32-safe');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'word-break', title:'Word Break', difficulty:'Intermediate', category:'Dynamic Programming',
+    description:'Given a string s and a dictionary of strings word_dict, return true if s can be segmented into a space-separated sequence of one or more dictionary words. Note that the same word in the dictionary may be reused multiple times in the segmentation. The dictionary contains no duplicate words.',
+    examples:[
+      {input:'s = "leetcode", word_dict = ["leet","code"]',output:'true',explanation:'"leetcode" can be segmented as "leet code".'},
+      {input:'s = "applepenapple", word_dict = ["apple","pen"]',output:'true',explanation:'"applepenapple" can be segmented as "apple pen apple"; note that "apple" is reused.'},
+      {input:'s = "catsandog", word_dict = ["cats","dog","sand","and","cat"]',output:'false',explanation:'There is no way to segment the entire string into dictionary words.'},
+    ],
+    constraints:['1 <= s.length <= 300','1 <= word_dict.length <= 1000','1 <= word_dict[i].length <= 20','s and word_dict[i] consist of only lowercase English letters','All the strings of word_dict are unique'],
+    hints:['dp[i] = can the prefix s[:i] be fully segmented? dp[0] = True','dp[i] is True if some j < i has dp[j] True and s[j:i] is in the dictionary','Put the dictionary in a set for O(1) membership and iterate end positions left to right'],
+    tags:['dynamic-programming','string','hash-set'], timeComplexity:'O(n²)', spaceComplexity:'O(n)',
+    starterCode:{
+      python:`def word_break(s, word_dict):
+    pass
+`,
+      javascript:`function wordBreak(s, wordDict) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(word_break('leetcode',['leet','code']),True,'example 1')
+_t(word_break('applepenapple',['apple','pen']),True,'reuse a word')
+_t(word_break('catsandog',['cats','dog','sand','and','cat']),False,'cannot segment')
+_t(word_break('a',['a']),True,'single letter')
+_t(word_break('aaaaaaa',['aaaa','aaa']),True,'overlap split')
+_t(word_break('cars',['car','ca','rs']),True,'ca + rs')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(wordBreak('leetcode',['leet','code']),true,'example 1');
+_t(wordBreak('applepenapple',['apple','pen']),true,'reuse a word');
+_t(wordBreak('catsandog',['cats','dog','sand','and','cat']),false,'cannot segment');
+_t(wordBreak('a',['a']),true,'single letter');
+_t(wordBreak('aaaaaaa',['aaaa','aaa']),true,'overlap split');
+_t(wordBreak('cars',['car','ca','rs']),true,'ca + rs');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'longest-common-subsequence', title:'Longest Common Subsequence', difficulty:'Intermediate', category:'Dynamic Programming',
+    description:'Given two strings text1 and text2, return the length of their longest common subsequence. If there is no common subsequence, return 0. A subsequence of a string is a new string generated from the original string with some characters (can be none) deleted without changing the relative order of the remaining characters. A common subsequence of two strings is a subsequence that is common to both strings.',
+    examples:[
+      {input:'text1 = "abcde", text2 = "ace"',output:'3',explanation:'The longest common subsequence is "ace" and its length is 3.'},
+      {input:'text1 = "abc", text2 = "abc"',output:'3',explanation:'The longest common subsequence is "abc".'},
+      {input:'text1 = "abc", text2 = "def"',output:'0',explanation:'There is no common subsequence, so the result is 0.'},
+    ],
+    constraints:['1 <= text1.length, text2.length <= 1000','text1 and text2 consist of only lowercase English characters'],
+    hints:['dp[i][j] = LCS length of the first i chars of text1 and first j chars of text2','If text1[i-1] == text2[j-1], dp[i][j] = dp[i-1][j-1] + 1','Otherwise dp[i][j] = max(dp[i-1][j], dp[i][j-1])'],
+    tags:['dynamic-programming','string'], timeComplexity:'O(m·n)', spaceComplexity:'O(m·n)',
+    starterCode:{
+      python:`def longest_common_subsequence(text1, text2):
+    pass
+`,
+      javascript:`function longestCommonSubsequence(text1, text2) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(longest_common_subsequence('abcde','ace'),3,'example 1')
+_t(longest_common_subsequence('abc','abc'),3,'identical')
+_t(longest_common_subsequence('abc','def'),0,'no overlap')
+_t(longest_common_subsequence('bsbininm','jmjkbkjkv'),1,'single shared char')
+_t(longest_common_subsequence('ezupkr','ubmrapg'),2,'mixed')
+_t(longest_common_subsequence('a','a'),1,'single char match')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(longestCommonSubsequence('abcde','ace'),3,'example 1');
+_t(longestCommonSubsequence('abc','abc'),3,'identical');
+_t(longestCommonSubsequence('abc','def'),0,'no overlap');
+_t(longestCommonSubsequence('bsbininm','jmjkbkjkv'),1,'single shared char');
+_t(longestCommonSubsequence('ezupkr','ubmrapg'),2,'mixed');
+_t(longestCommonSubsequence('a','a'),1,'single char match');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'decode-ways', title:'Decode Ways', difficulty:'Intermediate', category:'Dynamic Programming',
+    description:'A message containing letters from A-Z can be encoded into numbers using the mapping "A" → "1", "B" → "2", ..., "Z" → "26". To decode an encoded message, all the digits must be grouped then mapped back into letters using the reverse of this mapping (there may be many ways). For example, "11106" can be mapped into "AAJF" (1 1 10 6) or "KJF" (11 10 6); note that the grouping (1 11 06) is invalid because "06" cannot be mapped into a letter since leading zeros are not allowed. Given a string s containing only digits, return the number of ways to decode it. The answer fits in a 32-bit integer. Note that a string starting with 0 or containing an invalid standalone 0 has 0 ways.',
+    examples:[
+      {input:'s = "12"',output:'2',explanation:'"12" could be decoded as "AB" (1 2) or "L" (12).'},
+      {input:'s = "226"',output:'3',explanation:'"226" could be decoded as "BZ" (2 26), "VF" (22 6), or "BBF" (2 2 6).'},
+      {input:'s = "06"',output:'0',explanation:'"06" cannot be mapped to "F" because of the leading zero ("6" is different from "06").'},
+    ],
+    constraints:['1 <= s.length <= 100','s contains only digits and may contain leading zero(s)'],
+    hints:['dp[i] = number of ways to decode the prefix s[:i]; dp[0] = 1','A single digit s[i-1] contributes dp[i-1] ways when it is 1–9 (not 0)','A two-digit group s[i-2:i] contributes dp[i-2] ways when it is between 10 and 26'],
+    tags:['dynamic-programming','string'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def num_decodings(s):
+    pass
+`,
+      javascript:`function numDecodings(s) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(num_decodings('12'),2,'example 1')
+_t(num_decodings('226'),3,'example 2')
+_t(num_decodings('06'),0,'leading zero')
+_t(num_decodings('0'),0,'just zero')
+_t(num_decodings('10'),1,'ten only')
+_t(num_decodings('100'),0,'invalid trailing zero')
+_t(num_decodings('11106'),2,'classic multi')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(numDecodings('12'),2,'example 1');
+_t(numDecodings('226'),3,'example 2');
+_t(numDecodings('06'),0,'leading zero');
+_t(numDecodings('0'),0,'just zero');
+_t(numDecodings('10'),1,'ten only');
+_t(numDecodings('100'),0,'invalid trailing zero');
+_t(numDecodings('11106'),2,'classic multi');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'partition-equal-subset-sum', title:'Partition Equal Subset Sum', difficulty:'Intermediate', category:'Dynamic Programming',
+    description:'Given an integer array nums, return true if you can partition the array into two subsets such that the sum of the elements in both subsets is equal, or false otherwise. This reduces to a subset-sum problem: a valid partition exists if and only if the total sum is even and some subset sums to exactly half the total.',
+    examples:[
+      {input:'nums = [1,5,11,5]',output:'true',explanation:'The array can be partitioned as [1,5,5] and [11], both summing to 11.'},
+      {input:'nums = [1,2,3,5]',output:'false',explanation:'The array cannot be partitioned into equal-sum subsets.'},
+    ],
+    constraints:['1 <= nums.length <= 200','1 <= nums[i] <= 100'],
+    hints:['If the total sum is odd, an equal partition is impossible','Reduce to: can any subset sum to total/2? This is a 0/1 knapsack on the target','Use a boolean dp over achievable sums; iterate sums downward to reuse each number at most once'],
+    tags:['dynamic-programming','array','knapsack'], timeComplexity:'O(n·sum)', spaceComplexity:'O(sum)',
+    starterCode:{
+      python:`def can_partition(nums):
+    pass
+`,
+      javascript:`function canPartition(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(can_partition([1,5,11,5]),True,'example 1')
+_t(can_partition([1,2,3,5]),False,'odd-ish no split')
+_t(can_partition([1,1]),True,'two equal')
+_t(can_partition([1]),False,'single element')
+_t(can_partition([2,2,3,5]),False,'sum is even but no subset')
+_t(can_partition([3,3,3,4,5]),True,'sum 18 -> 9 each')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(canPartition([1,5,11,5]),true,'example 1');
+_t(canPartition([1,2,3,5]),false,'odd-ish no split');
+_t(canPartition([1,1]),true,'two equal');
+_t(canPartition([1]),false,'single element');
+_t(canPartition([2,2,3,5]),false,'sum is even but no subset');
+_t(canPartition([3,3,3,4,5]),true,'sum 18 -> 9 each');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'burst-balloons', title:'Burst Balloons', difficulty:'Expert', category:'Dynamic Programming',
+    description:'You are given n balloons, indexed from 0 to n - 1. Each balloon is painted with a number on it represented by an array nums. You are asked to burst all the balloons. If you burst the i-th balloon, you will get nums[i-1] · nums[i] · nums[i+1] coins. If i-1 or i+1 goes out of bounds of the array, then treat it as if there is a balloon with a 1 painted on it. Return the maximum coins you can collect by bursting the balloons wisely. The trick is to think about which balloon is burst LAST in a range: that fixes both of its (virtual) neighbors and splits the range into independent subproblems.',
+    examples:[
+      {input:'nums = [3,1,5,8]',output:'167',explanation:'Burst order [1,5,3,8]: 3·1·5 + 3·5·8 + 1·3·8 + 1·8·1 = 15 + 120 + 24 + 8 = 167.'},
+      {input:'nums = [1,5]',output:'10',explanation:'Burst 1 first (1·1·5 = 5), then 5 (1·5·1 = 5): total 10.'},
+    ],
+    constraints:['n == nums.length','1 <= n <= 300','0 <= nums[i] <= 100','Keep arrays small in practice — the DP is O(n³)'],
+    hints:['Pad the array with a 1 on each end so boundary balloons have neighbors','dp[i][j] = max coins from bursting all balloons strictly between indices i and j (exclusive)','For each range, try every k as the LAST balloon burst: dp[i][j] = max(dp[i][k] + nums[i]·nums[k]·nums[j] + dp[k][j])'],
+    tags:['dynamic-programming','divide-and-conquer','interval-dp'], timeComplexity:'O(n³)', spaceComplexity:'O(n²)',
+    starterCode:{
+      python:`def max_coins(nums):
+    pass
+`,
+      javascript:`function maxCoins(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(max_coins([3,1,5,8]),167,'example 1')
+_t(max_coins([1,5]),10,'two balloons')
+_t(max_coins([5]),5,'single balloon')
+_t(max_coins([7]),7,'single seven')
+_t(max_coins([1,2,3,4,5]),110,'ascending')
+_t(max_coins([9,76,64]),44416,'three values')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(maxCoins([3,1,5,8]),167,'example 1');
+_t(maxCoins([1,5]),10,'two balloons');
+_t(maxCoins([5]),5,'single balloon');
+_t(maxCoins([7]),7,'single seven');
+_t(maxCoins([1,2,3,4,5]),110,'ascending');
+_t(maxCoins([9,76,64]),44416,'three values');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]

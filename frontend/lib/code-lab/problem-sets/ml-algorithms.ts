@@ -80,4 +80,81 @@ _t(Math.round(_w3*4+_b3),-8,'negative slope y=-2x');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'perceptron', title:'Perceptron Learning Algorithm', difficulty:'Intermediate', category:'AI / ML Algorithms',
+    description:'Implement the classic single-layer perceptron learning algorithm from scratch (no ML libraries) for binary classification of 2-D points. Given training feature vectors X (a list of [x1, x2] points), binary labels y (each 0 or 1), a learning rate lr, and a number of epochs, train the perceptron and return the list of predictions for the training set after training. Initialize the weight vector w = [0, 0] and the bias b = 0. The prediction for a point x is 1 if w·x + b > 0 else 0 (strict greater-than, ties predict 0). For each epoch, iterate over the training examples in order and apply the perceptron update rule: for prediction pred on example (x, y), update w += lr·(y − pred)·x componentwise and b += lr·(y − pred). After all epochs, return the integer predictions for every training point. The algorithm is fully deterministic given this initialization and update order.',
+    examples:[
+      {input:'X = [[0,0],[0,1],[1,0],[1,1]], y = [0,0,0,1], lr = 0.1, epochs = 20',output:'[0,0,0,1]',explanation:'The AND gate is linearly separable; the perceptron converges and reproduces the labels.'},
+      {input:'X = [[0,0],[0,1],[1,0],[1,1]], y = [0,1,1,1], lr = 0.1, epochs = 20',output:'[0,1,1,1]',explanation:'The OR gate is also linearly separable and learned exactly.'},
+    ],
+    constraints:['1 <= len(X) == len(y) <= 1000','Each feature vector has exactly 2 dimensions','Each label y[i] is 0 or 1','Initialize w = [0, 0] and b = 0; pred = 1 if w·x + b > 0 else 0','No external ML libraries'],
+    hints:['Maintain w as a 2-element list and b as a scalar, both starting at 0','For each example compute pred, then error = y − pred (one of -1, 0, +1), and update w and b only when error is non-zero','After training, recompute the prediction for every training point and return them as integers'],
+    tags:['ml','classification','perceptron','optimization'], timeComplexity:'O(epochs·n·d)', spaceComplexity:'O(d)',
+    starterCode:{
+      python:`def perceptron(X, y, lr=0.1, epochs=20):
+    pass
+`,
+      javascript:`function perceptron(X, y, lr=0.1, epochs=20) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(perceptron([[0,0],[0,1],[1,0],[1,1]],[0,0,0,1],0.1,20),[0,0,0,1],'AND gate')
+_t(perceptron([[0,0],[0,1],[1,0],[1,1]],[0,1,1,1],0.1,20),[0,1,1,1],'OR gate')
+_t(perceptron([[0,0],[0,1],[1,0],[1,1]],[0,0,0,0],0.1,20),[0,0,0,0],'all zeros stay zero')
+_t(perceptron([[2,2],[3,3],[-1,-1],[-2,-2]],[1,1,0,0],0.1,20),[1,1,0,0],'separable diagonal')
+_t(perceptron([[1,1]],[1],0.1,20),[1],'single positive point')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(perceptron([[0,0],[0,1],[1,0],[1,1]],[0,0,0,1],0.1,20),[0,0,0,1],'AND gate');
+_t(perceptron([[0,0],[0,1],[1,0],[1,1]],[0,1,1,1],0.1,20),[0,1,1,1],'OR gate');
+_t(perceptron([[0,0],[0,1],[1,0],[1,1]],[0,0,0,0],0.1,20),[0,0,0,0],'all zeros stay zero');
+_t(perceptron([[2,2],[3,3],[-1,-1],[-2,-2]],[1,1,0,0],0.1,20),[1,1,0,0],'separable diagonal');
+_t(perceptron([[1,1]],[1],0.1,20),[1],'single positive point');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'cosine-similarity', title:'Cosine Similarity', difficulty:'Beginner', category:'AI / ML Algorithms',
+    description:'Implement cosine similarity between two equal-length numeric vectors a and b from scratch (no ML libraries). Cosine similarity is the dot product of the two vectors divided by the product of their Euclidean norms: cos(a, b) = (Σ a_i·b_i) / (sqrt(Σ a_i²) · sqrt(Σ b_i²)). It ranges from -1 (exactly opposite) through 0 (orthogonal) to 1 (same direction). Return the raw floating-point similarity; the tests compare round(sim · 10000) as an integer so the result is language-independent and avoids float-equality issues. You may assume neither vector is all zeros.',
+    examples:[
+      {input:'a = [1,0], b = [0,1]',output:'0.0',explanation:'Orthogonal vectors have a dot product of 0, so similarity is 0.'},
+      {input:'a = [1,2,3], b = [1,2,3]',output:'1.0',explanation:'Identical direction gives the maximum similarity of 1.'},
+      {input:'a = [1,2,3], b = [4,5,6]',output:'0.974631...',explanation:'Dot product 32 over norms √14·√77 ≈ 32.83 gives ≈ 0.9746, i.e. 9746 after round(·10000).'},
+    ],
+    constraints:['1 <= len(a) == len(b) <= 1000','-1000 <= a[i], b[i] <= 1000','Neither a nor b is the zero vector','Tests compare round(similarity · 10000) as an integer'],
+    hints:['Compute the dot product Σ a_i·b_i in a single pass','Compute each norm as the square root of the sum of squares','Divide the dot product by the product of the two norms'],
+    tags:['ml','distance-metrics','vectors','math'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`import math
+
+def cosine_similarity(a, b):
+    pass
+`,
+      javascript:`function cosineSimilarity(a, b) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(round(cosine_similarity([1,0],[0,1])*10000),0,'orthogonal')
+_t(round(cosine_similarity([1,2,3],[1,2,3])*10000),10000,'identical')
+_t(round(cosine_similarity([1,2,3],[-1,-2,-3])*10000),-10000,'opposite')
+_t(round(cosine_similarity([1,2,3],[4,5,6])*10000),9746,'known case')
+_t(round(cosine_similarity([2,0],[3,0])*10000),10000,'same direction scaled')
+_t(round(cosine_similarity([1,1],[1,0])*10000),7071,'45 degrees')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(Math.round(cosineSimilarity([1,0],[0,1])*10000),0,'orthogonal');
+_t(Math.round(cosineSimilarity([1,2,3],[1,2,3])*10000),10000,'identical');
+_t(Math.round(cosineSimilarity([1,2,3],[-1,-2,-3])*10000),-10000,'opposite');
+_t(Math.round(cosineSimilarity([1,2,3],[4,5,6])*10000),9746,'known case');
+_t(Math.round(cosineSimilarity([2,0],[3,0])*10000),10000,'same direction scaled');
+_t(Math.round(cosineSimilarity([1,1],[1,0])*10000),7071,'45 degrees');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]

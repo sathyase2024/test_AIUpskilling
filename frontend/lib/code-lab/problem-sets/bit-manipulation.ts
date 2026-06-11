@@ -72,4 +72,82 @@ _t(countBits(8),[0,1,1,2,1,2,2,3,1],'powers of two reset');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'number-of-1-bits', title:'Number of 1 Bits', difficulty:'Beginner', category:'Bit Manipulation',
+    description:'Write a function that takes a non-negative integer n and returns the number of 1 bits it has in its binary representation (also known as the Hamming weight or popcount). For this problem the input fits within an unsigned 31-bit range so the value is safe as a signed 32-bit integer in every language.',
+    examples:[
+      {input:'n = 11',output:'3',explanation:'The binary representation of 11 is 1011, which has three 1 bits.'},
+      {input:'n = 128',output:'1',explanation:'The binary representation of 128 is 10000000, which has a single 1 bit.'},
+      {input:'n = 0',output:'0',explanation:'Zero has no 1 bits.'},
+    ],
+    constraints:['0 <= n <= 2³¹ - 1'],
+    hints:['Inspect the lowest bit with n & 1, then shift n right by one','Repeat until n becomes 0, accumulating the set bits','Brian Kernighan trick: n & (n - 1) clears the lowest set bit, so the loop runs once per 1 bit'],
+    tags:['bit-manipulation','popcount'], timeComplexity:'O(number of set bits)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def hamming_weight(n):
+    pass
+`,
+      javascript:`function hammingWeight(n) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(hamming_weight(11),3,'example 1')
+_t(hamming_weight(128),1,'single bit')
+_t(hamming_weight(0),0,'zero')
+_t(hamming_weight(7),3,'three low bits')
+_t(hamming_weight(2147483647),31,'all 31 bits set')
+_t(hamming_weight(1),1,'one')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(hammingWeight(11),3,'example 1');
+_t(hammingWeight(128),1,'single bit');
+_t(hammingWeight(0),0,'zero');
+_t(hammingWeight(7),3,'three low bits');
+_t(hammingWeight(2147483647),31,'all 31 bits set');
+_t(hammingWeight(1),1,'one');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'missing-number', title:'Missing Number', difficulty:'Beginner', category:'Bit Manipulation',
+    description:'Given an array nums containing n distinct numbers in the range [0, n], return the only number in the range that is missing from the array. Can you implement a solution using only O(1) extra space complexity and O(n) runtime complexity? Both the XOR trick (XOR all indices and values) and the Gauss sum formula (n·(n+1)/2 minus the array sum) achieve this.',
+    examples:[
+      {input:'nums = [3,0,1]',output:'2',explanation:'n = 3 since there are 3 numbers, so all numbers are in the range [0,3]. 2 is the missing number.'},
+      {input:'nums = [0,1]',output:'2',explanation:'n = 2 since there are 2 numbers, so all numbers are in the range [0,2]. 2 is the missing number.'},
+      {input:'nums = [9,6,4,2,3,5,7,0,1]',output:'8',explanation:'n = 9; 8 is the missing number in the range [0,9].'},
+    ],
+    constraints:['n == nums.length','1 <= n <= 10⁴','0 <= nums[i] <= n','All the numbers of nums are unique'],
+    hints:['The expected sum of 0..n is n·(n+1)/2; subtract the actual sum to find the missing value','Alternatively XOR all indices 0..n together with all array values','Every present number cancels, leaving only the missing one'],
+    tags:['bit-manipulation','xor','array','math'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def missing_number(nums):
+    pass
+`,
+      javascript:`function missingNumber(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(missing_number([3,0,1]),2,'example 1')
+_t(missing_number([0,1]),2,'missing at end')
+_t(missing_number([9,6,4,2,3,5,7,0,1]),8,'example 3')
+_t(missing_number([0]),1,'missing one of [0,1]')
+_t(missing_number([1]),0,'missing zero')
+_t(missing_number([0,2]),1,'missing middle')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(missingNumber([3,0,1]),2,'example 1');
+_t(missingNumber([0,1]),2,'missing at end');
+_t(missingNumber([9,6,4,2,3,5,7,0,1]),8,'example 3');
+_t(missingNumber([0]),1,'missing one of [0,1]');
+_t(missingNumber([1]),0,'missing zero');
+_t(missingNumber([0,2]),1,'missing middle');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]

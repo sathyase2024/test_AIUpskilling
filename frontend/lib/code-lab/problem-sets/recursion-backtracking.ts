@@ -110,4 +110,116 @@ _t(solveNQueens(6).length,4,'n=6 has 4 solutions');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'permutations', title:'Permutations', difficulty:'Intermediate', category:'Recursion & Backtracking',
+    description:'Given an array nums of distinct integers, return all the possible permutations. You can return the answer in any order (the tests normalize ordering by sorting the outer list of permutations, while each individual permutation is left intact because permutations differ precisely by the order of their elements). An array of n distinct integers has exactly n! permutations.',
+    examples:[
+      {input:'nums = [1,2,3]',output:'[[1,2,3],[1,3,2],[2,1,3],[2,3,1],[3,1,2],[3,2,1]]',explanation:'All 3! = 6 orderings of the three numbers.'},
+      {input:'nums = [0,1]',output:'[[0,1],[1,0]]'},
+      {input:'nums = [1]',output:'[[1]]'},
+    ],
+    constraints:['1 <= nums.length <= 6','-10 <= nums[i] <= 10','All the integers of nums are unique'],
+    hints:['Backtrack: build the permutation one position at a time, choosing an unused element','Track which elements are already used (a boolean array or a remaining list)','When the current arrangement has length n, record a copy of it'],
+    tags:['backtracking','recursion','array'], timeComplexity:'O(n·n!)', spaceComplexity:'O(n)',
+    starterCode:{
+      python:`def permute(nums):
+    pass
+`,
+      javascript:`function permute(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`_norm=lambda a:sorted(a)
+${PY_HARNESS}
+_t(_norm(permute([1,2,3])),[[1,2,3],[1,3,2],[2,1,3],[2,3,1],[3,1,2],[3,2,1]],'example 1')
+_t(_norm(permute([0,1])),[[0,1],[1,0]],'two elements')
+_t(_norm(permute([1])),[[1]],'single element')
+_t(len(permute([1,2,3,4])),24,'4! permutations')
+_t(_norm(permute([7,8,9])),[[7,8,9],[7,9,8],[8,7,9],[8,9,7],[9,7,8],[9,8,7]],'distinct values')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`const _norm=a=>[...a].sort((x,y)=>{const m=Math.min(x.length,y.length);for(let i=0;i<m;i++){if(x[i]!==y[i])return x[i]-y[i];}return x.length-y.length;});
+${JS_HARNESS}
+_t(_norm(permute([1,2,3])),[[1,2,3],[1,3,2],[2,1,3],[2,3,1],[3,1,2],[3,2,1]],'example 1');
+_t(_norm(permute([0,1])),[[0,1],[1,0]],'two elements');
+_t(_norm(permute([1])),[[1]],'single element');
+_t(permute([1,2,3,4]).length,24,'4! permutations');
+_t(_norm(permute([7,8,9])),[[7,8,9],[7,9,8],[8,7,9],[8,9,7],[9,7,8],[9,8,7]],'distinct values');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'generate-parentheses', title:'Generate Parentheses', difficulty:'Intermediate', category:'Recursion & Backtracking',
+    description:'Given n pairs of parentheses, write a function to generate all combinations of well-formed (valid, balanced) parentheses. You may return the answer in any order (the tests normalize by sorting the list of strings). A string is well-formed if every opening bracket has a matching closing bracket and brackets are properly nested.',
+    examples:[
+      {input:'n = 3',output:'["((()))","(()())","(())()","()(())","()()()"]',explanation:'All five well-formed combinations of 3 pairs of parentheses.'},
+      {input:'n = 1',output:'["()"]'},
+    ],
+    constraints:['1 <= n <= 8'],
+    hints:['Backtrack tracking how many open and close brackets have been used','You may add an open bracket while open count < n; you may add a close bracket while close count < open count','Record the string when its length reaches 2·n'],
+    tags:['backtracking','recursion','string'], timeComplexity:'O(4ⁿ / √n)', spaceComplexity:'O(n)',
+    starterCode:{
+      python:`def generate_parenthesis(n):
+    pass
+`,
+      javascript:`function generateParenthesis(n) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(sorted(generate_parenthesis(3)),sorted(['((()))','(()())','(())()','()(())','()()()']),'example 1')
+_t(sorted(generate_parenthesis(1)),['()'],'single pair')
+_t(sorted(generate_parenthesis(2)),sorted(['(())','()()']),'two pairs')
+_t(len(generate_parenthesis(4)),14,'catalan number 14')
+_t(len(generate_parenthesis(5)),42,'catalan number 42')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(generateParenthesis(3).slice().sort(),['((()))','(()())','(())()','()(())','()()()'].sort(),'example 1');
+_t(generateParenthesis(1).slice().sort(),['()'],'single pair');
+_t(generateParenthesis(2).slice().sort(),['(())','()()'].sort(),'two pairs');
+_t(generateParenthesis(4).length,14,'catalan number 14');
+_t(generateParenthesis(5).length,42,'catalan number 42');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'sudoku-solver', title:'Sudoku Solver', difficulty:'Expert', category:'Recursion & Backtracking',
+    description:'Write a program to solve a Sudoku puzzle by filling the empty cells. The board is a 9 x 9 grid of strings where each cell holds a digit "1"-"9" or "." for an empty cell. A sudoku solution must satisfy all of the following rules: each of the digits 1-9 must occur exactly once in each row, each of the digits 1-9 must occur exactly once in each column, and each of the digits 1-9 must occur exactly once in each of the nine 3 x 3 sub-boxes of the grid. The "." character indicates empty cells. You may assume the input board has exactly one solution. Modify the board in place to fill the empty cells AND return the solved board so the full grid can be compared.',
+    examples:[
+      {input:'board = [["5","3",".",".","7",...],...] (the classic LeetCode puzzle)',output:'The unique completed 9x9 grid',explanation:'Each empty cell is filled so that every row, column, and 3x3 box contains the digits 1-9 exactly once.'},
+    ],
+    constraints:['board.length == 9','board[i].length == 9','board[i][j] is a digit "1"-"9" or "."','It is guaranteed that the input board has exactly one solution'],
+    hints:['Backtrack over empty cells; try digits 1-9 that do not violate the row, column, or 3x3 box','Maintain sets (or fixed-size arrays) of used digits per row, per column, and per box for O(1) validity checks','When a digit leads to a dead end, undo it and try the next; return success up the recursion once the grid is full'],
+    tags:['backtracking','recursion','matrix','hash-set'], timeComplexity:'O(9^(empty cells))', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def solve_sudoku(board):
+    pass
+`,
+      javascript:`function solveSudoku(board) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_p1=[['5','3','.','.','7','.','.','.','.'],['6','.','.','1','9','5','.','.','.'],['.','9','8','.','.','.','.','6','.'],['8','.','.','.','6','.','.','.','3'],['4','.','.','8','.','3','.','.','1'],['7','.','.','.','2','.','.','.','6'],['.','6','.','.','.','.','2','8','.'],['.','.','.','4','1','9','.','.','5'],['.','.','.','.','8','.','.','7','9']]
+_sol1=[['5','3','4','6','7','8','9','1','2'],['6','7','2','1','9','5','3','4','8'],['1','9','8','3','4','2','5','6','7'],['8','5','9','7','6','1','4','2','3'],['4','2','6','8','5','3','7','9','1'],['7','1','3','9','2','4','8','5','6'],['9','6','1','5','3','7','2','8','4'],['2','8','7','4','1','9','6','3','5'],['3','4','5','2','8','6','1','7','9']]
+_t(solve_sudoku(_p1),_sol1,'classic puzzle solved')
+_p2=[['5','3','4','6','7','8','9','1','2'],['6','7','2','1','9','5','3','4','8'],['1','9','8','3','4','2','5','6','7'],['8','5','9','7','6','1','4','2','3'],['4','2','6','8','5','3','7','9','1'],['7','1','3','9','2','4','8','5','6'],['9','6','1','5','3','7','2','8','4'],['2','8','7','4','1','9','6','3','5'],['3','4','5','2','8','6','1','7','.']]
+_sol2=[['5','3','4','6','7','8','9','1','2'],['6','7','2','1','9','5','3','4','8'],['1','9','8','3','4','2','5','6','7'],['8','5','9','7','6','1','4','2','3'],['4','2','6','8','5','3','7','9','1'],['7','1','3','9','2','4','8','5','6'],['9','6','1','5','3','7','2','8','4'],['2','8','7','4','1','9','6','3','5'],['3','4','5','2','8','6','1','7','9']]
+_t(solve_sudoku(_p2),_sol2,'one empty cell')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+const _p1=[['5','3','.','.','7','.','.','.','.'],['6','.','.','1','9','5','.','.','.'],['.','9','8','.','.','.','.','6','.'],['8','.','.','.','6','.','.','.','3'],['4','.','.','8','.','3','.','.','1'],['7','.','.','.','2','.','.','.','6'],['.','6','.','.','.','.','2','8','.'],['.','.','.','4','1','9','.','.','5'],['.','.','.','.','8','.','.','7','9']];
+const _sol1=[['5','3','4','6','7','8','9','1','2'],['6','7','2','1','9','5','3','4','8'],['1','9','8','3','4','2','5','6','7'],['8','5','9','7','6','1','4','2','3'],['4','2','6','8','5','3','7','9','1'],['7','1','3','9','2','4','8','5','6'],['9','6','1','5','3','7','2','8','4'],['2','8','7','4','1','9','6','3','5'],['3','4','5','2','8','6','1','7','9']];
+_t(solveSudoku(_p1),_sol1,'classic puzzle solved');
+const _p2=[['5','3','4','6','7','8','9','1','2'],['6','7','2','1','9','5','3','4','8'],['1','9','8','3','4','2','5','6','7'],['8','5','9','7','6','1','4','2','3'],['4','2','6','8','5','3','7','9','1'],['7','1','3','9','2','4','8','5','6'],['9','6','1','5','3','7','2','8','4'],['2','8','7','4','1','9','6','3','5'],['3','4','5','2','8','6','1','7','.']];
+const _sol2=[['5','3','4','6','7','8','9','1','2'],['6','7','2','1','9','5','3','4','8'],['1','9','8','3','4','2','5','6','7'],['8','5','9','7','6','1','4','2','3'],['4','2','6','8','5','3','7','9','1'],['7','1','3','9','2','4','8','5','6'],['9','6','1','5','3','7','2','8','4'],['2','8','7','4','1','9','6','3','5'],['3','4','5','2','8','6','1','7','9']];
+_t(solveSudoku(_p2),_sol2,'one empty cell');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]

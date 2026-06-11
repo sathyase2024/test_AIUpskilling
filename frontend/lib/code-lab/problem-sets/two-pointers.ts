@@ -153,4 +153,154 @@ _t(trap([2,0,2]),2,'simple valley');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'move-zeroes', title:'Move Zeroes', difficulty:'Beginner', category:'Two Pointers',
+    description:'Given an integer array nums, move all 0\'s to the end of it while maintaining the relative order of the non-zero elements. You must do this in place without making a copy of the array, and return the modified array so the tests can compare it directly. Follow-up: minimize the total number of operations.',
+    examples:[
+      {input:'nums = [0,1,0,3,12]',output:'[1,3,12,0,0]',explanation:'The non-zero elements keep their order; both zeros move to the end.'},
+      {input:'nums = [0]',output:'[0]',explanation:'A single zero stays in place.'},
+    ],
+    constraints:['1 <= nums.length <= 10⁴','-2³¹ <= nums[i] <= 2³¹ - 1'],
+    hints:['Use a slow pointer marking where the next non-zero element should land','Scan with a fast pointer; when it finds a non-zero, write it at the slow pointer and advance both','After all non-zeros are placed, fill the remaining tail with zeros (or swap as you go)'],
+    tags:['array','two-pointers','in-place'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def move_zeroes(nums):
+    pass
+`,
+      javascript:`function moveZeroes(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(move_zeroes([0,1,0,3,12]),[1,3,12,0,0],'example 1')
+_t(move_zeroes([0]),[0],'single zero')
+_t(move_zeroes([1,2,3]),[1,2,3],'no zeros')
+_t(move_zeroes([0,0,1]),[1,0,0],'leading zeros')
+_t(move_zeroes([1,0,2,0,3]),[1,2,3,0,0],'interleaved zeros')
+_t(move_zeroes([0,0,0]),[0,0,0],'all zeros')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(moveZeroes([0,1,0,3,12]),[1,3,12,0,0],'example 1');
+_t(moveZeroes([0]),[0],'single zero');
+_t(moveZeroes([1,2,3]),[1,2,3],'no zeros');
+_t(moveZeroes([0,0,1]),[1,0,0],'leading zeros');
+_t(moveZeroes([1,0,2,0,3]),[1,2,3,0,0],'interleaved zeros');
+_t(moveZeroes([0,0,0]),[0,0,0],'all zeros');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'remove-duplicates-sorted', title:'Remove Duplicates from Sorted Array', difficulty:'Beginner', category:'Two Pointers',
+    description:'Given an integer array nums sorted in non-decreasing order, remove the duplicates so that each unique element appears only once, keeping the relative order. To make the result simple to compare across languages, return the list of unique elements in order (the deduped prefix), rather than a count.',
+    examples:[
+      {input:'nums = [1,1,2]',output:'[1,2]',explanation:'The unique elements in order are 1 and 2.'},
+      {input:'nums = [0,0,1,1,1,2,2,3,3,4]',output:'[0,1,2,3,4]',explanation:'Each of the five distinct values appears once in the result.'},
+    ],
+    constraints:['1 <= nums.length <= 3·10⁴','-100 <= nums[i] <= 100','nums is sorted in non-decreasing order'],
+    hints:['Because the array is sorted, duplicates are adjacent','Keep a write pointer for the next slot; only write a value when it differs from the previous kept value','The first element is always kept'],
+    tags:['array','two-pointers'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def remove_duplicates(nums):
+    pass
+`,
+      javascript:`function removeDuplicates(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(remove_duplicates([1,1,2]),[1,2],'example 1')
+_t(remove_duplicates([0,0,1,1,1,2,2,3,3,4]),[0,1,2,3,4],'example 2')
+_t(remove_duplicates([1]),[1],'single element')
+_t(remove_duplicates([1,2,3]),[1,2,3],'already unique')
+_t(remove_duplicates([2,2,2,2]),[2],'all duplicates')
+_t(remove_duplicates([-3,-3,-1,0,0]),[-3,-1,0],'negatives')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(removeDuplicates([1,1,2]),[1,2],'example 1');
+_t(removeDuplicates([0,0,1,1,1,2,2,3,3,4]),[0,1,2,3,4],'example 2');
+_t(removeDuplicates([1]),[1],'single element');
+_t(removeDuplicates([1,2,3]),[1,2,3],'already unique');
+_t(removeDuplicates([2,2,2,2]),[2],'all duplicates');
+_t(removeDuplicates([-3,-3,-1,0,0]),[-3,-1,0],'negatives');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'sort-colors', title:'Sort Colors', difficulty:'Intermediate', category:'Two Pointers',
+    description:'Given an array nums with n objects colored red, white, or blue, sort them in place so that objects of the same color are adjacent, with the colors in the order red, white, and blue. We use the integers 0, 1, and 2 to represent the colors red, white, and blue respectively. You must solve this without using the library\'s sort function, and return the modified array so the tests can compare it directly. Follow-up: can you solve it in one pass with O(1) extra space?',
+    examples:[
+      {input:'nums = [2,0,2,1,1,0]',output:'[0,0,1,1,2,2]',explanation:'The colors are grouped 0s, then 1s, then 2s.'},
+      {input:'nums = [2,0,1]',output:'[0,1,2]',explanation:'A single pass groups the three colors.'},
+    ],
+    constraints:['n == nums.length','1 <= n <= 300','nums[i] is either 0, 1, or 2'],
+    hints:['A counting sort over three buckets works but takes two passes','Dutch national flag: maintain pointers low, mid, and high','Scan with mid: swap 0s to the low region, 2s to the high region, and leave 1s in place'],
+    tags:['array','two-pointers','sorting','dutch-national-flag'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def sort_colors(nums):
+    pass
+`,
+      javascript:`function sortColors(nums) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(sort_colors([2,0,2,1,1,0]),[0,0,1,1,2,2],'example 1')
+_t(sort_colors([2,0,1]),[0,1,2],'example 2')
+_t(sort_colors([0]),[0],'single element')
+_t(sort_colors([1,1,1]),[1,1,1],'all same')
+_t(sort_colors([2,2,0,0,1,1]),[0,0,1,1,2,2],'reverse grouped')
+_t(sort_colors([1,0,2,0]),[0,0,1,2],'mixed')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(sortColors([2,0,2,1,1,0]),[0,0,1,1,2,2],'example 1');
+_t(sortColors([2,0,1]),[0,1,2],'example 2');
+_t(sortColors([0]),[0],'single element');
+_t(sortColors([1,1,1]),[1,1,1],'all same');
+_t(sortColors([2,2,0,0,1,1]),[0,0,1,1,2,2],'reverse grouped');
+_t(sortColors([1,0,2,0]),[0,0,1,2],'mixed');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'three-sum-closest', title:'3Sum Closest', difficulty:'Intermediate', category:'Two Pointers',
+    description:'Given an integer array nums of length n and an integer target, find three integers in nums such that the sum is closest to target. Return the sum of the three integers. Each input is generated such that exactly one solution (one closest sum) exists.',
+    examples:[
+      {input:'nums = [-1,2,1,-4], target = 1',output:'2',explanation:'The sum that is closest to the target is 2 (from -1 + 2 + 1 = 2).'},
+      {input:'nums = [0,0,0], target = 1',output:'0',explanation:'The only triplet sums to 0, which is the closest possible.'},
+    ],
+    constraints:['3 <= nums.length <= 500','-1000 <= nums[i] <= 1000','-10⁴ <= target <= 10⁴','Exactly one closest sum exists'],
+    hints:['Sort the array so you can move two pointers intelligently','Fix the first element, then run left/right pointers on the remainder','Track the sum with the smallest absolute distance to target; move the pointer that reduces the gap'],
+    tags:['array','two-pointers','sorting'], timeComplexity:'O(n²)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def three_sum_closest(nums, target):
+    pass
+`,
+      javascript:`function threeSumClosest(nums, target) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(three_sum_closest([-1,2,1,-4],1),2,'example 1')
+_t(three_sum_closest([0,0,0],1),0,'all zeros')
+_t(three_sum_closest([1,1,0],-100),2,'far below target')
+_t(three_sum_closest([1,2,4,8,16,32,64,128],82),82,'exact match')
+_t(three_sum_closest([-3,-2,-5,3,-4],-1),-2,'negatives')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(threeSumClosest([-1,2,1,-4],1),2,'example 1');
+_t(threeSumClosest([0,0,0],1),0,'all zeros');
+_t(threeSumClosest([1,1,0],-100),2,'far below target');
+_t(threeSumClosest([1,2,4,8,16,32,64,128],82),82,'exact match');
+_t(threeSumClosest([-3,-2,-5,3,-4],-1),-2,'negatives');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]

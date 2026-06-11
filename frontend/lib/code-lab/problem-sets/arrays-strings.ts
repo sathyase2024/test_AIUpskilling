@@ -230,4 +230,232 @@ _t(firstMissingPositive([-5]),1,'only negative');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'rotate-array', title:'Rotate Array', difficulty:'Intermediate', category:'Arrays & Strings',
+    description:'Given an integer array nums, rotate the array to the right by k steps, where k is non-negative. k may be larger than the array length, in which case the effective rotation is k mod n. Modify the array in place and return it so the tests can compare the result directly. Follow-up: can you do it in O(1) extra space?',
+    examples:[
+      {input:'nums = [1,2,3,4,5,6,7], k = 3',output:'[5,6,7,1,2,3,4]',explanation:'Rotate right by 3: [7,1,2,3,4,5,6] → [6,7,1,2,3,4,5] → [5,6,7,1,2,3,4].'},
+      {input:'nums = [-1,-100,3,99], k = 2',output:'[3,99,-1,-100]',explanation:'Rotate right by 2: [99,-1,-100,3] → [3,99,-1,-100].'},
+    ],
+    constraints:['1 <= nums.length <= 10⁵','-2³¹ <= nums[i] <= 2³¹ - 1','0 <= k <= 10⁵'],
+    hints:['Rotating right by k moves each element to index (i + k) mod n','Reduce k modulo n first, since rotating by the length leaves the array unchanged','Reverse the whole array, then reverse the first k and the last n-k elements for O(1) space'],
+    tags:['array','math','two-pointers','in-place'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def rotate(nums, k):
+    pass
+`,
+      javascript:`function rotate(nums, k) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(rotate([1,2,3,4,5,6,7],3),[5,6,7,1,2,3,4],'example 1')
+_t(rotate([-1,-100,3,99],2),[3,99,-1,-100],'example 2')
+_t(rotate([1,2],3),[2,1],'k exceeds length')
+_t(rotate([1,2,3],0),[1,2,3],'zero rotation')
+_t(rotate([1],100),[1],'single element')
+_t(rotate([1,2,3,4],4),[1,2,3,4],'full rotation unchanged')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(rotate([1,2,3,4,5,6,7],3),[5,6,7,1,2,3,4],'example 1');
+_t(rotate([-1,-100,3,99],2),[3,99,-1,-100],'example 2');
+_t(rotate([1,2],3),[2,1],'k exceeds length');
+_t(rotate([1,2,3],0),[1,2,3],'zero rotation');
+_t(rotate([1],100),[1],'single element');
+_t(rotate([1,2,3,4],4),[1,2,3,4],'full rotation unchanged');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'longest-common-prefix', title:'Longest Common Prefix', difficulty:'Beginner', category:'Arrays & Strings',
+    description:'Write a function to find the longest common prefix string amongst an array of strings. If there is no common prefix, return the empty string "". The comparison is case-sensitive, and the prefix must be shared by every string in the array.',
+    examples:[
+      {input:'strs = ["flower","flow","flight"]',output:'"fl"',explanation:'The longest prefix common to all three strings is "fl".'},
+      {input:'strs = ["dog","racecar","car"]',output:'""',explanation:'There is no common prefix among the input strings, so the answer is the empty string.'},
+    ],
+    constraints:['1 <= strs.length <= 200','0 <= strs[i].length <= 200','strs[i] consists of only lowercase English letters if it is non-empty'],
+    hints:['The common prefix can be no longer than the shortest string','Compare characters column by column across all strings, stopping at the first mismatch','Alternatively take strs[0] as a candidate prefix and trim it against each remaining string'],
+    tags:['string','trie'], timeComplexity:'O(S)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def longest_common_prefix(strs):
+    pass
+`,
+      javascript:`function longestCommonPrefix(strs) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(longest_common_prefix(['flower','flow','flight']),'fl','example 1')
+_t(longest_common_prefix(['dog','racecar','car']),'','no common prefix')
+_t(longest_common_prefix(['a']),'a','single string')
+_t(longest_common_prefix(['ab','abc','abcd']),'ab','shortest is prefix')
+_t(longest_common_prefix(['','abc']),'','empty string present')
+_t(longest_common_prefix(['interspecies','interstellar','interstate']),'inters','long prefix')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(longestCommonPrefix(['flower','flow','flight']),'fl','example 1');
+_t(longestCommonPrefix(['dog','racecar','car']),'','no common prefix');
+_t(longestCommonPrefix(['a']),'a','single string');
+_t(longestCommonPrefix(['ab','abc','abcd']),'ab','shortest is prefix');
+_t(longestCommonPrefix(['','abc']),'','empty string present');
+_t(longestCommonPrefix(['interspecies','interstellar','interstate']),'inters','long prefix');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'spiral-matrix', title:'Spiral Matrix', difficulty:'Intermediate', category:'Arrays & Strings',
+    description:'Given an m x n matrix, return all elements of the matrix in spiral order, starting from the top-left corner and moving right, then down, then left, then up, spiralling inward until every element has been visited exactly once.',
+    examples:[
+      {input:'matrix = [[1,2,3],[4,5,6],[7,8,9]]',output:'[1,2,3,6,9,8,7,4,5]',explanation:'Traverse the outer ring clockwise, then the center element 5.'},
+      {input:'matrix = [[1,2,3,4],[5,6,7,8],[9,10,11,12]]',output:'[1,2,3,4,8,12,11,10,9,5,6,7]',explanation:'Spiral through the 3 x 4 grid clockwise.'},
+    ],
+    constraints:['m == matrix.length','n == matrix[i].length','1 <= m, n <= 10','-100 <= matrix[i][j] <= 100'],
+    hints:['Track four boundaries: top, bottom, left, right','Walk right along top, down the right, left along bottom, up the left — then shrink the boundaries','Stop when the boundaries cross; guard the bottom and left passes so single rows/columns are not revisited'],
+    tags:['array','matrix','simulation'], timeComplexity:'O(m·n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def spiral_order(matrix):
+    pass
+`,
+      javascript:`function spiralOrder(matrix) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(spiral_order([[1,2,3],[4,5,6],[7,8,9]]),[1,2,3,6,9,8,7,4,5],'example 1')
+_t(spiral_order([[1,2,3,4],[5,6,7,8],[9,10,11,12]]),[1,2,3,4,8,12,11,10,9,5,6,7],'example 2')
+_t(spiral_order([[1]]),[1],'single cell')
+_t(spiral_order([[1,2,3]]),[1,2,3],'single row')
+_t(spiral_order([[1],[2],[3]]),[1,2,3],'single column')
+_t(spiral_order([[1,2],[3,4]]),[1,2,4,3],'two by two')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(spiralOrder([[1,2,3],[4,5,6],[7,8,9]]),[1,2,3,6,9,8,7,4,5],'example 1');
+_t(spiralOrder([[1,2,3,4],[5,6,7,8],[9,10,11,12]]),[1,2,3,4,8,12,11,10,9,5,6,7],'example 2');
+_t(spiralOrder([[1]]),[1],'single cell');
+_t(spiralOrder([[1,2,3]]),[1,2,3],'single row');
+_t(spiralOrder([[1],[2],[3]]),[1,2,3],'single column');
+_t(spiralOrder([[1,2],[3,4]]),[1,2,4,3],'two by two');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'set-matrix-zeroes', title:'Set Matrix Zeroes', difficulty:'Intermediate', category:'Arrays & Strings',
+    description:'Given an m x n integer matrix, if an element is 0, set its entire row and column to 0. You must do it in place and return the modified matrix so the tests can compare it directly. Follow-up: a straightforward O(m·n) space solution copies the matrix; a better solution uses O(m + n) space, and you can achieve O(1) space by using the first row and first column as markers.',
+    examples:[
+      {input:'matrix = [[1,1,1],[1,0,1],[1,1,1]]',output:'[[1,0,1],[0,0,0],[1,0,1]]',explanation:'The single 0 at (1,1) zeroes row 1 and column 1.'},
+      {input:'matrix = [[0,1,2,0],[3,4,5,2],[1,3,1,5]]',output:'[[0,0,0,0],[0,4,5,0],[0,3,1,0]]',explanation:'Columns 0 and 3 and row 0 are zeroed because of the zeros in the first row.'},
+    ],
+    constraints:['m == matrix.length','n == matrix[0].length','1 <= m, n <= 200','-2³¹ <= matrix[i][j] <= 2³¹ - 1'],
+    hints:['Decide which rows and columns must be zeroed before you start writing zeros, or you will cascade','One clean approach records the affected row and column indices in two sets','For O(1) space, use the first row and column as the marker arrays and handle them separately'],
+    tags:['array','matrix','hash-set','in-place'], timeComplexity:'O(m·n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def set_zeroes(matrix):
+    pass
+`,
+      javascript:`function setZeroes(matrix) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(set_zeroes([[1,1,1],[1,0,1],[1,1,1]]),[[1,0,1],[0,0,0],[1,0,1]],'example 1')
+_t(set_zeroes([[0,1,2,0],[3,4,5,2],[1,3,1,5]]),[[0,0,0,0],[0,4,5,0],[0,3,1,0]],'example 2')
+_t(set_zeroes([[1,2,3]]),[[1,2,3]],'no zeros')
+_t(set_zeroes([[0]]),[[0]],'single zero')
+_t(set_zeroes([[1,0],[1,1]]),[[0,0],[1,0]],'two by two')
+_t(set_zeroes([[5,0,5],[5,5,5]]),[[0,0,0],[5,0,5]],'column zeroed')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(setZeroes([[1,1,1],[1,0,1],[1,1,1]]),[[1,0,1],[0,0,0],[1,0,1]],'example 1');
+_t(setZeroes([[0,1,2,0],[3,4,5,2],[1,3,1,5]]),[[0,0,0,0],[0,4,5,0],[0,3,1,0]],'example 2');
+_t(setZeroes([[1,2,3]]),[[1,2,3]],'no zeros');
+_t(setZeroes([[0]]),[[0]],'single zero');
+_t(setZeroes([[1,0],[1,1]]),[[0,0],[1,0]],'two by two');
+_t(setZeroes([[5,0,5],[5,5,5]]),[[0,0,0],[5,0,5]],'column zeroed');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'insert-interval', title:'Insert Interval', difficulty:'Intermediate', category:'Arrays & Strings',
+    description:'You are given an array of non-overlapping intervals intervals where intervals[i] = [start_i, end_i] are sorted in ascending order by start_i, and a new interval newInterval = [start, end]. Insert newInterval into intervals such that the result is still sorted in ascending order by start and still has no overlapping intervals (merging if necessary). Return the resulting array of intervals. Intervals that merely touch (one ends exactly where another begins) are considered overlapping and must be merged.',
+    examples:[
+      {input:'intervals = [[1,3],[6,9]], newInterval = [2,5]',output:'[[1,5],[6,9]]',explanation:'[2,5] overlaps [1,3], merging into [1,5]; [6,9] is unaffected.'},
+      {input:'intervals = [[1,2],[3,5],[6,7],[8,10],[12,16]], newInterval = [4,8]',output:'[[1,2],[3,10],[12,16]]',explanation:'[4,8] overlaps [3,5], [6,7] and [8,10], merging them into [3,10].'},
+    ],
+    constraints:['0 <= intervals.length <= 10⁴','intervals[i].length == 2','0 <= start_i <= end_i <= 10⁵','intervals is sorted by start_i in ascending order','newInterval.length == 2','0 <= start <= end <= 10⁵'],
+    hints:['Intervals ending before newInterval starts can be copied as-is','Merge every interval that overlaps newInterval by extending its start/end bounds','Append the remaining intervals that start after the merged interval ends'],
+    tags:['array','intervals'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
+    starterCode:{
+      python:`def insert(intervals, new_interval):
+    pass
+`,
+      javascript:`function insert(intervals, newInterval) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(insert([[1,3],[6,9]],[2,5]),[[1,5],[6,9]],'example 1')
+_t(insert([[1,2],[3,5],[6,7],[8,10],[12,16]],[4,8]),[[1,2],[3,10],[12,16]],'example 2')
+_t(insert([],[5,7]),[[5,7]],'empty list')
+_t(insert([[1,5]],[2,3]),[[1,5]],'contained interval')
+_t(insert([[3,5],[8,10]],[1,2]),[[1,2],[3,5],[8,10]],'insert at front')
+_t(insert([[1,2],[5,6]],[2,5]),[[1,6]],'touching merge')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(insert([[1,3],[6,9]],[2,5]),[[1,5],[6,9]],'example 1');
+_t(insert([[1,2],[3,5],[6,7],[8,10],[12,16]],[4,8]),[[1,2],[3,10],[12,16]],'example 2');
+_t(insert([],[5,7]),[[5,7]],'empty list');
+_t(insert([[1,5]],[2,3]),[[1,5]],'contained interval');
+_t(insert([[3,5],[8,10]],[1,2]),[[1,2],[3,5],[8,10]],'insert at front');
+_t(insert([[1,2],[5,6]],[2,5]),[[1,6]],'touching merge');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'candy', title:'Candy', difficulty:'Advanced', category:'Arrays & Strings',
+    description:'There are n children standing in a line, each assigned a rating value given in the integer array ratings. You are giving candies to these children subject to two requirements: each child must have at least one candy, and a child with a higher rating than an immediate neighbor must receive more candies than that neighbor. Return the minimum number of candies you need to distribute. Children with equal ratings have no constraint relative to each other.',
+    examples:[
+      {input:'ratings = [1,0,2]',output:'5',explanation:'Give 2, 1, 2 candies to the children for a total of 5.'},
+      {input:'ratings = [1,2,2]',output:'4',explanation:'Give 1, 2, 1 candies. The third child gets 1 candy; equal ratings carry no constraint.'},
+    ],
+    constraints:['n == ratings.length','1 <= n <= 2·10⁴','0 <= ratings[i] <= 2·10⁴'],
+    hints:['Start everyone at one candy','Left-to-right pass: if ratings[i] > ratings[i-1], give one more than the left neighbor','Right-to-left pass: if ratings[i] > ratings[i+1], take the max of the current count and one more than the right neighbor'],
+    tags:['array','greedy'], timeComplexity:'O(n)', spaceComplexity:'O(n)',
+    starterCode:{
+      python:`def candy(ratings):
+    pass
+`,
+      javascript:`function candy(ratings) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(candy([1,0,2]),5,'example 1')
+_t(candy([1,2,2]),4,'example 2')
+_t(candy([1]),1,'single child')
+_t(candy([1,2,3,4]),10,'strictly increasing')
+_t(candy([4,3,2,1]),10,'strictly decreasing')
+_t(candy([1,3,2,2,1]),7,'peak then plateau')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(candy([1,0,2]),5,'example 1');
+_t(candy([1,2,2]),4,'example 2');
+_t(candy([1]),1,'single child');
+_t(candy([1,2,3,4]),10,'strictly increasing');
+_t(candy([4,3,2,1]),10,'strictly decreasing');
+_t(candy([1,3,2,2,1]),7,'peak then plateau');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]

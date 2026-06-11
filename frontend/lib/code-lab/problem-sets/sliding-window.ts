@@ -123,4 +123,118 @@ _t(minWindow('aaflslflsldkalskaaa','aaa'),'aaa','repeated requirement');
 console.log(\`\${_p}/\${_n} tests passed\`);`,
     },
   },
+  {
+    id:'find-all-anagrams', title:'Find All Anagrams in a String', difficulty:'Intermediate', category:'Sliding Window',
+    description:'Given two strings s and p, return an array of all the start indices of p\'s anagrams in s. The indices must be returned in ascending order. An anagram is a string formed by rearranging the letters of another, using all the original letters exactly once. A match is a substring of s of length p.length whose character counts equal those of p.',
+    examples:[
+      {input:'s = "cbaebabacd", p = "abc"',output:'[0,6]',explanation:'The substring starting at index 0 is "cba" (an anagram of "abc") and at index 6 is "bac".'},
+      {input:'s = "abab", p = "ab"',output:'[0,1,2]',explanation:'"ab", "ba" and "ab" starting at indices 0, 1 and 2 are all anagrams of "ab".'},
+    ],
+    constraints:['1 <= s.length, p.length <= 3·10⁴','s and p consist of lowercase English letters'],
+    hints:['Slide a window of length p.length over s','Maintain character counts for the window and compare against counts of p','Update counts incrementally as the window advances instead of recounting each time'],
+    tags:['string','sliding-window','hash-map'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def find_anagrams(s, p):
+    pass
+`,
+      javascript:`function findAnagrams(s, p) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(find_anagrams('cbaebabacd','abc'),[0,6],'example 1')
+_t(find_anagrams('abab','ab'),[0,1,2],'example 2')
+_t(find_anagrams('aa','bb'),[],'no anagrams')
+_t(find_anagrams('a','ab'),[],'p longer than s')
+_t(find_anagrams('aaaa','a'),[0,1,2,3],'single char p')
+_t(find_anagrams('baa','aa'),[1],'one match')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(findAnagrams('cbaebabacd','abc'),[0,6],'example 1');
+_t(findAnagrams('abab','ab'),[0,1,2],'example 2');
+_t(findAnagrams('aa','bb'),[],'no anagrams');
+_t(findAnagrams('a','ab'),[],'p longer than s');
+_t(findAnagrams('aaaa','a'),[0,1,2,3],'single char p');
+_t(findAnagrams('baa','aa'),[1],'one match');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'longest-repeating-replacement', title:'Longest Repeating Character Replacement', difficulty:'Intermediate', category:'Sliding Window',
+    description:'You are given a string s and an integer k. You can choose any character of the string and change it to any other uppercase English character. You can perform this operation at most k times. Return the length of the longest substring containing the same letter you can get after performing the above operations.',
+    examples:[
+      {input:'s = "ABAB", k = 2',output:'4',explanation:'Replace the two A\'s with two B\'s or vice versa, making the whole string the same letter.'},
+      {input:'s = "AABABBA", k = 1',output:'4',explanation:'Replace the one A in the middle to get "AABBBBA"; the substring "BBBB" has length 4.'},
+    ],
+    constraints:['1 <= s.length <= 10⁵','s consists of only uppercase English letters','0 <= k <= s.length'],
+    hints:['A window is valid when (window length − count of its most frequent char) <= k','Expand the right edge, tracking the max frequency of any single char in the window','When the window becomes invalid, shrink from the left; the answer is the largest valid window seen'],
+    tags:['string','sliding-window','hash-map'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def character_replacement(s, k):
+    pass
+`,
+      javascript:`function characterReplacement(s, k) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(character_replacement('ABAB',2),4,'example 1')
+_t(character_replacement('AABABBA',1),4,'example 2')
+_t(character_replacement('A',0),1,'single char no ops')
+_t(character_replacement('AAAA',0),4,'all same')
+_t(character_replacement('ABCDE',1),2,'distinct chars')
+_t(character_replacement('AAAB',0),3,'no replacements allowed')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(characterReplacement('ABAB',2),4,'example 1');
+_t(characterReplacement('AABABBA',1),4,'example 2');
+_t(characterReplacement('A',0),1,'single char no ops');
+_t(characterReplacement('AAAA',0),4,'all same');
+_t(characterReplacement('ABCDE',1),2,'distinct chars');
+_t(characterReplacement('AAAB',0),3,'no replacements allowed');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
+  {
+    id:'max-consecutive-ones-iii', title:'Max Consecutive Ones III', difficulty:'Intermediate', category:'Sliding Window',
+    description:'Given a binary array nums and an integer k, return the maximum number of consecutive 1\'s in the array if you can flip at most k 0\'s to 1\'s.',
+    examples:[
+      {input:'nums = [1,1,1,0,0,0,1,1,1,1,0], k = 2',output:'6',explanation:'Flip the two 0\'s at indices 3 and 4 to get [1,1,1,1,1,1,1,1,1,1,0]; the longest run of 1s is 6 (bolded subarray [1,1,1,1,1,1]).'},
+      {input:'nums = [0,0,1,1,0,0,1,1,1,0,1,1,0,0,0,1,1,1,1], k = 3',output:'10',explanation:'Flipping three 0\'s yields a run of 10 consecutive 1s.'},
+    ],
+    constraints:['1 <= nums.length <= 10⁵','nums[i] is either 0 or 1','0 <= k <= nums.length'],
+    hints:['Find the longest window containing at most k zeros','Expand the right edge and count zeros inside the window','When the zero count exceeds k, shrink from the left until it is valid again'],
+    tags:['array','sliding-window','binary'], timeComplexity:'O(n)', spaceComplexity:'O(1)',
+    starterCode:{
+      python:`def longest_ones(nums, k):
+    pass
+`,
+      javascript:`function longestOnes(nums, k) {
+
+}
+`,
+    },
+    testCode:{
+      python:`${PY_HARNESS}
+_t(longest_ones([1,1,1,0,0,0,1,1,1,1,0],2),6,'example 1')
+_t(longest_ones([0,0,1,1,0,0,1,1,1,0,1,1,0,0,0,1,1,1,1],3),10,'example 2')
+_t(longest_ones([0,0,0],0),0,'no flips all zeros')
+_t(longest_ones([1,1,1],0),3,'all ones')
+_t(longest_ones([0,0,0],3),3,'flip everything')
+_t(longest_ones([1,0,1,0,1],1),3,'single flip')
+print(f'{_p}/{_n} tests passed')`,
+      javascript:`${JS_HARNESS}
+_t(longestOnes([1,1,1,0,0,0,1,1,1,1,0],2),6,'example 1');
+_t(longestOnes([0,0,1,1,0,0,1,1,1,0,1,1,0,0,0,1,1,1,1],3),10,'example 2');
+_t(longestOnes([0,0,0],0),0,'no flips all zeros');
+_t(longestOnes([1,1,1],0),3,'all ones');
+_t(longestOnes([0,0,0],3),3,'flip everything');
+_t(longestOnes([1,0,1,0,1],1),3,'single flip');
+console.log(\`\${_p}/\${_n} tests passed\`);`,
+    },
+  },
 ]
