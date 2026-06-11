@@ -150,7 +150,7 @@ function SyntaxCode({ code, language }: { code: string; language?: string }) {
   }
 
   return (
-    <div className="my-6 rounded-xl overflow-hidden border border-white/10 shadow-lg">
+    <div className="my-6 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-lg">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-[#161622] border-b border-white/10">
         <div className="flex items-center gap-2">
