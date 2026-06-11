@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Fira_Code } from "next/font/google";
+import BottomNav from "@/components/BottomNav";
 import "./globals.css";
 
 /* -------------------------------------------------------
@@ -77,65 +78,43 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${firaCode.variable} antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        {/* Resolve the theme before paint: stored choice, else system preference */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('sv-theme');if(!t)t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark'}}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className="min-h-screen flex flex-col relative">
 
         {/*
-          Fixed full-screen ambient background layers.
-          These sit behind all page content via z-index layering.
+          Fixed full-screen ambient background layers (theme-aware via the
+          --app-bg / --app-orb-* tokens defined in globals.css).
         */}
-
-        {/* Base dark gradient */}
         <div
           className="fixed inset-0 -z-30"
-          style={{
-            background:
-              "radial-gradient(ellipse 120% 80% at 50% -10%, rgba(124,58,237,0.18) 0%, transparent 60%), #0a0a0f",
-          }}
+          style={{ background: "var(--app-bg)" }}
           aria-hidden="true"
         />
-
-        {/* Subtle grid overlay */}
-        <div
-          className="fixed inset-0 -z-20 bg-grid opacity-60"
-          aria-hidden="true"
-        />
-
-        {/* Ambient purple orb — top-left */}
         <div
           className="fixed -top-32 -left-32 -z-10 h-[500px] w-[500px] rounded-full"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%)",
-            filter: "blur(40px)",
-          }}
+          style={{ background: "var(--app-orb-1)", filter: "blur(40px)" }}
           aria-hidden="true"
         />
-
-        {/* Ambient cyan orb — bottom-right */}
         <div
           className="fixed -bottom-32 -right-32 -z-10 h-[500px] w-[500px] rounded-full"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(6,182,212,0.1) 0%, transparent 70%)",
-            filter: "blur(40px)",
-          }}
-          aria-hidden="true"
-        />
-
-        {/* Ambient accent orb — top-right */}
-        <div
-          className="fixed top-1/3 -right-40 -z-10 h-[400px] w-[400px] rounded-full"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 70%)",
-            filter: "blur(60px)",
-          }}
+          style={{ background: "var(--app-orb-2)", filter: "blur(40px)" }}
           aria-hidden="true"
         />
 
         {/* Page content */}
         {children}
+
+        {/* Mobile bottom navigation (hidden on immersive workspaces) */}
+        <BottomNav />
 
       </body>
     </html>

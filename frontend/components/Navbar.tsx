@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useRef, useEffect } from 'react'
 import { getStoredUser, logout, type StoredUser } from '@/lib/api'
 import BrandLogo from '@/components/BrandLogo'
+import ThemeToggle from '@/components/ThemeToggle'
 import {
   Sparkles,
   Menu,
@@ -173,8 +174,8 @@ export default function Navbar() {
 
   const notifTypeIcon = (type: Notification['type']) => {
     if (type === 'achievement') return <Trophy className="w-4 h-4 text-amber-500" />
-    if (type === 'reminder')    return <Zap className="w-4 h-4 text-amber-600" />
-    return <Sparkles className="w-4 h-4 text-slate-400" />
+    if (type === 'reminder')    return <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+    return <Sparkles className="w-4 h-4 text-slate-400 dark:text-white/40" />
   }
 
   return (
@@ -182,8 +183,8 @@ export default function Navbar() {
       className={[
         'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
         scrolled
-          ? 'bg-white/85 backdrop-blur-xl border-b border-slate-200 shadow-sm'
-          : 'bg-white/85 backdrop-blur-md border-b border-slate-200',
+          ? 'bg-white/85 dark:bg-[#0d0d14]/90 backdrop-blur-xl border-b border-slate-200 dark:border-white/10 shadow-sm'
+          : 'bg-white/85 dark:bg-[#0d0d14]/90 backdrop-blur-md border-b border-slate-200 dark:border-white/10',
       ].join(' ')}
       aria-label="Main navigation"
     >
@@ -206,21 +207,20 @@ export default function Navbar() {
                     'relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium',
                     'transition-all duration-200 group',
                     active
-                      ? 'text-amber-600 bg-amber-50'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
+                      ? 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/15'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10',
                   ].join(' ')}
                   aria-current={active ? 'page' : undefined}
                 >
                   {/* Active background */}
                   {active && (
                     <span
-                      className="absolute inset-0 rounded-lg"
-                      style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}
+                      className="absolute inset-0 rounded-lg bg-amber-500/[0.08] border border-amber-500/25"
                       aria-hidden="true"
                     />
                   )}
 
-                  <span className={active ? 'text-amber-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors'} aria-hidden="true">
+                  <span className={active ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 group-hover:text-slate-600 dark:text-white/40 dark:group-hover:text-white/70 transition-colors'} aria-hidden="true">
                     {icon}
                   </span>
                   <span className="relative z-10">{label}</span>
@@ -240,6 +240,9 @@ export default function Navbar() {
 
           {/* ---- Right side controls ---- */}
           <div className="flex items-center gap-2">
+
+            {/* --- Theme toggle --- */}
+            <ThemeToggle />
 
             {/* --- Notification bell --- */}
             <div className="relative" ref={notifRef}>
