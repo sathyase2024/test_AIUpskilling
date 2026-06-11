@@ -473,7 +473,7 @@ export default function LandingPage() {
             </div>
 
             {/* Right column — floating code card */}
-            <div className="flex justify-center lg:justify-end">
+            <div className="flex justify-center lg:justify-end min-w-0">
               <FloatingCodeCard />
             </div>
           </div>
@@ -698,7 +698,7 @@ export default function LandingPage() {
             </div>
 
             {/* Right: live example */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 min-w-0">
               <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 transition-all duration-300 hover:border-purple-500/50">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-cyan-500">

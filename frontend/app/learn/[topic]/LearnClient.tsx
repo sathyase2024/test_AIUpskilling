@@ -613,7 +613,7 @@ export default function LearnClient({ topic }: { topic: string }) {
         </aside>
 
         {/* ── Main Content ── */}
-        <main ref={contentRef} className="flex-1 overflow-y-auto h-[calc(100vh-57px)]">
+        <main ref={contentRef} className="flex-1 min-w-0 overflow-y-auto h-[calc(100vh-57px)]">
           <div className="max-w-3xl mx-auto px-6 py-10">
 
             {/* ── Challenge view ── */}
@@ -1002,7 +1002,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                     </div>
 
                     {/* Question */}
-                    <p className="text-base font-medium leading-relaxed mb-5">{q.question}</p>
+                    <p className="text-base font-medium leading-relaxed mb-5 break-words">{q.question}</p>
 
                     {/* Options */}
                     <div className="space-y-2.5">
@@ -1019,7 +1019,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                                 setTimeout(() => setQuizCurrentQ((q) => q + 1), 350);
                               }
                             }}
-                            className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-all ${
+                            className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-all break-words ${
                               selected
                                 ? "border-purple-500/60 bg-purple-500/20 text-white"
                                 : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:bg-white/[0.05] hover:text-white"

@@ -322,6 +322,7 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
         value={code}
         onChange={(val) => setCode(val ?? '')}
         options={{
+          automaticLayout: true,
           fontSize: 13,
           fontFamily: '"Fira Code", "Cascadia Code", "JetBrains Mono", monospace',
           fontLigatures: true,

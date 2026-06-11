@@ -390,7 +390,7 @@ export default function CodeLabPage() {
           <div className="p-4 border-b border-white/[0.06] space-y-2.5">
             <h3 className="text-[10px] font-bold text-white/35 uppercase tracking-wider">Examples</h3>
             {problem.examples.map((ex, i) => (
-              <div key={i} className="rounded-lg bg-white/[0.03] border border-white/[0.08] p-2.5 text-xs font-mono space-y-1">
+              <div key={i} className="rounded-lg bg-white/[0.03] border border-white/[0.08] p-2.5 text-xs font-mono space-y-1 break-all">
                 <div><span className="text-white/25">In: </span><span className="text-green-300/75">{ex.input}</span></div>
                 <div><span className="text-white/25">Out: </span><span className="text-cyan-300/75">{ex.output}</span></div>
                 {ex.explanation && <div className="text-white/30 text-[10px]">{ex.explanation}</div>}
@@ -459,6 +459,7 @@ export default function CodeLabPage() {
               value={code}
               onChange={val => setCode(val ?? '')}
               options={{
+                automaticLayout: true,
                 fontSize: 13,
                 fontFamily: '"Fira Code","Cascadia Code","JetBrains Mono",monospace',
                 fontLigatures: true,
