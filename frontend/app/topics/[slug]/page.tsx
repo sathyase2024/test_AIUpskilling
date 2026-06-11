@@ -105,7 +105,7 @@ function transformApiResponse(raw: any): TopicDetail {
     enrolled,
     reviews: Math.floor((raw.enrolledCount ?? 0) / 8),
     icon: SLUG_ICON[raw.slug] ?? '📚',
-    gradient: raw.imageGradient ?? 'from-purple-600 to-cyan-500',
+    gradient: raw.imageGradient ?? 'from-amber-500 to-amber-600',
     lessons,
   }
 }
@@ -130,7 +130,7 @@ function buildFallbackTopic(slug: string): TopicDetail {
     enrolled: '25K',
     reviews: 1800,
     icon: '📚',
-    gradient: 'from-purple-600 to-cyan-500',
+    gradient: 'from-amber-500 to-amber-600',
     lessons: [
       { id: 'l1', title: `Introduction to ${name}`, duration: '12 min', type: 'video', xp: 30, locked: false },
       { id: 'l2', title: 'Core Concepts', duration: '18 min', type: 'reading', xp: 40, locked: false },
@@ -165,19 +165,19 @@ function getLessonTypeLabel(type: LessonType): string {
 
 function getLessonTypeColor(type: LessonType): string {
   switch (type) {
-    case 'video':    return 'text-blue-400'
-    case 'reading':  return 'text-green-400'
-    case 'exercise': return 'text-yellow-400'
-    case 'quiz':     return 'text-purple-400'
-    case 'project':  return 'text-orange-400'
-    default:         return 'text-white/40'
+    case 'video':    return 'text-blue-600'
+    case 'reading':  return 'text-emerald-600'
+    case 'exercise': return 'text-amber-600'
+    case 'quiz':     return 'text-amber-600'
+    case 'project':  return 'text-orange-600'
+    default:         return 'text-slate-400'
   }
 }
 
 function difficultyStyle(d: Difficulty) {
-  if (d === 'Beginner')     return 'text-green-400 bg-green-500/10 border-green-500/30'
-  if (d === 'Intermediate') return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30'
-  return 'text-red-400 bg-red-500/10 border-red-500/30'
+  if (d === 'Beginner')     return 'text-emerald-700 bg-emerald-50 border-emerald-200'
+  if (d === 'Intermediate') return 'text-blue-700 bg-blue-50 border-blue-200'
+  return 'text-amber-700 bg-amber-50 border-amber-200'
 }
 
 function generateBulletPoints(topicName: string): string[] {
@@ -194,18 +194,18 @@ function generateBulletPoints(topicName: string): string[] {
 
 function PageSkeleton() {
   return (
-    <div className="min-h-screen animate-pulse" style={{ backgroundColor: '#0a0a0f' }}>
-      <div className="h-64 bg-white/5" />
+    <div className="min-h-screen animate-pulse" style={{ backgroundColor: '#f7f8fa' }}>
+      <div className="h-64 bg-slate-100" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex gap-8">
           <div className="flex-1 space-y-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-24 rounded-2xl bg-white/5" />
+              <div key={i} className="h-24 rounded-2xl bg-slate-100" />
             ))}
           </div>
           <div className="w-80 space-y-4">
-            <div className="h-48 rounded-2xl bg-white/5" />
-            <div className="h-32 rounded-2xl bg-white/5" />
+            <div className="h-48 rounded-2xl bg-slate-100" />
+            <div className="h-32 rounded-2xl bg-slate-100" />
           </div>
         </div>
       </div>
@@ -253,19 +253,19 @@ export default function TopicDetailPage() {
   const bulletPoints = generateBulletPoints(topic.name)
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#0a0a0f' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#f7f8fa' }}>
 
       {/* ── Hero Header ── */}
       <div
         className="relative overflow-hidden"
         style={{
-          background: `radial-gradient(ellipse 120% 100% at 50% 0%, rgba(124,58,237,0.25) 0%, transparent 65%), #0a0a0f`,
+          background: `radial-gradient(ellipse 120% 100% at 50% 0%, rgba(245,158,11,0.12) 0%, transparent 65%), #f7f8fa`,
         }}
       >
         {/* Ambient orb */}
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full pointer-events-none"
-          style={{ background: 'radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 70%)', filter: 'blur(60px)' }}
+          style={{ background: 'radial-gradient(circle, rgba(245,158,11,0.10) 0%, transparent 70%)', filter: 'blur(60px)' }}
           aria-hidden="true"
         />
 
@@ -273,7 +273,7 @@ export default function TopicDetailPage() {
           {/* Back button */}
           <Link
             href="/topics"
-            className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm mb-8 group"
+            className="inline-flex items-center gap-2 text-slate-500 hover:text-amber-600 transition-colors text-sm mb-8 group"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
             Back to Topics
@@ -282,8 +282,8 @@ export default function TopicDetailPage() {
           <div className="flex flex-col sm:flex-row sm:items-start gap-6">
             {/* Icon */}
             <div
-              className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl shadow-2xl shrink-0"
-              style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.6) 0%, rgba(6,182,212,0.4) 100%)', border: '1px solid rgba(255,255,255,0.15)' }}
+              className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl shadow-lg shrink-0"
+              style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: '1px solid rgba(255,255,255,0.4)' }}
             >
               {topic.icon}
             </div>
@@ -293,7 +293,7 @@ export default function TopicDetailPage() {
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <span
                   className="px-3 py-1 rounded-full text-xs font-semibold border"
-                  style={{ background: 'rgba(124,58,237,0.15)', borderColor: 'rgba(124,58,237,0.4)', color: '#c4b5fd' }}
+                  style={{ background: 'rgba(245,158,11,0.10)', borderColor: 'rgba(245,158,11,0.30)', color: '#b45309' }}
                 >
                   {topic.category}
                 </span>
@@ -302,35 +302,35 @@ export default function TopicDetailPage() {
                 </span>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3 leading-tight">
+              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-3 leading-tight">
                 {topic.name}
               </h1>
 
-              <p className="text-white/60 text-base leading-relaxed mb-5 max-w-2xl">
+              <p className="text-slate-600 text-base leading-relaxed mb-5 max-w-2xl">
                 {topic.description}
               </p>
 
               {/* Stats row */}
-              <div className="flex flex-wrap items-center gap-5 text-sm text-white/50">
+              <div className="flex flex-wrap items-center gap-5 text-sm text-slate-500">
                 <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-cyan-400" />
+                  <Clock className="w-4 h-4 text-amber-600" />
                   <span>{topic.hours} hours</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                  <span className="text-white/80 font-semibold">{topic.rating}</span>
-                  <span className="text-white/30">({topic.reviews.toLocaleString()} reviews)</span>
+                  <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                  <span className="text-slate-700 font-semibold">{topic.rating}</span>
+                  <span className="text-slate-400">({topic.reviews.toLocaleString()} reviews)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-purple-400" />
+                  <Users className="w-4 h-4 text-amber-600" />
                   <span>{topic.enrolled} enrolled</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4 text-green-400" />
+                  <BookOpen className="w-4 h-4 text-emerald-600" />
                   <span>{totalLessons} lessons</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-amber-400" />
+                  <Zap className="w-4 h-4 text-amber-600" />
                   <span>{totalXp.toLocaleString()} XP total</span>
                 </div>
               </div>
@@ -345,36 +345,35 @@ export default function TopicDetailPage() {
 
           {/* ── Left Column: Lesson List ── */}
           <div className="flex-1 min-w-0 space-y-6">
-            <h2 className="text-xl font-bold text-white">Course Content</h2>
+            <h2 className="text-xl font-bold text-slate-900">Course Content</h2>
 
             {modules.map((mod, modIdx) => (
               <div
                 key={modIdx}
-                className="rounded-2xl overflow-hidden"
-                style={{ background: 'rgba(18,18,26,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}
+                className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm"
               >
                 {/* Module header */}
                 <div
                   className="px-5 py-3.5 flex items-center justify-between gap-3"
-                  style={{ background: 'rgba(124,58,237,0.08)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+                  style={{ background: 'rgba(245,158,11,0.06)', borderBottom: '1px solid rgba(226,232,240,1)' }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-purple-200 shrink-0"
-                      style={{ background: 'rgba(124,58,237,0.2)', border: '1px solid rgba(124,58,237,0.4)' }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-amber-700 shrink-0"
+                      style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.30)' }}
                     >
                       {modIdx + 1}
                     </span>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-bold text-white/85 truncate">{mod.title}</h3>
-                      <p className="text-xs text-white/40 truncate">{mod.subtitle}</p>
+                      <h3 className="text-sm font-bold text-slate-900 truncate">{mod.title}</h3>
+                      <p className="text-xs text-slate-500 truncate">{mod.subtitle}</p>
                     </div>
                   </div>
-                  <span className="text-xs text-white/40 shrink-0">{mod.lessons.length} lessons</span>
+                  <span className="text-xs text-slate-500 shrink-0">{mod.lessons.length} lessons</span>
                 </div>
 
                 {/* Lesson rows */}
-                <div className="divide-y divide-white/[0.05]">
+                <div className="divide-y divide-slate-100">
                   {mod.lessons.map((lesson) => {
                     const Icon = getLessonIcon(lesson.type)
                     const iconColor = getLessonTypeColor(lesson.type)
@@ -385,35 +384,35 @@ export default function TopicDetailPage() {
                         className={`flex items-center gap-4 px-5 py-3.5 transition-colors ${
                           lesson.locked
                             ? 'opacity-50 cursor-not-allowed'
-                            : 'hover:bg-white/[0.03] cursor-pointer'
+                            : 'hover:bg-slate-50 cursor-pointer'
                         }`}
                       >
                         {/* Type icon */}
                         <div
                           className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconColor}`}
-                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                          style={{ background: 'rgba(241,245,249,1)', border: '1px solid rgba(226,232,240,1)' }}
                         >
                           <Icon className="w-4 h-4" aria-hidden="true" />
                         </div>
 
                         {/* Title + type */}
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium truncate ${lesson.locked ? 'text-white/40' : 'text-white/85'}`}>
+                          <p className={`text-sm font-medium truncate ${lesson.locked ? 'text-slate-400' : 'text-slate-900'}`}>
                             {lesson.title}
                           </p>
-                          <p className={`text-xs mt-0.5 ${iconColor} opacity-80`}>
+                          <p className={`text-xs mt-0.5 ${iconColor} opacity-90`}>
                             {getLessonTypeLabel(lesson.type)}
                           </p>
                         </div>
 
                         {/* Duration */}
-                        <div className="flex items-center gap-1 text-xs text-white/30 shrink-0">
+                        <div className="flex items-center gap-1 text-xs text-slate-400 shrink-0">
                           <Clock className="w-3 h-3" />
                           {lesson.duration}
                         </div>
 
                         {/* XP */}
-                        <div className="hidden sm:flex items-center gap-1 text-xs text-amber-400/70 shrink-0">
+                        <div className="hidden sm:flex items-center gap-1 text-xs text-amber-600 shrink-0">
                           <Zap className="w-3 h-3" />
                           {lesson.xp} XP
                         </div>
@@ -421,8 +420,8 @@ export default function TopicDetailPage() {
                         {/* Lock / play indicator */}
                         <div className="shrink-0">
                           {lesson.locked
-                            ? <Lock className="w-4 h-4 text-white/20" aria-hidden="true" />
-                            : <ChevronRight className="w-4 h-4 text-white/20" aria-hidden="true" />
+                            ? <Lock className="w-4 h-4 text-slate-300" aria-hidden="true" />
+                            : <ChevronRight className="w-4 h-4 text-slate-300" aria-hidden="true" />
                           }
                         </div>
                       </div>
@@ -438,57 +437,54 @@ export default function TopicDetailPage() {
 
             {/* Start Learning CTA */}
             <div
-              className="rounded-2xl p-6 text-center"
-              style={{ background: 'rgba(18,18,26,0.85)', border: '1px solid rgba(139,92,246,0.25)' }}
+              className="rounded-2xl p-6 text-center bg-white border border-amber-200 shadow-sm"
             >
               <Link
                 href={`/learn/${slug}`}
                 className="block w-full py-3.5 rounded-xl text-white font-bold text-base transition-all hover:opacity-90 hover:scale-[1.02] active:scale-95 shadow-lg"
                 style={{
-                  background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)',
-                  boxShadow: '0 8px 30px rgba(124,58,237,0.35)',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  boxShadow: '0 8px 30px rgba(245,158,11,0.30)',
                 }}
               >
                 Start Learning
               </Link>
-              <p className="text-white/40 text-xs mt-3">Free preview available · No credit card required</p>
+              <p className="text-slate-500 text-xs mt-3">Free preview available · No credit card required</p>
             </div>
 
             {/* Topic Stats Card */}
             <div
-              className="rounded-2xl p-5 space-y-4"
-              style={{ background: 'rgba(18,18,26,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}
+              className="rounded-2xl p-5 space-y-4 bg-white border border-slate-200 shadow-sm"
             >
-              <h3 className="text-sm font-bold text-white/80">Topic Overview</h3>
+              <h3 className="text-sm font-bold text-slate-900">Topic Overview</h3>
 
               {[
-                { icon: Clock,    label: 'Duration',    value: `${topic.hours} hours`, color: 'text-cyan-400' },
-                { icon: BookOpen, label: 'Lessons',     value: `${totalLessons} lessons`, color: 'text-purple-400' },
-                { icon: Zap,      label: 'Total XP',    value: `${totalXp.toLocaleString()} XP`, color: 'text-amber-400' },
-                { icon: Award,    label: 'Certificate', value: 'Upon completion', color: 'text-green-400' },
-                { icon: Users,    label: 'Enrolled',    value: topic.enrolled, color: 'text-pink-400' },
+                { icon: Clock,    label: 'Duration',    value: `${topic.hours} hours`, color: 'text-amber-600' },
+                { icon: BookOpen, label: 'Lessons',     value: `${totalLessons} lessons`, color: 'text-amber-600' },
+                { icon: Zap,      label: 'Total XP',    value: `${totalXp.toLocaleString()} XP`, color: 'text-amber-600' },
+                { icon: Award,    label: 'Certificate', value: 'Upon completion', color: 'text-emerald-600' },
+                { icon: Users,    label: 'Enrolled',    value: topic.enrolled, color: 'text-amber-600' },
               ].map(({ icon: Icon, label, value, color }) => (
                 <div key={label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-white/50 text-sm">
+                  <div className="flex items-center gap-2.5 text-slate-500 text-sm">
                     <Icon className={`w-4 h-4 ${color}`} aria-hidden="true" />
                     {label}
                   </div>
-                  <span className="text-white/80 text-sm font-medium">{value}</span>
+                  <span className="text-slate-700 text-sm font-medium">{value}</span>
                 </div>
               ))}
             </div>
 
             {/* What you'll learn */}
             <div
-              className="rounded-2xl p-5"
-              style={{ background: 'rgba(18,18,26,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}
+              className="rounded-2xl p-5 bg-white border border-slate-200 shadow-sm"
             >
-              <h3 className="text-sm font-bold text-white/80 mb-4">What you&apos;ll learn</h3>
+              <h3 className="text-sm font-bold text-slate-900 mb-4">What you&apos;ll learn</h3>
               <ul className="space-y-2.5">
                 {bulletPoints.map((point, i) => (
                   <li key={i} className="flex items-start gap-2.5">
-                    <CheckCircle className="w-4 h-4 text-green-400 shrink-0 mt-0.5" aria-hidden="true" />
-                    <span className="text-white/60 text-sm leading-relaxed">{point}</span>
+                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
+                    <span className="text-slate-600 text-sm leading-relaxed">{point}</span>
                   </li>
                 ))}
               </ul>
@@ -496,21 +492,20 @@ export default function TopicDetailPage() {
 
             {/* Instructor Card */}
             <div
-              className="rounded-2xl p-5 flex items-center gap-4"
-              style={{ background: 'rgba(18,18,26,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}
+              className="rounded-2xl p-5 flex items-center gap-4 bg-white border border-slate-200 shadow-sm"
             >
               <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}
+                style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}
               >
                 <Brain className="w-6 h-6 text-white" aria-hidden="true" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <p className="text-sm font-semibold text-white">AI-Generated by Claude</p>
-                  <Sparkles className="w-3.5 h-3.5 text-purple-400" aria-hidden="true" />
+                  <p className="text-sm font-semibold text-slate-900">AI-Generated by Claude</p>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
                 </div>
-                <p className="text-xs text-white/40 leading-relaxed">
+                <p className="text-xs text-slate-500 leading-relaxed">
                   Content dynamically generated and personalized by Anthropic&apos;s Claude AI model.
                 </p>
               </div>
