@@ -102,18 +102,9 @@ export default function SignupPage() {
     })
   }
 
-  const inputStyle = {
-    background: '#ffffff',
-    border: '1px solid #cbd5e1',
-  }
-  const inputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.border = '1px solid #f59e0b'
-    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.15)'
-  }
-  const inputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.border = '1px solid #cbd5e1'
-    e.currentTarget.style.boxShadow = 'none'
-  }
+  const inputClasses =
+    'bg-white dark:bg-white/5 border border-slate-300 dark:border-white/15 ' +
+    'focus:border-amber-500 dark:focus:border-amber-500 focus:shadow-[0_0_0_3px_rgba(245,158,11,0.15)]'
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -154,10 +145,10 @@ export default function SignupPage() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4 py-12"
+      className="min-h-screen flex items-center justify-center px-4 py-12 bg-[#f7f8fa] dark:bg-transparent"
       style={{
-        background:
-          'radial-gradient(ellipse 120% 80% at 50% -10%, rgba(245,158,11,0.08) 0%, transparent 60%), #f7f8fa',
+        backgroundImage:
+          'radial-gradient(ellipse 120% 80% at 50% -10%, rgba(245,158,11,0.08) 0%, transparent 60%)',
       }}
     >
       {/* Ambient orbs */}
@@ -180,29 +171,24 @@ export default function SignupPage() {
 
       {/* Card */}
       <div
-        className="relative w-full max-w-md rounded-2xl p-8 shadow-xl"
-        style={{
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-        }}
+        className="relative w-full max-w-md rounded-2xl p-8 shadow-xl bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10"
       >
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <BrandLogo size="lg" tagline className="mb-6" />
 
-          <h1 className="text-2xl font-bold text-slate-900">Start learning today</h1>
-          <p className="text-slate-500 text-sm mt-1">Join 10,000+ developers upskilling with AI</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Start learning today</h1>
+          <p className="text-slate-500 dark:text-white/50 text-sm mt-1">Join 10,000+ developers upskilling with AI</p>
         </div>
 
         {/* Error banner */}
         {error && (
           <div
-            className="flex items-start gap-3 mb-5 px-4 py-3 rounded-xl"
-            style={{ background: '#fef2f2', border: '1px solid #fecaca' }}
+            className="flex items-start gap-3 mb-5 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30"
             role="alert"
           >
-            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" aria-hidden="true" />
-            <p className="text-red-700 text-sm">{error}</p>
+            <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+            <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
           </div>
         )}
 
@@ -210,12 +196,12 @@ export default function SignupPage() {
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {/* Full Name */}
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label htmlFor="name" className="block text-sm font-medium text-slate-700 dark:text-white/90 mb-1.5">
               Full Name
             </label>
             <div className="relative">
               <User
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/40 pointer-events-none"
                 aria-hidden="true"
               />
               <input
@@ -226,21 +212,18 @@ export default function SignupPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="John Doe"
-                className="w-full pl-10 pr-4 py-3 rounded-xl text-slate-900 placeholder-slate-400 text-sm outline-none transition-all"
-                style={inputStyle}
-                onFocus={inputFocus}
-                onBlur={inputBlur}
+                className={`w-full pl-10 pr-4 py-3 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/30 text-sm outline-none transition-all ${inputClasses}`}
               />
             </div>
           </div>
 
           {/* Username */}
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label htmlFor="username" className="block text-sm font-medium text-slate-700 dark:text-white/90 mb-1.5">
               Username
             </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-sm">@</span>
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/40 pointer-events-none text-sm">@</span>
               <input
                 id="username"
                 type="text"
@@ -251,23 +234,20 @@ export default function SignupPage() {
                 placeholder="johndoe"
                 minLength={3}
                 maxLength={30}
-                className="w-full pl-10 pr-4 py-3 rounded-xl text-slate-900 placeholder-slate-400 text-sm outline-none transition-all"
-                style={inputStyle}
-                onFocus={inputFocus}
-                onBlur={inputBlur}
+                className={`w-full pl-10 pr-4 py-3 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/30 text-sm outline-none transition-all ${inputClasses}`}
               />
             </div>
-            <p className="mt-1 text-xs text-slate-500">Letters, numbers, _ and - only</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-white/50">Letters, numbers, _ and - only</p>
           </div>
 
           {/* Email */}
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-white/90 mb-1.5">
               Email address
             </label>
             <div className="relative">
               <Mail
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/40 pointer-events-none"
                 aria-hidden="true"
               />
               <input
@@ -278,22 +258,19 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-3 rounded-xl text-slate-900 placeholder-slate-400 text-sm outline-none transition-all"
-                style={inputStyle}
-                onFocus={inputFocus}
-                onBlur={inputBlur}
+                className={`w-full pl-10 pr-4 py-3 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/30 text-sm outline-none transition-all ${inputClasses}`}
               />
             </div>
           </div>
 
           {/* Password */}
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-white/90 mb-1.5">
               Password
             </label>
             <div className="relative">
               <Lock
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/40 pointer-events-none"
                 aria-hidden="true"
               />
               <input
@@ -304,15 +281,12 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-11 py-3 rounded-xl text-slate-900 placeholder-slate-400 text-sm outline-none transition-all"
-                style={inputStyle}
-                onFocus={inputFocus}
-                onBlur={inputBlur}
+                className={`w-full pl-10 pr-11 py-3 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/30 text-sm outline-none transition-all ${inputClasses}`}
               />
               <button
                 type="button"
                 onClick={() => setShowPass((v) => !v)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-white/40 dark:hover:text-white/70 transition-colors"
                 aria-label={showPass ? 'Hide password' : 'Show password'}
               >
                 {showPass
@@ -325,7 +299,7 @@ export default function SignupPage() {
             {/* Strength bar */}
             {password && (
               <div className="mt-2 space-y-1">
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#e2e8f0' }}>
+                <div className="h-1.5 rounded-full overflow-hidden bg-slate-200 dark:bg-white/10">
                   <div
                     className="h-full rounded-full transition-all duration-300"
                     style={{
@@ -343,12 +317,12 @@ export default function SignupPage() {
 
           {/* Confirm Password */}
           <div>
-            <label htmlFor="confirm-password" className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label htmlFor="confirm-password" className="block text-sm font-medium text-slate-700 dark:text-white/90 mb-1.5">
               Confirm Password
             </label>
             <div className="relative">
               <Lock
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/40 pointer-events-none"
                 aria-hidden="true"
               />
               <input
@@ -359,15 +333,12 @@ export default function SignupPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirm(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-11 py-3 rounded-xl text-slate-900 placeholder-slate-400 text-sm outline-none transition-all"
-                style={inputStyle}
-                onFocus={inputFocus}
-                onBlur={inputBlur}
+                className={`w-full pl-10 pr-11 py-3 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/30 text-sm outline-none transition-all ${inputClasses}`}
               />
               <button
                 type="button"
                 onClick={() => setShowConfirm((v) => !v)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-white/40 dark:hover:text-white/70 transition-colors"
                 aria-label={showConfirm ? 'Hide password' : 'Show password'}
               >
                 {showConfirm
@@ -377,17 +348,16 @@ export default function SignupPage() {
               </button>
             </div>
             {confirmPassword && password !== confirmPassword && (
-              <p className="mt-1 text-xs text-red-600">Passwords do not match</p>
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">Passwords do not match</p>
             )}
           </div>
 
           {/* Hobby Selector */}
           <div
-            className="rounded-2xl p-4"
-            style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
+            className="rounded-2xl p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10"
           >
-            <p className="text-sm font-semibold text-slate-700 mb-1">Personalize your learning</p>
-            <p className="text-xs text-slate-500 mb-3">
+            <p className="text-sm font-semibold text-slate-700 dark:text-white/90 mb-1">Personalize your learning</p>
+            <p className="text-xs text-slate-500 dark:text-white/50 mb-3">
               AI tailors examples to your interests
             </p>
             <div className="grid grid-cols-4 gap-2">
@@ -398,20 +368,12 @@ export default function SignupPage() {
                     key={label}
                     type="button"
                     onClick={() => toggleHobby(label)}
-                    className="flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl text-[11px] font-medium transition-all duration-200"
-                    style={
+                    className={[
+                      'flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl text-[11px] font-medium transition-all duration-200 border',
                       selected
-                        ? {
-                            background: '#fffbeb',
-                            border: '1px solid #f59e0b',
-                            color: '#b45309',
-                          }
-                        : {
-                            background: '#ffffff',
-                            border: '1px solid #cbd5e1',
-                            color: '#64748b',
-                          }
-                    }
+                        ? 'bg-amber-50 dark:bg-amber-500/15 border-amber-500 text-amber-700 dark:text-amber-300'
+                        : 'bg-white dark:bg-white/5 border-slate-300 dark:border-white/15 text-slate-500 dark:text-white/50',
+                    ].join(' ')}
                   >
                     <Icon className="w-4 h-4" />
                     {label}
@@ -427,7 +389,7 @@ export default function SignupPage() {
               className={`mt-0.5 w-4 h-4 rounded border transition-all flex items-center justify-center shrink-0 ${
                 agreedTerms
                   ? 'bg-amber-500 border-amber-500'
-                  : 'border-slate-300 group-hover:border-slate-400'
+                  : 'border-slate-300 group-hover:border-slate-400 dark:border-white/15 dark:group-hover:border-white/30'
               }`}
               onClick={() => setTerms((v) => !v)}
             >
@@ -437,12 +399,11 @@ export default function SignupPage() {
                 </svg>
               )}
             </div>
-            <span className="text-xs text-slate-600 leading-relaxed" onClick={() => setTerms((v) => !v)}>
+            <span className="text-xs text-slate-600 dark:text-white/70 leading-relaxed" onClick={() => setTerms((v) => !v)}>
               I agree to the{' '}
               <Link
                 href="/terms"
-                className="font-semibold transition-colors"
-                style={{ color: '#d97706' }}
+                className="font-semibold transition-colors text-amber-600 dark:text-amber-400"
                 onClick={(e) => e.stopPropagation()}
               >
                 Terms of Service
@@ -450,8 +411,7 @@ export default function SignupPage() {
               and{' '}
               <Link
                 href="/privacy"
-                className="font-semibold transition-colors"
-                style={{ color: '#d97706' }}
+                className="font-semibold transition-colors text-amber-600 dark:text-amber-400"
                 onClick={(e) => e.stopPropagation()}
               >
                 Privacy Policy
@@ -478,18 +438,17 @@ export default function SignupPage() {
 
         {/* Divider */}
         <div className="flex items-center gap-3 my-6">
-          <div className="flex-1 h-px" style={{ background: '#e2e8f0' }} />
-          <span className="text-slate-400 text-xs font-medium">or</span>
-          <div className="flex-1 h-px" style={{ background: '#e2e8f0' }} />
+          <div className="flex-1 h-px bg-slate-200 dark:bg-white/10" />
+          <span className="text-slate-400 dark:text-white/40 text-xs font-medium">or</span>
+          <div className="flex-1 h-px bg-slate-200 dark:bg-white/10" />
         </div>
 
         {/* Sign in link */}
-        <p className="text-center text-sm text-slate-500">
+        <p className="text-center text-sm text-slate-500 dark:text-white/50">
           Already have an account?{' '}
           <Link
             href="/login"
-            className="font-semibold transition-colors"
-            style={{ color: '#d97706' }}
+            className="font-semibold transition-colors text-amber-600 dark:text-amber-400"
           >
             Sign in
           </Link>

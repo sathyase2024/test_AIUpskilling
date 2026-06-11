@@ -33,41 +33,39 @@ export default function ProfilePage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen" style={{ backgroundColor: '#f7f8fa' }}>
+      <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent">
         <Navbar />
         <div className="pt-24 max-w-2xl mx-auto px-4 pb-12">
-          <div className="rounded-2xl p-8 shadow-xl" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
+          <div className="rounded-2xl p-8 shadow-xl bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10">
             <div className="flex items-center gap-3 mb-8">
               <div className="p-2.5 rounded-xl" style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' }}>
                 <User className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-slate-900">Profile</h1>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Profile</h1>
             </div>
 
             <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1.5">Display name</label>
+                <label className="block text-sm font-medium text-slate-600 dark:text-white/70 mb-1.5">Display name</label>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl text-slate-900 text-sm outline-none"
-                  style={{ background: '#ffffff', border: '1px solid #cbd5e1' }}
+                  className="w-full px-4 py-3 rounded-xl text-slate-900 dark:text-white text-sm outline-none bg-white dark:bg-white/5 border border-slate-300 dark:border-white/15 dark:placeholder-white/30"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1.5">Email</label>
+                <label className="block text-sm font-medium text-slate-600 dark:text-white/70 mb-1.5">Email</label>
                 <input
                   value={user?.email ?? ''}
                   disabled
-                  className="w-full px-4 py-3 rounded-xl text-slate-400 text-sm"
-                  style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
+                  className="w-full px-4 py-3 rounded-xl text-slate-400 dark:text-white/40 text-sm bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10"
                 />
               </div>
               <div className="flex items-center gap-4 pt-2">
-                <div className="flex gap-4 text-sm text-slate-500">
-                  <span>Level <span className="text-slate-900 font-semibold">{user?.level ?? 1}</span></span>
-                  <span>XP <span className="text-slate-900 font-semibold">{user?.xp ?? 0}</span></span>
-                  <span>Streak <span className="text-slate-900 font-semibold">{user?.streak ?? 0}</span></span>
+                <div className="flex gap-4 text-sm text-slate-500 dark:text-white/50">
+                  <span>Level <span className="text-slate-900 dark:text-white font-semibold">{user?.level ?? 1}</span></span>
+                  <span>XP <span className="text-slate-900 dark:text-white font-semibold">{user?.xp ?? 0}</span></span>
+                  <span>Streak <span className="text-slate-900 dark:text-white font-semibold">{user?.streak ?? 0}</span></span>
                 </div>
               </div>
               <button

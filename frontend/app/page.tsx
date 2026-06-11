@@ -1,867 +1,828 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
+import BrandLogo, { BrandMark } from '@/components/BrandLogo'
 import {
-  Brain,
-  Code,
-  Rocket,
-  Zap,
-  Shield,
-  BarChart,
-  BookOpen,
-  Users,
-  Trophy,
-  Target,
-  Globe,
-  Lock,
-  Cpu,
-  Server,
   Sparkles,
-  ChevronRight,
+  Search,
+  Brain,
+  Bot,
+  Rocket,
+  Award,
+  GraduationCap,
+  Clock,
+  Gamepad2,
+  Music,
+  Camera,
+  Code2,
   ArrowRight,
   CheckCircle,
   TrendingUp,
-  Gamepad,
-  Music,
-  Camera,
-  Plane,
-  Dumbbell,
-  Flame,
-  Clock,
-  Layers,
-  GitBranch,
   Database,
+  Cloud,
+  Container,
+  GitBranch,
+  Shield,
+  Server,
+  Cpu,
+  Layers,
+  PlayCircle,
+  Zap,
+  Target,
+  BookOpen,
+  Users,
+  Trophy,
   Star,
+  Medal,
+  Video,
+  AtSign,
+  Bird,
+  Wallet,
+  Briefcase,
+  Crown,
+  PiggyBank,
+  Lightbulb,
+  Activity,
+  FileCode,
+  Terminal,
+  MessageSquare,
+  LineChart,
 } from 'lucide-react'
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ─── Shared classes ───────────────────────────────────────────────────────────
 
-const features = [
-  {
-    icon: Brain,
-    gradient: 'from-amber-500 to-amber-600',
-    title: 'AI-Generated Curriculum',
-    description:
-      'Personalized content generated on-demand by Claude AI. Every lesson adapts to your learning style, pace, and existing knowledge.',
-  },
-  {
-    icon: Rocket,
-    gradient: 'from-amber-400 to-amber-600',
-    title: 'Career Learning Paths',
-    description:
-      'Structured roadmaps for 20+ tech roles. Go from zero to job-ready with curated, ordered modules that mirror real hiring requirements.',
-  },
-  {
-    icon: Star,
-    gradient: 'from-pink-500 to-rose-600',
-    title: 'Hobby Personalization',
-    description:
-      'Learn with examples drawn from your passions. Love cricket? Understand data structures through match statistics and player analytics.',
-  },
-  {
-    icon: Code,
-    gradient: 'from-green-500 to-emerald-600',
-    title: 'Embedded Code Editor',
-    description:
-      'Practice inside a full Monaco editor without leaving the lesson. Submit your solution and get instant AI code review with detailed feedback.',
-  },
-  {
-    icon: Shield,
-    gradient: 'from-amber-500 to-orange-600',
-    title: 'Expert Validation',
-    description:
-      'Every piece of AI-generated content is automatically scored and must pass an 85%+ accuracy threshold before it reaches you.',
-  },
-  {
-    icon: BarChart,
-    gradient: 'from-teal-500 to-cyan-600',
-    title: 'Progress Tracking',
-    description:
-      'Earn XP, maintain streaks, and visualise your skills on interactive radar charts. Gamified progress keeps motivation high.',
-  },
+const CARD =
+  'bg-white border border-slate-200 shadow-sm dark:bg-[#12121a] dark:border-white/10'
+const HEADING = 'text-slate-900 dark:text-white'
+const BODY = 'text-slate-600 dark:text-white/70'
+const MUTED = 'text-slate-400 dark:text-white/40'
+const AMBER_LINK =
+  'inline-flex items-center gap-1 text-sm font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-500'
+const CHIP =
+  'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30'
+const PRIMARY_BTN =
+  'bg-gradient-to-r from-amber-500 to-amber-600 text-white hover:from-amber-400 hover:to-amber-500'
+const SCROLLER =
+  'flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 -mx-4 px-4 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:px-0 lg:overflow-visible lg:grid lg:snap-none lg:pb-0'
+
+// ─── Data ──────────────────────────────────────────────────────────────────────
+
+const ribbon = [
+  { icon: GraduationCap, label: '100% Free Forever', emoji: '🎓' },
+  { icon: Sparkles, label: 'AI-Powered Learning', emoji: '✨' },
+  { icon: Award, label: 'Industry Expert Content', emoji: '🏆' },
+  { icon: Medal, label: 'Certificates & Badges', emoji: '📜' },
+  { icon: Clock, label: 'Learn At Your Own Pace', emoji: '⏱' },
 ]
 
-const categories = [
-  { icon: Code, name: 'Programming', count: 42, color: 'from-amber-500 to-amber-600' },
-  { icon: Globe, name: 'Frontend', count: 28, color: 'from-amber-400 to-amber-600' },
-  { icon: Server, name: 'Backend', count: 35, color: 'from-green-500 to-emerald-600' },
-  { icon: Brain, name: 'AI / ML', count: 31, color: 'from-pink-500 to-rose-600' },
-  { icon: Cpu, name: 'Cloud & DevOps', count: 24, color: 'from-amber-500 to-orange-600' },
-  { icon: Lock, name: 'Security', count: 18, color: 'from-red-500 to-rose-600' },
-  { icon: Database, name: 'Databases', count: 22, color: 'from-teal-500 to-cyan-600' },
-  { icon: Layers, name: 'System Design', count: 15, color: 'from-amber-500 to-amber-700' },
+const heroFeatures = [
+  { icon: Sparkles, title: 'Hobby-Based Learning', desc: 'Learn concepts through what you love' },
+  { icon: Bot, title: 'AI Mentor 24/7', desc: 'Personalized guidance anytime' },
+  { icon: Rocket, title: 'Real-world Projects', desc: 'Build. Showcase. Get Hired.' },
+  { icon: Award, title: 'Certificates', desc: 'Industry-recognized completion certificates' },
 ]
 
-const careerPaths = [
-  {
-    title: 'Full Stack Java',
-    gradient: 'from-amber-500 to-amber-600',
-    stack: ['Java', 'Spring Boot', 'React', 'PostgreSQL', 'Docker'],
-    duration: '6 months',
-    difficulty: 'Intermediate',
-    difficultyColor: 'bg-blue-50 text-blue-700 border-blue-200',
-  },
-  {
-    title: 'AI Engineer',
-    gradient: 'from-amber-400 to-amber-600',
-    stack: ['Python', 'PyTorch', 'LangChain', 'FastAPI', 'RAG'],
-    duration: '5 months',
-    difficulty: 'Advanced',
-    difficultyColor: 'bg-amber-50 text-amber-700 border-amber-200',
-  },
-  {
-    title: 'DevOps & Cloud',
-    gradient: 'from-green-600 to-emerald-700',
-    stack: ['AWS', 'Terraform', 'Kubernetes', 'GitHub Actions', 'Prometheus'],
-    duration: '4 months',
-    difficulty: 'Intermediate',
-    difficultyColor: 'bg-blue-50 text-blue-700 border-blue-200',
-  },
-  {
-    title: 'MERN Stack',
-    gradient: 'from-pink-600 to-rose-700',
-    stack: ['MongoDB', 'Express', 'React', 'Node.js', 'TypeScript'],
-    duration: '4 months',
-    difficulty: 'Beginner',
-    difficultyColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  },
-]
+const popularSearches = ['Python', 'AI Engineer', 'DevOps', 'SQL', 'Data Science', 'Web Development']
+
+const employers = ['Google', 'Microsoft', 'Amazon', 'Deloitte', 'TCS', 'IBM', 'Infosys', '& 500+ More']
 
 const hobbies = [
-  { id: 'gaming', label: 'Gaming', icon: Gamepad, color: 'from-amber-500 to-amber-600' },
-  { id: 'cricket', label: 'Cricket', icon: Target, color: 'from-green-500 to-emerald-600' },
-  { id: 'music', label: 'Music', icon: Music, color: 'from-pink-500 to-rose-600' },
-  { id: 'fitness', label: 'Fitness', icon: Dumbbell, color: 'from-amber-500 to-orange-600' },
-  { id: 'photography', label: 'Photography', icon: Camera, color: 'from-amber-400 to-amber-600' },
-  { id: 'travel', label: 'Travel', icon: Plane, color: 'from-teal-500 to-cyan-600' },
+  { label: 'Cricket', emoji: '🏏', tint: 'bg-green-50 dark:bg-green-500/10' },
+  { label: 'Gaming', emoji: '🎮', tint: 'bg-violet-50 dark:bg-violet-500/10' },
+  { label: 'Music', emoji: '🎧', tint: 'bg-pink-50 dark:bg-pink-500/10' },
+  { label: 'Photography', emoji: '📷', tint: 'bg-sky-50 dark:bg-sky-500/10' },
+  { label: 'Travel', emoji: '✈️', tint: 'bg-teal-50 dark:bg-teal-500/10' },
+  { label: 'Movies', emoji: '🎬', tint: 'bg-rose-50 dark:bg-rose-500/10' },
+  { label: 'Fitness', emoji: '💪', tint: 'bg-orange-50 dark:bg-orange-500/10' },
+  { label: 'Chess', emoji: '♟️', tint: 'bg-slate-100 dark:bg-white/5' },
+  { label: 'Cooking', emoji: '🍳', tint: 'bg-amber-50 dark:bg-amber-500/10' },
+  { label: 'Finance', emoji: '💰', tint: 'bg-emerald-50 dark:bg-emerald-500/10' },
+  { label: 'Business', emoji: '💼', tint: 'bg-indigo-50 dark:bg-indigo-500/10' },
+  { label: 'Sports', emoji: '🏆', tint: 'bg-yellow-50 dark:bg-yellow-500/10' },
 ]
-
-const hobbyExamples: Record<string, { topic: string; lesson: string; code: string }> = {
-  gaming: {
-    topic: 'Data Structures via Game Inventory',
-    lesson:
-      'Understand hash maps and arrays by modelling a game inventory system. Each item slot maps directly to a key-value store — exactly how Python dicts work.',
-    code: `# Game inventory using a dict (hash map)
-inventory = {
-    "sword": {"damage": 45, "qty": 1},
-    "potion": {"heal": 50, "qty": 12},
-}
-
-def use_item(name: str) -> str:
-    item = inventory.get(name)          # O(1) lookup
-    if item and item["qty"] > 0:
-        item["qty"] -= 1
-        return f"Used {name}!"
-    return "Item not found."`,
-  },
-  cricket: {
-    topic: 'Statistics & Data Analysis via Cricket',
-    lesson:
-      'Learn Pandas DataFrames through real IPL match data. Aggregate batting averages, compute strike rates, and visualise run trends — all with live data.',
-    code: `import pandas as pd
-
-matches = pd.read_csv("ipl_2024.csv")
-
-# Top 5 run-scorers this season
-top_batters = (
-    matches.groupby("batter")["runs_scored"]
-    .sum()
-    .sort_values(ascending=False)
-    .head(5)
-)
-print(top_batters)`,
-  },
-  music: {
-    topic: 'Algorithms via Audio Signal Processing',
-    lesson:
-      'Discover sorting algorithms through music playlist curation. Merge-sort playlists by BPM, frequency analysis with FFT — algorithms you will actually remember.',
-    code: `import numpy as np
-
-def analyze_beat(audio_samples, sample_rate=44100):
-    """Detect BPM using Fast Fourier Transform."""
-    fft_result = np.fft.fft(audio_samples)
-    frequencies = np.fft.fftfreq(
-        len(audio_samples), 1 / sample_rate
-    )
-    dominant_freq = frequencies[
-        np.argmax(np.abs(fft_result))
-    ]
-    bpm = abs(dominant_freq) * 60
-    return round(bpm, 1)`,
-  },
-  fitness: {
-    topic: 'APIs & Data Modelling via Fitness Tracking',
-    lesson:
-      'Build a personal workout API with FastAPI. Model sets, reps, and progressive overload as REST resources — REST concepts click when the data is your own.',
-    code: `from fastapi import FastAPI
-from pydantic import BaseModel
-
-app = FastAPI()
-
-class WorkoutSet(BaseModel):
-    exercise: str
-    weight_kg: float
-    reps: int
-
-@app.post("/log")
-def log_set(s: WorkoutSet) -> dict:
-    volume = s.weight_kg * s.reps        # total volume
-    return {"exercise": s.exercise, "volume_kg": volume}`,
-  },
-  photography: {
-    topic: 'Image Processing & Computer Vision',
-    lesson:
-      'Learn NumPy array operations by editing photos. Brightness, contrast, and blur filters are just matrix math — theory you can see with your own images.',
-    code: `from PIL import Image
-import numpy as np
-
-def adjust_brightness(path: str, factor: float) -> Image.Image:
-    img = Image.open(path)
-    arr = np.array(img, dtype=np.float32)
-
-    # Matrix multiplication = brightness change
-    arr = np.clip(arr * factor, 0, 255)
-
-    return Image.fromarray(arr.astype(np.uint8))
-
-brighter = adjust_brightness("sunset.jpg", 1.4)
-brighter.save("sunset_bright.jpg")`,
-  },
-  travel: {
-    topic: 'Graph Algorithms via Route Optimisation',
-    lesson:
-      "Plan the perfect trip with Dijkstra's algorithm. Shortest-path finding makes graph theory tangible — your travel wishlist becomes a live coding exercise.",
-    code: `import heapq
-
-def cheapest_flight(graph, src, dst):
-    """Dijkstra's algorithm for cheapest fare."""
-    heap = [(0, src)]          # (cost, city)
-    visited = {}
-
-    while heap:
-        cost, city = heapq.heappop(heap)
-        if city in visited:
-            continue
-        visited[city] = cost
-        if city == dst:
-            return cost
-        for neighbour, fare in graph.get(city, []):
-            heapq.heappush(heap, (cost + fare, neighbour))
-    return float("inf")`,
-  },
-}
 
 const stats = [
-  { value: '95%', label: 'Validation Score', icon: CheckCircle, color: 'from-amber-500 to-amber-600' },
-  { value: '100hrs', label: 'Content per Topic', icon: Clock, color: 'from-amber-400 to-amber-600' },
-  { value: 'AI-First', label: 'Platform Design', icon: Brain, color: 'from-pink-500 to-rose-600' },
-  { value: 'Zero', label: 'Complexity Barriers', icon: Zap, color: 'from-amber-500 to-orange-600' },
+  { icon: Rocket, value: '12,000+', label: 'Projects Built' },
+  { icon: Award, value: '8,500+', label: 'Certificates Earned' },
+  { icon: BookOpen, value: '10,000+', label: 'Practice Questions' },
+  { icon: GraduationCap, value: '100%', label: 'Free Forever' },
 ]
 
-// ─── Animated Counter ────────────────────────────────────────────────────────
+const learningPaths = [
+  { icon: Brain, title: 'AI Engineer Path', meta: '50+ Topics', demand: 'High Demand' },
+  { icon: Layers, title: 'Full Stack Developer', meta: '60+ Topics', demand: 'High Demand' },
+  { icon: LineChart, title: 'Data Analyst Path', meta: '40+ Topics', demand: 'Growing' },
+  { icon: Container, title: 'DevOps Engineer', meta: '45+ Topics', demand: 'Fast Growing' },
+  { icon: Shield, title: 'Cyber Security Analyst', meta: '35+ Topics', demand: 'High Demand' },
+  { icon: Cloud, title: 'Cloud Engineer', meta: '40+ Topics', demand: 'High Demand' },
+]
 
-function AnimatedStat({ value, label }: { value: string; label: string }) {
-  const [displayed, setDisplayed] = useState('0')
+const capstones = [
+  { icon: FileCode, title: 'AI Resume Builder', stack: 'NLP, Python' },
+  { icon: Video, title: 'Netflix Clone', stack: 'Next.js, Tailwind' },
+  { icon: Activity, title: 'IPL Analytics Dashboard', stack: 'Python, Pandas' },
+  { icon: Bot, title: 'AI Interview Coach', stack: 'LLM, Python' },
+  { icon: Container, title: 'DevOps CI/CD Pipeline', stack: 'AWS, Docker' },
+  { icon: Briefcase, title: 'E-Commerce Platform', stack: 'MERN Stack' },
+  { icon: Wallet, title: 'Expense Tracker', stack: 'MERN Stack' },
+  { icon: TrendingUp, title: 'Stock Price Predictor', stack: 'ML, Python' },
+]
 
-  useEffect(() => {
-    const numeric = parseInt(value.replace(/\D/g, ''), 10)
-    if (isNaN(numeric)) {
-      setDisplayed(value)
-      return
-    }
-    let start = 0
-    const step = Math.ceil(numeric / 40)
-    const timer = setInterval(() => {
-      start += step
-      if (start >= numeric) {
-        clearInterval(timer)
-        setDisplayed(value)
-      } else {
-        setDisplayed(value.replace(/\d+/, String(start)))
-      }
-    }, 30)
-    return () => clearInterval(timer)
-  }, [value])
+const roadmaps = [
+  { title: 'AI Engineer', salary: '₹8-20 LPA', demand: 'High Demand' },
+  { title: 'Data Analyst', salary: '₹5-15 LPA', demand: 'Growing' },
+  { title: 'Full Stack Developer', salary: '₹6-18 LPA', demand: 'High Demand' },
+  { title: 'Cloud Engineer', salary: '₹7-17 LPA', demand: 'Fast Growing' },
+  { title: 'ML Engineer', salary: '₹10-25 LPA', demand: 'High Demand' },
+  { title: 'Data Scientist', salary: '₹9-22 LPA', demand: 'Growing' },
+  { title: 'DevOps Engineer', salary: '₹7-18 LPA', demand: 'Fast Growing' },
+  { title: 'JavaScript Developer', salary: '₹4-12 LPA', demand: 'From Zero to Hero' },
+]
 
-  return <span>{displayed}</span>
-}
+const tutorials = [
+  { icon: Terminal, label: 'Python Tutorial', color: 'text-amber-500' },
+  { icon: Database, label: 'SQL Tutorial', color: 'text-sky-500' },
+  { icon: Code2, label: 'Java Tutorial', color: 'text-orange-500' },
+  { icon: Cpu, label: 'React Tutorial', color: 'text-cyan-500' },
+  { icon: Brain, label: 'Machine Learning', color: 'text-pink-500' },
+  { icon: Cloud, label: 'AWS Tutorial', color: 'text-yellow-600' },
+  { icon: Container, label: 'Docker Tutorial', color: 'text-blue-500' },
+  { icon: FileCode, label: 'JavaScript Guide', color: 'text-yellow-500' },
+]
 
-// ─── Floating Code Card ───────────────────────────────────────────────────────
+const interviewTopics = [
+  { icon: Terminal, label: 'Python Interview' },
+  { icon: Database, label: 'SQL Interview' },
+  { icon: Layers, label: 'System Design' },
+  { icon: Cpu, label: 'React Interview' },
+  { icon: MessageSquare, label: 'Behavioral Questions' },
+]
 
-function FloatingCodeCard() {
+const exploreTopics = [
+  'Python', 'Java', 'JavaScript', 'React', 'Node.js', 'TypeScript', 'SQL',
+  'MongoDB', 'Git', 'Docker', 'Kubernetes', 'AWS', 'Linux', 'DSA', 'AI/ML', '+ More',
+]
+
+const testimonials = [
+  {
+    quote: 'SkillVeris taught me Python through Cricket. Now I’m building real projects and feeling confident!',
+    name: 'Arjun S.',
+    role: 'B.Tech Student',
+  },
+  {
+    quote: 'The best platform for hobby-based learning. Concepts finally stick.',
+    name: 'Priya R.',
+    role: 'Data Analyst',
+  },
+  {
+    quote: 'I went from zero coding to a portfolio of projects — all by learning through my love for gaming. Landed my first internship!',
+    name: 'Kabir M.',
+    role: 'CS Undergraduate',
+  },
+]
+
+const challenges = [
+  { icon: Terminal, title: 'Python Challenge', participants: '2,180 Participants' },
+  { icon: Sparkles, title: 'AI Prompt Challenge', participants: '3,104 Participants' },
+  { icon: Database, title: 'SQL Challenge', participants: '2,542 Participants' },
+  { icon: Code2, title: 'Web Dev Challenge', participants: '1,948 Participants' },
+]
+
+const leaderboard = [
+  { rank: 1, name: 'Rahul K.', xp: '12,450 XP', chip: 'bg-amber-400 text-amber-950' },
+  { rank: 2, name: 'Priya R.', xp: '10,230 XP', chip: 'bg-slate-300 text-slate-800 dark:bg-slate-400' },
+  { rank: 3, name: 'Arjun S.', xp: '8,910 XP', chip: 'bg-orange-300 text-orange-950' },
+]
+
+const footerColumns = [
+  {
+    heading: 'Learn',
+    links: [
+      { label: 'All Courses', href: '/topics' },
+      { label: 'Learning Paths', href: '/paths' },
+      { label: 'Practice Questions', href: '/codelab' },
+      { label: 'Mock Tests', href: '/codelab' },
+      { label: 'Code Lab', href: '/codelab' },
+    ],
+  },
+  {
+    heading: 'Career Paths',
+    links: [
+      { label: 'AI Engineer', href: '/paths' },
+      { label: 'Full Stack Developer', href: '/paths' },
+      { label: 'Data Analyst', href: '/paths' },
+      { label: 'DevOps Engineer', href: '/paths' },
+      { label: 'Cloud Engineer', href: '/paths' },
+    ],
+  },
+  {
+    heading: 'Resources',
+    links: [
+      { label: 'Blog', href: '/topics' },
+      { label: 'Cheat Sheets', href: '/topics' },
+      { label: 'Interview Questions', href: '/topics' },
+      { label: 'Study Notes', href: '/topics' },
+      { label: 'Roadmaps', href: '/topics' },
+    ],
+  },
+  {
+    heading: 'Company',
+    links: [
+      { label: 'About Us', href: '/terms' },
+      { label: 'Our Mission', href: '/terms' },
+      { label: 'Careers', href: '/terms' },
+      { label: 'Contact Us', href: '/terms' },
+    ],
+  },
+  {
+    heading: 'Legal',
+    links: [
+      { label: 'Terms of Use', href: '/terms' },
+      { label: 'Privacy Policy', href: '/privacy' },
+      { label: 'Cookie Policy', href: '/privacy' },
+      { label: 'Code of Conduct', href: '/terms' },
+    ],
+  },
+]
+
+// ─── Section header ──────────────────────────────────────────────────────────
+
+function SectionHead({
+  title,
+  href,
+  scrollable = true,
+}: {
+  title: string
+  href?: string
+  scrollable?: boolean
+}) {
   return (
-    <div className="relative w-full max-w-sm mx-auto lg:mx-0 animate-float">
-      {/* Glow */}
-      <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 opacity-30 blur-lg" />
-      <div className="relative bg-[#0d0d14] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-        {/* Title bar */}
-        <div className="flex items-center gap-2 px-4 py-3 bg-white/5 border-b border-white/10">
-          <span className="w-3 h-3 rounded-full bg-red-500/80" />
-          <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
-          <span className="w-3 h-3 rounded-full bg-green-500/80" />
-          <span className="ml-2 text-xs text-white/40 font-mono">ai_lesson.py — AI Tutor</span>
-        </div>
-        {/* Code */}
-        <pre className="p-4 text-xs font-mono leading-relaxed overflow-x-auto">
-          <code>
-            <span className="text-purple-400"># AI-Generated Lesson: Sorting Algorithms</span>
-            {'\n'}
-            <span className="text-cyan-400">def</span>{' '}
-            <span className="text-green-400">quicksort</span>
-            <span className="text-white">(arr):</span>
-            {'\n'}
-            <span className="text-white/40">    </span>
-            <span className="text-cyan-400">if</span>
-            <span className="text-white"> len(arr) </span>
-            <span className="text-purple-400">&lt;=</span>
-            <span className="text-amber-400"> 1</span>
-            <span className="text-white">:</span>
-            {'\n'}
-            <span className="text-white/40">        </span>
-            <span className="text-cyan-400">return</span>
-            <span className="text-white"> arr</span>
-            {'\n'}
-            <span className="text-white/40">    </span>
-            <span className="text-white">pivot </span>
-            <span className="text-purple-400">=</span>
-            <span className="text-white"> arr[len(arr) </span>
-            <span className="text-purple-400">//</span>
-            <span className="text-amber-400"> 2</span>
-            <span className="text-white">]</span>
-            {'\n'}
-            <span className="text-white/40">    </span>
-            <span className="text-white">left  </span>
-            <span className="text-purple-400">=</span>
-            <span className="text-white"> [x </span>
-            <span className="text-cyan-400">for</span>
-            <span className="text-white"> x </span>
-            <span className="text-cyan-400">in</span>
-            <span className="text-white"> arr </span>
-            <span className="text-cyan-400">if</span>
-            <span className="text-white"> x </span>
-            <span className="text-purple-400">&lt;</span>
-            <span className="text-white"> pivot]</span>
-            {'\n'}
-            <span className="text-white/40">    </span>
-            <span className="text-white">right </span>
-            <span className="text-purple-400">=</span>
-            <span className="text-white"> [x </span>
-            <span className="text-cyan-400">for</span>
-            <span className="text-white"> x </span>
-            <span className="text-cyan-400">in</span>
-            <span className="text-white"> arr </span>
-            <span className="text-cyan-400">if</span>
-            <span className="text-white"> x </span>
-            <span className="text-purple-400">&gt;</span>
-            <span className="text-white"> pivot]</span>
-            {'\n'}
-            <span className="text-white/40">    </span>
-            <span className="text-cyan-400">return</span>
-            <span className="text-white"> quicksort(left) </span>
-            <span className="text-purple-400">+</span>
-            <span className="text-white"> [pivot] </span>
-            <span className="text-purple-400">+</span>
-            <span className="text-white"> quicksort(right)</span>
-            {'\n\n'}
-            <span className="text-white/40"># ✅ AI Review: O(n log n) average — great work!</span>
-          </code>
-        </pre>
-        {/* AI badge */}
-        <div className="flex items-center gap-2 px-4 py-3 bg-white/3 border-t border-white/10">
-          <Sparkles className="w-4 h-4 text-cyan-400" />
-          <span className="text-xs text-white/60">Claude AI reviewed your solution</span>
-          <span className="ml-auto text-xs font-semibold text-green-400">98% score</span>
-        </div>
-      </div>
+    <div className="flex items-end justify-between gap-4 mb-6">
+      <h2 className={`text-2xl sm:text-3xl font-bold tracking-tight ${HEADING}`}>{title}</h2>
+      {href ? (
+        <Link href={href} className={`${AMBER_LINK} shrink-0`}>
+          <span className="lg:hidden">Swipe</span>
+          <span className="hidden lg:inline">View All</span>
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      ) : scrollable ? (
+        <span className={`${AMBER_LINK} shrink-0 lg:hidden`}>
+          Swipe
+          <ArrowRight className="w-4 h-4" />
+        </span>
+      ) : null}
     </div>
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+function DemandPill({ label }: { label: string }) {
+  return (
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${CHIP}`}>{label}</span>
+  )
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
-  const [selectedHobby, setSelectedHobby] = useState<string>('gaming')
+  const router = useRouter()
+  const [query, setQuery] = useState('')
+  const [email, setEmail] = useState('')
+  const [subscribed, setSubscribed] = useState(false)
 
-  const example = hobbyExamples[selectedHobby]
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    router.push('/topics')
+  }
+
+  function handleSubscribe(e: React.FormEvent) {
+    e.preventDefault()
+    setSubscribed(true)
+  }
 
   return (
-    <div className="min-h-screen text-slate-900 overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden pb-20 md:pb-0">
       <Navbar />
 
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
-        {/* Soft amber radial glows */}
-        <div className="absolute inset-0 bg-gradient-to-br from-amber-100/40 via-transparent to-amber-50/30" />
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-400/15 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-amber-300/10 rounded-full blur-3xl animate-pulse delay-500" />
-        </div>
-
-        {/* Particle dots */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 30 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute w-1 h-1 rounded-full bg-amber-400/30 animate-pulse"
-              style={{
-                left: `${(i * 37 + 5) % 100}%`,
-                top: `${(i * 53 + 10) % 100}%`,
-                animationDelay: `${(i * 0.3) % 3}s`,
-                animationDuration: `${2 + (i % 3)}s`,
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 w-full">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left column */}
-            <div className="flex flex-col gap-6">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 border border-amber-200 w-fit">
-                <Sparkles className="w-4 h-4 text-amber-600" />
-                <span className="text-sm text-slate-600">Powered by Claude AI</span>
-              </div>
-
-              <h1 className="text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
-                Master Any Skill with{' '}
-                <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                  AI-Powered Learning
-                </span>
-              </h1>
-
-              <p className="text-lg text-slate-600 leading-relaxed max-w-lg">
-                Get personalized learning paths crafted by AI, hands-on coding exercises with live
-                review, and lessons tailored to your hobbies and career goals.
-              </p>
-
-              <div className="flex flex-wrap gap-4">
-                <Link
-                  href="/signup"
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold hover:from-amber-400 hover:to-amber-500 transition-all duration-300 hover:scale-105 shadow-lg shadow-amber-500/25"
-                >
-                  Start Learning Free
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link
-                  href="/topics"
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-all duration-300 hover:scale-105"
-                >
-                  Explore Topics
-                  <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
-
-              {/* Stats row */}
-              <div className="flex flex-wrap gap-6 pt-4">
-                {[
-                  { value: '200+', label: 'Topics' },
-                  { value: '50+', label: 'Career Paths' },
-                  { value: '10K+', label: 'Learners' },
-                  { value: 'AI', label: 'Powered' },
-                ].map((stat) => (
-                  <div key={stat.label} className="flex flex-col">
-                    <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                      {stat.value}
-                    </span>
-                    <span className="text-xs text-slate-500">{stat.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Right column — floating code card */}
-            <div className="flex justify-center lg:justify-end min-w-0">
-              <FloatingCodeCard />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Features ──────────────────────────────────────────────────────── */}
-      <section className="py-24 bg-white">
+      {/* ── 1. Feature ribbon ─────────────────────────────────────────────── */}
+      <div className="pt-16 border-b border-slate-200 dark:border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4 text-slate-900">
-              Everything you need to{' '}
-              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                level up fast
-              </span>
-            </h2>
-            <p className="text-slate-600 max-w-xl mx-auto">
-              A complete learning ecosystem built from the ground up with AI at the core — not
-              bolted on as an afterthought.
-            </p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f) => {
-              const Icon = f.icon
+          <div className="flex gap-6 overflow-x-auto py-2.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:justify-center">
+            {ribbon.map((r) => {
+              const Icon = r.icon
               return (
                 <div
-                  key={f.title}
-                  className="group bg-white border border-slate-200 shadow-sm rounded-2xl p-6 hover:scale-105 transition-all duration-300 hover:border-amber-300 hover:shadow-md"
+                  key={r.label}
+                  className="flex items-center gap-1.5 shrink-0 text-xs font-medium text-amber-600 dark:text-amber-400"
                 >
-                  <div
-                    className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${f.gradient} mb-4 shadow-lg`}
-                  >
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2 text-slate-900 transition-colors">
-                    {f.title}
-                  </h3>
-                  <p className="text-sm text-slate-600 leading-relaxed">{f.description}</p>
+                  <span aria-hidden>{r.emoji}</span>
+                  <Icon className="w-3.5 h-3.5" />
+                  <span className="whitespace-nowrap">{r.label}</span>
                 </div>
               )
             })}
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* ── Topic Categories ──────────────────────────────────────────────── */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4 text-slate-900">
-              Explore{' '}
-              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                Topic Categories
-              </span>
-            </h2>
-            <p className="text-slate-600 max-w-xl mx-auto">
-              Dive into any domain. Every category contains structured lessons, hands-on exercises,
-              and AI-generated examples.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {categories.map((cat) => {
-              const Icon = cat.icon
-              return (
-                <Link
-                  key={cat.name}
-                  href="/topics"
-                  className="group bg-white border border-slate-200 shadow-sm rounded-2xl p-5 hover:scale-105 transition-all duration-300 hover:border-amber-300 hover:shadow-md flex flex-col gap-3 cursor-pointer"
-                >
-                  <div
-                    className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${cat.color} w-fit shadow-lg`}
-                  >
-                    <Icon className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm text-slate-900">{cat.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{cat.count} topics</p>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-
-          <div className="mt-10 flex justify-center">
-            <Link
-              href="/topics"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition-all duration-300 hover:scale-105"
-            >
-              View All Topics
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+      {/* ── 2. Hero ───────────────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden">
+        {/* Glow orbs */}
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute top-10 left-1/4 w-80 h-80 bg-amber-400/15 dark:bg-amber-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-amber-500/10 dark:bg-amber-400/10 rounded-full blur-3xl" />
         </div>
-      </section>
 
-      {/* ── Career Paths ──────────────────────────────────────────────────── */}
-      <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4 text-slate-900">
-              Structured{' '}
-              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                Career Paths
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-20">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left */}
+            <div className="flex flex-col gap-6 min-w-0">
+              <span className={`inline-flex items-center gap-2 w-fit px-3 py-1 rounded-full text-xs font-semibold ${CHIP}`}>
+                <Sparkles className="w-3.5 h-3.5" />
+                The World&apos;s First
               </span>
-            </h2>
-            <p className="text-slate-600 max-w-xl mx-auto">
-              Follow a proven roadmap from beginner to job-ready. Every path mirrors real hiring
-              criteria across top tech companies.
-            </p>
-          </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {careerPaths.map((path) => (
-              <div
-                key={path.title}
-                className="group bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:scale-105 transition-all duration-300 hover:border-amber-300 hover:shadow-md flex flex-col"
-              >
-                {/* Gradient header */}
-                <div className={`h-2 bg-gradient-to-r ${path.gradient}`} />
-                <div className="p-5 flex flex-col gap-4 flex-1">
-                  <div className="flex items-start justify-between">
-                    <h3 className="font-bold text-base leading-snug text-slate-900">{path.title}</h3>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ml-2 ${path.difficultyColor}`}
-                    >
-                      {path.difficulty}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {path.stack.map((tech) => (
-                      <span
-                        key={tech}
-                        className="text-xs px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-600"
-                      >
-                        {tech}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="mt-auto flex items-center gap-2 text-xs text-slate-500">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>{path.duration}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-10 flex justify-center">
-            <Link
-              href="/paths"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold hover:from-amber-400 hover:to-amber-500 transition-all duration-300 hover:scale-105 shadow-lg shadow-amber-500/20"
-            >
-              View All Paths
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Hobby Personalization ─────────────────────────────────────────── */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-start">
-            {/* Left: explanation */}
-            <div className="flex flex-col gap-6 lg:sticky lg:top-24">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 border border-amber-200 w-fit">
-                <Star className="w-4 h-4 text-amber-600" />
-                <span className="text-sm text-amber-700">Hobby Personalization</span>
-              </div>
-
-              <h2 className="text-4xl font-bold text-slate-900">
-                Learn through{' '}
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight">
                 <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                  what you love
+                  Hobby-Personalized
                 </span>
-              </h2>
+                <br />
+                <span className={HEADING}>Learning Platform</span>
+              </h1>
 
-              <p className="text-slate-600 leading-relaxed">
-                Abstract concepts stick when they come wrapped in something you already care about.
-                Pick a hobby and watch how the AI transforms standard lessons into stories and
-                examples that resonate with you personally.
+              <p className={`text-lg ${BODY} max-w-lg`}>
+                Learn technology through what you love.
               </p>
 
-              <ul className="flex flex-col gap-3">
-                {[
-                  'Concepts explained with real-world hobby examples',
-                  'Practice exercises built around your interests',
-                  'Projects that double as passion projects',
-                ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm text-slate-600">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
+              {/* Search */}
+              <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 max-w-lg">
+                <div className={`flex items-center gap-2 flex-1 rounded-xl px-4 ${CARD}`}>
+                  <Search className={`w-4 h-4 shrink-0 ${MUTED}`} />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="What do you want to learn?"
+                    aria-label="Search topics"
+                    className={`w-full min-w-0 bg-transparent py-3 text-sm outline-none ${HEADING} placeholder:text-slate-400 dark:placeholder:text-white/40`}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm shadow-lg shadow-amber-500/20 transition-all ${PRIMARY_BTN}`}
+                >
+                  <Search className="w-4 h-4" />
+                  Search
+                </button>
+              </form>
 
-              {/* Hobby selector buttons */}
-              <div className="flex flex-wrap gap-3 pt-2">
-                {hobbies.map((hobby) => {
-                  const Icon = hobby.icon
-                  const isActive = selectedHobby === hobby.id
+              {/* Popular searches */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`text-xs font-semibold ${MUTED}`}>Popular Searches:</span>
+                {popularSearches.map((p) => (
+                  <Link
+                    key={p}
+                    href="/topics"
+                    className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${CHIP} hover:brightness-95`}
+                  >
+                    {p}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Right */}
+            <div className="relative min-w-0">
+              {/* Decorative central shield + floating hobby orbs */}
+              <div className="relative mx-auto mb-8 hidden sm:flex h-56 items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-40 h-40 rounded-full bg-amber-400/15 dark:bg-amber-500/15 blur-2xl" />
+                </div>
+                <div className={`relative z-10 rounded-3xl p-6 ${CARD}`}>
+                  <BrandMark className="w-24 h-24" />
+                </div>
+                {[
+                  { Icon: Gamepad2, pos: 'top-0 left-2' },
+                  { Icon: Music, pos: 'top-2 right-2' },
+                  { Icon: Camera, pos: 'bottom-2 left-6' },
+                  { Icon: Code2, pos: 'bottom-0 right-6' },
+                ].map(({ Icon, pos }, i) => (
+                  <div
+                    key={i}
+                    className={`absolute ${pos} z-20 flex h-11 w-11 items-center justify-center rounded-2xl shadow-md ${CARD}`}
+                  >
+                    <Icon className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                ))}
+              </div>
+
+              {/* Feature card list */}
+              <div className={`rounded-2xl p-5 flex flex-col gap-3 ${CARD}`}>
+                {heroFeatures.map((f) => {
+                  const Icon = f.icon
                   return (
-                    <button
-                      key={hobby.id}
-                      onClick={() => setSelectedHobby(hobby.id)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all duration-300 hover:scale-105 ${
-                        isActive
-                          ? `bg-gradient-to-r ${hobby.color} border-transparent text-white shadow-lg`
-                          : 'bg-white border-slate-300 text-slate-700 hover:border-amber-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      {hobby.label}
-                    </button>
+                    <div key={f.title} className="flex items-start gap-3">
+                      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${CHIP}`}>
+                        <Icon className="w-5 h-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className={`font-semibold text-sm ${HEADING}`}>{f.title}</p>
+                        <p className={`text-xs ${BODY}`}>{f.desc}</p>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Right: live example */}
-            <div className="flex flex-col gap-4 min-w-0">
-              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 transition-all duration-300 hover:border-amber-300 hover:shadow-md">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600">
-                    <Brain className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">AI Lesson</p>
-                    <p className="text-sm font-semibold text-slate-900">{example.topic}</p>
-                  </div>
-                </div>
-                <p className="text-sm text-slate-600 leading-relaxed border-l-2 border-amber-300 pl-4">
-                  {example.lesson}
-                </p>
+      {/* ── 3. Employer strip ─────────────────────────────────────────────── */}
+      <section className="py-10 border-y border-slate-200 dark:border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className={`text-center text-sm font-semibold mb-5 ${BODY}`}>
+            Skills Aligned With Top Technology Employers
+          </p>
+          <div className="flex gap-8 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:justify-center">
+            {employers.map((e) => (
+              <span
+                key={e}
+                className={`shrink-0 whitespace-nowrap text-lg font-bold tracking-tight ${MUTED}`}
+              >
+                {e}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 4. Learn through what you love ────────────────────────────────── */}
+      <section className="py-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHead title="Learn Through What You Love" href="/signup" />
+        <div className={`${SCROLLER} lg:grid-cols-6`}>
+          {hobbies.map((h) => (
+            <Link
+              key={h.label}
+              href="/signup"
+              className={`group shrink-0 w-28 lg:w-auto snap-start rounded-2xl p-4 flex flex-col items-center gap-2 transition-all hover:-translate-y-1 ${CARD}`}
+            >
+              <span className={`flex h-14 w-14 items-center justify-center rounded-2xl text-2xl ${h.tint}`}>
+                {h.emoji}
+              </span>
+              <span className={`text-xs font-semibold text-center ${HEADING}`}>{h.label}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 5. Continue learning ──────────────────────────────────────────── */}
+      <section className="py-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 className={`text-2xl sm:text-3xl font-bold tracking-tight mb-6 ${HEADING}`}>
+          Continue Learning
+        </h2>
+        <div className="grid lg:grid-cols-3 gap-4">
+          <div className={`lg:col-span-2 rounded-2xl p-6 ${CARD}`}>
+            <div className="flex items-center justify-between gap-4 mb-1">
+              <p className={`font-bold ${HEADING}`}>Python for Cricket Lovers</p>
+              <span className={`text-xs font-semibold ${MUTED}`}>65% Complete</span>
+            </div>
+            <p className={`text-sm mb-4 ${BODY}`}>Working with Pandas</p>
+            <div className="h-2 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden mb-5">
+              <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-600" style={{ width: '65%' }} />
+            </div>
+            <Link
+              href="/learn/python-for-ai-ml"
+              className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-amber-500/20 transition-all ${PRIMARY_BTN}`}
+            >
+              <PlayCircle className="w-4 h-4" />
+              Resume
+            </Link>
+          </div>
+          <div className={`rounded-2xl p-6 flex flex-col justify-center gap-2 ${CARD}`}>
+            <span className={`text-xs font-semibold uppercase tracking-wider ${MUTED}`}>Next Up</span>
+            <p className={`font-semibold ${HEADING}`}>Data Analysis with Pandas</p>
+            <span className={`flex items-center gap-1.5 text-xs ${BODY}`}>
+              <Clock className="w-3.5 h-3.5" />
+              25 min
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 6. Stats row ──────────────────────────────────────────────────── */}
+      <section className="py-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((s) => {
+            const Icon = s.icon
+            return (
+              <div key={s.label} className={`rounded-2xl p-6 flex flex-col items-center text-center gap-2 ${CARD}`}>
+                <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${CHIP}`}>
+                  <Icon className="w-5 h-5" />
+                </span>
+                <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-400">{s.value}</p>
+                <p className={`text-xs font-medium ${BODY}`}>{s.label}</p>
               </div>
+            )
+          })}
+        </div>
+      </section>
 
-              <div className="bg-[#0d0d14] border border-white/10 rounded-2xl overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 bg-white/5 border-b border-white/10">
-                  <span className="w-3 h-3 rounded-full bg-red-500/80" />
-                  <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                  <span className="w-3 h-3 rounded-full bg-green-500/80" />
-                  <span className="ml-2 text-xs text-white/40 font-mono">example.py</span>
+      {/* ── 7. Top learning paths ─────────────────────────────────────────── */}
+      <section className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHead title="Top Learning Paths" href="/paths" />
+        <div className={`${SCROLLER} lg:grid-cols-3`}>
+          {learningPaths.map((p) => {
+            const Icon = p.icon
+            return (
+              <Link
+                key={p.title}
+                href="/paths"
+                className={`group shrink-0 w-72 lg:w-auto snap-start rounded-2xl p-5 flex flex-col gap-3 transition-all hover:-translate-y-1 ${CARD}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${CHIP}`}>
+                    <Icon className="w-5 h-5" />
+                  </span>
+                  <DemandPill label={p.demand} />
                 </div>
-                <pre className="p-5 text-xs font-mono leading-relaxed overflow-x-auto text-white/75 whitespace-pre">
-                  {example.code}
-                </pre>
-              </div>
+                <p className={`font-bold ${HEADING}`}>{p.title}</p>
+                <p className={`text-xs ${MUTED}`}>{p.meta}</p>
+              </Link>
+            )
+          })}
+        </div>
+      </section>
 
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
-                <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
-                <p className="text-xs text-slate-600">
-                  This example was generated by Claude AI specifically for{' '}
-                  <span className="text-slate-900 capitalize">{selectedHobby}</span> enthusiasts.
-                </p>
+      {/* ── 8. Capstone projects ──────────────────────────────────────────── */}
+      <section className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHead title="Build Portfolio-Worthy Capstone Projects" href="/topics" />
+        <div className={`${SCROLLER} lg:grid-cols-4`}>
+          {capstones.map((c) => {
+            const Icon = c.icon
+            return (
+              <Link
+                key={c.title}
+                href="/topics"
+                className={`group shrink-0 w-60 lg:w-auto snap-start rounded-2xl p-5 flex flex-col gap-3 transition-all hover:-translate-y-1 ${CARD}`}
+              >
+                <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${CHIP}`}>
+                  <Icon className="w-5 h-5" />
+                </span>
+                <p className={`font-bold leading-snug ${HEADING}`}>{c.title}</p>
+                <p className={`text-xs ${MUTED}`}>{c.stack}</p>
+              </Link>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* ── 9. Career roadmaps ────────────────────────────────────────────── */}
+      <section className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHead title="Career Roadmaps" href="/paths" />
+        <div className={`${SCROLLER} lg:grid-cols-4`}>
+          {roadmaps.map((r) => (
+            <Link
+              key={r.title}
+              href="/paths"
+              className={`group shrink-0 w-60 lg:w-auto snap-start rounded-2xl p-5 flex flex-col gap-2 transition-all hover:-translate-y-1 ${CARD}`}
+            >
+              <p className={`font-bold ${HEADING}`}>{r.title}</p>
+              <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">{r.salary}</p>
+              <DemandPill label={r.demand} />
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 10. Trending tutorials ────────────────────────────────────────── */}
+      <section className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHead title="Trending Tutorials" href="/topics" />
+        <div className={`${SCROLLER} lg:grid-cols-4`}>
+          {tutorials.map((t) => {
+            const Icon = t.icon
+            return (
+              <Link
+                key={t.label}
+                href="/topics"
+                className={`group shrink-0 w-48 lg:w-auto snap-start rounded-2xl p-5 flex items-center gap-3 transition-all hover:-translate-y-1 ${CARD}`}
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 dark:bg-white/5">
+                  <Icon className={`w-5 h-5 ${t.color}`} />
+                </span>
+                <span className={`font-semibold text-sm ${HEADING}`}>{t.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* ── 11. Popular interview questions ───────────────────────────────── */}
+      <section className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHead title="Popular Interview Questions" href="/codelab" />
+        <div className={`${SCROLLER} lg:grid-cols-5`}>
+          {interviewTopics.map((t) => {
+            const Icon = t.icon
+            return (
+              <Link
+                key={t.label}
+                href="/codelab"
+                className={`group shrink-0 w-48 lg:w-auto snap-start rounded-2xl p-5 flex items-center gap-3 transition-all hover:-translate-y-1 ${CARD}`}
+              >
+                <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${CHIP}`}>
+                  <Icon className="w-5 h-5" />
+                </span>
+                <span className={`font-semibold text-sm ${HEADING}`}>{t.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </section>
+
+      {/* ── 12. Explore learning topics ───────────────────────────────────── */}
+      <section className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 className={`text-2xl sm:text-3xl font-bold tracking-tight mb-6 ${HEADING}`}>
+          Explore Learning Topics
+        </h2>
+        <div className="flex flex-wrap gap-2.5">
+          {exploreTopics.map((t) => (
+            <Link
+              key={t}
+              href="/topics"
+              className={`text-sm font-medium px-3.5 py-1.5 rounded-full transition-colors ${CHIP} hover:brightness-95`}
+            >
+              {t}
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 13. Save more, learn more ─────────────────────────────────────── */}
+      <section className="py-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 className={`text-2xl sm:text-3xl font-bold tracking-tight text-center mb-2 ${HEADING}`}>
+          Save More. Learn More.
+        </h2>
+        <p className={`text-center text-sm mb-8 ${BODY}`}>
+          <span aria-hidden>🐷</span> Why pay a fortune when you can learn it all for free?
+        </p>
+        <div className="grid sm:grid-cols-2 gap-4 max-w-3xl mx-auto">
+          <div className={`rounded-2xl p-6 flex flex-col gap-2 ${CARD}`}>
+            <p className={`font-semibold ${BODY}`}>Traditional Platforms</p>
+            <p className={`text-3xl font-extrabold line-through ${MUTED}`}>₹2,30,000+</p>
+            <p className={`text-xs ${MUTED}`}>Avg. annual cost</p>
+          </div>
+          <div className="relative rounded-2xl p-6 flex flex-col gap-2 border-2 border-amber-400 dark:border-amber-500/50 bg-amber-50/60 dark:bg-amber-500/10 shadow-lg shadow-amber-500/10">
+            <span className={`absolute -top-3 right-5 text-xs font-bold px-3 py-1 rounded-full ${PRIMARY_BTN}`}>
+              Most Popular
+            </span>
+            <p className={`font-semibold ${HEADING}`}>SkillVeris</p>
+            <p className="text-3xl font-extrabold text-amber-600 dark:text-amber-400">₹0</p>
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">100% Free Forever</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 14. Testimonials ──────────────────────────────────────────────── */}
+      <section className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHead title="What Students Say" scrollable />
+        <div className={`${SCROLLER} lg:grid-cols-3`}>
+          {testimonials.map((t) => (
+            <div
+              key={t.name}
+              className={`shrink-0 w-80 lg:w-auto snap-start rounded-2xl p-6 flex flex-col gap-3 ${CARD}`}
+            >
+              <div className="flex gap-0.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                ))}
+              </div>
+              <p className={`text-sm leading-relaxed ${BODY}`}>&ldquo;{t.quote}&rdquo;</p>
+              <div className="mt-auto">
+                <p className={`text-sm font-semibold ${HEADING}`}>{t.name}</p>
+                <p className={`text-xs ${MUTED}`}>{t.role}</p>
               </div>
             </div>
-          </div>
+          ))}
         </div>
       </section>
 
-      {/* ── Social Proof / Stats ──────────────────────────────────────────── */}
-      <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4 text-slate-900">
-              Built for{' '}
-              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                serious learners
-              </span>
-            </h2>
-            <p className="text-slate-600 max-w-xl mx-auto">
-              Quality over quantity. Every metric reflects our obsession with making learning
-              genuinely effective.
-            </p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {stats.map((s) => {
-              const Icon = s.icon
-              return (
-                <div
-                  key={s.label}
-                  className="group bg-white border border-slate-200 shadow-sm rounded-2xl p-6 hover:scale-105 transition-all duration-300 hover:border-amber-300 hover:shadow-md text-center flex flex-col items-center gap-3"
-                >
-                  <div
-                    className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${s.color} shadow-lg`}
-                  >
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                    <AnimatedStat value={s.value} label={s.label} />
-                  </p>
-                  <p className="text-sm text-slate-600">{s.label}</p>
+      {/* ── 15. Community & challenges ────────────────────────────────────── */}
+      <section className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHead title="Community & Challenges" href="/codelab" />
+        <div className={`${SCROLLER} lg:grid-cols-4`}>
+          {challenges.map((c) => {
+            const Icon = c.icon
+            return (
+              <Link
+                key={c.title}
+                href="/codelab"
+                className={`group shrink-0 w-60 lg:w-auto snap-start rounded-2xl p-5 flex flex-col gap-3 transition-all hover:-translate-y-1 ${CARD}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${CHIP}`}>
+                    <Icon className="w-5 h-5" />
+                  </span>
+                  <span aria-hidden className="text-xl">🏆</span>
                 </div>
-              )
-            })}
-          </div>
+                <p className={`font-bold ${HEADING}`}>{c.title}</p>
+                <p className={`text-xs ${MUTED}`}>{c.participants}</p>
+              </Link>
+            )
+          })}
         </div>
       </section>
 
-      {/* ── CTA Banner ────────────────────────────────────────────────────── */}
-      <section className="py-20 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-amber-100/40 via-transparent to-amber-50/30" />
-        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center gap-6">
-          <h2 className="text-4xl lg:text-5xl font-bold text-slate-900">
-            Ready to start your{' '}
-            <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-              AI learning journey?
-            </span>
+      {/* ── 16. Weekly leaderboard ────────────────────────────────────────── */}
+      <section className="py-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHead title="Weekly Leaderboard" href="/dashboard" scrollable={false} />
+        <div className={`rounded-2xl p-6 ${CARD}`}>
+          <div className="flex items-center gap-2 mb-4">
+            <Trophy className="w-5 h-5 text-amber-500" />
+            <span className={`text-sm font-semibold ${HEADING}`}>This Week&apos;s Top Learners</span>
+          </div>
+          <ul className="flex flex-col divide-y divide-slate-100 dark:divide-white/10">
+            {leaderboard.map((l) => (
+              <li key={l.rank} className="flex items-center gap-4 py-3">
+                <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${l.chip}`}>
+                  {l.rank}
+                </span>
+                <span className={`flex-1 font-semibold ${HEADING}`}>{l.name}</span>
+                <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{l.xp}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* ── 17. Newsletter ────────────────────────────────────────────────── */}
+      <section className="py-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className={`rounded-2xl p-8 sm:p-10 text-center flex flex-col items-center gap-4 ${CARD}`}>
+          <h2 className={`text-2xl sm:text-3xl font-bold tracking-tight ${HEADING}`}>
+            Stay Ahead in Your Learning Journey
           </h2>
-          <p className="text-slate-600 text-lg max-w-xl">
-            Join thousands of learners who are accelerating their careers with AI-personalised
-            lessons and expert-validated content.
+          <p className={`max-w-xl text-sm ${BODY}`}>
+            Get the best learning resources, tips and updates delivered to your inbox.
           </p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <Link
-              href="/signup"
-              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold text-lg hover:from-amber-400 hover:to-amber-500 transition-all duration-300 hover:scale-105 shadow-xl shadow-amber-500/25"
-            >
-              Get Started Free
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link
-              href="/paths"
-              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-white border border-slate-300 text-slate-700 font-semibold text-lg hover:bg-slate-50 transition-all duration-300 hover:scale-105"
-            >
-              View Career Paths
-            </Link>
-          </div>
+          {subscribed ? (
+            <p className="flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400">
+              <CheckCircle className="w-5 h-5" />
+              Thanks! You&apos;re on the list.
+            </p>
+          ) : (
+            <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                aria-label="Email address"
+                className={`flex-1 min-w-0 rounded-xl px-4 py-3 text-sm outline-none ${CARD} ${HEADING} placeholder:text-slate-400 dark:placeholder:text-white/40`}
+              />
+              <button
+                type="submit"
+                className={`px-6 py-3 rounded-xl font-semibold text-sm shadow-lg shadow-amber-500/20 transition-all ${PRIMARY_BTN}`}
+              >
+                Subscribe
+              </button>
+            </form>
+          )}
         </div>
       </section>
 
-      {/* ── Footer ────────────────────────────────────────────────────────── */}
-      <footer className="bg-white border-t border-slate-200 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
+      {/* ── 18. Footer ────────────────────────────────────────────────────── */}
+      <footer className="border-t border-slate-200 dark:border-white/10 mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-10 mb-12">
             {/* Brand */}
             <div className="lg:col-span-2 flex flex-col gap-4">
-              <Link href="/" className="flex items-center gap-2 w-fit">
-                <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600">
-                  <Brain className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-slate-900 font-bold text-lg tracking-tight">
-                  AI
-                  <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
-                    Upskill
-                  </span>
-                </span>
-              </Link>
-              <p className="text-sm text-slate-500 leading-relaxed max-w-xs">
-                The AI-first learning platform that personalises every lesson to your career goals
-                and hobbies. Master any skill, faster.
+              <BrandLogo />
+              <p className={`text-sm leading-relaxed max-w-xs ${BODY}`}>
+                The world&apos;s first hobby-personalized learning platform. Learn tech skills
+                through what excites you. 100% Free Forever.
               </p>
+              <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                Learn Through What You Love
+              </p>
+              <div className="flex items-center gap-2">
+                {[Video, AtSign, Bird, Camera].map((Icon, i) => (
+                  <Link
+                    key={i}
+                    href="/terms"
+                    aria-label="Social link"
+                    className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${CARD} ${BODY} hover:text-amber-600 dark:hover:text-amber-400`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </Link>
+                ))}
+              </div>
             </div>
 
-            {/* Links */}
-            {[
-              {
-                heading: 'Product',
-                links: [
-                  { label: 'How it works', href: '/about' },
-                  { label: 'Pricing', href: '/pricing' },
-                  { label: 'Changelog', href: '/changelog' },
-                ],
-              },
-              {
-                heading: 'Topics',
-                links: [
-                  { label: 'Programming', href: '/topics' },
-                  { label: 'AI / ML', href: '/topics' },
-                  { label: 'Cloud & DevOps', href: '/topics' },
-                ],
-              },
-              {
-                heading: 'Paths',
-                links: [
-                  { label: 'Full Stack Java', href: '/paths' },
-                  { label: 'AI Engineer', href: '/paths' },
-                  { label: 'MERN Stack', href: '/paths' },
-                ],
-              },
-            ].map((col) => (
-              <div key={col.heading} className="flex flex-col gap-4">
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            {/* Link columns */}
+            {footerColumns.map((col) => (
+              <div key={col.heading} className="flex flex-col gap-3">
+                <p className={`text-xs font-semibold uppercase tracking-widest ${MUTED}`}>
                   {col.heading}
                 </p>
                 <ul className="flex flex-col gap-2.5">
@@ -869,7 +830,7 @@ export default function LandingPage() {
                     <li key={link.label}>
                       <Link
                         href={link.href}
-                        className="text-sm text-slate-500 hover:text-amber-600 transition-colors"
+                        className={`text-sm transition-colors ${BODY} hover:text-amber-600 dark:hover:text-amber-400`}
                       >
                         {link.label}
                       </Link>
@@ -880,39 +841,16 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className="border-t border-slate-200 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-slate-400">
-              &copy; {new Date().getFullYear()}{' '}
-              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent font-medium">
-                AIUpskill
-              </span>
-              . All rights reserved.
+          <div className="border-t border-slate-200 dark:border-white/10 pt-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className={`text-xs ${MUTED}`}>
+              Made with <span aria-hidden>❤️</span> for learners in India and around the world
             </p>
-            <div className="flex items-center gap-6">
-              {['Privacy', 'Terms', 'Contact'].map((item) => (
-                <Link
-                  key={item}
-                  href="/"
-                  className="text-xs text-slate-400 hover:text-amber-600 transition-colors"
-                >
-                  {item}
-                </Link>
-              ))}
-            </div>
+            <p className={`text-xs ${MUTED}`}>
+              © {new Date().getFullYear()} SkillVeris. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
-
-      {/* Keyframes for float animation */}
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-12px); }
-        }
-        .animate-float {
-          animation: float 4s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   )
 }
