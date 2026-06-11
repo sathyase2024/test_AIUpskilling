@@ -343,7 +343,7 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
   )
 
   const outputPane = (
-    <div className="border-t border-white/10 bg-black/40">
+    <div className="border-t border-slate-200 dark:border-white/10 bg-[#0d0d14]">
       <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
         <Terminal className="w-3.5 h-3.5 text-white/30" />
         <span className="text-[11px] text-white/40 font-medium uppercase tracking-wider">Output</span>
@@ -401,7 +401,7 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
             <span className="text-slate-500 dark:text-white/50 font-medium">Fix: </span>{hint.fix}
           </p>
           {hint.example && (
-            <pre className="mt-2 text-[10px] leading-relaxed text-cyan-300/70 bg-black/30 border border-white/5 rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap">
+            <pre className="mt-2 text-[10px] leading-relaxed text-cyan-300/90 bg-[#0d0d14] border border-white/10 rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap">
               {hint.example}
             </pre>
           )}
