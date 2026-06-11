@@ -172,9 +172,9 @@ export default function Navbar() {
     href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   const notifTypeIcon = (type: Notification['type']) => {
-    if (type === 'achievement') return <Trophy className="w-4 h-4 text-amber-400" />
-    if (type === 'reminder')    return <Zap className="w-4 h-4 text-cyan-400" />
-    return <Sparkles className="w-4 h-4 text-purple-400" />
+    if (type === 'achievement') return <Trophy className="w-4 h-4 text-amber-500" />
+    if (type === 'reminder')    return <Zap className="w-4 h-4 text-amber-600" />
+    return <Sparkles className="w-4 h-4 text-slate-400" />
   }
 
   return (
@@ -182,8 +182,8 @@ export default function Navbar() {
       className={[
         'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
         scrolled
-          ? 'bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.4)]'
-          : 'bg-white/5 backdrop-blur-md border-b border-white/5',
+          ? 'bg-white/85 backdrop-blur-xl border-b border-slate-200 shadow-sm'
+          : 'bg-white/85 backdrop-blur-md border-b border-slate-200',
       ].join(' ')}
       aria-label="Main navigation"
     >
@@ -206,8 +206,8 @@ export default function Navbar() {
                     'relative flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium',
                     'transition-all duration-200 group',
                     active
-                      ? 'text-white'
-                      : 'text-white/60 hover:text-white hover:bg-white/5',
+                      ? 'text-amber-600 bg-amber-50'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
                   ].join(' ')}
                   aria-current={active ? 'page' : undefined}
                 >
@@ -215,12 +215,12 @@ export default function Navbar() {
                   {active && (
                     <span
                       className="absolute inset-0 rounded-lg"
-                      style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.25)' }}
+                      style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}
                       aria-hidden="true"
                     />
                   )}
 
-                  <span className={active ? 'text-primary-400' : 'text-white/40 group-hover:text-white/70 transition-colors'} aria-hidden="true">
+                  <span className={active ? 'text-amber-600' : 'text-slate-400 group-hover:text-slate-600 transition-colors'} aria-hidden="true">
                     {icon}
                   </span>
                   <span className="relative z-10">{label}</span>
@@ -229,7 +229,7 @@ export default function Navbar() {
                   {active && (
                     <span
                       className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-6 rounded-full"
-                      style={{ background: 'linear-gradient(90deg, #7c3aed, #06b6d4)' }}
+                      style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706)' }}
                       aria-hidden="true"
                     />
                   )}
@@ -245,9 +245,9 @@ export default function Navbar() {
             <div className="relative" ref={notifRef}>
               <button
                 className={[
-                  'relative p-2 rounded-lg text-white/60 hover:text-white',
-                  'hover:bg-white/5 transition-all duration-200',
-                  notifOpen ? 'bg-white/5 text-white' : '',
+                  'relative p-2 rounded-lg text-slate-600 hover:text-slate-900',
+                  'hover:bg-slate-100 transition-all duration-200',
+                  notifOpen ? 'bg-slate-100 text-slate-900' : '',
                 ].join(' ')}
                 onClick={() => {
                   setNotifOpen(v => !v)
@@ -265,11 +265,11 @@ export default function Navbar() {
                   >
                     <span
                       className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                      style={{ background: '#7c3aed' }}
+                      style={{ background: '#f59e0b' }}
                     />
                     <span
                       className="relative inline-flex rounded-full h-2 w-2"
-                      style={{ background: '#7c3aed' }}
+                      style={{ background: '#f59e0b' }}
                     />
                   </span>
                 )}
@@ -278,22 +278,21 @@ export default function Navbar() {
               {/* Notification dropdown */}
               {notifOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-80 rounded-2xl overflow-hidden shadow-2xl"
+                  className="absolute right-0 mt-2 w-80 rounded-2xl overflow-hidden shadow-xl"
                   style={{
-                    background: 'rgba(18,18,26,0.96)',
-                    border: '1px solid rgba(139,92,246,0.2)',
-                    backdropFilter: 'blur(24px)',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
                   }}
                   role="dialog"
                   aria-label="Notifications"
                 >
                   {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-                    <h3 className="font-semibold text-white text-sm">Notifications</h3>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                    <h3 className="font-semibold text-slate-900 text-sm">Notifications</h3>
                     {unreadCount > 0 && (
                       <span
                         className="text-xs px-2 py-0.5 rounded-full font-medium"
-                        style={{ background: 'rgba(124,58,237,0.2)', color: '#a78bfa' }}
+                        style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}
                       >
                         {unreadCount} new
                       </span>
@@ -301,31 +300,31 @@ export default function Navbar() {
                   </div>
 
                   {/* Notification list */}
-                  <ul className="divide-y divide-white/5">
+                  <ul className="divide-y divide-slate-100">
                     {mockNotifications.map(notif => (
                       <li
                         key={notif.id}
                         className={[
                           'flex items-start gap-3 px-4 py-3 cursor-pointer',
-                          'hover:bg-white/5 transition-colors duration-150',
-                          !notif.read ? 'bg-purple-500/5' : '',
+                          'hover:bg-slate-50 transition-colors duration-150',
+                          !notif.read ? 'bg-amber-50/60' : '',
                         ].join(' ')}
                       >
                         <div
                           className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
-                          style={{ background: 'rgba(255,255,255,0.06)' }}
+                          style={{ background: '#f1f5f9' }}
                         >
                           {notifTypeIcon(notif.type)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">{notif.title}</p>
-                          <p className="text-xs text-white/50 mt-0.5 line-clamp-2">{notif.message}</p>
-                          <p className="text-xs text-white/30 mt-1">{notif.time}</p>
+                          <p className="text-sm font-medium text-slate-900 truncate">{notif.title}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{notif.message}</p>
+                          <p className="text-xs text-slate-400 mt-1">{notif.time}</p>
                         </div>
                         {!notif.read && (
                           <div
                             className="mt-2 flex-shrink-0 w-1.5 h-1.5 rounded-full"
-                            style={{ background: '#7c3aed' }}
+                            style={{ background: '#f59e0b' }}
                             aria-label="Unread"
                           />
                         )}
@@ -334,8 +333,8 @@ export default function Navbar() {
                   </ul>
 
                   {/* Footer */}
-                  <div className="px-4 py-2.5 border-t border-white/5">
-                    <button className="w-full text-xs text-center font-medium transition-colors" style={{ color: '#a78bfa' }}>
+                  <div className="px-4 py-2.5 border-t border-slate-100">
+                    <button className="w-full text-xs text-center font-medium transition-colors" style={{ color: '#d97706' }}>
                       View all notifications
                     </button>
                   </div>
@@ -348,8 +347,8 @@ export default function Navbar() {
               <button
                 className={[
                   'flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl',
-                  'hover:bg-white/5 transition-all duration-200 group',
-                  userMenuOpen ? 'bg-white/5' : '',
+                  'hover:bg-slate-100 transition-all duration-200 group',
+                  userMenuOpen ? 'bg-slate-100' : '',
                 ].join(' ')}
                 onClick={() => {
                   setUserMenuOpen(v => !v)
@@ -362,18 +361,18 @@ export default function Navbar() {
                 {/* Avatar */}
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}
+                  style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' }}
                   aria-hidden="true"
                 >
                   {initials}
                 </div>
                 <div className="hidden sm:block text-left">
-                  <p className="text-xs font-semibold text-white leading-tight">{displayName}</p>
-                  <p className="text-xs text-white/40 leading-tight">Level {level}</p>
+                  <p className="text-xs font-semibold text-slate-900 leading-tight">{displayName}</p>
+                  <p className="text-xs text-slate-500 leading-tight">Level {level}</p>
                 </div>
                 <ChevronDown
                   className={[
-                    'hidden sm:block w-3.5 h-3.5 text-white/40 transition-transform duration-200',
+                    'hidden sm:block w-3.5 h-3.5 text-slate-400 transition-transform duration-200',
                     userMenuOpen ? 'rotate-180' : '',
                   ].join(' ')}
                   aria-hidden="true"
@@ -383,45 +382,44 @@ export default function Navbar() {
               {/* User dropdown */}
               {userMenuOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-64 rounded-2xl overflow-hidden shadow-2xl"
+                  className="absolute right-0 mt-2 w-64 rounded-2xl overflow-hidden shadow-xl"
                   style={{
-                    background: 'rgba(18,18,26,0.96)',
-                    border: '1px solid rgba(139,92,246,0.2)',
-                    backdropFilter: 'blur(24px)',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
                   }}
                   role="menu"
                   aria-label="User menu"
                 >
                   {/* Profile header */}
                   <div
-                    className="px-4 py-4 border-b border-white/5"
-                    style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(6,182,212,0.05) 100%)' }}
+                    className="px-4 py-4 border-b border-slate-100"
+                    style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%)' }}
                   >
                     <div className="flex items-center gap-3">
                       <div
                         className="w-10 h-10 rounded-xl flex items-center justify-center text-base font-bold text-white flex-shrink-0"
-                        style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}
+                        style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' }}
                       >
                         {initials}
                       </div>
                       <div>
-                        <p className="font-semibold text-white text-sm">{displayName}</p>
-                        <p className="text-xs text-white/50">{displayEmail}</p>
+                        <p className="font-semibold text-slate-900 text-sm">{displayName}</p>
+                        <p className="text-xs text-slate-500">{displayEmail}</p>
                       </div>
                     </div>
 
                     {/* XP progress bar */}
                     <div className="mt-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-white/50">Level {level}</span>
-                        <span className="text-xs" style={{ color: '#a78bfa' }}>{xp.toLocaleString()} XP</span>
+                        <span className="text-xs text-slate-500">Level {level}</span>
+                        <span className="text-xs" style={{ color: '#b45309' }}>{xp.toLocaleString()} XP</span>
                       </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#e2e8f0' }}>
                         <div
                           className="h-full rounded-full"
                           style={{
                             width: `${Math.min(100, (xp % 10000) / 100)}%`,
-                            background: 'linear-gradient(90deg, #7c3aed, #06b6d4)',
+                            background: 'linear-gradient(90deg, #f59e0b, #d97706)',
                           }}
                         />
                       </div>
@@ -441,22 +439,22 @@ export default function Navbar() {
                         key={href}
                         href={href}
                         role="menuitem"
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors duration-150"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150"
                         onClick={() => setUserMenuOpen(false)}
                       >
-                        <span className="text-white/40" aria-hidden="true">{icon}</span>
+                        <span className="text-slate-400" aria-hidden="true">{icon}</span>
                         {label}
                       </Link>
                     ))}
                   </div>
 
                   {/* Divider + Logout / Sign in */}
-                  <div className="border-t border-white/5 py-1.5">
+                  <div className="border-t border-slate-100 py-1.5">
                     {mounted && !user ? (
                       <Link
                         href="/login"
                         role="menuitem"
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-white/70 hover:text-white hover:bg-white/5 transition-colors duration-150"
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150"
                         onClick={() => setUserMenuOpen(false)}
                       >
                         <User className="w-4 h-4" aria-hidden="true" />
@@ -465,7 +463,7 @@ export default function Navbar() {
                     ) : (
                       <button
                         role="menuitem"
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/5 transition-colors duration-150"
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors duration-150"
                         onClick={handleLogout}
                       >
                         <LogOut className="w-4 h-4" aria-hidden="true" />
@@ -479,7 +477,7 @@ export default function Navbar() {
 
             {/* --- Mobile menu toggle --- */}
             <button
-              className="md:hidden p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-all duration-200"
+              className="md:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-200"
               onClick={() => setMobileOpen(v => !v)}
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileOpen}
@@ -505,9 +503,9 @@ export default function Navbar() {
         ].join(' ')}
         aria-hidden={!mobileOpen}
         style={{
-          borderTop: mobileOpen ? '1px solid rgba(255,255,255,0.07)' : 'none',
-          background: 'rgba(10,10,15,0.97)',
-          backdropFilter: 'blur(20px)',
+          borderTop: mobileOpen ? '1px solid #e2e8f0' : 'none',
+          background: '#ffffff',
+          boxShadow: mobileOpen ? '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)' : 'none',
         }}
       >
         <div className="px-4 py-4 space-y-1">
@@ -522,23 +520,23 @@ export default function Navbar() {
                 className={[
                   'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
                   active
-                    ? 'text-white'
-                    : 'text-white/60 hover:text-white hover:bg-white/5',
+                    ? 'text-amber-600 bg-amber-50'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
                 ].join(' ')}
                 style={active ? {
-                  background: 'rgba(124,58,237,0.15)',
-                  border: '1px solid rgba(124,58,237,0.25)',
+                  background: '#fffbeb',
+                  border: '1px solid #fde68a',
                 } : {}}
                 aria-current={active ? 'page' : undefined}
               >
-                <span className={active ? 'text-purple-400' : 'text-white/40'} aria-hidden="true">
+                <span className={active ? 'text-amber-600' : 'text-slate-400'} aria-hidden="true">
                   {icon}
                 </span>
                 {label}
                 {active && (
                   <span
                     className="ml-auto w-1.5 h-1.5 rounded-full"
-                    style={{ background: '#7c3aed' }}
+                    style={{ background: '#f59e0b' }}
                     aria-hidden="true"
                   />
                 )}
@@ -550,30 +548,30 @@ export default function Navbar() {
         {/* Mobile user section */}
         <div
           className="mx-4 mb-4 rounded-xl overflow-hidden"
-          style={{ border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}
+          style={{ border: '1px solid #e2e8f0', background: '#f8fafc' }}
         >
           {/* User info row */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200">
             <div
               className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}
+              style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' }}
             >
               {initials}
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">{displayName}</p>
+              <p className="text-sm font-semibold text-slate-900">{displayName}</p>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-white/40">Lv. {level} ·</span>
-                <span className="text-xs" style={{ color: '#a78bfa' }}>{xp.toLocaleString()} XP</span>
+                <span className="text-xs text-slate-500">Lv. {level} ·</span>
+                <span className="text-xs" style={{ color: '#b45309' }}>{xp.toLocaleString()} XP</span>
               </div>
             </div>
           </div>
 
           {/* Quick actions */}
-          <div className="grid grid-cols-2 divide-x divide-white/5">
+          <div className="grid grid-cols-2 divide-x divide-slate-200">
             <Link
               href="/settings"
-              className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+              className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             >
               <Settings className="w-4 h-4" aria-hidden="true" />
               Settings
@@ -581,7 +579,7 @@ export default function Navbar() {
             {mounted && !user ? (
               <Link
                 href="/login"
-                className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
               >
                 <User className="w-4 h-4" aria-hidden="true" />
                 Sign In
@@ -589,7 +587,7 @@ export default function Navbar() {
             ) : (
               <button
                 onClick={handleLogout}
-                className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/5 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
               >
                 <LogOut className="w-4 h-4" aria-hidden="true" />
                 Sign Out
