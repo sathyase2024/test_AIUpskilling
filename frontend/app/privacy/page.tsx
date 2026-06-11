@@ -1,10 +1,12 @@
 import Navbar from '@/components/Navbar'
+import FeatureRibbon from '@/components/FeatureRibbon'
 
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent">
       <Navbar />
-      <main className="pt-24 pb-16 max-w-3xl mx-auto px-4 sm:px-6">
+      <FeatureRibbon withNavbarOffset />
+      <main className="pt-8 pb-16 max-w-3xl mx-auto px-4 sm:px-6">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">Privacy Policy</h1>
         <div className="bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10 rounded-2xl p-8 space-y-4 text-slate-600 dark:text-white/70 text-sm leading-relaxed">
           <p>

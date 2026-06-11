@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Navbar from '@/components/Navbar'
+import FeatureRibbon from '@/components/FeatureRibbon'
 import { PROBLEMS } from '@/lib/code-lab/problems'
 import { validateOutput } from '@/lib/code-lab/validator'
 import type { CodeLabProblem, Difficulty, Category, Language, ValidationResult } from '@/lib/code-lab/types'
@@ -152,7 +153,8 @@ export default function CodeLabPage() {
     return (
       <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent">
         <Navbar />
-        <div className="pt-20 pb-12">
+        <FeatureRibbon withNavbarOffset />
+        <div className="pt-6 pb-12">
           {/* Hero */}
           <div className="text-center px-4 py-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-xs text-amber-700 dark:text-amber-300 mb-4">

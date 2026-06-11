@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import BrandLogo, { BrandMark } from '@/components/BrandLogo'
+import FeatureRibbon from '@/components/FeatureRibbon'
 import {
   Sparkles,
   Search,
@@ -69,14 +70,6 @@ const SCROLLER =
   'flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 -mx-4 px-4 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:px-0 lg:overflow-visible lg:grid lg:snap-none lg:pb-0'
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
-
-const ribbon = [
-  { icon: GraduationCap, label: '100% Free Forever', emoji: '🎓' },
-  { icon: Sparkles, label: 'AI-Powered Learning', emoji: '✨' },
-  { icon: Award, label: 'Industry Expert Content', emoji: '🏆' },
-  { icon: Medal, label: 'Certificates & Badges', emoji: '📜' },
-  { icon: Clock, label: 'Learn At Your Own Pace', emoji: '⏱' },
-]
 
 const heroFeatures = [
   { icon: Sparkles, title: 'Hobby-Based Learning', desc: 'Learn concepts through what you love' },
@@ -307,25 +300,7 @@ export default function LandingPage() {
       <Navbar />
 
       {/* ── 1. Feature ribbon ─────────────────────────────────────────────── */}
-      <div className="pt-16 border-b border-slate-200 dark:border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-6 overflow-x-auto py-2.5 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:justify-center">
-            {ribbon.map((r) => {
-              const Icon = r.icon
-              return (
-                <div
-                  key={r.label}
-                  className="flex items-center gap-1.5 shrink-0 text-xs font-medium text-amber-600 dark:text-amber-400"
-                >
-                  <span aria-hidden>{r.emoji}</span>
-                  <Icon className="w-3.5 h-3.5" />
-                  <span className="whitespace-nowrap">{r.label}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
+      <FeatureRibbon withNavbarOffset />
 
       {/* ── 2. Hero ───────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">

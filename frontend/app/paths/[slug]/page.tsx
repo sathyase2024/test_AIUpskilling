@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Navbar from '@/components/Navbar'
+import FeatureRibbon from '@/components/FeatureRibbon'
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -99,8 +101,10 @@ export default function PathDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent text-slate-900 dark:text-white">
+      <Navbar />
+      <FeatureRibbon withNavbarOffset />
       {/* Hero */}
-      <section className="relative pt-20 pb-14 px-6 overflow-hidden">
+      <section className="relative pt-8 pb-14 px-6 overflow-hidden">
         <div className={`absolute inset-0 bg-gradient-to-br ${meta.headerGradient} opacity-40 pointer-events-none`} />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-amber-300/20 rounded-full blur-3xl pointer-events-none" />
 

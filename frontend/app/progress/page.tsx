@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
+import FeatureRibbon from '@/components/FeatureRibbon'
 import AuthGuard from '@/components/AuthGuard'
 import { apiGet } from '@/lib/api'
 import { TrendingUp, CheckCircle, Clock, Loader2 } from 'lucide-react'
@@ -29,7 +30,8 @@ export default function ProgressPage() {
     <AuthGuard>
       <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent">
         <Navbar />
-        <div className="pt-24 max-w-3xl mx-auto px-4 pb-12">
+        <FeatureRibbon withNavbarOffset />
+        <div className="pt-8 max-w-3xl mx-auto px-4 pb-12">
           <div className="flex items-center gap-3 mb-8">
             <div className="p-2.5 rounded-xl" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
               <TrendingUp className="w-5 h-5 text-white" />
