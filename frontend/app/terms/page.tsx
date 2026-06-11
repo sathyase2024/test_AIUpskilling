@@ -8,7 +8,7 @@ export default function TermsPage() {
         <h1 className="text-3xl font-bold text-white mb-6">Terms of Service</h1>
         <div className="bg-white/5 border border-white/10 rounded-2xl p-8 space-y-4 text-white/70 text-sm leading-relaxed">
           <p>
-            SkillForge AI is currently an MVP and research preview. Full terms of service are coming
+            SkillVeris is currently an MVP and research preview. Full terms of service are coming
             soon.
           </p>
           <p>
