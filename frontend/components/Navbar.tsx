@@ -248,9 +248,9 @@ export default function Navbar() {
             <div className="relative" ref={notifRef}>
               <button
                 className={[
-                  'relative p-2 rounded-lg text-slate-600 hover:text-slate-900',
-                  'hover:bg-slate-100 transition-all duration-200',
-                  notifOpen ? 'bg-slate-100 text-slate-900' : '',
+                  'relative p-2 rounded-lg text-slate-600 hover:text-slate-900 dark:text-white/70 dark:hover:text-white',
+                  'hover:bg-slate-100 dark:hover:bg-white/10 transition-all duration-200',
+                  notifOpen ? 'bg-slate-100 text-slate-900 dark:bg-white/10 dark:text-white' : '',
                 ].join(' ')}
                 onClick={() => {
                   setNotifOpen(v => !v)
@@ -281,21 +281,16 @@ export default function Navbar() {
               {/* Notification dropdown */}
               {notifOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-80 rounded-2xl overflow-hidden shadow-xl"
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                  }}
+                  className="absolute right-0 mt-2 w-80 rounded-2xl overflow-hidden shadow-xl bg-white dark:bg-[#16161e] border border-slate-200 dark:border-white/10"
                   role="dialog"
                   aria-label="Notifications"
                 >
                   {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-                    <h3 className="font-semibold text-slate-900 text-sm">Notifications</h3>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/10">
+                    <h3 className="font-semibold text-slate-900 dark:text-white text-sm">Notifications</h3>
                     {unreadCount > 0 && (
                       <span
-                        className="text-xs px-2 py-0.5 rounded-full font-medium"
-                        style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}
+                        className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
                       >
                         {unreadCount} new
                       </span>
@@ -303,26 +298,25 @@ export default function Navbar() {
                   </div>
 
                   {/* Notification list */}
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-slate-100 dark:divide-white/10">
                     {mockNotifications.map(notif => (
                       <li
                         key={notif.id}
                         className={[
                           'flex items-start gap-3 px-4 py-3 cursor-pointer',
-                          'hover:bg-slate-50 transition-colors duration-150',
-                          !notif.read ? 'bg-amber-50/60' : '',
+                          'hover:bg-slate-50 dark:hover:bg-white/10 transition-colors duration-150',
+                          !notif.read ? 'bg-amber-50/60 dark:bg-amber-500/10' : '',
                         ].join(' ')}
                       >
                         <div
-                          className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
-                          style={{ background: '#f1f5f9' }}
+                          className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 dark:bg-white/10"
                         >
                           {notifTypeIcon(notif.type)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">{notif.title}</p>
-                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{notif.message}</p>
-                          <p className="text-xs text-slate-400 mt-1">{notif.time}</p>
+                          <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{notif.title}</p>
+                          <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5 line-clamp-2">{notif.message}</p>
+                          <p className="text-xs text-slate-400 dark:text-white/40 mt-1">{notif.time}</p>
                         </div>
                         {!notif.read && (
                           <div
@@ -336,8 +330,8 @@ export default function Navbar() {
                   </ul>
 
                   {/* Footer */}
-                  <div className="px-4 py-2.5 border-t border-slate-100">
-                    <button className="w-full text-xs text-center font-medium transition-colors" style={{ color: '#d97706' }}>
+                  <div className="px-4 py-2.5 border-t border-slate-100 dark:border-white/10">
+                    <button className="w-full text-xs text-center font-medium transition-colors text-amber-600 dark:text-amber-400">
                       View all notifications
                     </button>
                   </div>
@@ -350,8 +344,8 @@ export default function Navbar() {
               <button
                 className={[
                   'flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl',
-                  'hover:bg-slate-100 transition-all duration-200 group',
-                  userMenuOpen ? 'bg-slate-100' : '',
+                  'hover:bg-slate-100 dark:hover:bg-white/10 transition-all duration-200 group',
+                  userMenuOpen ? 'bg-slate-100 dark:bg-white/10' : '',
                 ].join(' ')}
                 onClick={() => {
                   setUserMenuOpen(v => !v)
@@ -370,12 +364,12 @@ export default function Navbar() {
                   {initials}
                 </div>
                 <div className="hidden sm:block text-left">
-                  <p className="text-xs font-semibold text-slate-900 leading-tight">{displayName}</p>
-                  <p className="text-xs text-slate-500 leading-tight">Level {level}</p>
+                  <p className="text-xs font-semibold text-slate-900 dark:text-white leading-tight">{displayName}</p>
+                  <p className="text-xs text-slate-500 dark:text-white/50 leading-tight">Level {level}</p>
                 </div>
                 <ChevronDown
                   className={[
-                    'hidden sm:block w-3.5 h-3.5 text-slate-400 transition-transform duration-200',
+                    'hidden sm:block w-3.5 h-3.5 text-slate-400 dark:text-white/40 transition-transform duration-200',
                     userMenuOpen ? 'rotate-180' : '',
                   ].join(' ')}
                   aria-hidden="true"
@@ -385,17 +379,13 @@ export default function Navbar() {
               {/* User dropdown */}
               {userMenuOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-64 rounded-2xl overflow-hidden shadow-xl"
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                  }}
+                  className="absolute right-0 mt-2 w-64 rounded-2xl overflow-hidden shadow-xl bg-white dark:bg-[#16161e] border border-slate-200 dark:border-white/10"
                   role="menu"
                   aria-label="User menu"
                 >
                   {/* Profile header */}
                   <div
-                    className="px-4 py-4 border-b border-slate-100"
+                    className="px-4 py-4 border-b border-slate-100 dark:border-white/10"
                     style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%)' }}
                   >
                     <div className="flex items-center gap-3">
@@ -406,18 +396,18 @@ export default function Navbar() {
                         {initials}
                       </div>
                       <div>
-                        <p className="font-semibold text-slate-900 text-sm">{displayName}</p>
-                        <p className="text-xs text-slate-500">{displayEmail}</p>
+                        <p className="font-semibold text-slate-900 dark:text-white text-sm">{displayName}</p>
+                        <p className="text-xs text-slate-500 dark:text-white/50">{displayEmail}</p>
                       </div>
                     </div>
 
                     {/* XP progress bar */}
                     <div className="mt-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-slate-500">Level {level}</span>
-                        <span className="text-xs" style={{ color: '#b45309' }}>{xp.toLocaleString()} XP</span>
+                        <span className="text-xs text-slate-500 dark:text-white/50">Level {level}</span>
+                        <span className="text-xs text-amber-700 dark:text-amber-300">{xp.toLocaleString()} XP</span>
                       </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#e2e8f0' }}>
+                      <div className="h-1.5 rounded-full overflow-hidden bg-slate-200 dark:bg-white/10">
                         <div
                           className="h-full rounded-full"
                           style={{
@@ -442,22 +432,22 @@ export default function Navbar() {
                         key={href}
                         href={href}
                         role="menuitem"
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10 transition-colors duration-150"
                         onClick={() => setUserMenuOpen(false)}
                       >
-                        <span className="text-slate-400" aria-hidden="true">{icon}</span>
+                        <span className="text-slate-400 dark:text-white/40" aria-hidden="true">{icon}</span>
                         {label}
                       </Link>
                     ))}
                   </div>
 
                   {/* Divider + Logout / Sign in */}
-                  <div className="border-t border-slate-100 py-1.5">
+                  <div className="border-t border-slate-100 dark:border-white/10 py-1.5">
                     {mounted && !user ? (
                       <Link
                         href="/login"
                         role="menuitem"
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150"
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10 transition-colors duration-150"
                         onClick={() => setUserMenuOpen(false)}
                       >
                         <User className="w-4 h-4" aria-hidden="true" />
@@ -466,7 +456,7 @@ export default function Navbar() {
                     ) : (
                       <button
                         role="menuitem"
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors duration-150"
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-500/10 transition-colors duration-150"
                         onClick={handleLogout}
                       >
                         <LogOut className="w-4 h-4" aria-hidden="true" />
@@ -480,7 +470,7 @@ export default function Navbar() {
 
             {/* --- Mobile menu toggle --- */}
             <button
-              className="md:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-200"
+              className="md:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10 transition-all duration-200"
               onClick={() => setMobileOpen(v => !v)}
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileOpen}
@@ -501,15 +491,12 @@ export default function Navbar() {
       <div
         id="mobile-menu"
         className={[
-          'md:hidden overflow-hidden transition-all duration-300 ease-in-out',
-          mobileOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0',
+          'md:hidden overflow-hidden transition-all duration-300 ease-in-out bg-white dark:bg-[#16161e]',
+          mobileOpen
+            ? 'max-h-[600px] opacity-100 border-t border-slate-200 dark:border-white/10 shadow-xl'
+            : 'max-h-0 opacity-0',
         ].join(' ')}
         aria-hidden={!mobileOpen}
-        style={{
-          borderTop: mobileOpen ? '1px solid #e2e8f0' : 'none',
-          background: '#ffffff',
-          boxShadow: mobileOpen ? '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)' : 'none',
-        }}
       >
         <div className="px-4 py-4 space-y-1">
 
@@ -523,16 +510,12 @@ export default function Navbar() {
                 className={[
                   'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
                   active
-                    ? 'text-amber-600 bg-amber-50'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
+                    ? 'text-amber-600 bg-amber-50 border border-amber-200 dark:text-amber-400 dark:bg-amber-500/15 dark:border-amber-500/30'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10',
                 ].join(' ')}
-                style={active ? {
-                  background: '#fffbeb',
-                  border: '1px solid #fde68a',
-                } : {}}
                 aria-current={active ? 'page' : undefined}
               >
-                <span className={active ? 'text-amber-600' : 'text-slate-400'} aria-hidden="true">
+                <span className={active ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400 dark:text-white/40'} aria-hidden="true">
                   {icon}
                 </span>
                 {label}
@@ -550,11 +533,10 @@ export default function Navbar() {
 
         {/* Mobile user section */}
         <div
-          className="mx-4 mb-4 rounded-xl overflow-hidden"
-          style={{ border: '1px solid #e2e8f0', background: '#f8fafc' }}
+          className="mx-4 mb-4 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5"
         >
           {/* User info row */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-white/10">
             <div
               className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' }}
@@ -562,19 +544,19 @@ export default function Navbar() {
               {initials}
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-900">{displayName}</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-slate-500">Lv. {level} ·</span>
-                <span className="text-xs" style={{ color: '#b45309' }}>{xp.toLocaleString()} XP</span>
+                <span className="text-xs text-slate-500 dark:text-white/50">Lv. {level} ·</span>
+                <span className="text-xs text-amber-700 dark:text-amber-300">{xp.toLocaleString()} XP</span>
               </div>
             </div>
           </div>
 
           {/* Quick actions */}
-          <div className="grid grid-cols-2 divide-x divide-slate-200">
+          <div className="grid grid-cols-2 divide-x divide-slate-200 dark:divide-white/10">
             <Link
               href="/settings"
-              className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
             >
               <Settings className="w-4 h-4" aria-hidden="true" />
               Settings
@@ -582,7 +564,7 @@ export default function Navbar() {
             {mounted && !user ? (
               <Link
                 href="/login"
-                className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-white/70 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
               >
                 <User className="w-4 h-4" aria-hidden="true" />
                 Sign In
@@ -590,7 +572,7 @@ export default function Navbar() {
             ) : (
               <button
                 onClick={handleLogout}
-                className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-500/10 transition-colors"
               >
                 <LogOut className="w-4 h-4" aria-hidden="true" />
                 Sign Out
