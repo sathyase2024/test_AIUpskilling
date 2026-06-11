@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
+import FeatureRibbon from '@/components/FeatureRibbon'
 import {
   Search,
   Star,
@@ -977,9 +978,10 @@ export default function TopicsPage() {
   return (
     <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent">
       <Navbar />
+      <FeatureRibbon withNavbarOffset />
 
       {/* Hero Header */}
-      <section className="relative pt-24 pb-10 px-4 sm:px-6 overflow-hidden">
+      <section className="relative pt-8 pb-10 px-4 sm:px-6 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-100/40 dark:from-amber-500/10 via-transparent to-amber-50/30 dark:to-amber-500/5 pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[250px] bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
 

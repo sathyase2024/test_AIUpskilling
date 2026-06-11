@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic'
 // Client-side only — slug fetched via useParams(), no generateStaticParams needed.
 
 import { useState, useEffect } from 'react'
+import Navbar from '@/components/Navbar'
+import FeatureRibbon from '@/components/FeatureRibbon'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import {
@@ -254,6 +256,8 @@ export default function TopicDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent">
+      <Navbar />
+      <FeatureRibbon withNavbarOffset />
 
       {/* ── Hero Header ── */}
       <div

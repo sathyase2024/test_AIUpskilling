@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
+import FeatureRibbon from '@/components/FeatureRibbon'
 import AuthGuard from '@/components/AuthGuard'
 import { apiGet } from '@/lib/api'
 import {
@@ -789,8 +790,9 @@ export default function DashboardPage() {
     <AuthGuard>
     <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent">
       <Navbar />
+      <FeatureRibbon withNavbarOffset />
 
-      <div className="pt-16 max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="pt-4 max-w-7xl mx-auto px-4 sm:px-6">
         {/* Dashboard top bar */}
         <div className="flex items-center justify-between py-4 border-b border-slate-200 dark:border-white/10">
           <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-white/50">

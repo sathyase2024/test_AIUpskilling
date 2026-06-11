@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
+import FeatureRibbon from '@/components/FeatureRibbon'
 import AuthGuard from '@/components/AuthGuard'
 import { getStoredUser, apiGet, apiPatch, StoredUser } from '@/lib/api'
 import { User, Save, Loader2 } from 'lucide-react'
@@ -35,7 +36,8 @@ export default function ProfilePage() {
     <AuthGuard>
       <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent">
         <Navbar />
-        <div className="pt-24 max-w-2xl mx-auto px-4 pb-12">
+        <FeatureRibbon withNavbarOffset />
+        <div className="pt-8 max-w-2xl mx-auto px-4 pb-12">
           <div className="rounded-2xl p-8 shadow-xl bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10">
             <div className="flex items-center gap-3 mb-8">
               <div className="p-2.5 rounded-xl" style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' }}>
