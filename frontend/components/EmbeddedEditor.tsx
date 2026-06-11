@@ -9,7 +9,7 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full bg-[#1e1e1e]">
-      <div className="w-5 h-5 border-2 border-purple-500/40 border-t-purple-500 rounded-full animate-spin" />
+      <div className="w-5 h-5 border-2 border-amber-500/40 border-t-amber-500 rounded-full animate-spin" />
     </div>
   ),
 })
@@ -267,7 +267,7 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
   // ── Shared inner sections (toolbar + editor + output + hint) ─────────────────
 
   const toolbar = (
-    <div className="flex items-center gap-2 px-4 py-2 border-t border-white/10 bg-black/30">
+    <div className="flex items-center gap-2 px-4 py-2 border-t border-slate-200 bg-slate-50">
       <div className="flex gap-1 flex-wrap">
         {(Object.keys(LANGUAGES) as Language[]).map((l) => (
           <button
@@ -275,8 +275,8 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
             onClick={() => handleLangChange(l)}
             className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${
               lang === l
-                ? 'bg-purple-600/40 border border-purple-500/50 text-purple-200'
-                : 'bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80'
+                ? 'bg-amber-50 border border-amber-300 text-amber-700'
+                : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             {LANGUAGES[l].label}
@@ -284,7 +284,7 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
         ))}
       </div>
       {lessonSnippets?.[lang] && (
-        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-[10px] font-semibold text-cyan-300">
+        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[10px] font-semibold text-amber-700">
           <Sparkles className="w-2.5 h-2.5" />
           {snippetLabel ?? 'From this lesson'}
         </span>
@@ -292,7 +292,7 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
       <div className="flex-1" />
       <button
         onClick={reset}
-        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
         title={lessonSnippets?.[lang] ? 'Reset to the lesson code' : 'Reset to starter code'}
       >
         <RotateCcw className="w-3.5 h-3.5" />
@@ -301,7 +301,7 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
       <button
         onClick={handleRun}
         disabled={running}
-        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-500 hover:to-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all shadow-md shadow-green-900/30"
+        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all shadow-md shadow-amber-500/20"
       >
         {running ? (
           <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -387,18 +387,18 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
   )
 
   const hintCard = hint ? (
-    <div className="border-t border-amber-500/20 bg-amber-500/5 px-4 py-3">
+    <div className="border-t border-amber-200 bg-amber-50 px-4 py-3">
       <div className="flex items-start gap-2.5">
-        <div className="mt-0.5 shrink-0 w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center">
-          <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+        <div className="mt-0.5 shrink-0 w-6 h-6 rounded-lg bg-amber-100 border border-amber-300 flex items-center justify-center">
+          <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-amber-300 mb-1">{hint.title}</p>
-          <p className="text-[11px] text-white/55 leading-relaxed mb-1.5">
-            <span className="text-white/35 font-medium">Why: </span>{hint.cause}
+          <p className="text-xs font-semibold text-amber-700 mb-1">{hint.title}</p>
+          <p className="text-[11px] text-slate-600 leading-relaxed mb-1.5">
+            <span className="text-slate-500 font-medium">Why: </span>{hint.cause}
           </p>
-          <p className="text-[11px] text-white/65 leading-relaxed">
-            <span className="text-white/35 font-medium">Fix: </span>{hint.fix}
+          <p className="text-[11px] text-slate-700 leading-relaxed">
+            <span className="text-slate-500 font-medium">Fix: </span>{hint.fix}
           </p>
           {hint.example && (
             <pre className="mt-2 text-[10px] leading-relaxed text-cyan-300/70 bg-black/30 border border-white/5 rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap">
@@ -413,7 +413,7 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
   // ── Embedded mode: flat render inside a parent card (no own wrapper/toggle) ──
   if (embedded) {
     return (
-      <div className="overflow-hidden bg-[#0d0d18]">
+      <div className="overflow-hidden bg-white">
         {toolbar}
         {editorPane}
         {outputPane}
@@ -424,30 +424,30 @@ export default function EmbeddedEditor({ topicSlug, lessonId, lessonSnippets, sn
 
   // ── Standalone mode: own card with collapsible toggle ─────────────────────────
   return (
-    <div className="mt-10 rounded-2xl overflow-hidden bg-[#0d0d18]"
-      style={{ border: '1px solid transparent', backgroundClip: 'padding-box', boxShadow: '0 0 0 1px rgba(139,92,246,0.35), 0 4px 24px rgba(139,92,246,0.12)' }}
+    <div className="mt-10 rounded-2xl overflow-hidden bg-white border border-slate-200"
+      style={{ boxShadow: '0 0 0 1px rgba(245,158,11,0.20), 0 4px 24px rgba(245,158,11,0.08)' }}
     >
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-white/5 transition-colors text-left bg-gradient-to-r from-purple-900/30 to-cyan-900/10"
+        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50 transition-colors text-left bg-gradient-to-r from-amber-50 to-orange-50"
       >
-        <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-600 to-cyan-500 shrink-0 shadow-lg shadow-purple-500/30">
+        <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 shrink-0 shadow-lg shadow-amber-500/30">
           <Code2 className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <p className="text-sm font-bold text-white">Code Playground</p>
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/30 text-[10px] font-semibold text-green-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+            <p className="text-sm font-bold text-slate-900">Code Playground</p>
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
               Live
             </span>
           </div>
-          <p className="text-[11px] text-white/50 mt-0.5">Write and run code right here — no sign-in needed</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">Write and run code right here — no sign-in needed</p>
         </div>
         {open ? (
-          <ChevronUp className="w-4 h-4 text-white/30" />
+          <ChevronUp className="w-4 h-4 text-slate-400" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-white/30" />
+          <ChevronDown className="w-4 h-4 text-slate-400" />
         )}
       </button>
 

@@ -41,14 +41,14 @@ import {
 const features = [
   {
     icon: Brain,
-    gradient: 'from-purple-500 to-violet-600',
+    gradient: 'from-amber-500 to-amber-600',
     title: 'AI-Generated Curriculum',
     description:
       'Personalized content generated on-demand by Claude AI. Every lesson adapts to your learning style, pace, and existing knowledge.',
   },
   {
     icon: Rocket,
-    gradient: 'from-cyan-500 to-blue-600',
+    gradient: 'from-amber-400 to-amber-600',
     title: 'Career Learning Paths',
     description:
       'Structured roadmaps for 20+ tech roles. Go from zero to job-ready with curated, ordered modules that mirror real hiring requirements.',
@@ -84,32 +84,32 @@ const features = [
 ]
 
 const categories = [
-  { icon: Code, name: 'Programming', count: 42, color: 'from-purple-500 to-violet-600' },
-  { icon: Globe, name: 'Frontend', count: 28, color: 'from-cyan-500 to-blue-600' },
+  { icon: Code, name: 'Programming', count: 42, color: 'from-amber-500 to-amber-600' },
+  { icon: Globe, name: 'Frontend', count: 28, color: 'from-amber-400 to-amber-600' },
   { icon: Server, name: 'Backend', count: 35, color: 'from-green-500 to-emerald-600' },
   { icon: Brain, name: 'AI / ML', count: 31, color: 'from-pink-500 to-rose-600' },
   { icon: Cpu, name: 'Cloud & DevOps', count: 24, color: 'from-amber-500 to-orange-600' },
   { icon: Lock, name: 'Security', count: 18, color: 'from-red-500 to-rose-600' },
   { icon: Database, name: 'Databases', count: 22, color: 'from-teal-500 to-cyan-600' },
-  { icon: Layers, name: 'System Design', count: 15, color: 'from-indigo-500 to-purple-600' },
+  { icon: Layers, name: 'System Design', count: 15, color: 'from-amber-500 to-amber-700' },
 ]
 
 const careerPaths = [
   {
     title: 'Full Stack Java',
-    gradient: 'from-purple-600 to-violet-700',
+    gradient: 'from-amber-500 to-amber-600',
     stack: ['Java', 'Spring Boot', 'React', 'PostgreSQL', 'Docker'],
     duration: '6 months',
     difficulty: 'Intermediate',
-    difficultyColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    difficultyColor: 'bg-blue-50 text-blue-700 border-blue-200',
   },
   {
     title: 'AI Engineer',
-    gradient: 'from-cyan-600 to-blue-700',
+    gradient: 'from-amber-400 to-amber-600',
     stack: ['Python', 'PyTorch', 'LangChain', 'FastAPI', 'RAG'],
     duration: '5 months',
     difficulty: 'Advanced',
-    difficultyColor: 'bg-red-500/20 text-red-400 border-red-500/30',
+    difficultyColor: 'bg-amber-50 text-amber-700 border-amber-200',
   },
   {
     title: 'DevOps & Cloud',
@@ -117,7 +117,7 @@ const careerPaths = [
     stack: ['AWS', 'Terraform', 'Kubernetes', 'GitHub Actions', 'Prometheus'],
     duration: '4 months',
     difficulty: 'Intermediate',
-    difficultyColor: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    difficultyColor: 'bg-blue-50 text-blue-700 border-blue-200',
   },
   {
     title: 'MERN Stack',
@@ -125,16 +125,16 @@ const careerPaths = [
     stack: ['MongoDB', 'Express', 'React', 'Node.js', 'TypeScript'],
     duration: '4 months',
     difficulty: 'Beginner',
-    difficultyColor: 'bg-green-500/20 text-green-400 border-green-500/30',
+    difficultyColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   },
 ]
 
 const hobbies = [
-  { id: 'gaming', label: 'Gaming', icon: Gamepad, color: 'from-purple-500 to-violet-600' },
+  { id: 'gaming', label: 'Gaming', icon: Gamepad, color: 'from-amber-500 to-amber-600' },
   { id: 'cricket', label: 'Cricket', icon: Target, color: 'from-green-500 to-emerald-600' },
   { id: 'music', label: 'Music', icon: Music, color: 'from-pink-500 to-rose-600' },
   { id: 'fitness', label: 'Fitness', icon: Dumbbell, color: 'from-amber-500 to-orange-600' },
-  { id: 'photography', label: 'Photography', icon: Camera, color: 'from-cyan-500 to-blue-600' },
+  { id: 'photography', label: 'Photography', icon: Camera, color: 'from-amber-400 to-amber-600' },
   { id: 'travel', label: 'Travel', icon: Plane, color: 'from-teal-500 to-cyan-600' },
 ]
 
@@ -254,8 +254,8 @@ def cheapest_flight(graph, src, dst):
 }
 
 const stats = [
-  { value: '95%', label: 'Validation Score', icon: CheckCircle, color: 'from-purple-500 to-violet-600' },
-  { value: '100hrs', label: 'Content per Topic', icon: Clock, color: 'from-cyan-500 to-blue-600' },
+  { value: '95%', label: 'Validation Score', icon: CheckCircle, color: 'from-amber-500 to-amber-600' },
+  { value: '100hrs', label: 'Content per Topic', icon: Clock, color: 'from-amber-400 to-amber-600' },
   { value: 'AI-First', label: 'Platform Design', icon: Brain, color: 'from-pink-500 to-rose-600' },
   { value: 'Zero', label: 'Complexity Barriers', icon: Zap, color: 'from-amber-500 to-orange-600' },
 ]
@@ -294,7 +294,7 @@ function FloatingCodeCard() {
   return (
     <div className="relative w-full max-w-sm mx-auto lg:mx-0 animate-float">
       {/* Glow */}
-      <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-400 opacity-30 blur-lg" />
+      <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 opacity-30 blur-lg" />
       <div className="relative bg-[#0d0d14] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
         {/* Title bar */}
         <div className="flex items-center gap-2 px-4 py-3 bg-white/5 border-b border-white/10">
@@ -387,17 +387,17 @@ export default function LandingPage() {
   const example = hobbyExamples[selectedHobby]
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white overflow-x-hidden">
+    <div className="min-h-screen text-slate-900 overflow-x-hidden">
       <Navbar />
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
-        {/* Animated gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-[#0a0a0f] to-cyan-900/30" />
+        {/* Soft amber radial glows */}
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-100/40 via-transparent to-amber-50/30" />
         <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl animate-pulse delay-1000" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-violet-600/15 rounded-full blur-3xl animate-pulse delay-500" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-400/15 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-amber-300/10 rounded-full blur-3xl animate-pulse delay-500" />
         </div>
 
         {/* Particle dots */}
@@ -405,7 +405,7 @@ export default function LandingPage() {
           {Array.from({ length: 30 }).map((_, i) => (
             <div
               key={i}
-              className="absolute w-1 h-1 rounded-full bg-white/20 animate-pulse"
+              className="absolute w-1 h-1 rounded-full bg-amber-400/30 animate-pulse"
               style={{
                 left: `${(i * 37 + 5) % 100}%`,
                 top: `${(i * 53 + 10) % 100}%`,
@@ -420,19 +420,19 @@ export default function LandingPage() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left column */}
             <div className="flex flex-col gap-6">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 w-fit">
-                <Sparkles className="w-4 h-4 text-cyan-400" />
-                <span className="text-sm text-white/70">Powered by Claude AI</span>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 border border-amber-200 w-fit">
+                <Sparkles className="w-4 h-4 text-amber-600" />
+                <span className="text-sm text-slate-600">Powered by Claude AI</span>
               </div>
 
               <h1 className="text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
                 Master Any Skill with{' '}
-                <span className="bg-gradient-to-r from-purple-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
                   AI-Powered Learning
                 </span>
               </h1>
 
-              <p className="text-lg text-white/60 leading-relaxed max-w-lg">
+              <p className="text-lg text-slate-600 leading-relaxed max-w-lg">
                 Get personalized learning paths crafted by AI, hands-on coding exercises with live
                 review, and lessons tailored to your hobbies and career goals.
               </p>
@@ -440,14 +440,14 @@ export default function LandingPage() {
               <div className="flex flex-wrap gap-4">
                 <Link
                   href="/signup"
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-semibold hover:opacity-90 transition-all duration-300 hover:scale-105 shadow-lg shadow-purple-500/25"
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold hover:from-amber-400 hover:to-amber-500 transition-all duration-300 hover:scale-105 shadow-lg shadow-amber-500/25"
                 >
                   Start Learning Free
                   <ArrowRight className="w-4 h-4" />
                 </Link>
                 <Link
                   href="/topics"
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl border border-white/20 text-white/80 font-semibold hover:border-purple-500/50 hover:text-white transition-all duration-300 hover:scale-105 backdrop-blur-sm"
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-all duration-300 hover:scale-105"
                 >
                   Explore Topics
                   <ChevronRight className="w-4 h-4" />
@@ -463,10 +463,10 @@ export default function LandingPage() {
                   { value: 'AI', label: 'Powered' },
                 ].map((stat) => (
                   <div key={stat.label} className="flex flex-col">
-                    <span className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                    <span className="text-2xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
                       {stat.value}
                     </span>
-                    <span className="text-xs text-white/50">{stat.label}</span>
+                    <span className="text-xs text-slate-500">{stat.label}</span>
                   </div>
                 ))}
               </div>
@@ -481,16 +481,16 @@ export default function LandingPage() {
       </section>
 
       {/* ── Features ──────────────────────────────────────────────────────── */}
-      <section className="py-24 bg-[#0d0d14]">
+      <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">
+            <h2 className="text-4xl font-bold mb-4 text-slate-900">
               Everything you need to{' '}
-              <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
                 level up fast
               </span>
             </h2>
-            <p className="text-white/50 max-w-xl mx-auto">
+            <p className="text-slate-600 max-w-xl mx-auto">
               A complete learning ecosystem built from the ground up with AI at the core — not
               bolted on as an afterthought.
             </p>
@@ -502,17 +502,17 @@ export default function LandingPage() {
               return (
                 <div
                   key={f.title}
-                  className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:scale-105 transition-all duration-300 hover:border-purple-500/50 hover:bg-white/8"
+                  className="group bg-white border border-slate-200 shadow-sm rounded-2xl p-6 hover:scale-105 transition-all duration-300 hover:border-amber-300 hover:shadow-md"
                 >
                   <div
                     className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${f.gradient} mb-4 shadow-lg`}
                   >
                     <Icon className="w-6 h-6 text-white" />
                   </div>
-                  <h3 className="text-lg font-semibold mb-2 group-hover:text-white transition-colors">
+                  <h3 className="text-lg font-semibold mb-2 text-slate-900 transition-colors">
                     {f.title}
                   </h3>
-                  <p className="text-sm text-white/50 leading-relaxed">{f.description}</p>
+                  <p className="text-sm text-slate-600 leading-relaxed">{f.description}</p>
                 </div>
               )
             })}
@@ -521,16 +521,16 @@ export default function LandingPage() {
       </section>
 
       {/* ── Topic Categories ──────────────────────────────────────────────── */}
-      <section className="py-24 bg-[#0a0a0f]">
+      <section className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">
+            <h2 className="text-4xl font-bold mb-4 text-slate-900">
               Explore{' '}
-              <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
                 Topic Categories
               </span>
             </h2>
-            <p className="text-white/50 max-w-xl mx-auto">
+            <p className="text-slate-600 max-w-xl mx-auto">
               Dive into any domain. Every category contains structured lessons, hands-on exercises,
               and AI-generated examples.
             </p>
@@ -543,7 +543,7 @@ export default function LandingPage() {
                 <Link
                   key={cat.name}
                   href="/topics"
-                  className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:scale-105 transition-all duration-300 hover:border-purple-500/50 flex flex-col gap-3 cursor-pointer"
+                  className="group bg-white border border-slate-200 shadow-sm rounded-2xl p-5 hover:scale-105 transition-all duration-300 hover:border-amber-300 hover:shadow-md flex flex-col gap-3 cursor-pointer"
                 >
                   <div
                     className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${cat.color} w-fit shadow-lg`}
@@ -551,8 +551,8 @@ export default function LandingPage() {
                     <Icon className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">{cat.name}</p>
-                    <p className="text-xs text-white/40 mt-0.5">{cat.count} topics</p>
+                    <p className="font-semibold text-sm text-slate-900">{cat.name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{cat.count} topics</p>
                   </div>
                 </Link>
               )
@@ -562,7 +562,7 @@ export default function LandingPage() {
           <div className="mt-10 flex justify-center">
             <Link
               href="/topics"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl border border-white/20 text-white/70 hover:text-white hover:border-purple-500/50 transition-all duration-300 hover:scale-105"
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition-all duration-300 hover:scale-105"
             >
               View All Topics
               <ArrowRight className="w-4 h-4" />
@@ -572,16 +572,16 @@ export default function LandingPage() {
       </section>
 
       {/* ── Career Paths ──────────────────────────────────────────────────── */}
-      <section className="py-24 bg-[#0d0d14]">
+      <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">
+            <h2 className="text-4xl font-bold mb-4 text-slate-900">
               Structured{' '}
-              <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
                 Career Paths
               </span>
             </h2>
-            <p className="text-white/50 max-w-xl mx-auto">
+            <p className="text-slate-600 max-w-xl mx-auto">
               Follow a proven roadmap from beginner to job-ready. Every path mirrors real hiring
               criteria across top tech companies.
             </p>
@@ -591,13 +591,13 @@ export default function LandingPage() {
             {careerPaths.map((path) => (
               <div
                 key={path.title}
-                className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden hover:scale-105 transition-all duration-300 hover:border-purple-500/50 flex flex-col"
+                className="group bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:scale-105 transition-all duration-300 hover:border-amber-300 hover:shadow-md flex flex-col"
               >
                 {/* Gradient header */}
                 <div className={`h-2 bg-gradient-to-r ${path.gradient}`} />
                 <div className="p-5 flex flex-col gap-4 flex-1">
                   <div className="flex items-start justify-between">
-                    <h3 className="font-bold text-base leading-snug">{path.title}</h3>
+                    <h3 className="font-bold text-base leading-snug text-slate-900">{path.title}</h3>
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ml-2 ${path.difficultyColor}`}
                     >
@@ -609,14 +609,14 @@ export default function LandingPage() {
                     {path.stack.map((tech) => (
                       <span
                         key={tech}
-                        className="text-xs px-2 py-0.5 rounded-md bg-white/8 border border-white/10 text-white/60"
+                        className="text-xs px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-600"
                       >
                         {tech}
                       </span>
                     ))}
                   </div>
 
-                  <div className="mt-auto flex items-center gap-2 text-xs text-white/40">
+                  <div className="mt-auto flex items-center gap-2 text-xs text-slate-500">
                     <Clock className="w-3.5 h-3.5" />
                     <span>{path.duration}</span>
                   </div>
@@ -628,7 +628,7 @@ export default function LandingPage() {
           <div className="mt-10 flex justify-center">
             <Link
               href="/paths"
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-semibold hover:opacity-90 transition-all duration-300 hover:scale-105 shadow-lg shadow-purple-500/20"
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold hover:from-amber-400 hover:to-amber-500 transition-all duration-300 hover:scale-105 shadow-lg shadow-amber-500/20"
             >
               View All Paths
               <ArrowRight className="w-4 h-4" />
@@ -638,24 +638,24 @@ export default function LandingPage() {
       </section>
 
       {/* ── Hobby Personalization ─────────────────────────────────────────── */}
-      <section className="py-24 bg-[#0a0a0f]">
+      <section className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-start">
             {/* Left: explanation */}
             <div className="flex flex-col gap-6 lg:sticky lg:top-24">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 w-fit">
-                <Star className="w-4 h-4 text-purple-400" />
-                <span className="text-sm text-purple-300">Hobby Personalization</span>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-50 border border-amber-200 w-fit">
+                <Star className="w-4 h-4 text-amber-600" />
+                <span className="text-sm text-amber-700">Hobby Personalization</span>
               </div>
 
-              <h2 className="text-4xl font-bold">
+              <h2 className="text-4xl font-bold text-slate-900">
                 Learn through{' '}
-                <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
                   what you love
                 </span>
               </h2>
 
-              <p className="text-white/60 leading-relaxed">
+              <p className="text-slate-600 leading-relaxed">
                 Abstract concepts stick when they come wrapped in something you already care about.
                 Pick a hobby and watch how the AI transforms standard lessons into stories and
                 examples that resonate with you personally.
@@ -667,8 +667,8 @@ export default function LandingPage() {
                   'Practice exercises built around your interests',
                   'Projects that double as passion projects',
                 ].map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-sm text-white/60">
-                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
+                  <li key={item} className="flex items-start gap-2 text-sm text-slate-600">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                     {item}
                   </li>
                 ))}
@@ -686,7 +686,7 @@ export default function LandingPage() {
                       className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all duration-300 hover:scale-105 ${
                         isActive
                           ? `bg-gradient-to-r ${hobby.color} border-transparent text-white shadow-lg`
-                          : 'bg-white/5 border-white/10 text-white/60 hover:border-purple-500/50 hover:text-white'
+                          : 'bg-white border-slate-300 text-slate-700 hover:border-amber-300 hover:bg-slate-50'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -699,17 +699,17 @@ export default function LandingPage() {
 
             {/* Right: live example */}
             <div className="flex flex-col gap-4 min-w-0">
-              <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 transition-all duration-300 hover:border-purple-500/50">
+              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 transition-all duration-300 hover:border-amber-300 hover:shadow-md">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-cyan-500">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600">
                     <Brain className="w-4 h-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-xs text-white/40 uppercase tracking-wider">AI Lesson</p>
-                    <p className="text-sm font-semibold text-white">{example.topic}</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider">AI Lesson</p>
+                    <p className="text-sm font-semibold text-slate-900">{example.topic}</p>
                   </div>
                 </div>
-                <p className="text-sm text-white/60 leading-relaxed border-l-2 border-purple-500/40 pl-4">
+                <p className="text-sm text-slate-600 leading-relaxed border-l-2 border-amber-300 pl-4">
                   {example.lesson}
                 </p>
               </div>
@@ -726,11 +726,11 @@ export default function LandingPage() {
                 </pre>
               </div>
 
-              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/3 border border-white/8">
-                <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
-                <p className="text-xs text-white/50">
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
+                <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                <p className="text-xs text-slate-600">
                   This example was generated by Claude AI specifically for{' '}
-                  <span className="text-white/80 capitalize">{selectedHobby}</span> enthusiasts.
+                  <span className="text-slate-900 capitalize">{selectedHobby}</span> enthusiasts.
                 </p>
               </div>
             </div>
@@ -739,16 +739,16 @@ export default function LandingPage() {
       </section>
 
       {/* ── Social Proof / Stats ──────────────────────────────────────────── */}
-      <section className="py-24 bg-[#0d0d14]">
+      <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">
+            <h2 className="text-4xl font-bold mb-4 text-slate-900">
               Built for{' '}
-              <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
                 serious learners
               </span>
             </h2>
-            <p className="text-white/50 max-w-xl mx-auto">
+            <p className="text-slate-600 max-w-xl mx-auto">
               Quality over quantity. Every metric reflects our obsession with making learning
               genuinely effective.
             </p>
@@ -760,17 +760,17 @@ export default function LandingPage() {
               return (
                 <div
                   key={s.label}
-                  className="group bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:scale-105 transition-all duration-300 hover:border-purple-500/50 text-center flex flex-col items-center gap-3"
+                  className="group bg-white border border-slate-200 shadow-sm rounded-2xl p-6 hover:scale-105 transition-all duration-300 hover:border-amber-300 hover:shadow-md text-center flex flex-col items-center gap-3"
                 >
                   <div
                     className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${s.color} shadow-lg`}
                   >
                     <Icon className="w-6 h-6 text-white" />
                   </div>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                  <p className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
                     <AnimatedStat value={s.value} label={s.label} />
                   </p>
-                  <p className="text-sm text-white/50">{s.label}</p>
+                  <p className="text-sm text-slate-600">{s.label}</p>
                 </div>
               )
             })}
@@ -779,30 +779,30 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA Banner ────────────────────────────────────────────────────── */}
-      <section className="py-20 bg-[#0a0a0f] relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-900/30 via-transparent to-cyan-900/20" />
+      <section className="py-20 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-amber-100/40 via-transparent to-amber-50/30" />
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center gap-6">
-          <h2 className="text-4xl lg:text-5xl font-bold">
+          <h2 className="text-4xl lg:text-5xl font-bold text-slate-900">
             Ready to start your{' '}
-            <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
               AI learning journey?
             </span>
           </h2>
-          <p className="text-white/50 text-lg max-w-xl">
+          <p className="text-slate-600 text-lg max-w-xl">
             Join thousands of learners who are accelerating their careers with AI-personalised
             lessons and expert-validated content.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <Link
               href="/signup"
-              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-semibold text-lg hover:opacity-90 transition-all duration-300 hover:scale-105 shadow-xl shadow-purple-500/25"
+              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold text-lg hover:from-amber-400 hover:to-amber-500 transition-all duration-300 hover:scale-105 shadow-xl shadow-amber-500/25"
             >
               Get Started Free
               <ArrowRight className="w-5 h-5" />
             </Link>
             <Link
               href="/paths"
-              className="flex items-center gap-2 px-8 py-4 rounded-xl border border-white/20 text-white/80 font-semibold text-lg hover:border-purple-500/50 hover:text-white transition-all duration-300 hover:scale-105"
+              className="flex items-center gap-2 px-8 py-4 rounded-xl bg-white border border-slate-300 text-slate-700 font-semibold text-lg hover:bg-slate-50 transition-all duration-300 hover:scale-105"
             >
               View Career Paths
             </Link>
@@ -811,23 +811,23 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ────────────────────────────────────────────────────────── */}
-      <footer className="bg-[#07070d] border-t border-white/5 py-16">
+      <footer className="bg-white border-t border-slate-200 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
             {/* Brand */}
             <div className="lg:col-span-2 flex flex-col gap-4">
               <Link href="/" className="flex items-center gap-2 w-fit">
-                <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-600 to-cyan-400">
+                <div className="p-1.5 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600">
                   <Brain className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white font-bold text-lg tracking-tight">
+                <span className="text-slate-900 font-bold text-lg tracking-tight">
                   AI
-                  <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
                     Upskill
                   </span>
                 </span>
               </Link>
-              <p className="text-sm text-white/40 leading-relaxed max-w-xs">
+              <p className="text-sm text-slate-500 leading-relaxed max-w-xs">
                 The AI-first learning platform that personalises every lesson to your career goals
                 and hobbies. Master any skill, faster.
               </p>
@@ -861,7 +861,7 @@ export default function LandingPage() {
               },
             ].map((col) => (
               <div key={col.heading} className="flex flex-col gap-4">
-                <p className="text-xs font-semibold uppercase tracking-widest text-white/30">
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
                   {col.heading}
                 </p>
                 <ul className="flex flex-col gap-2.5">
@@ -869,7 +869,7 @@ export default function LandingPage() {
                     <li key={link.label}>
                       <Link
                         href={link.href}
-                        className="text-sm text-white/50 hover:text-white transition-colors"
+                        className="text-sm text-slate-500 hover:text-amber-600 transition-colors"
                       >
                         {link.label}
                       </Link>
@@ -880,10 +880,10 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-white/30">
+          <div className="border-t border-slate-200 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-slate-400">
               &copy; {new Date().getFullYear()}{' '}
-              <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent font-medium">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent font-medium">
                 AIUpskill
               </span>
               . All rights reserved.
@@ -893,7 +893,7 @@ export default function LandingPage() {
                 <Link
                   key={item}
                   href="/"
-                  className="text-xs text-white/30 hover:text-white/60 transition-colors"
+                  className="text-xs text-slate-400 hover:text-amber-600 transition-colors"
                 >
                   {item}
                 </Link>

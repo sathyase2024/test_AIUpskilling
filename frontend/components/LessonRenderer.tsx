@@ -198,13 +198,13 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
       const level = section.level ?? 2
       if (level === 2) {
         return (
-          <h2 className="text-xl font-bold text-white border-b border-white/10 pb-2 mt-8 mb-4">
+          <h2 className="text-xl font-bold text-slate-900 border-b border-slate-200 pb-2 mt-8 mb-4">
             {section.content}
           </h2>
         )
       }
       return (
-        <h3 className="text-lg font-bold text-white/90 mt-6 mb-3">
+        <h3 className="text-lg font-bold text-slate-900 mt-6 mb-3">
           {section.content}
         </h3>
       )
@@ -212,7 +212,7 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
 
     case 'paragraph':
       return (
-        <p className="text-white/80 leading-relaxed mb-4">
+        <p className="text-slate-700 leading-relaxed mb-4">
           {section.content}
         </p>
       )
@@ -222,28 +222,28 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
 
     case 'info_box':
       return (
-        <div className="my-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 flex gap-3">
-          <Lightbulb size={18} className="text-blue-400 flex-shrink-0 mt-0.5" />
-          <p className="text-blue-200/80 text-sm leading-relaxed">{section.content}</p>
+        <div className="my-4 p-4 rounded-xl bg-blue-50 border border-blue-200 flex gap-3">
+          <Lightbulb size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+          <p className="text-blue-900 text-sm leading-relaxed">{section.content}</p>
         </div>
       )
 
     case 'warning_box':
       return (
-        <div className="my-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-3">
-          <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-amber-200/80 text-sm leading-relaxed">{section.content}</p>
+        <div className="my-4 p-4 rounded-xl bg-amber-50 border border-amber-200 flex gap-3">
+          <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <p className="text-amber-900 text-sm leading-relaxed">{section.content}</p>
         </div>
       )
 
     case 'analogy':
       return (
-        <div className="my-6 p-5 rounded-2xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/5 border border-violet-500/25">
+        <div className="my-6 p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200">
           <div className="flex items-center gap-2 mb-3">
-            <Sparkles size={16} className="text-violet-400 flex-shrink-0" />
-            <span className="text-sm font-semibold text-violet-300">Analogy</span>
+            <Sparkles size={16} className="text-amber-600 flex-shrink-0" />
+            <span className="text-sm font-semibold text-amber-700">Analogy</span>
           </div>
-          <p className="text-violet-100/80 text-sm leading-relaxed whitespace-pre-wrap">{section.content}</p>
+          <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{section.content}</p>
         </div>
       )
 
@@ -252,8 +252,8 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
         <ul className="my-4 space-y-2">
           {section.items?.map((item, i) => (
             <li key={i} className="flex items-start gap-2">
-              <CheckCircle size={16} className="text-emerald-400 flex-shrink-0 mt-0.5" />
-              <span className="text-white/75 text-sm">{item}</span>
+              <CheckCircle size={16} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+              <span className="text-slate-700 text-sm">{item}</span>
             </li>
           ))}
         </ul>
@@ -267,25 +267,25 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
       const correctAnswer = section.answer ?? 0
 
       return (
-        <div className="my-6 rounded-2xl border border-purple-500/25 bg-gradient-to-br from-purple-900/20 to-violet-900/10 p-6">
+        <div className="my-6 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-6">
           <div className="flex items-center gap-2 mb-4">
-            <HelpCircle size={18} className="text-purple-400 flex-shrink-0" />
-            <span className="text-sm font-semibold text-purple-300">Knowledge Check</span>
+            <HelpCircle size={18} className="text-amber-600 flex-shrink-0" />
+            <span className="text-sm font-semibold text-amber-700">Knowledge Check</span>
           </div>
-          <p className="text-sm font-medium text-white/90 mb-4">{question}</p>
+          <p className="text-sm font-medium text-slate-900 mb-4">{question}</p>
           <div className="space-y-2">
             {(options.length > 0 ? options : ['Option A', 'Option B', 'Option C', 'Option D']).map((option, i) => {
               const isSelected = selectedAnswer === i
               const isCorrect = i === correctAnswer
               let cls = 'w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-all '
               if (!hasAnswered) {
-                cls += 'border-white/10 bg-white/5 text-white/60 hover:bg-white/8 hover:border-white/20 cursor-pointer'
+                cls += 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:border-amber-400 cursor-pointer'
               } else if (isCorrect) {
-                cls += 'border-green-500/40 bg-green-500/10 text-green-300 cursor-default'
+                cls += 'border-emerald-200 bg-emerald-50 text-emerald-700 cursor-default'
               } else if (isSelected && !isCorrect) {
-                cls += 'border-red-500/40 bg-red-500/10 text-red-300 cursor-default'
+                cls += 'border-red-200 bg-red-50 text-red-700 cursor-default'
               } else {
-                cls += 'border-white/5 bg-white/[0.02] text-white/30 cursor-default'
+                cls += 'border-slate-200 bg-white text-slate-400 cursor-default'
               }
               return (
                 <button
@@ -294,18 +294,18 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
                   disabled={hasAnswered}
                   className={cls}
                 >
-                  <span className="font-mono text-white/30 mr-2">{String.fromCharCode(65 + i)}.</span>
+                  <span className="font-mono text-slate-400 mr-2">{String.fromCharCode(65 + i)}.</span>
                   {option}
                 </button>
               )
             })}
           </div>
           {hasAnswered && (
-            <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
-              <p className="text-xs text-white/60 leading-relaxed">
+            <div className="mt-4 p-3 rounded-lg bg-white border border-slate-200">
+              <p className="text-xs text-slate-600 leading-relaxed">
                 {selectedAnswer === correctAnswer
-                  ? <span className="text-green-400 font-semibold">Correct! </span>
-                  : <span className="text-red-400 font-semibold">Incorrect. </span>}
+                  ? <span className="text-emerald-700 font-semibold">Correct! </span>
+                  : <span className="text-red-700 font-semibold">Incorrect. </span>}
                 {section.explanation && section.explanation}
               </p>
             </div>
@@ -320,24 +320,24 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
         : null
 
       return (
-        <div className="my-6 rounded-xl border border-cyan-500/20 bg-cyan-900/10 p-5">
+        <div className="my-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
           <div className="flex items-center gap-2 mb-3">
-            <BookOpen size={16} className="text-cyan-400 flex-shrink-0" />
-            <span className="text-sm font-semibold text-cyan-300">Exercise</span>
+            <BookOpen size={16} className="text-amber-600 flex-shrink-0" />
+            <span className="text-sm font-semibold text-amber-700">Exercise</span>
           </div>
           {steps ? (
             <ol className="space-y-2">
               {steps.map((step, i) => (
                 <li key={i} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-mono flex items-center justify-center mt-0.5">
+                  <span className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-100 border border-amber-300 text-amber-600 text-xs font-mono flex items-center justify-center mt-0.5">
                     {i + 1}
                   </span>
-                  <span className="text-white/75 text-sm leading-relaxed">{step}</span>
+                  <span className="text-slate-700 text-sm leading-relaxed">{step}</span>
                 </li>
               ))}
             </ol>
           ) : (
-            <p className="text-white/75 text-sm leading-relaxed">{section.content}</p>
+            <p className="text-slate-700 text-sm leading-relaxed">{section.content}</p>
           )}
         </div>
       )

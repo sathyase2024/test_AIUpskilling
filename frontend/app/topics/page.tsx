@@ -87,8 +87,8 @@ const TC: Record<string, string> = {
 function gradientBg(cls: string, dir = 'to right'): string {
   const fromKey = cls.match(/from-([a-z]+-\d+)/)?.[1] ?? ''
   const toKey   = cls.match(/\bto-([a-z]+-\d+)/)?.[1] ?? ''
-  const from = TC[fromKey] ?? '#7c3aed'
-  const to   = TC[toKey]   ?? '#06b6d4'
+  const from = TC[fromKey] ?? '#f59e0b'
+  const to   = TC[toKey]   ?? '#d97706'
   return `linear-gradient(${dir}, ${from}, ${to})`
 }
 
@@ -564,24 +564,24 @@ const HOBBY_OPTIONS = [
 
 function difficultyBadgeStyle(d: Difficulty) {
   return d === 'Beginner'
-    ? 'text-green-400 bg-green-500/10 border-green-500/30'
+    ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
     : d === 'Intermediate'
-    ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30'
-    : 'text-red-400 bg-red-500/10 border-red-500/30'
+    ? 'text-blue-700 bg-blue-50 border-blue-200'
+    : 'text-amber-700 bg-amber-50 border-amber-200'
 }
 
 function categoryBadgeStyle(c: Category) {
   const map: Record<Category, string> = {
-    'AI/ML': 'text-purple-300 bg-purple-500/10 border-purple-500/20',
-    Cloud: 'text-sky-300 bg-sky-500/10 border-sky-500/20',
-    DevOps: 'text-orange-300 bg-orange-500/10 border-orange-500/20',
-    Backend: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20',
-    'Data Engineering': 'text-blue-300 bg-blue-500/10 border-blue-500/20',
-    Frontend: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20',
-    'System Design': 'text-violet-300 bg-violet-500/10 border-violet-500/20',
-    Security: 'text-red-300 bg-red-500/10 border-red-500/20',
+    'AI/ML': 'text-amber-700 bg-amber-50 border-amber-200',
+    Cloud: 'text-sky-700 bg-sky-50 border-sky-200',
+    DevOps: 'text-orange-700 bg-orange-50 border-orange-200',
+    Backend: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    'Data Engineering': 'text-blue-700 bg-blue-50 border-blue-200',
+    Frontend: 'text-amber-700 bg-amber-50 border-amber-200',
+    'System Design': 'text-amber-700 bg-amber-50 border-amber-200',
+    Security: 'text-red-700 bg-red-50 border-red-200',
   }
-  return map[c] ?? 'text-white/60 bg-white/5 border-white/10'
+  return map[c] ?? 'text-slate-600 bg-slate-50 border-slate-200'
 }
 
 // ─── Topic Card ───────────────────────────────────────────────────────────────
@@ -589,10 +589,10 @@ function categoryBadgeStyle(c: Category) {
 function TopicCard({ topic }: { topic: Topic }) {
   const inner = (
     <div
-      className={`group relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 flex flex-col ${
+      className={`group relative bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden transition-all duration-300 flex flex-col ${
         topic.comingSoon
           ? 'opacity-65'
-          : 'hover:-translate-y-1 hover:scale-[1.02] hover:border-white/25 hover:shadow-2xl hover:shadow-purple-500/10 cursor-pointer'
+          : 'hover:-translate-y-1 hover:scale-[1.02] hover:border-amber-300 hover:shadow-md hover:shadow-amber-500/10 cursor-pointer'
       }`}
     >
       {/* Colored top bar */}
@@ -637,14 +637,14 @@ function TopicCard({ topic }: { topic: Topic }) {
           </span>
         </div>
 
-        <h3 className={`font-bold text-base leading-snug transition-colors ${topic.comingSoon ? 'text-white/70' : 'text-white/90 group-hover:text-purple-200'}`}>
+        <h3 className={`font-bold text-base leading-snug transition-colors ${topic.comingSoon ? 'text-slate-500' : 'text-slate-900 group-hover:text-amber-600'}`}>
           {topic.name}
         </h3>
 
-        <p className="text-white/50 text-xs leading-relaxed line-clamp-2">{topic.description}</p>
+        <p className="text-slate-600 text-xs leading-relaxed line-clamp-2">{topic.description}</p>
 
         {/* Meta row */}
-        <div className="flex items-center gap-3 text-xs text-white/50">
+        <div className="flex items-center gap-3 text-xs text-slate-500">
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
             {topic.hours}h
@@ -652,9 +652,9 @@ function TopicCard({ topic }: { topic: Topic }) {
           {!topic.comingSoon && (
             <>
               <div className="flex items-center gap-1">
-                <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                <span className="text-white/70">{topic.rating}</span>
-                <span className="text-white/30">({topic.reviews.toLocaleString()})</span>
+                <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                <span className="text-slate-700">{topic.rating}</span>
+                <span className="text-slate-400">({topic.reviews.toLocaleString()})</span>
               </div>
               <div className="flex items-center gap-1 ml-auto">
                 <Users className="w-3 h-3" />
@@ -669,7 +669,7 @@ function TopicCard({ topic }: { topic: Topic }) {
           {topic.tags.slice(0, 4).map((tag) => (
             <span
               key={tag}
-              className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-white/5 border border-white/10 text-white/50"
+              className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-50 border border-slate-200 text-slate-600"
             >
               {tag}
             </span>
@@ -679,7 +679,7 @@ function TopicCard({ topic }: { topic: Topic }) {
         {/* CTA */}
         <div className="mt-auto pt-1">
           {topic.comingSoon ? (
-            <div className="block w-full py-2.5 rounded-xl text-white/35 text-sm font-semibold text-center bg-white/5 border border-white/10 cursor-not-allowed select-none">
+            <div className="block w-full py-2.5 rounded-xl text-slate-400 text-sm font-semibold text-center bg-slate-50 border border-slate-200 cursor-not-allowed select-none">
               Coming Soon
             </div>
           ) : (
@@ -741,13 +741,13 @@ function SidebarFilters({
     <aside className="hidden lg:block w-56 shrink-0 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-purple-400" />
-          <h3 className="text-white font-semibold text-sm">Filters</h3>
+          <Filter className="w-4 h-4 text-amber-600" />
+          <h3 className="text-slate-900 font-semibold text-sm">Filters</h3>
         </div>
         {hasFilters && (
           <button
             onClick={onClearAll}
-            className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+            className="text-xs text-amber-600 hover:text-amber-700 transition-colors flex items-center gap-1"
           >
             <X className="w-3 h-3" />
             Clear
@@ -756,13 +756,13 @@ function SidebarFilters({
       </div>
 
       {/* Duration */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
-        <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">Duration</p>
+      <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 space-y-2">
+        <p className="text-slate-600 text-xs font-semibold uppercase tracking-wider mb-3">Duration</p>
         {DURATION_OPTIONS.map((opt, idx) => (
           <label key={opt.label} className="flex items-center gap-3 cursor-pointer group">
             <div
               className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${
-                selectedDurations.has(idx) ? 'bg-purple-500 border-purple-500' : 'border-white/20 group-hover:border-white/40'
+                selectedDurations.has(idx) ? 'bg-amber-500 border-amber-500' : 'border-slate-300 group-hover:border-slate-400'
               }`}
               onClick={() => onDurationChange(idx)}
             >
@@ -773,7 +773,7 @@ function SidebarFilters({
               )}
             </div>
             <span
-              className={`text-sm transition-colors ${selectedDurations.has(idx) ? 'text-white' : 'text-white/50 group-hover:text-white/70'}`}
+              className={`text-sm transition-colors ${selectedDurations.has(idx) ? 'text-slate-900' : 'text-slate-500 group-hover:text-slate-700'}`}
               onClick={() => onDurationChange(idx)}
             >
               {opt.label}
@@ -783,13 +783,13 @@ function SidebarFilters({
       </div>
 
       {/* Difficulty */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
-        <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">Difficulty</p>
+      <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 space-y-2">
+        <p className="text-slate-600 text-xs font-semibold uppercase tracking-wider mb-3">Difficulty</p>
         {DIFFICULTY_OPTIONS.map((d) => (
           <label key={d} className="flex items-center gap-3 cursor-pointer group">
             <div
               className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${
-                difficultyFilter.has(d) ? 'bg-purple-500 border-purple-500' : 'border-white/20 group-hover:border-white/40'
+                difficultyFilter.has(d) ? 'bg-amber-500 border-amber-500' : 'border-slate-300 group-hover:border-slate-400'
               }`}
               onClick={() => onDifficultyChange(d)}
             >
@@ -800,7 +800,7 @@ function SidebarFilters({
               )}
             </div>
             <span
-              className={`text-sm transition-colors ${difficultyFilter.has(d) ? 'text-white' : 'text-white/50 group-hover:text-white/70'}`}
+              className={`text-sm transition-colors ${difficultyFilter.has(d) ? 'text-slate-900' : 'text-slate-500 group-hover:text-slate-700'}`}
               onClick={() => onDifficultyChange(d)}
             >
               {d}
@@ -813,20 +813,20 @@ function SidebarFilters({
       </div>
 
       {/* Category */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-1">
-        <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">Category</p>
+      <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 space-y-1">
+        <p className="text-slate-600 text-xs font-semibold uppercase tracking-wider mb-3">Category</p>
         {CATEGORIES.filter((c) => c !== 'All').map((c) => (
           <button
             key={c}
             onClick={() => onCategoryChange(c)}
             className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-sm transition-all ${
               categoryFilter === c
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                : 'text-white/50 hover:text-white hover:bg-white/5'
+                ? 'bg-amber-50 text-amber-700 border border-amber-300'
+                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
             }`}
           >
             {c}
-            <span className="text-xs text-white/30">
+            <span className="text-xs text-slate-400">
               {allTopics.filter((t) => t.category === c).length}
             </span>
           </button>
@@ -834,9 +834,9 @@ function SidebarFilters({
       </div>
 
       {/* Hobby Personalization */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-        <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">Personalize by Hobby</p>
-        <p className="text-white/30 text-xs mb-3 leading-relaxed">AI tailors examples to your interests</p>
+      <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4">
+        <p className="text-slate-600 text-xs font-semibold uppercase tracking-wider mb-3">Personalize by Hobby</p>
+        <p className="text-slate-400 text-xs mb-3 leading-relaxed">AI tailors examples to your interests</p>
         <div className="grid grid-cols-2 gap-2">
           {HOBBY_OPTIONS.map(({ icon: Icon, label }) => (
             <button
@@ -844,8 +844,8 @@ function SidebarFilters({
               onClick={() => onHobbyChange(label)}
               className={`flex flex-col items-center gap-1.5 py-2.5 rounded-xl border text-xs font-medium transition-all ${
                 selectedHobbies.has(label)
-                  ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
-                  : 'border-white/10 text-white/40 hover:border-white/20 hover:text-white/60'
+                  ? 'bg-amber-50 border-amber-300 text-amber-700'
+                  : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -862,23 +862,23 @@ function SidebarFilters({
 
 function SkeletonCard() {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden flex flex-col animate-pulse">
-      <div className="h-1.5 w-full bg-white/10" />
-      <div className="h-32 bg-white/5" />
+    <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden flex flex-col animate-pulse">
+      <div className="h-1.5 w-full bg-slate-200" />
+      <div className="h-32 bg-slate-100" />
       <div className="p-4 flex flex-col gap-3">
         <div className="flex gap-2">
-          <div className="h-4 w-20 rounded-full bg-white/10" />
-          <div className="h-4 w-16 rounded-full bg-white/10" />
+          <div className="h-4 w-20 rounded-full bg-slate-200" />
+          <div className="h-4 w-16 rounded-full bg-slate-200" />
         </div>
-        <div className="h-5 w-3/4 rounded bg-white/10" />
-        <div className="h-4 w-full rounded bg-white/5" />
-        <div className="h-4 w-2/3 rounded bg-white/5" />
+        <div className="h-5 w-3/4 rounded bg-slate-200" />
+        <div className="h-4 w-full rounded bg-slate-100" />
+        <div className="h-4 w-2/3 rounded bg-slate-100" />
         <div className="flex gap-2 mt-1">
-          <div className="h-5 w-12 rounded bg-white/10" />
-          <div className="h-5 w-12 rounded bg-white/10" />
-          <div className="h-5 w-12 rounded bg-white/10" />
+          <div className="h-5 w-12 rounded bg-slate-200" />
+          <div className="h-5 w-12 rounded bg-slate-200" />
+          <div className="h-5 w-12 rounded bg-slate-200" />
         </div>
-        <div className="h-9 w-full rounded-xl bg-white/10 mt-auto" />
+        <div className="h-9 w-full rounded-xl bg-slate-200 mt-auto" />
       </div>
     </div>
   )
@@ -975,27 +975,27 @@ export default function TopicsPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#0a0a0f' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#f7f8fa' }}>
       <Navbar />
 
       {/* Hero Header */}
       <section className="relative pt-24 pb-10 px-4 sm:px-6 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/15 via-transparent to-cyan-900/15 pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[250px] bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-100/40 via-transparent to-amber-50/30 pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[250px] bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto relative">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-white/60 mb-5">
-              <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-sm text-slate-600 mb-5">
+              <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
               {availableCount} courses live · {baseTopics.length} total in catalogue
             </div>
-            <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3">
+            <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-3">
               Explore{' '}
-              <span className="bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">
                 All Courses
               </span>
             </h1>
-            <p className="text-white/50 text-lg max-w-xl mx-auto">
+            <p className="text-slate-600 text-lg max-w-xl mx-auto">
               Browse 39 developer courses across AI, Cloud, DevOps, Backend, Frontend and more.
             </p>
           </div>
@@ -1003,18 +1003,18 @@ export default function TopicsPage() {
           {/* Search */}
           <div className="max-w-2xl mx-auto">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search courses, tags, or technologies..."
-                className="w-full bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl pl-12 pr-12 py-3.5 text-white placeholder-white/30 focus:outline-none focus:border-purple-500/50 transition-all text-sm"
+                className="w-full bg-white border border-slate-200 shadow-sm rounded-2xl pl-12 pr-12 py-3.5 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-300 transition-all text-sm"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1035,8 +1035,8 @@ export default function TopicsPage() {
                   }}
                   className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200 ${
                     isActive
-                      ? 'bg-gradient-to-r from-purple-600 to-cyan-500 border-transparent text-white shadow-lg shadow-purple-500/25'
-                      : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white hover:border-white/20'
+                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 border-transparent text-white shadow-lg shadow-amber-500/25'
+                      : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-amber-300'
                   }`}
                 >
                   {pill}
@@ -1048,7 +1048,7 @@ export default function TopicsPage() {
       </section>
 
       {/* Category Tabs */}
-      <div className="sticky top-16 z-30 bg-[#0a0a0f]/90 backdrop-blur-md border-b border-white/5 px-4 sm:px-6">
+      <div className="sticky top-16 z-30 bg-[#f7f8fa]/90 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-1 overflow-x-auto py-3 scrollbar-hide">
             {CATEGORIES.map((cat) => {
@@ -1059,13 +1059,13 @@ export default function TopicsPage() {
                   onClick={() => setActiveCategory(cat)}
                   className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 shrink-0 ${
                     isActive
-                      ? 'bg-gradient-to-r from-purple-600 to-cyan-500 text-white shadow-lg shadow-purple-500/25'
-                      : 'text-white/50 hover:text-white hover:bg-white/5'
+                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/25'
+                      : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
                   {cat}
                   {cat !== 'All' && (
-                    <span className={`ml-1.5 text-[10px] ${isActive ? 'text-white/70' : 'text-white/30'}`}>
+                    <span className={`ml-1.5 text-[10px] ${isActive ? 'text-white/70' : 'text-slate-400'}`}>
                       {baseTopics.filter((t) => t.category === cat).length}
                     </span>
                   )}
@@ -1096,15 +1096,15 @@ export default function TopicsPage() {
             {/* Results count + sort */}
             <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
               <div className="flex items-center gap-3">
-                <p className="text-white/50 text-sm">
+                <p className="text-slate-500 text-sm">
                   Showing{' '}
-                  <span className="text-white font-semibold">{filteredTopics.length}</span> of{' '}
-                  <span className="text-white font-semibold">{baseTopics.length}</span> courses
+                  <span className="text-slate-900 font-semibold">{filteredTopics.length}</span> of{' '}
+                  <span className="text-slate-900 font-semibold">{baseTopics.length}</span> courses
                 </p>
                 {(difficultyFilter.size > 0 || activeCategory !== 'All' || selectedDurations.size > 0 || searchQuery) && (
                   <button
                     onClick={clearAll}
-                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1 px-2 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20"
+                    className="text-xs text-amber-600 hover:text-amber-700 transition-colors flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 border border-amber-200"
                   >
                     <X className="w-3 h-3" />
                     Clear filters
@@ -1113,8 +1113,8 @@ export default function TopicsPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-white/40 text-sm">Sort by:</span>
-                <select className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white/70 text-sm focus:outline-none focus:border-white/20 transition-all">
+                <span className="text-slate-500 text-sm">Sort by:</span>
+                <select className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-slate-700 text-sm focus:outline-none focus:border-amber-300 transition-all">
                   <option value="popular">Most Popular</option>
                   <option value="rating">Top Rated</option>
                   <option value="newest">Newest</option>
@@ -1127,19 +1127,19 @@ export default function TopicsPage() {
             {(difficultyFilter.size > 0 || activeCategory !== 'All' || selectedDurations.size > 0 || selectedHobbies.size > 0) && (
               <div className="flex flex-wrap gap-2 mb-5">
                 {activeCategory !== 'All' && (
-                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-medium">
+                  <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
                     {activeCategory}
                     <button onClick={() => setActiveCategory('All')}><X className="w-3 h-3" /></button>
                   </span>
                 )}
                 {[...difficultyFilter].map((d) => (
-                  <span key={d} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-white/60 text-xs font-medium">
+                  <span key={d} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-xs font-medium">
                     {d}
                     <button onClick={() => toggleDifficulty(d)}><X className="w-3 h-3" /></button>
                   </span>
                 ))}
                 {[...selectedHobbies].map((h) => (
-                  <span key={h} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-medium">
+                  <span key={h} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
                     {h}
                     <button onClick={() => toggleHobby(h)}><X className="w-3 h-3" /></button>
                   </span>
@@ -1160,14 +1160,14 @@ export default function TopicsPage() {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
-                  <BookOpen className="w-8 h-8 text-white/20" />
+                <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center mb-4">
+                  <BookOpen className="w-8 h-8 text-slate-300" />
                 </div>
-                <p className="text-white/50 font-semibold mb-2">No courses found</p>
-                <p className="text-white/30 text-sm mb-5">Try adjusting your search or filters.</p>
+                <p className="text-slate-600 font-semibold mb-2">No courses found</p>
+                <p className="text-slate-400 text-sm mb-5">Try adjusting your search or filters.</p>
                 <button
                   onClick={clearAll}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-semibold hover:from-amber-400 hover:to-amber-500 transition-all"
                 >
                   Clear all filters
                 </button>
@@ -1175,7 +1175,7 @@ export default function TopicsPage() {
             )}
 
             {!isLoading && filteredTopics.length > 0 && (
-              <p className="mt-10 text-center text-white/20 text-sm">
+              <p className="mt-10 text-center text-slate-400 text-sm">
                 {filteredTopics.length === baseTopics.length
                   ? `All ${baseTopics.length} courses shown`
                   : `${filteredTopics.length} of ${baseTopics.length} courses match your filters`}

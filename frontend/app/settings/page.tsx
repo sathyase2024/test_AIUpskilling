@@ -13,33 +13,33 @@ const sections = [
 export default function SettingsPage() {
   return (
     <AuthGuard>
-      <div className="min-h-screen" style={{ backgroundColor: '#0a0a0f' }}>
+      <div className="min-h-screen" style={{ backgroundColor: '#f7f8fa' }}>
         <Navbar />
         <div className="pt-24 max-w-2xl mx-auto px-4 pb-12">
           <div className="flex items-center gap-3 mb-8">
-            <div className="p-2.5 rounded-xl" style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%)' }}>
+            <div className="p-2.5 rounded-xl" style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)' }}>
               <Settings className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white">Settings</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
           </div>
           <div className="space-y-3">
             {sections.map(({ icon: Icon, label, description, comingSoon }) => (
               <div
                 key={label}
                 className="flex items-center justify-between p-5 rounded-2xl"
-                style={{ background: 'rgba(18,18,26,0.85)', border: '1px solid rgba(139,92,246,0.2)' }}
+                style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}
               >
                 <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-lg" style={{ background: 'rgba(124,58,237,0.15)' }}>
-                    <Icon className="w-4 h-4 text-purple-400" />
+                  <div className="p-2 rounded-lg" style={{ background: '#fffbeb' }}>
+                    <Icon className="w-4 h-4 text-amber-600" />
                   </div>
                   <div>
-                    <p className="text-white font-medium text-sm">{label}</p>
-                    <p className="text-white/40 text-xs mt-0.5">{description}</p>
+                    <p className="text-slate-900 font-medium text-sm">{label}</p>
+                    <p className="text-slate-500 text-xs mt-0.5">{description}</p>
                   </div>
                 </div>
                 {comingSoon && (
-                  <span className="text-xs px-2.5 py-1 rounded-full text-purple-300 font-medium" style={{ background: 'rgba(124,58,237,0.15)' }}>
+                  <span className="text-xs px-2.5 py-1 rounded-full text-amber-700 font-medium" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
                     Coming soon
                   </span>
                 )}
