@@ -165,19 +165,19 @@ function getLessonTypeLabel(type: LessonType): string {
 
 function getLessonTypeColor(type: LessonType): string {
   switch (type) {
-    case 'video':    return 'text-blue-600'
-    case 'reading':  return 'text-emerald-600'
-    case 'exercise': return 'text-amber-600'
-    case 'quiz':     return 'text-amber-600'
-    case 'project':  return 'text-orange-600'
-    default:         return 'text-slate-400'
+    case 'video':    return 'text-blue-600 dark:text-blue-400'
+    case 'reading':  return 'text-emerald-600 dark:text-emerald-400'
+    case 'exercise': return 'text-amber-600 dark:text-amber-400'
+    case 'quiz':     return 'text-amber-600 dark:text-amber-400'
+    case 'project':  return 'text-orange-600 dark:text-orange-400'
+    default:         return 'text-slate-400 dark:text-white/40'
   }
 }
 
 function difficultyStyle(d: Difficulty) {
-  if (d === 'Beginner')     return 'text-emerald-700 bg-emerald-50 border-emerald-200'
-  if (d === 'Intermediate') return 'text-blue-700 bg-blue-50 border-blue-200'
-  return 'text-amber-700 bg-amber-50 border-amber-200'
+  if (d === 'Beginner')     return 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-500/15 dark:border-emerald-500/30'
+  if (d === 'Intermediate') return 'text-blue-700 bg-blue-50 border-blue-200 dark:text-blue-300 dark:bg-blue-500/15 dark:border-blue-500/30'
+  return 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-500/15 dark:border-amber-500/30'
 }
 
 function generateBulletPoints(topicName: string): string[] {
@@ -194,18 +194,18 @@ function generateBulletPoints(topicName: string): string[] {
 
 function PageSkeleton() {
   return (
-    <div className="min-h-screen animate-pulse" style={{ backgroundColor: '#f7f8fa' }}>
-      <div className="h-64 bg-slate-100" />
+    <div className="min-h-screen animate-pulse bg-[#f7f8fa] dark:bg-transparent">
+      <div className="h-64 bg-slate-100 dark:bg-white/10" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex gap-8">
           <div className="flex-1 space-y-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-24 rounded-2xl bg-slate-100" />
+              <div key={i} className="h-24 rounded-2xl bg-slate-100 dark:bg-white/10" />
             ))}
           </div>
           <div className="w-80 space-y-4">
-            <div className="h-48 rounded-2xl bg-slate-100" />
-            <div className="h-32 rounded-2xl bg-slate-100" />
+            <div className="h-48 rounded-2xl bg-slate-100 dark:bg-white/10" />
+            <div className="h-32 rounded-2xl bg-slate-100 dark:bg-white/10" />
           </div>
         </div>
       </div>
@@ -253,13 +253,13 @@ export default function TopicDetailPage() {
   const bulletPoints = generateBulletPoints(topic.name)
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#f7f8fa' }}>
+    <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent">
 
       {/* ── Hero Header ── */}
       <div
-        className="relative overflow-hidden"
+        className="relative overflow-hidden bg-[#f7f8fa] dark:bg-transparent"
         style={{
-          background: `radial-gradient(ellipse 120% 100% at 50% 0%, rgba(245,158,11,0.12) 0%, transparent 65%), #f7f8fa`,
+          backgroundImage: `radial-gradient(ellipse 120% 100% at 50% 0%, rgba(245,158,11,0.12) 0%, transparent 65%)`,
         }}
       >
         {/* Ambient orb */}
@@ -273,7 +273,7 @@ export default function TopicDetailPage() {
           {/* Back button */}
           <Link
             href="/topics"
-            className="inline-flex items-center gap-2 text-slate-500 hover:text-amber-600 transition-colors text-sm mb-8 group"
+            className="inline-flex items-center gap-2 text-slate-500 dark:text-white/50 hover:text-amber-600 dark:hover:text-amber-400 transition-colors text-sm mb-8 group"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
             Back to Topics
@@ -292,8 +292,7 @@ export default function TopicDetailPage() {
               {/* Badges */}
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <span
-                  className="px-3 py-1 rounded-full text-xs font-semibold border"
-                  style={{ background: 'rgba(245,158,11,0.10)', borderColor: 'rgba(245,158,11,0.30)', color: '#b45309' }}
+                  className="px-3 py-1 rounded-full text-xs font-semibold border bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
                 >
                   {topic.category}
                 </span>
@@ -302,35 +301,35 @@ export default function TopicDetailPage() {
                 </span>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-3 leading-tight">
+              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white mb-3 leading-tight">
                 {topic.name}
               </h1>
 
-              <p className="text-slate-600 text-base leading-relaxed mb-5 max-w-2xl">
+              <p className="text-slate-600 dark:text-white/70 text-base leading-relaxed mb-5 max-w-2xl">
                 {topic.description}
               </p>
 
               {/* Stats row */}
-              <div className="flex flex-wrap items-center gap-5 text-sm text-slate-500">
+              <div className="flex flex-wrap items-center gap-5 text-sm text-slate-500 dark:text-white/50">
                 <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-amber-600" />
+                  <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   <span>{topic.hours} hours</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                  <span className="text-slate-700 font-semibold">{topic.rating}</span>
-                  <span className="text-slate-400">({topic.reviews.toLocaleString()} reviews)</span>
+                  <span className="text-slate-700 dark:text-white/90 font-semibold">{topic.rating}</span>
+                  <span className="text-slate-400 dark:text-white/40">({topic.reviews.toLocaleString()} reviews)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-amber-600" />
+                  <Users className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   <span>{topic.enrolled} enrolled</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4 text-emerald-600" />
+                  <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>{totalLessons} lessons</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-amber-600" />
+                  <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                   <span>{totalXp.toLocaleString()} XP total</span>
                 </div>
               </div>
@@ -345,35 +344,33 @@ export default function TopicDetailPage() {
 
           {/* ── Left Column: Lesson List ── */}
           <div className="flex-1 min-w-0 space-y-6">
-            <h2 className="text-xl font-bold text-slate-900">Course Content</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Course Content</h2>
 
             {modules.map((mod, modIdx) => (
               <div
                 key={modIdx}
-                className="rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm"
+                className="rounded-2xl overflow-hidden bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10 shadow-sm"
               >
                 {/* Module header */}
                 <div
-                  className="px-5 py-3.5 flex items-center justify-between gap-3"
-                  style={{ background: 'rgba(245,158,11,0.06)', borderBottom: '1px solid rgba(226,232,240,1)' }}
+                  className="px-5 py-3.5 flex items-center justify-between gap-3 bg-amber-500/[0.06] border-b border-slate-200 dark:border-white/10"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-amber-700 shrink-0"
-                      style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.30)' }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-amber-700 dark:text-amber-300 shrink-0 bg-amber-500/[0.12] border border-amber-500/30"
                     >
                       {modIdx + 1}
                     </span>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-bold text-slate-900 truncate">{mod.title}</h3>
-                      <p className="text-xs text-slate-500 truncate">{mod.subtitle}</p>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">{mod.title}</h3>
+                      <p className="text-xs text-slate-500 dark:text-white/50 truncate">{mod.subtitle}</p>
                     </div>
                   </div>
-                  <span className="text-xs text-slate-500 shrink-0">{mod.lessons.length} lessons</span>
+                  <span className="text-xs text-slate-500 dark:text-white/50 shrink-0">{mod.lessons.length} lessons</span>
                 </div>
 
                 {/* Lesson rows */}
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 dark:divide-white/10">
                   {mod.lessons.map((lesson) => {
                     const Icon = getLessonIcon(lesson.type)
                     const iconColor = getLessonTypeColor(lesson.type)
@@ -384,20 +381,19 @@ export default function TopicDetailPage() {
                         className={`flex items-center gap-4 px-5 py-3.5 transition-colors ${
                           lesson.locked
                             ? 'opacity-50 cursor-not-allowed'
-                            : 'hover:bg-slate-50 cursor-pointer'
+                            : 'hover:bg-slate-50 dark:hover:bg-white/10 cursor-pointer'
                         }`}
                       >
                         {/* Type icon */}
                         <div
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconColor}`}
-                          style={{ background: 'rgba(241,245,249,1)', border: '1px solid rgba(226,232,240,1)' }}
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 ${iconColor}`}
                         >
                           <Icon className="w-4 h-4" aria-hidden="true" />
                         </div>
 
                         {/* Title + type */}
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium truncate ${lesson.locked ? 'text-slate-400' : 'text-slate-900'}`}>
+                          <p className={`text-sm font-medium truncate ${lesson.locked ? 'text-slate-400 dark:text-white/40' : 'text-slate-900 dark:text-white'}`}>
                             {lesson.title}
                           </p>
                           <p className={`text-xs mt-0.5 ${iconColor} opacity-90`}>
@@ -406,13 +402,13 @@ export default function TopicDetailPage() {
                         </div>
 
                         {/* Duration */}
-                        <div className="flex items-center gap-1 text-xs text-slate-400 shrink-0">
+                        <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-white/40 shrink-0">
                           <Clock className="w-3 h-3" />
                           {lesson.duration}
                         </div>
 
                         {/* XP */}
-                        <div className="hidden sm:flex items-center gap-1 text-xs text-amber-600 shrink-0">
+                        <div className="hidden sm:flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 shrink-0">
                           <Zap className="w-3 h-3" />
                           {lesson.xp} XP
                         </div>
@@ -420,8 +416,8 @@ export default function TopicDetailPage() {
                         {/* Lock / play indicator */}
                         <div className="shrink-0">
                           {lesson.locked
-                            ? <Lock className="w-4 h-4 text-slate-300" aria-hidden="true" />
-                            : <ChevronRight className="w-4 h-4 text-slate-300" aria-hidden="true" />
+                            ? <Lock className="w-4 h-4 text-slate-300 dark:text-white/30" aria-hidden="true" />
+                            : <ChevronRight className="w-4 h-4 text-slate-300 dark:text-white/30" aria-hidden="true" />
                           }
                         </div>
                       </div>
@@ -437,7 +433,7 @@ export default function TopicDetailPage() {
 
             {/* Start Learning CTA */}
             <div
-              className="rounded-2xl p-6 text-center bg-white border border-amber-200 shadow-sm"
+              className="rounded-2xl p-6 text-center bg-white dark:bg-[#12121a] border border-amber-200 dark:border-amber-500/30 shadow-sm"
             >
               <Link
                 href={`/learn/${slug}`}
@@ -449,42 +445,42 @@ export default function TopicDetailPage() {
               >
                 Start Learning
               </Link>
-              <p className="text-slate-500 text-xs mt-3">Free preview available · No credit card required</p>
+              <p className="text-slate-500 dark:text-white/50 text-xs mt-3">Free preview available · No credit card required</p>
             </div>
 
             {/* Topic Stats Card */}
             <div
-              className="rounded-2xl p-5 space-y-4 bg-white border border-slate-200 shadow-sm"
+              className="rounded-2xl p-5 space-y-4 bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10 shadow-sm"
             >
-              <h3 className="text-sm font-bold text-slate-900">Topic Overview</h3>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Topic Overview</h3>
 
               {[
-                { icon: Clock,    label: 'Duration',    value: `${topic.hours} hours`, color: 'text-amber-600' },
-                { icon: BookOpen, label: 'Lessons',     value: `${totalLessons} lessons`, color: 'text-amber-600' },
-                { icon: Zap,      label: 'Total XP',    value: `${totalXp.toLocaleString()} XP`, color: 'text-amber-600' },
-                { icon: Award,    label: 'Certificate', value: 'Upon completion', color: 'text-emerald-600' },
-                { icon: Users,    label: 'Enrolled',    value: topic.enrolled, color: 'text-amber-600' },
+                { icon: Clock,    label: 'Duration',    value: `${topic.hours} hours`, color: 'text-amber-600 dark:text-amber-400' },
+                { icon: BookOpen, label: 'Lessons',     value: `${totalLessons} lessons`, color: 'text-amber-600 dark:text-amber-400' },
+                { icon: Zap,      label: 'Total XP',    value: `${totalXp.toLocaleString()} XP`, color: 'text-amber-600 dark:text-amber-400' },
+                { icon: Award,    label: 'Certificate', value: 'Upon completion', color: 'text-emerald-600 dark:text-emerald-400' },
+                { icon: Users,    label: 'Enrolled',    value: topic.enrolled, color: 'text-amber-600 dark:text-amber-400' },
               ].map(({ icon: Icon, label, value, color }) => (
                 <div key={label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 text-slate-500 text-sm">
+                  <div className="flex items-center gap-2.5 text-slate-500 dark:text-white/50 text-sm">
                     <Icon className={`w-4 h-4 ${color}`} aria-hidden="true" />
                     {label}
                   </div>
-                  <span className="text-slate-700 text-sm font-medium">{value}</span>
+                  <span className="text-slate-700 dark:text-white/90 text-sm font-medium">{value}</span>
                 </div>
               ))}
             </div>
 
             {/* What you'll learn */}
             <div
-              className="rounded-2xl p-5 bg-white border border-slate-200 shadow-sm"
+              className="rounded-2xl p-5 bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10 shadow-sm"
             >
-              <h3 className="text-sm font-bold text-slate-900 mb-4">What you&apos;ll learn</h3>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4">What you&apos;ll learn</h3>
               <ul className="space-y-2.5">
                 {bulletPoints.map((point, i) => (
                   <li key={i} className="flex items-start gap-2.5">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" aria-hidden="true" />
-                    <span className="text-slate-600 text-sm leading-relaxed">{point}</span>
+                    <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
+                    <span className="text-slate-600 dark:text-white/70 text-sm leading-relaxed">{point}</span>
                   </li>
                 ))}
               </ul>
@@ -492,7 +488,7 @@ export default function TopicDetailPage() {
 
             {/* Instructor Card */}
             <div
-              className="rounded-2xl p-5 flex items-center gap-4 bg-white border border-slate-200 shadow-sm"
+              className="rounded-2xl p-5 flex items-center gap-4 bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10 shadow-sm"
             >
               <div
                 className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
@@ -502,10 +498,10 @@ export default function TopicDetailPage() {
               </div>
               <div>
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <p className="text-sm font-semibold text-slate-900">AI-Generated by Claude</p>
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">AI-Generated by Claude</p>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
                 </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
+                <p className="text-xs text-slate-500 dark:text-white/50 leading-relaxed">
                   Content dynamically generated and personalized by Anthropic&apos;s Claude AI model.
                 </p>
               </div>

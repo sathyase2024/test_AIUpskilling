@@ -44,9 +44,9 @@ interface ApiPath {
 }
 
 const DIFF_ICON_COLOR: Record<string, string> = {
-  beginner: 'text-emerald-600',
-  intermediate: 'text-amber-600',
-  advanced: 'text-red-600',
+  beginner: 'text-emerald-600 dark:text-emerald-400',
+  intermediate: 'text-amber-600 dark:text-amber-400',
+  advanced: 'text-red-600 dark:text-red-400',
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -74,10 +74,10 @@ export default function PathDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f7f8fa] text-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent text-slate-900 dark:text-white flex items-center justify-center">
         <div className="text-center space-y-4">
           <Loader2 className="w-10 h-10 text-amber-500 animate-spin mx-auto" />
-          <p className="text-slate-500 text-sm">Loading path…</p>
+          <p className="text-slate-500 dark:text-white/50 text-sm">Loading path…</p>
         </div>
       </div>
     );
@@ -85,11 +85,11 @@ export default function PathDetailPage() {
 
   if (error || !path) {
     return (
-      <div className="min-h-screen bg-[#f7f8fa] text-slate-900 flex items-center justify-center px-6">
+      <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent text-slate-900 dark:text-white flex items-center justify-center px-6">
         <div className="text-center space-y-4 max-w-md">
           <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
-          <p className="text-slate-600">{error ?? 'Path not found.'}</p>
-          <Link href="/paths" className="inline-flex items-center gap-2 text-amber-600 hover:text-amber-700 text-sm">
+          <p className="text-slate-600 dark:text-white/70">{error ?? 'Path not found.'}</p>
+          <Link href="/paths" className="inline-flex items-center gap-2 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 text-sm">
             <ArrowLeft size={14} /> Back to Paths
           </Link>
         </div>
@@ -98,7 +98,7 @@ export default function PathDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa] text-slate-900">
+    <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent text-slate-900 dark:text-white">
       {/* Hero */}
       <section className="relative pt-20 pb-14 px-6 overflow-hidden">
         <div className={`absolute inset-0 bg-gradient-to-br ${meta.headerGradient} opacity-40 pointer-events-none`} />
