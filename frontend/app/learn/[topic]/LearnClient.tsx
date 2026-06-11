@@ -364,12 +364,12 @@ export default function LearnClient({ topic }: { topic: string }) {
   // ── Loading / error states ───────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center">
+      <div className="min-h-screen bg-[#f7f8fa] text-slate-900 flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center mx-auto animate-pulse">
-            <Brain className="w-6 h-6 text-purple-400" />
+          <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-300 flex items-center justify-center mx-auto animate-pulse">
+            <Brain className="w-6 h-6 text-amber-600" />
           </div>
-          <p className="text-white/50 text-sm">Loading course…</p>
+          <p className="text-slate-500 text-sm">Loading course…</p>
         </div>
       </div>
     );
@@ -377,13 +377,13 @@ export default function LearnClient({ topic }: { topic: string }) {
 
   if (error || !topicData) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center px-6">
+      <div className="min-h-screen bg-[#f7f8fa] text-slate-900 flex items-center justify-center px-6">
         <div className="max-w-md text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-6 h-6 text-red-400" />
+          <div className="w-12 h-12 rounded-full bg-red-50 border border-red-200 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6 text-red-600" />
           </div>
-          <p className="text-white/70 text-sm">{error ?? "Course not found."}</p>
-          <Link href="/topics" className="inline-block text-sm text-purple-300 hover:text-purple-200">
+          <p className="text-slate-600 text-sm">{error ?? "Course not found."}</p>
+          <Link href="/topics" className="inline-block text-sm text-amber-600 hover:text-amber-500">
             ← Back to all topics
           </Link>
         </div>
@@ -421,39 +421,39 @@ export default function LearnClient({ topic }: { topic: string }) {
             <button
               onClick={() => toggleModule(mIdx)}
               className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all ${
-                hasCurrent ? "bg-white/[0.04]" : "hover:bg-white/[0.03]"
+                hasCurrent ? "bg-amber-50" : "hover:bg-slate-50"
               }`}
             >
               <span
                 className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0 ${
                   allDone
-                    ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                    : "bg-purple-500/15 text-purple-300 border border-purple-500/30"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-amber-50 text-amber-700 border border-amber-300"
                 }`}
               >
                 {mIdx + 1}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-white/80 truncate">{mod.title}</p>
-                <p className="text-[10px] text-white/35">{doneCount}/{mod.lessons.length} done</p>
+                <p className="text-xs font-semibold text-slate-700 truncate">{mod.title}</p>
+                <p className="text-[10px] text-slate-400">{doneCount}/{mod.lessons.length} done</p>
               </div>
               <ChevronDown
                 size={14}
-                className={`text-white/30 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+                className={`text-slate-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
               />
             </button>
 
             {/* Test-out action row */}
             {hasAssessment && (
               modResult?.passed ? (
-                <div className="flex items-center gap-1 px-3 pb-1 text-[10px] text-green-400">
+                <div className="flex items-center gap-1 px-3 pb-1 text-[10px] text-emerald-700">
                   <CheckCircle2 size={10} />
                   Tested out — {modResult.score}%
                 </div>
               ) : (
                 <button
                   onClick={() => openModuleQuiz(mIdx)}
-                  className="w-full text-left px-3 pb-1.5 text-[10px] text-purple-400/70 hover:text-purple-300 transition-colors flex items-center gap-1"
+                  className="w-full text-left px-3 pb-1.5 text-[10px] text-amber-600 hover:text-amber-500 transition-colors flex items-center gap-1"
                 >
                   <GraduationCap size={10} />
                   Test out this module
@@ -462,7 +462,7 @@ export default function LearnClient({ topic }: { topic: string }) {
             )}
 
             {open && (
-              <div className="mt-0.5 ml-2 pl-2 border-l border-white/10 space-y-0.5">
+              <div className="mt-0.5 ml-2 pl-2 border-l border-slate-200 space-y-0.5">
                 {mod.lessons.map((lesson, j) => {
                   const globalIdx = mod.startIndex + j;
                   const isDone = completedLessons.includes(lesson.id);
@@ -474,27 +474,27 @@ export default function LearnClient({ topic }: { topic: string }) {
                       onClick={() => onPick(lesson.id)}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all text-xs ${
                         isCurrent
-                          ? "bg-purple-600/20 border border-purple-500/40 text-white"
+                          ? "bg-amber-50 border border-amber-300 text-amber-700"
                           : isDone
-                          ? "text-white/50 hover:bg-white/5"
+                          ? "text-slate-400 hover:bg-slate-50"
                           : reviewFlag
-                          ? "text-red-400/80 hover:bg-red-500/5 hover:text-red-300"
-                          : "text-white/60 hover:bg-white/5 hover:text-white"
+                          ? "text-red-600 hover:bg-red-50 hover:text-red-700"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                       }`}
                     >
                       {isDone ? (
-                        <CheckCircle2 size={13} className="text-green-400 shrink-0" />
+                        <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
                       ) : isCurrent ? (
-                        <Play size={13} className="text-purple-400 shrink-0 fill-purple-400" />
+                        <Play size={13} className="text-amber-600 shrink-0 fill-amber-600" />
                       ) : reviewFlag ? (
                         <span className="w-[13px] flex items-center justify-center shrink-0">
-                          <span className="w-2 h-2 rounded-full bg-red-400/70" />
+                          <span className="w-2 h-2 rounded-full bg-red-500" />
                         </span>
                       ) : (
-                        <span className="w-[13px] text-center text-white/30 shrink-0 font-mono">{globalIdx + 1}</span>
+                        <span className="w-[13px] text-center text-slate-400 shrink-0 font-mono">{globalIdx + 1}</span>
                       )}
                       <span className="flex-1 leading-tight">{lesson.title}</span>
-                      {isCurrent && <span className="text-purple-400 text-[10px] font-medium shrink-0">Now</span>}
+                      {isCurrent && <span className="text-amber-600 text-[10px] font-medium shrink-0">Now</span>}
                     </button>
                   );
                 })}
@@ -505,14 +505,14 @@ export default function LearnClient({ topic }: { topic: string }) {
                     onClick={() => onChallengePick(mIdx)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all text-xs ${
                       challengeModuleIndex === mIdx
-                        ? "bg-orange-500/15 border border-orange-500/35 text-orange-200"
-                        : "text-orange-400/60 hover:bg-orange-500/8 hover:text-orange-300"
+                        ? "bg-amber-50 border border-amber-300 text-amber-700"
+                        : "text-amber-600 hover:bg-amber-50 hover:text-amber-700"
                     }`}
                   >
                     <FlaskConical size={13} className="shrink-0" />
                     <span className="flex-1 leading-tight">Module Challenge</span>
                     {challengeModuleIndex === mIdx && (
-                      <span className="text-orange-400 text-[10px] font-medium shrink-0">Now</span>
+                      <span className="text-amber-600 text-[10px] font-medium shrink-0">Now</span>
                     )}
                   </button>
                 )}
@@ -525,13 +525,13 @@ export default function LearnClient({ topic }: { topic: string }) {
   );
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
+    <div className="min-h-screen bg-[#f7f8fa] text-slate-900 flex flex-col">
       {/* ── Top Bar ── */}
-      <header className="sticky top-0 z-40 bg-[#0a0a0f]/90 backdrop-blur-md border-b border-white/10 px-4 py-3">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex items-center gap-4">
           <Link
             href="/topics"
-            className="flex items-center gap-1.5 text-white/50 hover:text-white transition-colors text-sm shrink-0"
+            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors text-sm shrink-0"
           >
             <ArrowLeft size={16} />
             <span className="hidden sm:inline">Back</span>
@@ -539,34 +539,34 @@ export default function LearnClient({ topic }: { topic: string }) {
 
           <button
             onClick={() => setMobileNavOpen(true)}
-            className="lg:hidden flex items-center gap-1.5 text-white/50 hover:text-white transition-colors text-sm shrink-0"
+            className="lg:hidden flex items-center gap-1.5 text-slate-500 hover:text-slate-900 transition-colors text-sm shrink-0"
             aria-label="Open lesson list"
           >
             <Menu size={16} />
             <span className="text-xs">Lessons</span>
           </button>
 
-          <div className="h-4 w-px bg-white/10" />
+          <div className="h-4 w-px bg-slate-200" />
 
-          <span className="text-sm font-medium text-white/80 capitalize truncate max-w-xs">
+          <span className="text-sm font-medium text-slate-700 capitalize truncate max-w-xs">
             {topicData.name || decodedTopic}
           </span>
 
           <div className="ml-auto flex items-center gap-4">
-            <span className="hidden sm:flex items-center gap-1.5 text-xs text-white/40">
+            <span className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400">
               <BookOpen size={13} />
               Lesson {currentIndex + 1} of {totalLessons}
             </span>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/30">
-              <Zap size={13} className="text-yellow-400" />
-              <span className="text-xs font-semibold text-yellow-300">+{currentLesson?.xpReward ?? 50} XP</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200">
+              <Zap size={13} className="text-amber-600" />
+              <span className="text-xs font-semibold text-amber-700">+{currentLesson?.xpReward ?? 50} XP</span>
             </div>
           </div>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/5">
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-200">
           <div
-            className="h-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all duration-150"
+            className="h-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-150"
             style={{ width: `${scrollProgress}%` }}
           />
         </div>
@@ -575,13 +575,13 @@ export default function LearnClient({ topic }: { topic: string }) {
       {/* ── Body ── */}
       <div className="flex flex-1 max-w-7xl mx-auto w-full">
         {/* ── Sidebar ── */}
-        <aside className="hidden lg:flex flex-col w-[300px] shrink-0 border-r border-white/10 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
-          <div className="p-4 border-b border-white/10">
-            <h2 className="font-bold text-sm mb-1 truncate">{topicData.name}</h2>
-            <p className="text-xs text-white/40 mb-3">{courseProgress}% complete</p>
-            <div className="h-1.5 rounded-full bg-white/5">
+        <aside className="hidden lg:flex flex-col w-[300px] shrink-0 bg-white border-r border-slate-200 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
+          <div className="p-4 border-b border-slate-200">
+            <h2 className="font-bold text-sm mb-1 truncate text-slate-900">{topicData.name}</h2>
+            <p className="text-xs text-slate-400 mb-3">{courseProgress}% complete</p>
+            <div className="h-1.5 rounded-full bg-slate-200">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all duration-500"
+                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-500"
                 style={{ width: `${courseProgress}%` }}
               />
             </div>
@@ -593,16 +593,16 @@ export default function LearnClient({ topic }: { topic: string }) {
 
           {/* Final exam / course complete */}
           {assessment?.finalExam && (
-            <div className="p-3 border-t border-white/10 shrink-0">
+            <div className="p-3 border-t border-slate-200 shrink-0">
               {finalResult?.passed ? (
-                <div className="flex items-center gap-2 text-sm text-green-400 font-semibold justify-center py-1">
+                <div className="flex items-center gap-2 text-sm text-emerald-700 font-semibold justify-center py-1">
                   <Trophy size={15} />
                   Course Complete!
                 </div>
               ) : (
                 <button
                   onClick={openFinalExam}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-xs font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs font-semibold hover:from-amber-400 hover:to-amber-500 transition-all flex items-center justify-center gap-1.5"
                 >
                   <GraduationCap size={14} />
                   Take Final Exam
@@ -620,11 +620,11 @@ export default function LearnClient({ topic }: { topic: string }) {
             {activeChallenge && challengeModuleIndex !== null ? (
               <>
                 <div className="flex flex-wrap items-center gap-3 mb-6">
-                  <span className="flex items-center gap-1.5 text-xs text-orange-300 bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/30">
+                  <span className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
                     <FlaskConical size={12} />
                     Module Challenge
                   </span>
-                  <span className="text-xs text-white/40 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                  <span className="text-xs text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">
                     {modules[challengeModuleIndex]?.title}
                   </span>
                 </div>
@@ -639,20 +639,20 @@ export default function LearnClient({ topic }: { topic: string }) {
               <>
                 {/* ── Lesson view ── */}
                 <div className="flex flex-wrap items-center gap-3 mb-3">
-                  <span className="flex items-center gap-1.5 text-xs text-white/40 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                  <span className="flex items-center gap-1.5 text-xs text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">
                     <Clock size={12} />
                     {currentLesson?.durationMinutes ?? 15} min
                   </span>
-                  <span className="text-xs px-3 py-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 text-yellow-400 capitalize">
+                  <span className="text-xs px-3 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 capitalize">
                     {topicData.difficulty}
                   </span>
-                  <span className="flex items-center gap-1.5 text-xs text-purple-300 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/30">
+                  <span className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
                     <Zap size={12} />
                     {currentLesson?.xpReward ?? 50} XP
                   </span>
                 </div>
 
-                <h1 className="text-3xl font-bold mb-8 leading-tight">
+                <h1 className="text-3xl font-bold mb-8 leading-tight text-slate-900">
                   {currentLesson?.title ?? topicData.name}
                 </h1>
 
@@ -661,10 +661,10 @@ export default function LearnClient({ topic }: { topic: string }) {
                 ) : (
                   <div className="flex items-center justify-center h-64">
                     <div className="text-center space-y-4">
-                      <div className="w-12 h-12 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center mx-auto">
-                        <Brain className="w-6 h-6 text-purple-400" />
+                      <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-300 flex items-center justify-center mx-auto">
+                        <Brain className="w-6 h-6 text-amber-600" />
                       </div>
-                      <p className="text-white/50 text-sm">
+                      <p className="text-slate-500 text-sm">
                         Content for this lesson hasn&apos;t been generated yet.
                       </p>
                     </div>
@@ -675,7 +675,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                 {currentLesson && (
                   <button
                     onClick={markComplete}
-                    className="mt-10 w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-semibold hover:opacity-90 transition-all shadow-lg shadow-purple-500/20"
+                    className="mt-10 w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold hover:from-amber-400 hover:to-amber-500 transition-all shadow-lg shadow-amber-500/20"
                   >
                     {completedLessons.includes(currentLesson.id)
                       ? nextLesson
@@ -689,25 +689,25 @@ export default function LearnClient({ topic }: { topic: string }) {
                 {!nextLesson && assessment?.finalExam && !finalResult?.passed && (
                   <button
                     onClick={openFinalExam}
-                    className="mt-4 w-full py-3 rounded-xl border border-purple-500/40 text-purple-300 text-sm font-semibold hover:bg-purple-500/10 transition-all flex items-center justify-center gap-2"
+                    className="mt-4 w-full py-3 rounded-xl border border-amber-300 text-amber-700 text-sm font-semibold hover:bg-amber-50 transition-all flex items-center justify-center gap-2"
                   >
                     <GraduationCap size={16} />
                     Take Final Exam
                   </button>
                 )}
                 {!nextLesson && finalResult?.passed && (
-                  <div className="mt-4 flex items-center justify-center gap-2 text-green-400 font-semibold py-2">
+                  <div className="mt-4 flex items-center justify-center gap-2 text-emerald-700 font-semibold py-2">
                     <Trophy size={18} />
                     Course Complete!
                   </div>
                 )}
 
                 {/* Bottom Navigation */}
-                <div className="mt-12 pt-6 border-t border-white/10 flex items-center justify-between gap-4">
+                <div className="mt-12 pt-6 border-t border-slate-200 flex items-center justify-between gap-4">
                   <button
                     onClick={() => prevLesson && selectLesson(prevLesson.id)}
                     disabled={!prevLesson}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 text-sm text-white/60 hover:bg-white/5 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed max-w-[45%]"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-300 text-sm text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-30 disabled:cursor-not-allowed max-w-[45%]"
                   >
                     <ArrowLeft size={15} className="shrink-0" />
                     <span className="truncate">{prevLesson ? prevLesson.title : "Previous"}</span>
@@ -716,7 +716,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                   <button
                     onClick={() => nextLesson && selectLesson(nextLesson.id)}
                     disabled={!nextLesson}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-sm font-medium hover:opacity-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed max-w-[45%]"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-medium hover:from-amber-400 hover:to-amber-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed max-w-[45%]"
                   >
                     <span className="truncate">{nextLesson ? nextLesson.title : "Next"}</span>
                     <ArrowRight size={15} className="shrink-0" />
@@ -732,24 +732,24 @@ export default function LearnClient({ topic }: { topic: string }) {
       {mobileNavOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             onClick={() => setMobileNavOpen(false)}
           />
-          <div className="absolute left-0 top-0 h-full w-72 bg-[#0d0d18] border-r border-white/10 flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
-              <h2 className="font-bold text-sm truncate pr-2">{topicData.name}</h2>
+          <div className="absolute left-0 top-0 h-full w-72 bg-white border-r border-slate-200 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h2 className="font-bold text-sm truncate pr-2 text-slate-900">{topicData.name}</h2>
               <button
                 onClick={() => setMobileNavOpen(false)}
-                className="text-white/40 hover:text-white transition-colors shrink-0"
+                className="text-slate-400 hover:text-slate-900 transition-colors shrink-0"
               >
                 <X size={18} />
               </button>
             </div>
-            <div className="px-4 py-3 border-b border-white/10">
-              <p className="text-xs text-white/40 mb-2">{courseProgress}% complete</p>
-              <div className="h-1.5 rounded-full bg-white/5">
+            <div className="px-4 py-3 border-b border-slate-200">
+              <p className="text-xs text-slate-400 mb-2">{courseProgress}% complete</p>
+              <div className="h-1.5 rounded-full bg-slate-200">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all duration-500"
+                  className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-500"
                   style={{ width: `${courseProgress}%` }}
                 />
               </div>
@@ -761,16 +761,16 @@ export default function LearnClient({ topic }: { topic: string }) {
               )}
             </nav>
             {assessment?.finalExam && (
-              <div className="p-3 border-t border-white/10 shrink-0">
+              <div className="p-3 border-t border-slate-200 shrink-0">
                 {finalResult?.passed ? (
-                  <div className="flex items-center gap-2 text-sm text-green-400 font-semibold justify-center py-1">
+                  <div className="flex items-center gap-2 text-sm text-emerald-700 font-semibold justify-center py-1">
                     <Trophy size={15} />
                     Course Complete!
                   </div>
                 ) : (
                   <button
                     onClick={() => { openFinalExam(); setMobileNavOpen(false); }}
-                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-xs font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-1.5"
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs font-semibold hover:from-amber-400 hover:to-amber-500 transition-all flex items-center justify-center gap-1.5"
                   >
                     <GraduationCap size={14} />
                     Take Final Exam
@@ -785,7 +785,7 @@ export default function LearnClient({ topic }: { topic: string }) {
       {/* ── Floating XP Widget ── */}
       {showXpWidget && (
         <div className="fixed bottom-24 right-6 z-50 animate-bounce">
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-bold shadow-xl shadow-purple-500/30 text-sm">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold shadow-xl shadow-amber-500/30 text-sm">
             <Zap size={16} className="fill-white" />
             +{currentLesson?.xpReward ?? 50} XP
           </div>
@@ -795,7 +795,7 @@ export default function LearnClient({ topic }: { topic: string }) {
       {/* ── Course Advisor FAB ── */}
       <button
         onClick={() => setAiChatOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-semibold shadow-xl shadow-purple-500/30 hover:opacity-90 hover:scale-105 transition-all"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold shadow-xl shadow-amber-500/30 hover:from-amber-400 hover:to-amber-500 hover:scale-105 transition-all"
       >
         <MessageSquare size={18} />
         Course Advisor
@@ -805,46 +805,46 @@ export default function LearnClient({ topic }: { topic: string }) {
       {aiChatOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-end pointer-events-none">
           <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm pointer-events-auto"
             onClick={() => setAiChatOpen(false)}
           />
-          <div className="relative pointer-events-auto w-full sm:w-[420px] h-[76vh] sm:h-[560px] sm:mr-6 sm:mb-6 rounded-t-2xl sm:rounded-2xl bg-[#12121f] border border-white/10 shadow-2xl flex flex-col overflow-hidden">
+          <div className="relative pointer-events-auto w-full sm:w-[420px] h-[76vh] sm:h-[560px] sm:mr-6 sm:mb-6 rounded-t-2xl sm:rounded-2xl bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
 
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-gradient-to-r from-purple-900/50 to-cyan-900/20 shrink-0">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center shadow-lg">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-orange-50 shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg">
                 <Bot size={17} className="text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold leading-tight">Course Advisor</p>
-                <p className="text-[11px] text-white/50 truncate">{topicData.name}</p>
+                <p className="text-sm font-bold leading-tight text-slate-900">Course Advisor</p>
+                <p className="text-[11px] text-slate-500 truncate">{topicData.name}</p>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-green-400 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+              <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
                 Online
               </div>
               <button
                 onClick={() => setAiChatOpen(false)}
-                className="ml-2 text-white/40 hover:text-white transition-colors shrink-0"
+                className="ml-2 text-slate-400 hover:text-slate-900 transition-colors shrink-0"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="px-4 py-2 bg-purple-500/5 border-b border-white/5 shrink-0">
-              <p className="text-[11px] text-white/40 text-center">
-                Answers questions about <span className="text-white/60 font-medium">scope · salary · career · future · difficulty</span>
+            <div className="px-4 py-2 bg-amber-50 border-b border-slate-200 shrink-0">
+              <p className="text-[11px] text-slate-500 text-center">
+                Answers questions about <span className="text-slate-700 font-medium">scope · salary · career · future · difficulty</span>
               </p>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
               <div className="flex gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shrink-0 mt-0.5">
                   <Bot size={13} className="text-white" />
                 </div>
                 <div className="flex-1">
-                  <div className="bg-white/5 border border-white/8 rounded-xl rounded-tl-none px-3.5 py-3 text-sm text-white/80 leading-relaxed">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl rounded-tl-none px-3.5 py-3 text-sm text-slate-700 leading-relaxed">
                     Hi! I&apos;m your advisor for{" "}
-                    <span className="text-white font-semibold">{topicData.name}</span>.
+                    <span className="text-slate-900 font-semibold">{topicData.name}</span>.
                     {" "}I can answer specific questions about this skill&apos;s scope, salary, career opportunities, future outlook, and learning difficulty.
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-2.5">
@@ -853,7 +853,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                         key={chip.label}
                         onClick={() => handleChipClick(chip.question)}
                         disabled={chatLoading}
-                        className="px-2.5 py-1 rounded-full border border-purple-500/35 bg-purple-500/10 text-purple-300 text-[11px] font-medium hover:bg-purple-500/25 hover:border-purple-400/50 transition-all disabled:opacity-50"
+                        className="px-2.5 py-1 rounded-full border border-amber-300 bg-amber-50 text-amber-700 text-[11px] font-medium hover:bg-amber-100 hover:border-amber-400 transition-all disabled:opacity-50"
                       >
                         {chip.label}
                       </button>
@@ -867,12 +867,12 @@ export default function LearnClient({ topic }: { topic: string }) {
                   <div
                     className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
                       msg.role === "user"
-                        ? "bg-purple-600/40 border border-purple-500/40"
-                        : "bg-gradient-to-br from-purple-500 to-cyan-400"
+                        ? "bg-amber-100 border border-amber-300"
+                        : "bg-gradient-to-br from-amber-500 to-amber-600"
                     }`}
                   >
                     {msg.role === "user" ? (
-                      <User size={13} className="text-purple-300" />
+                      <User size={13} className="text-amber-700" />
                     ) : (
                       <Bot size={13} className="text-white" />
                     )}
@@ -881,8 +881,8 @@ export default function LearnClient({ topic }: { topic: string }) {
                     <div
                       className={`rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
                         msg.role === "user"
-                          ? "bg-purple-600/20 border border-purple-500/30 text-white rounded-tr-none"
-                          : "bg-white/5 border border-white/8 text-white/85 rounded-tl-none"
+                          ? "bg-amber-50 border border-amber-200 text-slate-900 rounded-tr-none"
+                          : "bg-slate-50 border border-slate-200 text-slate-700 rounded-tl-none"
                       }`}
                     >
                       {msg.text}
@@ -894,7 +894,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                             key={chip.label}
                             onClick={() => handleChipClick(chip.question)}
                             disabled={chatLoading}
-                            className="px-2.5 py-1 rounded-full border border-white/15 bg-white/5 text-white/50 text-[11px] font-medium hover:bg-purple-500/15 hover:border-purple-500/35 hover:text-purple-300 transition-all disabled:opacity-40"
+                            className="px-2.5 py-1 rounded-full border border-slate-300 bg-white text-slate-600 text-[11px] font-medium hover:bg-amber-50 hover:border-amber-300 hover:text-amber-700 transition-all disabled:opacity-40"
                           >
                             {chip.label}
                           </button>
@@ -907,20 +907,20 @@ export default function LearnClient({ topic }: { topic: string }) {
 
               {chatLoading && (
                 <div className="flex gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-cyan-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shrink-0 mt-0.5">
                     <Bot size={13} className="text-white" />
                   </div>
-                  <div className="bg-white/5 border border-white/8 rounded-xl rounded-tl-none px-4 py-3 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl rounded-tl-none px-4 py-3 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                 </div>
               )}
               <div ref={chatEndRef} />
             </div>
 
-            <div className="p-3 border-t border-white/10 shrink-0 bg-[#12121f]">
+            <div className="p-3 border-t border-slate-200 shrink-0 bg-white">
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -929,17 +929,17 @@ export default function LearnClient({ topic }: { topic: string }) {
                   onKeyDown={(e) => e.key === "Enter" && !chatLoading && sendChat()}
                   placeholder="Ask about scope, salary, career, future…"
                   disabled={chatLoading}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-purple-500/50 focus:bg-white/8 transition-all disabled:opacity-50"
+                  className="flex-1 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-amber-400 focus:bg-slate-50 transition-all disabled:opacity-50"
                 />
                 <button
                   onClick={sendChat}
                   disabled={chatLoading || !chatInput.trim()}
-                  className="w-10 h-10 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 flex items-center justify-center hover:opacity-90 transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-10 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center hover:from-amber-400 hover:to-amber-500 transition-all shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Send size={15} className="text-white" />
                 </button>
               </div>
-              <p className="text-center text-[10px] text-white/20 mt-2">
+              <p className="text-center text-[10px] text-slate-400 mt-2">
                 Answers are based on industry research · Not personalised advice
               </p>
             </div>
@@ -951,29 +951,29 @@ export default function LearnClient({ topic }: { topic: string }) {
       {quizOpen && assessment && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             onClick={closeQuiz}
           />
-          <div className="relative w-full max-w-2xl max-h-[88vh] bg-[#0d0d18] border border-white/15 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+          <div className="relative w-full max-w-2xl max-h-[88vh] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
             {/* Modal header */}
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-white/10 bg-gradient-to-r from-purple-900/40 to-transparent shrink-0">
-              <GraduationCap size={18} className="text-purple-400 shrink-0" />
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-200 bg-gradient-to-r from-amber-50 to-transparent shrink-0">
+              <GraduationCap size={18} className="text-amber-600 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold">
+                <p className="text-sm font-bold text-slate-900">
                   {quizOpen.type === "module"
                     ? `Module ${quizOpen.moduleIndex + 1} — Knowledge Check`
                     : "Final Exam"}
                 </p>
                 {!quizResult && (
-                  <p className="text-[11px] text-white/40">
+                  <p className="text-[11px] text-slate-500">
                     {quizOpen.type === "module"
                       ? "Score ≥80% to test out of this module"
                       : "Score ≥80% to earn course completion"}
                   </p>
                 )}
               </div>
-              <button onClick={closeQuiz} className="text-white/40 hover:text-white transition-colors shrink-0">
+              <button onClick={closeQuiz} className="text-slate-400 hover:text-slate-900 transition-colors shrink-0">
                 <X size={18} />
               </button>
             </div>
@@ -989,20 +989,20 @@ export default function LearnClient({ topic }: { topic: string }) {
                   <div className="flex-1 overflow-y-auto p-5">
                     {/* Progress bar */}
                     <div className="flex items-center gap-3 mb-5">
-                      <span className="text-xs text-white/40 shrink-0">
+                      <span className="text-xs text-slate-500 shrink-0">
                         {quizCurrentQ + 1} / {totalQ}
                       </span>
-                      <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                      <div className="flex-1 h-1 bg-slate-200 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-purple-500 to-cyan-400 rounded-full transition-all duration-300"
+                          className="h-full bg-gradient-to-r from-amber-500 to-amber-600 rounded-full transition-all duration-300"
                           style={{ width: `${((quizCurrentQ + 1) / totalQ) * 100}%` }}
                         />
                       </div>
-                      <span className="text-[11px] text-white/30 shrink-0">{answered} answered</span>
+                      <span className="text-[11px] text-slate-400 shrink-0">{answered} answered</span>
                     </div>
 
                     {/* Question */}
-                    <p className="text-base font-medium leading-relaxed mb-5 break-words">{q.question}</p>
+                    <p className="text-base font-medium leading-relaxed mb-5 break-words text-slate-900">{q.question}</p>
 
                     {/* Options */}
                     <div className="space-y-2.5">
@@ -1021,11 +1021,11 @@ export default function LearnClient({ topic }: { topic: string }) {
                             }}
                             className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-all break-words ${
                               selected
-                                ? "border-purple-500/60 bg-purple-500/20 text-white"
-                                : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:bg-white/[0.05] hover:text-white"
+                                ? "border-amber-400 bg-amber-50 text-slate-900"
+                                : "border-slate-300 bg-white text-slate-700 hover:border-amber-300 hover:bg-slate-50 hover:text-slate-900"
                             }`}
                           >
-                            <span className="font-mono text-purple-400 mr-2.5 text-xs">
+                            <span className="font-mono text-amber-600 mr-2.5 text-xs">
                               {String.fromCharCode(65 + idx)}.
                             </span>
                             {opt}
@@ -1036,24 +1036,24 @@ export default function LearnClient({ topic }: { topic: string }) {
                   </div>
 
                   {/* Footer nav */}
-                  <div className="px-5 py-4 border-t border-white/10 flex items-center gap-3 shrink-0">
+                  <div className="px-5 py-4 border-t border-slate-200 flex items-center gap-3 shrink-0">
                     <button
                       onClick={() => setQuizCurrentQ((q) => Math.max(0, q - 1))}
                       disabled={quizCurrentQ === 0}
-                      className="px-3 py-2 rounded-lg border border-white/10 text-white/50 text-sm disabled:opacity-30 hover:bg-white/5 transition-all"
+                      className="px-3 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-sm disabled:opacity-30 hover:bg-slate-50 transition-all"
                     >
                       Back
                     </button>
                     <div className="flex-1">
                       {quizError && (
-                        <p className="text-xs text-red-400 text-center">{quizError}</p>
+                        <p className="text-xs text-red-600 text-center">{quizError}</p>
                       )}
                     </div>
                     {quizCurrentQ < totalQ - 1 ? (
                       <button
                         onClick={() => setQuizCurrentQ((q) => q + 1)}
                         disabled={quizAnswers[quizCurrentQ] === null}
-                        className="px-4 py-2 rounded-lg bg-purple-600/25 border border-purple-500/40 text-purple-300 text-sm disabled:opacity-30 hover:bg-purple-600/35 transition-all"
+                        className="px-4 py-2 rounded-lg bg-amber-50 border border-amber-300 text-amber-700 text-sm disabled:opacity-30 hover:bg-amber-100 transition-all"
                       >
                         Next
                       </button>
@@ -1061,7 +1061,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                       <button
                         onClick={submitQuiz}
                         disabled={!allAnswered || quizSubmitting}
-                        className="px-5 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-sm font-semibold disabled:opacity-40 hover:opacity-90 transition-all"
+                        className="px-5 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-semibold disabled:opacity-40 hover:from-amber-400 hover:to-amber-500 transition-all"
                       >
                         {quizSubmitting ? "Submitting…" : "Submit"}
                       </button>
@@ -1079,19 +1079,19 @@ export default function LearnClient({ topic }: { topic: string }) {
                   <div className="text-center py-4 mb-5">
                     <div
                       className={`text-5xl font-bold mb-2 ${
-                        quizResult.passed ? "text-green-400" : "text-orange-400"
+                        quizResult.passed ? "text-emerald-600" : "text-amber-600"
                       }`}
                     >
                       {quizResult.score}%
                     </div>
-                    <p className="text-white/40 text-sm mb-3">
+                    <p className="text-slate-500 text-sm mb-3">
                       {quizResult.correct} of {quizResult.total} correct
                     </p>
                     <div
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold ${
                         quizResult.passed
-                          ? "bg-green-500/20 border border-green-500/40 text-green-400"
-                          : "bg-orange-500/20 border border-orange-500/40 text-orange-400"
+                          ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                          : "bg-amber-50 border border-amber-200 text-amber-700"
                       }`}
                     >
                       {quizResult.passed ? (
@@ -1104,7 +1104,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                         <><AlertCircle size={14} /> Keep Studying</>
                       )}
                     </div>
-                    <p className="text-xs text-white/40 mt-3">
+                    <p className="text-xs text-slate-500 mt-3">
                       {quizResult.passed
                         ? quizOpen.type === "module"
                           ? "All lessons in this module are now marked complete."
@@ -1127,27 +1127,27 @@ export default function LearnClient({ topic }: { topic: string }) {
                             key={i}
                             className={`p-3.5 rounded-xl border text-sm ${
                               correct
-                                ? "border-green-500/20 bg-green-500/5"
-                                : "border-red-500/20 bg-red-500/5"
+                                ? "border-emerald-200 bg-emerald-50"
+                                : "border-red-200 bg-red-50"
                             }`}
                           >
                             <div className="flex items-start gap-2.5">
                               {correct ? (
-                                <CheckCircle2 size={14} className="text-green-400 shrink-0 mt-0.5" />
+                                <CheckCircle2 size={14} className="text-emerald-600 shrink-0 mt-0.5" />
                               ) : (
-                                <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                                <AlertCircle size={14} className="text-red-600 shrink-0 mt-0.5" />
                               )}
-                              <p className="text-white/75 leading-relaxed">{q.question}</p>
+                              <p className="text-slate-700 leading-relaxed">{q.question}</p>
                             </div>
                             {!correct && review && (
                               <div className="mt-2 ml-6 space-y-1">
-                                <p className="text-[11px] text-red-400/70">
+                                <p className="text-[11px] text-red-600">
                                   Your answer: {q.options[userAns]}
                                 </p>
-                                <p className="text-[11px] text-green-400/80">
+                                <p className="text-[11px] text-emerald-700">
                                   Correct: {q.options[review.correctAnswer]}
                                 </p>
-                                <p className="text-[11px] text-white/35 leading-relaxed">
+                                <p className="text-[11px] text-slate-500 leading-relaxed">
                                   {review.explanation}
                                 </p>
                               </div>
@@ -1179,22 +1179,22 @@ export default function LearnClient({ topic }: { topic: string }) {
                     if (areas.length === 0) return null;
                     return (
                       <div>
-                        <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
                           Areas to revisit
                         </p>
                         <div className="space-y-3">
                           {areas.map((area, i) => (
                             <div
                               key={i}
-                              className="p-3.5 rounded-xl border border-orange-500/25 bg-orange-500/5"
+                              className="p-3.5 rounded-xl border border-amber-200 bg-amber-50"
                             >
-                              <p className="text-sm font-semibold text-orange-300 mb-2">
+                              <p className="text-sm font-semibold text-amber-700 mb-2">
                                 {area.title}
                               </p>
                               <ul className="space-y-1">
                                 {area.lessonTitles.map((title, j) => (
-                                  <li key={j} className="flex items-start gap-2 text-xs text-white/55">
-                                    <span className="text-orange-400/60 shrink-0 mt-0.5">·</span>
+                                  <li key={j} className="flex items-start gap-2 text-xs text-slate-600">
+                                    <span className="text-amber-500 shrink-0 mt-0.5">·</span>
                                     {title}
                                   </li>
                                 ))}
@@ -1207,10 +1207,10 @@ export default function LearnClient({ topic }: { topic: string }) {
                   })()}
                 </div>
 
-                <div className="px-5 py-4 border-t border-white/10 flex justify-end shrink-0">
+                <div className="px-5 py-4 border-t border-slate-200 flex justify-end shrink-0">
                   <button
                     onClick={closeQuiz}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 text-white text-sm font-semibold hover:opacity-90 transition-all"
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-semibold hover:from-amber-400 hover:to-amber-500 transition-all"
                   >
                     Close
                   </button>
