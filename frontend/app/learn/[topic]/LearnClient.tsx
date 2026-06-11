@@ -36,6 +36,7 @@ import {
   getAssessmentResults,
   submitModuleAssessment,
   submitFinalAssessment,
+  gradeAssessment,
   type Assessment,
   type SubmitResult,
 } from "@/lib/api";
@@ -292,20 +293,11 @@ export default function LearnClient({ topic }: { topic: string }) {
       let result: SubmitResult;
 
       if (!isAuthenticated()) {
-        // Grade locally — not persisted (user not signed in)
-        const questions = quizOpen.type === "module"
-          ? (assessment.modules.find((m) => m.index === quizOpen.moduleIndex)?.questions ?? [])
-          : (assessment.finalExam?.questions ?? []);
-        const threshold = assessment.passThreshold ?? 80;
-        let correct = 0;
-        const wrongLessonOrders: number[] = [];
-        for (let i = 0; i < questions.length; i++) {
-          if (answers[i] === questions[i].answer) correct++;
-          else wrongLessonOrders.push(questions[i].lessonOrder);
-        }
-        const total = questions.length;
-        const score = Math.round((correct / total) * 100);
-        result = { score, passed: score >= threshold, correct, total, wrongLessonOrders };
+        // Grade on the server without persisting — answers never reach the client
+        result =
+          quizOpen.type === "module"
+            ? await gradeAssessment(topic, "module", answers, quizOpen.moduleIndex)
+            : await gradeAssessment(topic, "final", answers);
       } else if (quizOpen.type === "module") {
         result = await submitModuleAssessment(topic, quizOpen.moduleIndex, answers);
       } else {
@@ -1128,7 +1120,8 @@ export default function LearnClient({ topic }: { topic: string }) {
                     <div className="space-y-2">
                       {quizQuestions.map((q: any, i: number) => {
                         const userAns = quizAnswers[i] as number;
-                        const correct = userAns === q.answer;
+                        const review = quizResult.review?.[i];
+                        const correct = review?.correct ?? false;
                         return (
                           <div
                             key={i}
@@ -1146,16 +1139,16 @@ export default function LearnClient({ topic }: { topic: string }) {
                               )}
                               <p className="text-white/75 leading-relaxed">{q.question}</p>
                             </div>
-                            {!correct && (
+                            {!correct && review && (
                               <div className="mt-2 ml-6 space-y-1">
                                 <p className="text-[11px] text-red-400/70">
                                   Your answer: {q.options[userAns]}
                                 </p>
                                 <p className="text-[11px] text-green-400/80">
-                                  Correct: {q.options[q.answer]}
+                                  Correct: {q.options[review.correctAnswer]}
                                 </p>
                                 <p className="text-[11px] text-white/35 leading-relaxed">
-                                  {q.explanation}
+                                  {review.explanation}
                                 </p>
                               </div>
                             )}
@@ -1167,7 +1160,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                     // Final exam: group wrong answers by module → show areas of improvement
                     const byModule = new Map<number, { title: string; lessonTitles: string[] }>();
                     quizQuestions.forEach((q: any, i: number) => {
-                      if (quizAnswers[i] !== q.answer) {
+                      if (!quizResult.review?.[i]?.correct) {
                         const modIdx = typeof q.moduleIndex === "number" ? q.moduleIndex : -1;
                         const modTitle =
                           assessment?.modules.find((m) => m.index === modIdx)?.title ??
