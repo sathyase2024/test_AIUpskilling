@@ -68,7 +68,7 @@ export class AiController {
   }
 
   @Post('translate-analogy')
-  @SkipThrottle()
+  @SkipThrottle({ global: true })
   @ApiOperation({ summary: 'Return domain-specific analogy for a concept; DB-cached after first generation (public)' })
   translateAnalogy(@Body() body: {
     cricketAnalogy: string;
