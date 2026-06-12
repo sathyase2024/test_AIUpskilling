@@ -23,6 +23,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import Link from "next/link";
+import Navbar from "@/components/Navbar";
 import LessonRenderer from "@/components/LessonRenderer";
 import ModuleChallengeCard from "@/components/ModuleChallengeCard";
 import { getModuleChallenge } from "@/lib/module-challenges";
@@ -365,6 +366,7 @@ export default function LearnClient({ topic }: { topic: string }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent text-slate-900 dark:text-white flex items-center justify-center">
+        <Navbar />
         <div className="text-center space-y-4">
           <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/30 flex items-center justify-center mx-auto animate-pulse">
             <Brain className="w-6 h-6 text-amber-600 dark:text-amber-400" />
@@ -378,6 +380,7 @@ export default function LearnClient({ topic }: { topic: string }) {
   if (error || !topicData) {
     return (
       <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent text-slate-900 dark:text-white flex items-center justify-center px-6">
+        <Navbar />
         <div className="max-w-md text-center space-y-4">
           <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/25 flex items-center justify-center mx-auto">
             <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
@@ -525,9 +528,10 @@ export default function LearnClient({ topic }: { topic: string }) {
   );
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent text-slate-900 dark:text-white flex flex-col">
+    <div className="min-h-screen bg-[#f7f8fa] dark:bg-transparent text-slate-900 dark:text-white flex flex-col pt-16">
+      <Navbar />
       {/* ── Top Bar ── */}
-      <header className="sticky top-0 z-40 bg-white/90 dark:bg-[#0d0d14]/90 backdrop-blur-md border-b border-slate-200 dark:border-white/10 px-4 py-3">
+      <header className="sticky top-16 z-40 bg-white/90 dark:bg-[#0d0d14]/90 backdrop-blur-md border-b border-slate-200 dark:border-white/10 px-4 py-3">
         <div className="max-w-7xl mx-auto flex items-center gap-4">
           <Link
             href="/topics"
@@ -575,7 +579,7 @@ export default function LearnClient({ topic }: { topic: string }) {
       {/* ── Body ── */}
       <div className="flex flex-1 max-w-7xl mx-auto w-full">
         {/* ── Sidebar ── */}
-        <aside className="hidden lg:flex flex-col w-[300px] shrink-0 bg-white dark:bg-[#0d0d14] border-r border-slate-200 dark:border-white/10 sticky top-[57px] h-[calc(100vh-57px)] overflow-y-auto">
+        <aside className="hidden lg:flex flex-col w-[300px] shrink-0 bg-white dark:bg-[#0d0d14] border-r border-slate-200 dark:border-white/10 sticky top-[121px] h-[calc(100vh-121px)] overflow-y-auto">
           <div className="p-4 border-b border-slate-200 dark:border-white/10">
             <h2 className="font-bold text-sm mb-1 truncate text-slate-900 dark:text-white">{topicData.name}</h2>
             <p className="text-xs text-slate-400 dark:text-white/40 mb-3">{courseProgress}% complete</p>
@@ -613,7 +617,7 @@ export default function LearnClient({ topic }: { topic: string }) {
         </aside>
 
         {/* ── Main Content ── */}
-        <main ref={contentRef} className="flex-1 min-w-0 overflow-y-auto h-[calc(100vh-57px)]">
+        <main ref={contentRef} className="flex-1 min-w-0 overflow-y-auto h-[calc(100vh-121px)]">
           <div className="max-w-3xl mx-auto px-6 py-10">
 
             {/* ── Challenge view ── */}
