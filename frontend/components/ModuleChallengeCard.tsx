@@ -24,7 +24,10 @@ export default function ModuleChallengeCard({
 
   return (
     <div
-      className="mt-12 rounded-2xl overflow-hidden bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10"
+      // The `dark` class forces the dark-theme treatment for this whole card
+      // (including the embedded editor chrome) in BOTH site themes — the
+      // challenge is a code-first surface and reads best on dark.
+      className="dark mt-12 rounded-2xl overflow-hidden bg-white dark:bg-[#12121a] border border-slate-200 dark:border-white/10"
       style={{
         boxShadow: '0 0 0 1px rgba(245,158,11,0.20), 0 4px 24px rgba(245,158,11,0.08)',
       }}
