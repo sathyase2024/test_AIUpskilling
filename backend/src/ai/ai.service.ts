@@ -117,6 +117,36 @@ export class AiService implements OnApplicationBootstrap {
   }
 
   /**
+   * Call translateAnalogy with retry on transient connection errors
+   * (EAI_AGAIN / ECONNREFUSED = ai-worker restarting).
+   * Gives up after maxAttempts and rethrows the last error.
+   */
+  private async translateWithRetry(
+    cricketAnalogy: string,
+    domain: string,
+    conceptName: string,
+    courseSlug: string,
+    conceptId: string,
+    maxAttempts = 4,
+  ): Promise<{ analogy: string; cached: boolean }> {
+    const RETRIABLE = ['EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'];
+    let lastErr: any;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.translateAnalogy(cricketAnalogy, domain, conceptName, courseSlug, conceptId);
+      } catch (err: any) {
+        lastErr = err;
+        const isRetriable = RETRIABLE.some(code => err?.message?.includes(code) || err?.code === code);
+        if (!isRetriable || attempt === maxAttempts) throw err;
+        const waitMs = attempt * 8_000;   // 8s, 16s, 24s — give worker time to restart
+        this.logger.warn(`Seed retry ${attempt}/${maxAttempts - 1} for ${courseSlug}/${conceptId}/${domain} in ${waitMs / 1000}s — ${err.message}`);
+        await new Promise(r => setTimeout(r, waitMs));
+      }
+    }
+    throw lastErr;
+  }
+
+  /**
    * Pre-generate and DB-cache analogies for every domain across every lesson
    * that has already been generated. Runs entirely in the background — the
    * caller gets an instant response with a summary of what was queued.
@@ -176,15 +206,15 @@ export class AiService implements OnApplicationBootstrap {
               effectiveCricket = cached.analogy;
             } else {
               try {
-                const result = await this.translateAnalogy('', 'cricket', conceptName, courseSlug, conceptId);
+                const result = await this.translateWithRetry('', 'cricket', conceptName, courseSlug, conceptId);
                 effectiveCricket = result.analogy;
                 generated++;
-              } catch (err) {
+              } catch (err: any) {
                 failed++;
                 this.logger.warn(`Seed cricket failed: ${courseSlug}/${conceptId} — ${err.message}`);
                 continue;   // skip other domains if we couldn't get cricket either
               }
-              await new Promise(r => setTimeout(r, 400));
+              await new Promise(r => setTimeout(r, 1_500));
             }
           }
 
@@ -196,14 +226,16 @@ export class AiService implements OnApplicationBootstrap {
             if (exists) { skipped++; continue; }
 
             try {
-              await this.translateAnalogy(effectiveCricket, domain, conceptName, courseSlug, conceptId);
+              await this.translateWithRetry(effectiveCricket, domain, conceptName, courseSlug, conceptId);
               generated++;
-            } catch (err) {
+            } catch (err: any) {
               failed++;
               this.logger.warn(`Seed failed: ${courseSlug}/${conceptId}/${domain} — ${err.message}`);
             }
 
-            await new Promise(r => setTimeout(r, 400));
+            // 1.5s between calls — keeps only one in-flight request to the ai-worker
+            // and prevents the worker from being overwhelmed and restarting
+            await new Promise(r => setTimeout(r, 1_500));
           }
         }
 
