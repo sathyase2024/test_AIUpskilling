@@ -78,39 +78,53 @@ export class AiService implements OnApplicationBootstrap {
   /**
    * Extract every teachable concept from a lesson's contentJson.
    *
-   * Strategy: iterate level-3 headings (each is a distinct concept).
-   * For each heading, look ahead for an explicit `analogy` section — if found,
-   * its content is the cricket analogy text. If not (lesson was generated without
-   * hobby), we return an empty string as cricketAnalogy and the seed job will
-   * generate one via the AI.
+   * IMPORTANT: this MUST mirror `buildRenderItems` in
+   * frontend/components/LessonRenderer.tsx — the conceptIds produced here are
+   * the cache keys the frontend looks up. Two card shapes exist there:
+   *
+   * 1. An explicit `analogy` section → card keyed by the preceding level-3
+   *    heading, or by the LESSON TITLE when the analogy appears before any
+   *    L3 heading (typically the lesson's opening analogy).
+   * 2. A level-3 heading followed by a paragraph with no analogy section →
+   *    card keyed by the heading, with no cricket text (generated via AI).
    */
   private extractAnalogyContexts(
     contentJson: Record<string, any>,
   ): Array<{ conceptId: string; conceptName: string; cricketAnalogy: string }> {
     const sections: Array<{ type: string; content?: string; level?: number }> =
       contentJson?.sections ?? [];
+    const title: string = contentJson?.title ?? '';
     const seen = new Set<string>();
     const results: Array<{ conceptId: string; conceptName: string; cricketAnalogy: string }> = [];
+    let l3: { name: string; id: string } | null = null;
 
     for (let i = 0; i < sections.length; i++) {
       const s = sections[i];
-      if (s.type !== 'heading' || (s.level ?? 2) !== 3 || !s.content?.trim()) continue;
 
-      const conceptId = this.slugify(s.content);
-      if (seen.has(conceptId)) continue;
-      seen.add(conceptId);
-
-      // Look ahead for an analogy section before the next heading
-      let cricketAnalogy = '';
-      for (let j = i + 1; j < sections.length; j++) {
-        if (sections[j].type === 'heading') break;
-        if (sections[j].type === 'analogy' && sections[j].content?.trim()) {
-          cricketAnalogy = sections[j].content!;
-          break;
+      if (s.type === 'heading') {
+        if ((s.level ?? 2) === 3 && s.content?.trim()) {
+          l3 = { name: s.content, id: this.slugify(s.content) };
+        } else {
+          l3 = null;
+        }
+      } else if (s.type === 'analogy') {
+        const name = l3?.name ?? title;
+        const conceptId = l3?.id ?? this.slugify(title);
+        if (conceptId && !seen.has(conceptId)) {
+          seen.add(conceptId);
+          results.push({ conceptId, conceptName: name, cricketAnalogy: s.content?.trim() ? s.content : '' });
+          l3 = null;   // consumed
+        }
+      } else if (s.type === 'paragraph' && l3) {
+        // Frontend injects a card after the first paragraph under an L3 heading
+        // when no analogy section follows it
+        const next = sections[i + 1];
+        if (next?.type !== 'analogy' && !seen.has(l3.id)) {
+          seen.add(l3.id);
+          results.push({ conceptId: l3.id, conceptName: l3.name, cricketAnalogy: '' });
+          l3 = null;   // consumed
         }
       }
-
-      results.push({ conceptId, conceptName: s.content, cricketAnalogy });
     }
 
     return results;
@@ -262,7 +276,6 @@ export class AiService implements OnApplicationBootstrap {
         }
 
         lessonsDone++;
-      }
       }
 
       this.logger.log(

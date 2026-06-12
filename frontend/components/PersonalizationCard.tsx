@@ -38,6 +38,7 @@ export default function PersonalizationCard({
   const [picking, setPicking]     = useState(false)
   const [translated, setTranslated] = useState<string | null>(null)
   const [loading, setLoading]     = useState(false)
+  const [failed, setFailed]       = useState(false)
   // Track which (domain, conceptId) the current translation was generated for
   const translatedFor = useRef<string>('')
 
@@ -72,12 +73,14 @@ export default function PersonalizationCard({
     if (domain === 'cricket') {
       // Cricket is always served from fallbackText — no API needed
       setTranslated(null)
+      setFailed(false)
       translatedFor.current = ''
       return
     }
     if (staticAnalogy !== null) {
       // Static pre-generated data covers this domain — no API needed
       setTranslated(null)
+      setFailed(false)
       translatedFor.current = ''
       return
     }
@@ -99,6 +102,7 @@ export default function PersonalizationCard({
     // Small stagger (50ms × index) avoids exact-simultaneous requests while
     // remaining imperceptible now that the DB cache returns in ~10ms.
     setLoading(true)
+    setFailed(false)
     const ctrl = new AbortController()
     const timer = setTimeout(() => {
       fetch('/api/proxy/ai/translate-analogy', {
@@ -119,11 +123,14 @@ export default function PersonalizationCard({
             if (typeof window !== 'undefined') localStorage.setItem(cacheKey, data.analogy)
             setTranslated(data.analogy)
             translatedFor.current = key
+          } else {
+            setFailed(true)
           }
         })
         .catch(err => {
           if ((err as { name?: string })?.name !== 'AbortError') {
             console.warn(`[PersonalizationCard] analogy generation failed for ${conceptId}/${domain}:`, err)
+            setFailed(true)
           }
         })
         .finally(() => setLoading(false))
@@ -139,7 +146,12 @@ export default function PersonalizationCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domain, staticAnalogy, fallbackText, courseSlug, conceptId, conceptName, sectionIndex])
 
-  const analogy = staticAnalogy ?? translated
+  // Resolution order: static engine data → live/cached translation →
+  // cricket text from the lesson JSON (when generation failed — the analogy
+  // section must never disappear just because the AI path is down).
+  const cricketFallback = failed && domain !== 'cricket' && fallbackText ? fallbackText : null
+  const analogy = staticAnalogy ?? translated ?? cricketFallback
+  const showingCricketFallback = !staticAnalogy && !translated && cricketFallback !== null
 
   if (!analogy && !loading) return null
 
@@ -184,9 +196,17 @@ export default function PersonalizationCard({
           </p>
         </div>
       ) : (
-        <p className="px-5 pb-4 text-sm text-white/75 leading-relaxed">
-          {analogy}
-        </p>
+        <div className="px-5 pb-4">
+          <p className="text-sm text-white/75 leading-relaxed">
+            {analogy}
+          </p>
+          {showingCricketFallback && (
+            <p className="text-[11px] text-white/25 pt-2">
+              🏏 Showing the cricket analogy — your {DOMAIN_LABELS[domain]} version couldn&apos;t be
+              generated right now. It will appear automatically on a future visit.
+            </p>
+          )}
+        </div>
       )}
 
       {/* Domain picker */}
