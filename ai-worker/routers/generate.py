@@ -556,47 +556,148 @@ async def generate_curriculum(req: CurriculumRequest):
 
 
 class TranslateAnalogyRequest(BaseModel):
-    cricket_analogy: str
+    cricket_analogy: str        # source analogy — may be empty if lesson had no analogy
     domain: str
     concept_name: str
     topic_name: str
 
 
-_DOMAIN_CONTEXT = {
-    "gaming":       "video games — think mechanics, characters, levels, boss fights, and game design",
-    "music":        "music — think instruments, chord progressions, recording, performance, and composition",
-    "photography":  "photography — think aperture, shutter speed, composition, lighting, and post-processing",
-    "travel":       "travel — think routes, destinations, layovers, visas, packing, and navigation",
-    "movies":       "filmmaking — think directors, cinematography, editing, scripts, and storytelling",
-    "fitness":      "fitness training — think reps, progressive overload, muscle groups, recovery, and form",
-    "chess":        "chess — think pieces, strategy, openings, tactics, endgames, and position evaluation",
-    "cooking":      "cooking — think ingredients, techniques, heat, timing, flavour balance, and recipes",
-    "finance":      "personal finance and investing — think portfolios, risk, returns, compounding, and markets",
-    "business":     "business and startups — think strategy, product-market fit, scaling, pivots, and execution",
-    "sports":       "sports and athletics — think teamwork, tactics, conditioning, competition, and performance",
-    "cricket":      "cricket — think innings, overs, batting, bowling, fielding, and match strategy",
+# Rich terminology banks — the prompt injects these so the model produces
+# domain-specific language instead of generic descriptions.
+_DOMAIN_VOCAB = {
+    "gaming": (
+        "🎮",
+        "video games",
+        "game mechanics, level design, boss fights, respawning, save points, XP systems, "
+        "cooldowns, hitboxes, aggro, render pipelines, game loops, procedural generation, "
+        "loot tables, character builds, frame rates, pathfinding AI, collision detection"
+    ),
+    "music": (
+        "🎵",
+        "music",
+        "chord progressions, time signatures, key signatures, dynamics (piano/forte), "
+        "counterpoint, modulation, overdubbing, compression, EQ, reverb, attack/release envelopes, "
+        "harmonic resonance, tempo, syncopation, mixing, mastering, stems, MIDI, DAWs"
+    ),
+    "photography": (
+        "📷",
+        "photography",
+        "aperture, shutter speed, ISO, depth of field, bokeh, exposure triangle, RAW files, "
+        "histograms, white balance, focal length, crop factor, dynamic range, noise reduction, "
+        "lens distortion, compositing layers, bracketing, HDR, sensor size, mirrorless vs DSLR"
+    ),
+    "travel": (
+        "✈️",
+        "travel",
+        "layovers, visa requirements, itineraries, time zones, customs declarations, "
+        "carry-on restrictions, boarding passes, hub airports, codeshare flights, "
+        "travel insurance, local SIM cards, currency exchange rates, hotel check-in windows, "
+        "travel advisories, packing cubes, points redemptions, flight classes"
+    ),
+    "movies": (
+        "🎬",
+        "filmmaking",
+        "cinematography, mise-en-scène, continuity editing, jump cuts, rack focus, "
+        "blocking, colour grading, ADR, foley, score vs soundtrack, three-act structure, "
+        "coverage, B-roll, practical effects vs VFX, aspect ratios, lighting setups (key/fill/back), "
+        "screenplay formatting, director's cut, distribution windows"
+    ),
+    "fitness": (
+        "💪",
+        "fitness training",
+        "progressive overload, one-rep max, compound lifts, hypertrophy, DOMS, periodization, "
+        "deload weeks, ATP-CP system, VO2 max, lactate threshold, muscle fibre types, "
+        "RPE scale, time under tension, supersets, accessory work, macros, caloric deficit/surplus"
+    ),
+    "chess": (
+        "♟️",
+        "chess",
+        "opening theory, middlegame plans, endgame technique, piece activity, pawn structure, "
+        "tempo, zugzwang, fork, pin, skewer, discovered attack, outposts, weak squares, "
+        "king safety, Elo rating, time pressure, prophylaxis, positional vs tactical play"
+    ),
+    "cooking": (
+        "👨‍🍳",
+        "cooking",
+        "mise en place, Maillard reaction, emulsification, seasoning layers, reduction, "
+        "knife cuts (brunoise, julienne, chiffonade), caramelisation, rendering fat, "
+        "braising vs sautéing, acidity balance, umami, resting meat, tempering chocolate, "
+        "fermentation, cross-contamination, blind baking, deglazing"
+    ),
+    "finance": (
+        "📈",
+        "investing and finance",
+        "compound interest, dollar-cost averaging, diversification, liquidity, volatility, "
+        "P/E ratio, market cap, yield curves, options premium, stop-loss orders, "
+        "rebalancing, alpha/beta, drawdown, expense ratio, tax-loss harvesting, "
+        "margin calls, credit spreads, risk-adjusted returns, portfolio correlation"
+    ),
+    "business": (
+        "💼",
+        "business and startups",
+        "product-market fit, burn rate, runway, MVP, pivot, churn, CAC, LTV, "
+        "go-to-market strategy, Series A/B funding, term sheets, cap table, "
+        "unit economics, gross margin, OKRs, north star metric, A/B testing, "
+        "virality coefficient, network effects, moat, competitive differentiation"
+    ),
+    "sports": (
+        "⚽",
+        "sports and athletics",
+        "game film, set plays, pressing, counter-attack, off-the-ball movement, "
+        "shot selection, conditioning windows, taper week, periodised training, "
+        "zone defence, man-to-man marking, assist, expected goals (xG), "
+        "injury prevention, sports psychology, competition format, officiating"
+    ),
 }
 
 
 @router.post("/translate-analogy")
 async def translate_analogy(req: TranslateAnalogyRequest):
-    """Translate a cricket-based analogy to the learner's interest domain."""
-    domain_ctx = _DOMAIN_CONTEXT.get(req.domain, req.domain)
+    """
+    Generate a domain-specific analogy for a technical concept at the same
+    depth and structural quality as the original cricket analogies.
+    """
+    entry = _DOMAIN_VOCAB.get(req.domain)
+    if not entry:
+        raise HTTPException(status_code=400, detail=f"Unknown domain: {req.domain}")
 
-    prompt = (
-        f"A technical concept called '{req.concept_name}' (from the topic '{req.topic_name}') "
-        f"has been explained using a cricket analogy:\n\n"
-        f"\"{req.cricket_analogy}\"\n\n"
-        f"Rewrite this as an analogy using {domain_ctx}. "
-        f"Keep the same depth of insight — be specific, use real terminology from that domain, "
-        f"and make every sentence map clearly to the technical concept. "
-        f"3-5 sentences. Output ONLY the analogy text with no preamble, label, or quotation marks."
-    )
+    emoji, domain_label, vocab_hint = entry
+
+    reference_block = (
+        f"REFERENCE — a cricket-based analogy for the same concept (use this to understand "
+        f"which aspects of {req.concept_name} are most important to highlight):\n"
+        f'"{req.cricket_analogy}"\n\n'
+    ) if req.cricket_analogy.strip() else ""
+
+    prompt = f"""You are writing a DEEP, vivid analogy to explain a technical concept to someone who loves {domain_label}.
+
+Concept: "{req.concept_name}" (from the topic "{req.topic_name}")
+{reference_block}Write a fresh analogy in the {domain_label} world. Do NOT translate the cricket analogy — write an original one that captures the same technical insight.
+
+You MUST follow this exact 3-part structure:
+
+PART A — Setup (2-3 sentences):
+  Describe a specific, concrete {domain_label} scenario. Use precise {domain_label} terminology.
+  Name real players/artists/films/dishes (whichever applies). Make it immersive and recognisable
+  to someone who knows {domain_label} well. Relevant vocabulary: {vocab_hint}.
+
+PART B — The Parallel (3-4 sentences):
+  Explicitly map EACH key aspect of {req.concept_name} to its {domain_label} equivalent.
+  Use the form "just as [X in {domain_label}]... [Y in {req.concept_name}]..." for each mapping.
+  Cover every important dimension — not just one surface-level similarity.
+
+PART C — The Insight (1-2 sentences):
+  State what understanding this {domain_label} parallel reveals about WHY {req.concept_name}
+  works the way it does, or why it was designed this way.
+
+Total length: 6-10 sentences.
+First word: "{emoji} Think of it like {domain_label}:"
+Output ONLY the analogy text — no preamble, no section labels, no quotation marks."""
 
     try:
         response = get_client().messages.create(
             model=MODEL,
-            max_tokens=400,
+            max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )
         return {"analogy": response.content[0].text.strip()}
@@ -609,4 +710,4 @@ async def translate_analogy(req: TranslateAnalogyRequest):
     except anthropic.APIStatusError as e:
         raise HTTPException(status_code=502, detail=f"Anthropic API error: {e.message}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to translate analogy: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate analogy: {str(e)}")

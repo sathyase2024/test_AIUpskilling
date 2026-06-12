@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Sparkles } from 'lucide-react'
 import {
   getCourseAnalogies,
@@ -18,17 +18,28 @@ interface Props {
   courseSlug: string
   conceptId: string
   conceptName: string
-  /** Raw analogy text from the lesson JSON — used as cricket fallback and
-   *  as the source text for on-demand translation to other domains. */
+  /** Cricket analogy text from the lesson JSON — used as cricket display text
+   *  and as reference context when generating other-domain analogies. */
   fallbackText?: string
+  /** Position in the lesson (0-based). Used to stagger API calls so that
+   *  several analogy cards on the same page don't all fire simultaneously. */
+  sectionIndex?: number
 }
 
-export default function PersonalizationCard({ courseSlug, conceptId, conceptName, fallbackText }: Props) {
-  const [analogies, setAnalogies]             = useState<CourseAnalogies | null>(null)
-  const [domain, setDomain]                   = useState<InterestDomain>('cricket')
-  const [picking, setPicking]                 = useState(false)
-  const [translatedAnalogy, setTranslated]    = useState<string | null>(null)
-  const [loading, setLoading]                 = useState(false)
+export default function PersonalizationCard({
+  courseSlug,
+  conceptId,
+  conceptName,
+  fallbackText,
+  sectionIndex = 0,
+}: Props) {
+  const [analogies, setAnalogies] = useState<CourseAnalogies | null>(null)
+  const [domain, setDomain]       = useState<InterestDomain>('cricket')
+  const [picking, setPicking]     = useState(false)
+  const [translated, setTranslated] = useState<string | null>(null)
+  const [loading, setLoading]     = useState(false)
+  // Track which (domain, conceptId) the current translation was generated for
+  const translatedFor = useRef<string>('')
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -51,59 +62,85 @@ export default function PersonalizationCard({ courseSlug, conceptId, conceptName
     slug.includes(c.name.toLowerCase().replace(/\s+/g, '-'))
   )
 
-  // Static analogy: pre-generated data hit or cricket fallback
+  // Static analogy: pre-generated data or the raw cricket text (cricket domain only)
   const staticAnalogy =
     (concept ? concept[domain] : null) ??
     (domain === 'cricket' && fallbackText ? fallbackText : null)
 
-  // When static data is unavailable for a non-cricket domain, fetch a translation
+  // Fetch a generated analogy from the backend when static data is unavailable
   useEffect(() => {
-    if (staticAnalogy !== null || domain === 'cricket' || !fallbackText) {
+    if (domain === 'cricket') {
+      // Cricket is always served from fallbackText — no API needed
       setTranslated(null)
+      translatedFor.current = ''
       return
     }
+    if (staticAnalogy !== null) {
+      // Static pre-generated data covers this domain — no API needed
+      setTranslated(null)
+      translatedFor.current = ''
+      return
+    }
+
+    const key = `${domain}:${conceptId}`
+    // Already have a fresh translation for this combo
+    if (translatedFor.current === key && translated !== null) return
 
     const cacheKey = `${CACHE_PREFIX}${courseSlug}:${conceptId}:${domain}`
     if (typeof window !== 'undefined') {
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         setTranslated(cached)
+        translatedFor.current = key
         return
       }
     }
 
+    // Stagger requests: each section waits (sectionIndex * 150 ms) before firing
+    // so that a lesson with 5 analogy cards doesn't hit the API simultaneously.
     setLoading(true)
-    setTranslated(null)
-
     const ctrl = new AbortController()
-    fetch('/api/proxy/ai/translate-analogy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cricketAnalogy: fallbackText,
-        domain,
-        conceptName,
-        topicName: courseSlug.replace(/-/g, ' '),
-      }),
-      signal: ctrl.signal,
-    })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => {
-        if (data?.analogy) {
-          if (typeof window !== 'undefined') localStorage.setItem(cacheKey, data.analogy)
-          setTranslated(data.analogy)
-        }
+    const timer = setTimeout(() => {
+      fetch('/api/proxy/ai/translate-analogy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cricketAnalogy: fallbackText ?? '',
+          domain,
+          conceptName,
+          topicName: courseSlug.replace(/-/g, ' '),
+        }),
+        signal: ctrl.signal,
       })
-      .catch(err => { if (err?.name !== 'AbortError') console.warn('Analogy translation failed', err) })
-      .finally(() => setLoading(false))
+        .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
+        .then(data => {
+          if (data?.analogy) {
+            if (typeof window !== 'undefined') localStorage.setItem(cacheKey, data.analogy)
+            setTranslated(data.analogy)
+            translatedFor.current = key
+          }
+        })
+        .catch(err => {
+          if ((err as { name?: string })?.name !== 'AbortError') {
+            console.warn(`[PersonalizationCard] analogy generation failed for ${conceptId}/${domain}:`, err)
+          }
+        })
+        .finally(() => setLoading(false))
+    }, sectionIndex * 200)
 
-    return () => ctrl.abort()
-  }, [domain, staticAnalogy, fallbackText, courseSlug, conceptId, conceptName])
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
+    }
+  }, [domain, staticAnalogy, fallbackText, courseSlug, conceptId, conceptName, sectionIndex, translated])
 
-  const analogy = staticAnalogy ?? translatedAnalogy
+  const analogy = staticAnalogy ?? translated
 
-  // Keep card visible while loading so the layout doesn't jump
-  if (!analogy && !loading) return null
+  // Show loading skeleton so the card doesn't pop in/out — but only if we
+  // have something to generate (cricket text or at least a concept name).
+  const canGenerate = domain !== 'cricket' && (!!fallbackText || !!conceptName)
+  if (!analogy && !loading && !canGenerate) return null
+  if (!analogy && !loading) return null   // nothing to show and not fetching
 
   function pickDomain(d: InterestDomain) {
     setDomain(d)
@@ -112,10 +149,11 @@ export default function PersonalizationCard({ courseSlug, conceptId, conceptName
   }
 
   return (
-    <div className="my-6 rounded-2xl overflow-hidden bg-[#0d0d18] dark:bg-[#0d0d18] bg-opacity-100"
+    <div
+      className="my-6 rounded-2xl overflow-hidden bg-[#0d0d18] dark:bg-[#0d0d18] bg-opacity-100"
       style={{ boxShadow: '0 0 0 1px rgba(168,85,247,0.20), 0 4px 16px rgba(168,85,247,0.06)' }}
     >
-      {/* Label row */}
+      {/* Header row */}
       <div className="flex items-center justify-between px-5 pt-4 pb-2">
         <div className="flex items-center gap-2">
           <div className="p-1 rounded-md bg-gradient-to-br from-purple-500 to-violet-400 shadow shadow-purple-500/30">
@@ -134,18 +172,23 @@ export default function PersonalizationCard({ courseSlug, conceptId, conceptName
         </button>
       </div>
 
-      {/* Analogy text or loading pulse */}
+      {/* Body */}
       {loading ? (
-        <p className="px-5 pb-4 text-sm text-white/35 italic leading-relaxed animate-pulse">
-          Personalising analogy for {DOMAIN_LABELS[domain]}…
-        </p>
+        <div className="px-5 pb-4 space-y-2">
+          <div className="h-3 rounded bg-white/[0.06] animate-pulse w-full" />
+          <div className="h-3 rounded bg-white/[0.06] animate-pulse w-5/6" />
+          <div className="h-3 rounded bg-white/[0.06] animate-pulse w-4/6" />
+          <p className="text-[11px] text-white/25 pt-1">
+            Crafting {DOMAIN_LABELS[domain]} analogy…
+          </p>
+        </div>
       ) : (
         <p className="px-5 pb-4 text-sm text-white/75 leading-relaxed">
           {analogy}
         </p>
       )}
 
-      {/* Domain picker (inline, shown on demand) */}
+      {/* Domain picker */}
       {picking && (
         <div className="px-5 pb-4 pt-1 border-t border-white/[0.06]">
           <div className="flex flex-wrap gap-1.5">

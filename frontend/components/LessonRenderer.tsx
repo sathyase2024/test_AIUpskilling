@@ -364,28 +364,19 @@ export default function LessonRenderer({ content, courseSlug }: Props) {
   }
 
   // Pre-compute: for each analogy section, associate it with the heading above it
-  // (that heading names the concept being explained in the analogy)
-  const conceptBySection = new Map<number, { id: string; name: string }>()
+  // and its ordinal position among analogy sections (used to stagger API calls).
+  const conceptBySection = new Map<number, { id: string; name: string; analogyIndex: number }>()
   if (courseSlug) {
     let lastHeading = content.title
+    let analogyCount = 0
     for (let i = 0; i < content.sections.length; i++) {
       const s = content.sections[i]
       if (s.type === 'heading') lastHeading = s.content
       if (s.type === 'analogy') {
         const name = lastHeading
         const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-        conceptBySection.set(i, { id, name })
+        conceptBySection.set(i, { id, name, analogyIndex: analogyCount++ })
       }
-    }
-    // Fallback: if no analogy section found heading, use lesson title for all
-    if (conceptBySection.size === 0) {
-      content.sections.forEach((s, i) => {
-        if (s.type === 'analogy') {
-          const name = content.title
-          const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-          conceptBySection.set(i, { id, name })
-        }
-      })
     }
   }
 
@@ -402,7 +393,8 @@ export default function LessonRenderer({ content, courseSlug }: Props) {
               courseSlug={courseSlug}
               conceptId={ctx.id}
               conceptName={ctx.name}
-              fallbackText={section.content}
+              fallbackText={section.content || undefined}
+              sectionIndex={ctx.analogyIndex}
             />
           )
         }
