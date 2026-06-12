@@ -26,14 +26,11 @@ export interface CourseAnalogies {
   concepts: ConceptAnalogy[]
 }
 
-// Registry — each entry is a lazy import so only the needed course loads
+// Registry of courses with pre-written static analogy data (all 12 domains × all concepts).
+// All other courses are served dynamically from the analogy_cache DB table via the API.
 const COURSE_REGISTRY: Record<string, () => Promise<{ default: CourseAnalogies }>> = {
-  'pytorch-deep-learning':         () => import('./analogies/pytorch-deep-learning'),
-  'large-language-models':         () => import('./analogies/large-language-models'),
-  'hugging-face-transformers':     () => import('./analogies/hugging-face-transformers'),
-  'tensorflow-keras':              () => import('./analogies/tensorflow-keras'),
-  'retrieval-augmented-generation':() => import('./analogies/retrieval-augmented-generation'),
-  'ai-agents-agentic-workflows':   () => import('./analogies/ai-agents-agentic-workflows'),
+  'pytorch-deep-learning': () => import('./analogies/pytorch-deep-learning'),
+  'large-language-models': () => import('./analogies/large-language-models'),
 }
 
 export async function getCourseAnalogies(slug: string): Promise<CourseAnalogies | null> {

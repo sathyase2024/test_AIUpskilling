@@ -565,6 +565,15 @@ class TranslateAnalogyRequest(BaseModel):
 # Rich terminology banks — the prompt injects these so the model produces
 # domain-specific language instead of generic descriptions.
 _DOMAIN_VOCAB = {
+    "cricket": (
+        "🏏",
+        "cricket",
+        "batting, bowling, fielding, innings, overs, deliveries, wickets, runs, extras, "
+        "DRS, Duckworth-Lewis method, powerplay overs, death overs, maiden over, economy rate, "
+        "strike rate, LBW, no-ball, wide, yorker, bouncer, flipper, doosra, reverse swing, "
+        "batting order, nightwatchman, Test match, ODI, T20, fielding positions, "
+        "duck, century, half-century, follow-on, declaration, Elo, ICC rankings"
+    ),
     "gaming": (
         "🎮",
         "video games",

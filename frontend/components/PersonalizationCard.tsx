@@ -96,8 +96,8 @@ export default function PersonalizationCard({
       }
     }
 
-    // Stagger requests: each section waits (sectionIndex * 150 ms) before firing
-    // so that a lesson with 5 analogy cards doesn't hit the API simultaneously.
+    // Small stagger (50ms × index) avoids exact-simultaneous requests while
+    // remaining imperceptible now that the DB cache returns in ~10ms.
     setLoading(true)
     const ctrl = new AbortController()
     const timer = setTimeout(() => {
@@ -127,21 +127,21 @@ export default function PersonalizationCard({
           }
         })
         .finally(() => setLoading(false))
-    }, sectionIndex * 200)
+    }, sectionIndex * 50)
 
     return () => {
       clearTimeout(timer)
       ctrl.abort()
     }
-  }, [domain, staticAnalogy, fallbackText, courseSlug, conceptId, conceptName, sectionIndex, translated])
+  // Intentionally omit `translated` from deps — including it would re-run
+  // the effect after every successful translation (the ref guard prevents loops
+  // but the extra execution is wasteful).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domain, staticAnalogy, fallbackText, courseSlug, conceptId, conceptName, sectionIndex])
 
   const analogy = staticAnalogy ?? translated
 
-  // Show loading skeleton so the card doesn't pop in/out — but only if we
-  // have something to generate (cricket text or at least a concept name).
-  const canGenerate = domain !== 'cricket' && (!!fallbackText || !!conceptName)
-  if (!analogy && !loading && !canGenerate) return null
-  if (!analogy && !loading) return null   // nothing to show and not fetching
+  if (!analogy && !loading) return null
 
   function pickDomain(d: InterestDomain) {
     setDomain(d)

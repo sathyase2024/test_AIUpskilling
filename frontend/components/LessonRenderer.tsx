@@ -352,6 +352,75 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
   }
 }
 
+type RenderItem =
+  | { kind: 'section'; section: LessonSection; index: number }
+  | { kind: 'card'; conceptId: string; conceptName: string; fallbackText: string | undefined; analogyIndex: number }
+
+function slugify(s: string) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+/** Build an ordered list of things to render.
+ *
+ *  Two lesson shapes are handled:
+ *  1. Lesson generated with hobby="cricket" → has explicit `analogy` sections.
+ *     Each analogy section becomes a PersonalizationCard (with fallbackText).
+ *  2. Lesson generated without hobby → no `analogy` sections.
+ *     A PersonalizationCard is injected after the first paragraph that follows
+ *     each level-3 concept heading (no fallbackText — analogy comes from DB).
+ */
+function buildRenderItems(content: LessonContent, courseSlug: string | undefined): RenderItem[] {
+  const items: RenderItem[] = []
+  if (!courseSlug) {
+    return content.sections.map((section, index) => ({ kind: 'section', section, index }))
+  }
+
+  const seen = new Set<string>()   // dedup: one card per conceptId
+  let l3Heading: { name: string; id: string } | null = null
+  let analogyIndex = 0
+
+  for (let i = 0; i < content.sections.length; i++) {
+    const s = content.sections[i]
+
+    if (s.type === 'heading') {
+      // Level-3 headings are concept names; level-2 headings are major sections
+      if ((s.level ?? 2) === 3 && s.content) {
+        l3Heading = { name: s.content, id: slugify(s.content) }
+      } else {
+        l3Heading = null
+      }
+      items.push({ kind: 'section', section: s, index: i })
+
+    } else if (s.type === 'analogy') {
+      // Explicit analogy section — replace with PersonalizationCard
+      const name = l3Heading?.name ?? content.title
+      const id   = l3Heading?.id   ?? slugify(content.title)
+      if (!seen.has(id)) {
+        seen.add(id)
+        items.push({ kind: 'card', conceptId: id, conceptName: name, fallbackText: s.content || undefined, analogyIndex: analogyIndex++ })
+        l3Heading = null   // consumed
+      }
+      // Skip rendering the raw analogy section — card replaces it
+
+    } else if (s.type === 'paragraph' && l3Heading) {
+      items.push({ kind: 'section', section: s, index: i })
+      // If the very next section is NOT an analogy, inject a card here
+      // (lesson has no analogy sections — relies entirely on DB cache)
+      const next = content.sections[i + 1]
+      if (next?.type !== 'analogy' && !seen.has(l3Heading.id)) {
+        seen.add(l3Heading.id)
+        items.push({ kind: 'card', conceptId: l3Heading.id, conceptName: l3Heading.name, fallbackText: undefined, analogyIndex: analogyIndex++ })
+        l3Heading = null   // consumed — don't inject again for subsequent paragraphs
+      }
+
+    } else {
+      items.push({ kind: 'section', section: s, index: i })
+    }
+  }
+
+  return items
+}
+
 export default function LessonRenderer({ content, courseSlug }: Props) {
   const [quizAnswers, setQuizAnswers] = useState<Map<number, number>>(new Map())
 
@@ -363,46 +432,28 @@ export default function LessonRenderer({ content, courseSlug }: Props) {
     })
   }
 
-  // Pre-compute: for each analogy section, associate it with the heading above it
-  // and its ordinal position among analogy sections (used to stagger API calls).
-  const conceptBySection = new Map<number, { id: string; name: string; analogyIndex: number }>()
-  if (courseSlug) {
-    let lastHeading = content.title
-    let analogyCount = 0
-    for (let i = 0; i < content.sections.length; i++) {
-      const s = content.sections[i]
-      if (s.type === 'heading') lastHeading = s.content
-      if (s.type === 'analogy') {
-        const name = lastHeading
-        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-        conceptBySection.set(i, { id, name, analogyIndex: analogyCount++ })
-      }
-    }
-  }
+  const renderItems = buildRenderItems(content, courseSlug)
 
   return (
     <article className="prose-custom max-w-none">
-      {content.sections.map((section, i) => {
-        // When courseSlug is set, analogy sections are replaced entirely by
-        // PersonalizationCard (which handles all domains including cricket).
-        if (section.type === 'analogy' && courseSlug && conceptBySection.has(i)) {
-          const ctx = conceptBySection.get(i)!
+      {renderItems.map((item, i) => {
+        if (item.kind === 'card') {
           return (
             <PersonalizationCard
-              key={i}
-              courseSlug={courseSlug}
-              conceptId={ctx.id}
-              conceptName={ctx.name}
-              fallbackText={section.content || undefined}
-              sectionIndex={ctx.analogyIndex}
+              key={`card-${item.conceptId}-${i}`}
+              courseSlug={courseSlug!}
+              conceptId={item.conceptId}
+              conceptName={item.conceptName}
+              fallbackText={item.fallbackText}
+              sectionIndex={item.analogyIndex}
             />
           )
         }
         return (
           <SectionRenderer
-            key={i}
-            section={section}
-            index={i}
+            key={item.index}
+            section={item.section}
+            index={item.index}
             quizAnswers={quizAnswers}
             onQuizAnswer={handleQuizAnswer}
           />

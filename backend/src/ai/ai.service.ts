@@ -44,6 +44,7 @@ export class AiService implements OnApplicationBootstrap {
           topicName: (lesson as any).topic?.name || 'Programming',
           topicCategory: (lesson as any).topic?.category || 'general',
           difficulty: (lesson as any).topic?.difficulty || 'intermediate',
+          hobby: 'cricket',   // always embed cricket analogy sections for personalization
         }, { timeout: 90000 })
       );
       lesson.contentJson = response.data;
@@ -70,27 +71,48 @@ export class AiService implements OnApplicationBootstrap {
 
   // ── Analogy helpers ──────────────────────────────────────────────────────────
 
-  /** Extract every analogy section from a lesson's contentJson together with
-   *  the concept name derived from the heading immediately above it. */
+  private slugify(text: string): string {
+    return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+
+  /**
+   * Extract every teachable concept from a lesson's contentJson.
+   *
+   * Strategy: iterate level-3 headings (each is a distinct concept).
+   * For each heading, look ahead for an explicit `analogy` section — if found,
+   * its content is the cricket analogy text. If not (lesson was generated without
+   * hobby), we return an empty string as cricketAnalogy and the seed job will
+   * generate one via the AI.
+   */
   private extractAnalogyContexts(
     contentJson: Record<string, any>,
   ): Array<{ conceptId: string; conceptName: string; cricketAnalogy: string }> {
-    const sections: Array<{ type: string; content?: string }> =
+    const sections: Array<{ type: string; content?: string; level?: number }> =
       contentJson?.sections ?? [];
+    const seen = new Set<string>();
     const results: Array<{ conceptId: string; conceptName: string; cricketAnalogy: string }> = [];
-    let lastHeading: string = contentJson?.title ?? '';
 
-    for (const s of sections) {
-      if (s.type === 'heading' && s.content) lastHeading = s.content;
-      if (s.type === 'analogy' && s.content?.trim()) {
-        const conceptName = lastHeading;
-        const conceptId = conceptName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, '');
-        results.push({ conceptId, conceptName, cricketAnalogy: s.content });
+    for (let i = 0; i < sections.length; i++) {
+      const s = sections[i];
+      if (s.type !== 'heading' || (s.level ?? 2) !== 3 || !s.content?.trim()) continue;
+
+      const conceptId = this.slugify(s.content);
+      if (seen.has(conceptId)) continue;
+      seen.add(conceptId);
+
+      // Look ahead for an analogy section before the next heading
+      let cricketAnalogy = '';
+      for (let j = i + 1; j < sections.length; j++) {
+        if (sections[j].type === 'heading') break;
+        if (sections[j].type === 'analogy' && sections[j].content?.trim()) {
+          cricketAnalogy = sections[j].content!;
+          break;
+        }
       }
+
+      results.push({ conceptId, conceptName: s.content, cricketAnalogy });
     }
+
     return results;
   }
 
@@ -135,17 +157,38 @@ export class AiService implements OnApplicationBootstrap {
         const contexts = this.extractAnalogyContexts(lesson.contentJson as Record<string, any>);
         if (contexts.length === 0) continue;
 
-        for (const { conceptId, conceptName, cricketAnalogy } of contexts) {
-          // ── Cricket: store from lesson JSON, no AI call ──────────────────
-          await this.analogyCacheRepo
-            .createQueryBuilder()
-            .insert()
-            .into(AnalogyCacheEntry)
-            .values({ courseSlug, conceptId, domain: 'cricket', analogy: cricketAnalogy })
-            .orIgnore()
-            .execute();
+        for (const { conceptId, conceptName, cricketAnalogy: rawCricket } of contexts) {
+          // ── Step 1: ensure we have a cricket analogy (reference for other domains) ──
+          let effectiveCricket = rawCricket;
 
-          // ── Other domains: generate if not already cached ────────────────
+          if (rawCricket) {
+            // Lesson was generated with cricket hobby — store directly, zero AI calls
+            await this.analogyCacheRepo
+              .createQueryBuilder().insert().into(AnalogyCacheEntry)
+              .values({ courseSlug, conceptId, domain: 'cricket', analogy: rawCricket })
+              .orIgnore().execute();
+          } else {
+            // Lesson has no analogy sections — generate cricket from concept name
+            const cached = await this.analogyCacheRepo.findOne({
+              where: { courseSlug, conceptId, domain: 'cricket' },
+            });
+            if (cached) {
+              effectiveCricket = cached.analogy;
+            } else {
+              try {
+                const result = await this.translateAnalogy('', 'cricket', conceptName, courseSlug, conceptId);
+                effectiveCricket = result.analogy;
+                generated++;
+              } catch (err) {
+                failed++;
+                this.logger.warn(`Seed cricket failed: ${courseSlug}/${conceptId} — ${err.message}`);
+                continue;   // skip other domains if we couldn't get cricket either
+              }
+              await new Promise(r => setTimeout(r, 400));
+            }
+          }
+
+          // ── Step 2: generate the other 11 domains using cricket as reference ──
           for (const domain of NON_CRICKET_DOMAINS) {
             const exists = await this.analogyCacheRepo.findOne({
               where: { courseSlug, conceptId, domain },
@@ -153,16 +196,13 @@ export class AiService implements OnApplicationBootstrap {
             if (exists) { skipped++; continue; }
 
             try {
-              await this.translateAnalogy(cricketAnalogy, domain, conceptName, courseSlug, conceptId);
+              await this.translateAnalogy(effectiveCricket, domain, conceptName, courseSlug, conceptId);
               generated++;
             } catch (err) {
               failed++;
-              this.logger.warn(
-                `Seed failed: ${courseSlug}/${conceptId}/${domain} — ${err.message}`,
-              );
+              this.logger.warn(`Seed failed: ${courseSlug}/${conceptId}/${domain} — ${err.message}`);
             }
 
-            // 400 ms between AI calls — keeps us well within Claude rate limits
             await new Promise(r => setTimeout(r, 400));
           }
         }
