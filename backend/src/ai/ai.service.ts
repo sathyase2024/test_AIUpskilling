@@ -347,7 +347,7 @@ export class AiService implements OnApplicationBootstrap {
       this.httpService.post(
         `${this.workerUrl}/generate/translate-analogy`,
         { cricket_analogy: cricketAnalogy, domain, concept_name: conceptName, topic_name: topicName },
-        { timeout: 30_000 },
+        { timeout: 60_000 },
       ),
     );
     const { analogy } = response.data as { analogy: string };

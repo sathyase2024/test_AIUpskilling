@@ -665,7 +665,13 @@ async def translate_analogy(req: TranslateAnalogyRequest):
     """
     Generate a domain-specific analogy for a technical concept at the same
     depth and structural quality as the original cricket analogies.
+
+    The Anthropic SDK call is dispatched via asyncio.to_thread so that
+    concurrent seed-job requests (e.g. 3 at once) run truly in parallel
+    rather than serially on the event loop, avoiding 30 s timeouts.
     """
+    import asyncio
+
     entry = _DOMAIN_VOCAB.get(req.domain)
     if not entry:
         raise HTTPException(status_code=400, detail=f"Unknown domain: {req.domain}")
@@ -703,12 +709,15 @@ Total length: 6-10 sentences.
 First word: "{emoji} Think of it like {domain_label}:"
 Output ONLY the analogy text — no preamble, no section labels, no quotation marks."""
 
-    try:
-        response = get_client().messages.create(
+    def _call_api():
+        return get_client().messages.create(
             model=MODEL,
             max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )
+
+    try:
+        response = await asyncio.to_thread(_call_api)
         return {"analogy": response.content[0].text.strip()}
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
