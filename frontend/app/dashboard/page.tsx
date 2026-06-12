@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar'
 import FeatureRibbon from '@/components/FeatureRibbon'
 import AuthGuard from '@/components/AuthGuard'
 import { apiGet } from '@/lib/api'
+import HobbySelector from '@/components/HobbySelector'
 import {
   Flame,
   Zap,
@@ -529,6 +530,7 @@ interface TopicItem {
 function RecommendedCourses() {
   const [topics, setTopics] = useState<TopicItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [hobbySlug, setHobbySlug] = useState<string | null>(null)
 
   useEffect(() => {
     apiGet<TopicItem[] | { topics: TopicItem[] }>('/topics?limit=6')
@@ -609,16 +611,23 @@ function RecommendedCourses() {
                   <span className="text-slate-400 dark:text-white/40 text-xs">{c.enrolledCount != null ? `${c.enrolledCount.toLocaleString()} enrolled` : ''}</span>
                 </div>
               </div>
-              <Link
-                href={`/learn/${c.slug}`}
-                className="block text-center py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs font-semibold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md shadow-amber-500/20"
+              <button
+                onClick={() => setHobbySlug(c.slug)}
+                className="block w-full text-center py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs font-semibold hover:from-amber-400 hover:to-amber-500 transition-all shadow-md shadow-amber-500/20"
               >
                 Start Learning
-              </Link>
+              </button>
             </div>
           </div>
         ))}
       </div>
+
+      {hobbySlug && (
+        <HobbySelector
+          courseSlug={hobbySlug}
+          onClose={() => setHobbySlug(null)}
+        />
+      )}
     </div>
   )
 }

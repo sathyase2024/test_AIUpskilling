@@ -8,6 +8,7 @@ import Navbar from '@/components/Navbar'
 import FeatureRibbon from '@/components/FeatureRibbon'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import HobbySelector from '@/components/HobbySelector'
 import {
   ArrowLeft,
   Star,
@@ -223,6 +224,7 @@ export default function TopicDetailPage() {
 
   const [topic, setTopic] = useState<TopicDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showHobbySelector, setShowHobbySelector] = useState(false)
 
   useEffect(() => {
     if (!slug) return
@@ -439,8 +441,8 @@ export default function TopicDetailPage() {
             <div
               className="rounded-2xl p-6 text-center bg-white dark:bg-[#12121a] border border-amber-200 dark:border-amber-500/30 shadow-sm"
             >
-              <Link
-                href={`/learn/${slug}`}
+              <button
+                onClick={() => setShowHobbySelector(true)}
                 className="block w-full py-3.5 rounded-xl text-white font-bold text-base transition-all hover:opacity-90 hover:scale-[1.02] active:scale-95 shadow-lg"
                 style={{
                   background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -448,9 +450,16 @@ export default function TopicDetailPage() {
                 }}
               >
                 Start Learning
-              </Link>
+              </button>
               <p className="text-slate-500 dark:text-white/50 text-xs mt-3">Free preview available · No credit card required</p>
             </div>
+
+            {showHobbySelector && (
+              <HobbySelector
+                courseSlug={slug}
+                onClose={() => setShowHobbySelector(false)}
+              />
+            )}
 
             {/* Topic Stats Card */}
             <div
