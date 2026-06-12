@@ -13,6 +13,7 @@ from reportlab.platypus import (
 )
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from datetime import date
+from course_curricula import PENDING_LESSONS
 
 # ── Colour palette ────────────────────────────────────────────────────────────
 DARK_BG    = colors.HexColor('#0f0f1a')
@@ -451,6 +452,8 @@ def get_lessons(course):
     slug = course['slug']
     if slug in GENERATED:
         return GENERATED[slug]['lessons']
+    if slug in PENDING_LESSONS:
+        return PENDING_LESSONS[slug]
     return [(t, title, mins, xp) for t, title, mins, xp in STUB_LESSONS]
 
 def lesson_count(course):
@@ -567,16 +570,18 @@ def build_pdf(path):
     # COURSE SECTIONS — grouped by category
     # ════════════════════════════════════════════════════════════════════════
     seen_cats = []
-    for c in COURSES:
+    for idx, c in enumerate(COURSES):
         cat  = c['category']
         cclr = CAT_COLORS.get(cat, PURPLE)
         dclr = DIFF_COLORS.get(c['difficulty'], SLATE)
 
-        # Category header
+        # Each course starts on its own page (except the very first)
+        if idx > 0:
+            story.append(PageBreak())
+
+        # Category header printed at the top of the first course page in each category
         if cat not in seen_cats:
             seen_cats.append(cat)
-            if seen_cats.index(cat) > 0:
-                story.append(PageBreak())
 
             cat_hdr = Table([[Paragraph(CAT_LABELS.get(cat, cat), h2)]], colWidths=[W])
             cat_hdr.setStyle(TableStyle([
