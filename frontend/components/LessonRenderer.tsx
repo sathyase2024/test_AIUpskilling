@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Lightbulb, AlertTriangle, CheckCircle, Code2, BookOpen, HelpCircle, Sparkles, Copy, Check } from 'lucide-react'
+import PersonalizationCard from '@/components/PersonalizationCard'
 
 interface LessonSection {
   type: 'heading' | 'paragraph' | 'code' | 'info_box' | 'warning_box' | 'quiz' | 'exercise' | 'key_points' | 'analogy'
@@ -24,6 +25,7 @@ interface LessonContent {
 
 interface Props {
   content: LessonContent
+  courseSlug?: string
 }
 
 interface SectionProps {
@@ -348,7 +350,7 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
   }
 }
 
-export default function LessonRenderer({ content }: Props) {
+export default function LessonRenderer({ content, courseSlug }: Props) {
   const [quizAnswers, setQuizAnswers] = useState<Map<number, number>>(new Map())
 
   const handleQuizAnswer = (sectionIndex: number, optionIndex: number) => {
@@ -359,16 +361,50 @@ export default function LessonRenderer({ content }: Props) {
     })
   }
 
+  // Pre-compute: for each analogy section, associate it with the heading above it
+  // (that heading names the concept being explained in the analogy)
+  const conceptBySection = new Map<number, { id: string; name: string }>()
+  if (courseSlug) {
+    let lastHeading = content.title
+    for (let i = 0; i < content.sections.length; i++) {
+      const s = content.sections[i]
+      if (s.type === 'heading') lastHeading = s.content
+      if (s.type === 'analogy') {
+        const name = lastHeading
+        const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+        conceptBySection.set(i, { id, name })
+      }
+    }
+    // Fallback: if no analogy section found heading, use lesson title for all
+    if (conceptBySection.size === 0) {
+      content.sections.forEach((s, i) => {
+        if (s.type === 'analogy') {
+          const name = content.title
+          const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+          conceptBySection.set(i, { id, name })
+        }
+      })
+    }
+  }
+
   return (
     <article className="prose-custom max-w-none">
       {content.sections.map((section, i) => (
-        <SectionRenderer
-          key={i}
-          section={section}
-          index={i}
-          quizAnswers={quizAnswers}
-          onQuizAnswer={handleQuizAnswer}
-        />
+        <div key={i}>
+          <SectionRenderer
+            section={section}
+            index={i}
+            quizAnswers={quizAnswers}
+            onQuizAnswer={handleQuizAnswer}
+          />
+          {section.type === 'analogy' && courseSlug && conceptBySection.has(i) && (
+            <PersonalizationCard
+              courseSlug={courseSlug}
+              conceptId={conceptBySection.get(i)!.id}
+              conceptName={conceptBySection.get(i)!.name}
+            />
+          )}
+        </div>
       ))}
     </article>
   )

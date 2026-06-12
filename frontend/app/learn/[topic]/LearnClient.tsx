@@ -661,7 +661,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                 </h1>
 
                 {lessonContent ? (
-                  <LessonRenderer content={lessonContent} />
+                  <LessonRenderer content={lessonContent} courseSlug={topic} />
                 ) : (
                   <div className="flex items-center justify-center h-64">
                     <div className="text-center space-y-4">

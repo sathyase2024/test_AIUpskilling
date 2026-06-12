@@ -38,8 +38,16 @@ export default function PersonalizationCard({ courseSlug, conceptId, conceptName
     getCourseAnalogies(courseSlug).then(setAnalogies)
   }, [courseSlug])
 
-  const concept  = analogies?.concepts.find(c => c.id === conceptId)
-  const analogy  = concept ? concept[domain] : null
+  // Fuzzy match: exact id → name contains slug words → slug contains name words
+  const slug = conceptId.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+  const slugWords = slug.split('-').filter(w => w.length > 3)
+  const concept = analogies?.concepts.find(c =>
+    c.id === slug ||
+    slugWords.some(w => c.id.includes(w) || c.name.toLowerCase().includes(w)) ||
+    c.name.toLowerCase().replace(/\s+/g, '-').includes(slug) ||
+    slug.includes(c.name.toLowerCase().replace(/\s+/g, '-'))
+  )
+  const analogy = concept ? concept[domain] : null
 
   if (!analogy) return null
 
