@@ -218,24 +218,33 @@ export class AiService implements OnApplicationBootstrap {
             }
           }
 
-          // ── Step 2: generate the other 11 domains using cricket as reference ──
-          for (const domain of NON_CRICKET_DOMAINS) {
-            const exists = await this.analogyCacheRepo.findOne({
-              where: { courseSlug, conceptId, domain },
-            });
-            if (exists) { skipped++; continue; }
+          // ── Step 2: generate the other 11 domains in parallel ──
+          // Check cache for all domains first, then fire missing ones concurrently.
+          const existingEntries = await this.analogyCacheRepo
+            .createQueryBuilder('ac')
+            .where('ac.courseSlug = :courseSlug AND ac.conceptId = :conceptId AND ac.domain IN (:...domains)', {
+              courseSlug, conceptId, domains: NON_CRICKET_DOMAINS,
+            })
+            .getMany();
+          const cachedDomains = new Set(existingEntries.map(e => e.domain));
+          skipped += cachedDomains.size;
 
-            try {
-              await this.translateWithRetry(effectiveCricket, domain, conceptName, courseSlug, conceptId);
-              generated++;
-            } catch (err: any) {
-              failed++;
-              this.logger.warn(`Seed failed: ${courseSlug}/${conceptId}/${domain} — ${err.message}`);
+          const missingDomains = NON_CRICKET_DOMAINS.filter(d => !cachedDomains.has(d));
+          if (missingDomains.length > 0) {
+            const domainResults = await Promise.allSettled(
+              missingDomains.map(domain =>
+                this.translateWithRetry(effectiveCricket, domain, conceptName, courseSlug, conceptId),
+              ),
+            );
+            for (let i = 0; i < domainResults.length; i++) {
+              const r = domainResults[i];
+              if (r.status === 'fulfilled') {
+                generated++;
+              } else {
+                failed++;
+                this.logger.warn(`Seed failed: ${courseSlug}/${conceptId}/${missingDomains[i]} — ${(r.reason as any)?.message}`);
+              }
             }
-
-            // 1.5s between calls — keeps only one in-flight request to the ai-worker
-            // and prevents the worker from being overwhelmed and restarting
-            await new Promise(r => setTimeout(r, 1_500));
           }
         }
 
