@@ -231,18 +231,25 @@ export class AiService implements OnApplicationBootstrap {
 
           const missingDomains = NON_CRICKET_DOMAINS.filter(d => !cachedDomains.has(d));
           if (missingDomains.length > 0) {
-            const domainResults = await Promise.allSettled(
-              missingDomains.map(domain =>
-                this.translateWithRetry(effectiveCricket, domain, conceptName, courseSlug, conceptId),
-              ),
-            );
-            for (let i = 0; i < domainResults.length; i++) {
-              const r = domainResults[i];
-              if (r.status === 'fulfilled') {
-                generated++;
-              } else {
-                failed++;
-                this.logger.warn(`Seed failed: ${courseSlug}/${conceptId}/${missingDomains[i]} — ${(r.reason as any)?.message}`);
+            // Process in batches of 3 — parallel within each batch, sequential across
+            // batches. Prevents the ai-worker from receiving 11 simultaneous Claude
+            // calls and timing out on the ones that queue behind the first few.
+            const BATCH = 3;
+            for (let b = 0; b < missingDomains.length; b += BATCH) {
+              const chunk = missingDomains.slice(b, b + BATCH);
+              const chunkResults = await Promise.allSettled(
+                chunk.map(domain =>
+                  this.translateWithRetry(effectiveCricket, domain, conceptName, courseSlug, conceptId),
+                ),
+              );
+              for (let i = 0; i < chunkResults.length; i++) {
+                const r = chunkResults[i];
+                if (r.status === 'fulfilled') {
+                  generated++;
+                } else {
+                  failed++;
+                  this.logger.warn(`Seed failed: ${courseSlug}/${conceptId}/${chunk[i]} — ${(r.reason as any)?.message}`);
+                }
               }
             }
           }
