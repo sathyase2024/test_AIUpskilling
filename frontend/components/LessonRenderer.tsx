@@ -239,6 +239,8 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
       )
 
     case 'analogy':
+      // Replaced by PersonalizationCard in the parent — rendered inline per-domain.
+      // This case only runs when courseSlug is not provided (no personalization context).
       return (
         <div className="my-6 p-5 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-500/10 dark:to-orange-500/10 border border-amber-200 dark:border-amber-500/30">
           <div className="flex items-center gap-2 mb-3">
@@ -389,23 +391,31 @@ export default function LessonRenderer({ content, courseSlug }: Props) {
 
   return (
     <article className="prose-custom max-w-none">
-      {content.sections.map((section, i) => (
-        <div key={i}>
+      {content.sections.map((section, i) => {
+        // When courseSlug is set, analogy sections are replaced entirely by
+        // PersonalizationCard (which handles all domains including cricket).
+        if (section.type === 'analogy' && courseSlug && conceptBySection.has(i)) {
+          const ctx = conceptBySection.get(i)!
+          return (
+            <PersonalizationCard
+              key={i}
+              courseSlug={courseSlug}
+              conceptId={ctx.id}
+              conceptName={ctx.name}
+              fallbackText={section.content}
+            />
+          )
+        }
+        return (
           <SectionRenderer
+            key={i}
             section={section}
             index={i}
             quizAnswers={quizAnswers}
             onQuizAnswer={handleQuizAnswer}
           />
-          {section.type === 'analogy' && courseSlug && conceptBySection.has(i) && (
-            <PersonalizationCard
-              courseSlug={courseSlug}
-              conceptId={conceptBySection.get(i)!.id}
-              conceptName={conceptBySection.get(i)!.name}
-            />
-          )}
-        </div>
-      ))}
+        )
+      })}
     </article>
   )
 }
