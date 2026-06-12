@@ -104,7 +104,7 @@ export default function PersonalizationCard({
       // Stagger start: 200ms per card index — just enough to avoid exact-simultaneous
       // requests. With asyncio.to_thread on the worker all calls run in parallel
       // anyway, so 8 cards complete within ~5s total rather than 14s.
-      await sleep(sectionIndex * 200)
+      await sleep(sectionIndex * 100)
 
       for (let i = 0; i < RETRY_DELAYS.length; i++) {
         if (ctrl.signal.aborted) return
