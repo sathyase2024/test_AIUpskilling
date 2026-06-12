@@ -22,6 +22,7 @@ import { UserProgress } from './entities/user-progress.entity';
 import { CodingSubmission } from './entities/coding-submission.entity';
 import { EmailOtp } from './entities/email-otp.entity';
 import { CourseAssessmentResult } from './entities/course-assessment-result.entity';
+import { AnalogyCacheEntry } from './entities/analogy-cache.entity';
 
 @Module({
   imports: [
@@ -45,7 +46,7 @@ import { CourseAssessmentResult } from './entities/course-assessment-result.enti
           : cfg.get('DATABASE_URL')
           ? { rejectUnauthorized: false }       // managed DBs (Railway, Render, Supabase)
           : false,
-        entities: [User, Topic, Lesson, LearningPath, UserProgress, CodingSubmission, EmailOtp, CourseAssessmentResult],
+        entities: [User, Topic, Lesson, LearningPath, UserProgress, CodingSubmission, EmailOtp, CourseAssessmentResult, AnalogyCacheEntry],
         // Synchronize is ON unless DB_SYNC=false is explicitly set.
         // This prevents schema drift when new columns are added during active development.
         // Set DB_SYNC=false only after the schema is stable and you have migrations in place.

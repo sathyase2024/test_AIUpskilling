@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { Lesson } from '../entities/lesson.entity';
 import { Topic } from '../entities/topic.entity';
+import { AnalogyCacheEntry } from '../entities/analogy-cache.entity';
 
 @Injectable()
 export class AiService implements OnApplicationBootstrap {
@@ -19,6 +20,7 @@ export class AiService implements OnApplicationBootstrap {
     private httpService: HttpService,
     @InjectRepository(Lesson) private lessonRepo: Repository<Lesson>,
     @InjectRepository(Topic) private topicRepo: Repository<Topic>,
+    @InjectRepository(AnalogyCacheEntry) private analogyCacheRepo: Repository<AnalogyCacheEntry>,
   ) {
     this.apiKey = this.configService.get<string>('ANTHROPIC_API_KEY', '');
     this.workerUrl = this.configService.get<string>('AI_WORKER_URL', 'http://localhost:8000');
@@ -118,13 +120,28 @@ export class AiService implements OnApplicationBootstrap {
     return lesson;
   }
 
-  /** Translate a cricket analogy to the learner's chosen interest domain */
+  /**
+   * Return a domain-specific analogy for a concept.
+   * Checks the DB cache first — generates via ai-worker only on a cache miss,
+   * then persists the result so every subsequent call is instant.
+   */
   async translateAnalogy(
     cricketAnalogy: string,
     domain: string,
     conceptName: string,
-    topicName: string,
-  ): Promise<{ analogy: string }> {
+    courseSlug: string,
+    conceptId: string,
+  ): Promise<{ analogy: string; cached: boolean }> {
+    // 1. DB cache hit — return immediately, no AI call needed
+    const existing = await this.analogyCacheRepo.findOne({
+      where: { courseSlug, conceptId, domain },
+    });
+    if (existing) {
+      return { analogy: existing.analogy, cached: true };
+    }
+
+    // 2. Cache miss — ask the ai-worker to generate
+    const topicName = courseSlug.replace(/-/g, ' ');
     const response = await firstValueFrom(
       this.httpService.post(
         `${this.workerUrl}/generate/translate-analogy`,
@@ -132,7 +149,19 @@ export class AiService implements OnApplicationBootstrap {
         { timeout: 30_000 },
       ),
     );
-    return response.data;
+    const { analogy } = response.data as { analogy: string };
+
+    // 3. Persist — use upsert to handle the rare race where two users request
+    //    the same concept+domain simultaneously
+    await this.analogyCacheRepo
+      .createQueryBuilder()
+      .insert()
+      .into(AnalogyCacheEntry)
+      .values({ courseSlug, conceptId, domain, analogy })
+      .orIgnore()
+      .execute();
+
+    return { analogy, cached: false };
   }
 
   /** Send code to AI worker for review */

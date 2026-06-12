@@ -108,7 +108,8 @@ export default function PersonalizationCard({
           cricketAnalogy: fallbackText ?? '',
           domain,
           conceptName,
-          topicName: courseSlug.replace(/-/g, ' '),
+          courseSlug,
+          conceptId: slug,
         }),
         signal: ctrl.signal,
       })

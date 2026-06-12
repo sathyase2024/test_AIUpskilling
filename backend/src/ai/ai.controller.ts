@@ -63,9 +63,21 @@ export class AiController {
 
   @Post('translate-analogy')
   @Throttle({ global: { ttl: 60_000, limit: 30 } })
-  @ApiOperation({ summary: 'Translate cricket analogy to another interest domain (public)' })
-  translateAnalogy(@Body() body: { cricketAnalogy: string; domain: string; conceptName: string; topicName: string }) {
-    return this.aiService.translateAnalogy(body.cricketAnalogy, body.domain, body.conceptName, body.topicName);
+  @ApiOperation({ summary: 'Return domain-specific analogy for a concept; DB-cached after first generation (public)' })
+  translateAnalogy(@Body() body: {
+    cricketAnalogy: string;
+    domain: string;
+    conceptName: string;
+    courseSlug: string;
+    conceptId: string;
+  }) {
+    return this.aiService.translateAnalogy(
+      body.cricketAnalogy,
+      body.domain,
+      body.conceptName,
+      body.courseSlug,
+      body.conceptId,
+    );
   }
 
   // ── Legacy routes (protected) ──────────────────────────────────────────────────
