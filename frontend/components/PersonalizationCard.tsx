@@ -12,20 +12,23 @@ import {
 } from '@/lib/personalization/engine'
 
 const INTEREST_KEY = 'user_interest_domain'
+const CACHE_PREFIX = 'analogy_cache:'
 
 interface Props {
   courseSlug: string
   conceptId: string
   conceptName: string
-  /** Raw analogy text from the lesson JSON — used as cricket fallback when
-   *  no pre-generated data exists for this concept yet. */
+  /** Raw analogy text from the lesson JSON — used as cricket fallback and
+   *  as the source text for on-demand translation to other domains. */
   fallbackText?: string
 }
 
 export default function PersonalizationCard({ courseSlug, conceptId, conceptName, fallbackText }: Props) {
-  const [analogies, setAnalogies] = useState<CourseAnalogies | null>(null)
-  const [domain, setDomain]       = useState<InterestDomain>('cricket')
-  const [picking, setPicking]     = useState(false)
+  const [analogies, setAnalogies]             = useState<CourseAnalogies | null>(null)
+  const [domain, setDomain]                   = useState<InterestDomain>('cricket')
+  const [picking, setPicking]                 = useState(false)
+  const [translatedAnalogy, setTranslated]    = useState<string | null>(null)
+  const [loading, setLoading]                 = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -38,7 +41,7 @@ export default function PersonalizationCard({ courseSlug, conceptId, conceptName
     getCourseAnalogies(courseSlug).then(setAnalogies)
   }, [courseSlug])
 
-  // Fuzzy match: exact id → name contains slug words → slug contains concept name
+  // Fuzzy match concept from pre-generated static data
   const slug = conceptId.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   const slugWords = slug.split('-').filter(w => w.length > 3)
   const concept = analogies?.concepts.find(c =>
@@ -48,12 +51,59 @@ export default function PersonalizationCard({ courseSlug, conceptId, conceptName
     slug.includes(c.name.toLowerCase().replace(/\s+/g, '-'))
   )
 
-  // Resolve analogy text: pre-generated data → cricket fallback text → nothing
-  const analogy =
+  // Static analogy: pre-generated data hit or cricket fallback
+  const staticAnalogy =
     (concept ? concept[domain] : null) ??
     (domain === 'cricket' && fallbackText ? fallbackText : null)
 
-  if (!analogy) return null
+  // When static data is unavailable for a non-cricket domain, fetch a translation
+  useEffect(() => {
+    if (staticAnalogy !== null || domain === 'cricket' || !fallbackText) {
+      setTranslated(null)
+      return
+    }
+
+    const cacheKey = `${CACHE_PREFIX}${courseSlug}:${conceptId}:${domain}`
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        setTranslated(cached)
+        return
+      }
+    }
+
+    setLoading(true)
+    setTranslated(null)
+
+    const ctrl = new AbortController()
+    fetch('/api/proxy/ai/translate-analogy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cricketAnalogy: fallbackText,
+        domain,
+        conceptName,
+        topicName: courseSlug.replace(/-/g, ' '),
+      }),
+      signal: ctrl.signal,
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        if (data?.analogy) {
+          if (typeof window !== 'undefined') localStorage.setItem(cacheKey, data.analogy)
+          setTranslated(data.analogy)
+        }
+      })
+      .catch(err => { if (err?.name !== 'AbortError') console.warn('Analogy translation failed', err) })
+      .finally(() => setLoading(false))
+
+    return () => ctrl.abort()
+  }, [domain, staticAnalogy, fallbackText, courseSlug, conceptId, conceptName])
+
+  const analogy = staticAnalogy ?? translatedAnalogy
+
+  // Keep card visible while loading so the layout doesn't jump
+  if (!analogy && !loading) return null
 
   function pickDomain(d: InterestDomain) {
     setDomain(d)
@@ -84,10 +134,16 @@ export default function PersonalizationCard({ courseSlug, conceptId, conceptName
         </button>
       </div>
 
-      {/* Analogy text */}
-      <p className="px-5 pb-4 text-sm text-white/75 leading-relaxed">
-        {analogy}
-      </p>
+      {/* Analogy text or loading pulse */}
+      {loading ? (
+        <p className="px-5 pb-4 text-sm text-white/35 italic leading-relaxed animate-pulse">
+          Personalising analogy for {DOMAIN_LABELS[domain]}…
+        </p>
+      ) : (
+        <p className="px-5 pb-4 text-sm text-white/75 leading-relaxed">
+          {analogy}
+        </p>
+      )}
 
       {/* Domain picker (inline, shown on demand) */}
       {picking && (

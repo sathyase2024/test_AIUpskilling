@@ -1,4 +1,5 @@
 import anthropic
+import json
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
@@ -552,3 +553,60 @@ async def generate_curriculum(req: CurriculumRequest):
         raise HTTPException(status_code=502, detail=f"Anthropic API error: {e.message}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate curriculum: {str(e)}")
+
+
+class TranslateAnalogyRequest(BaseModel):
+    cricket_analogy: str
+    domain: str
+    concept_name: str
+    topic_name: str
+
+
+_DOMAIN_CONTEXT = {
+    "gaming":       "video games — think mechanics, characters, levels, boss fights, and game design",
+    "music":        "music — think instruments, chord progressions, recording, performance, and composition",
+    "photography":  "photography — think aperture, shutter speed, composition, lighting, and post-processing",
+    "travel":       "travel — think routes, destinations, layovers, visas, packing, and navigation",
+    "movies":       "filmmaking — think directors, cinematography, editing, scripts, and storytelling",
+    "fitness":      "fitness training — think reps, progressive overload, muscle groups, recovery, and form",
+    "chess":        "chess — think pieces, strategy, openings, tactics, endgames, and position evaluation",
+    "cooking":      "cooking — think ingredients, techniques, heat, timing, flavour balance, and recipes",
+    "finance":      "personal finance and investing — think portfolios, risk, returns, compounding, and markets",
+    "business":     "business and startups — think strategy, product-market fit, scaling, pivots, and execution",
+    "sports":       "sports and athletics — think teamwork, tactics, conditioning, competition, and performance",
+    "cricket":      "cricket — think innings, overs, batting, bowling, fielding, and match strategy",
+}
+
+
+@router.post("/translate-analogy")
+async def translate_analogy(req: TranslateAnalogyRequest):
+    """Translate a cricket-based analogy to the learner's interest domain."""
+    domain_ctx = _DOMAIN_CONTEXT.get(req.domain, req.domain)
+
+    prompt = (
+        f"A technical concept called '{req.concept_name}' (from the topic '{req.topic_name}') "
+        f"has been explained using a cricket analogy:\n\n"
+        f"\"{req.cricket_analogy}\"\n\n"
+        f"Rewrite this as an analogy using {domain_ctx}. "
+        f"Keep the same depth of insight — be specific, use real terminology from that domain, "
+        f"and make every sentence map clearly to the technical concept. "
+        f"3-5 sentences. Output ONLY the analogy text with no preamble, label, or quotation marks."
+    )
+
+    try:
+        response = get_client().messages.create(
+            model=MODEL,
+            max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return {"analogy": response.content[0].text.strip()}
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except anthropic.AuthenticationError:
+        raise HTTPException(status_code=401, detail="Invalid Anthropic API key")
+    except anthropic.RateLimitError:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Please retry later.")
+    except anthropic.APIStatusError as e:
+        raise HTTPException(status_code=502, detail=f"Anthropic API error: {e.message}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to translate analogy: {str(e)}")

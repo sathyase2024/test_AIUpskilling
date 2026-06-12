@@ -118,6 +118,23 @@ export class AiService implements OnApplicationBootstrap {
     return lesson;
   }
 
+  /** Translate a cricket analogy to the learner's chosen interest domain */
+  async translateAnalogy(
+    cricketAnalogy: string,
+    domain: string,
+    conceptName: string,
+    topicName: string,
+  ): Promise<{ analogy: string }> {
+    const response = await firstValueFrom(
+      this.httpService.post(
+        `${this.workerUrl}/generate/translate-analogy`,
+        { cricket_analogy: cricketAnalogy, domain, concept_name: conceptName, topic_name: topicName },
+        { timeout: 30_000 },
+      ),
+    );
+    return response.data;
+  }
+
   /** Send code to AI worker for review */
   async reviewCode(code: string, language: string): Promise<{ review: string; suggestions: string[]; score: number }> {
     try {

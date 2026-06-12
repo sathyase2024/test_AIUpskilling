@@ -61,6 +61,13 @@ export class AiController {
     return this.aiService.reviewCode(body.code, body.language);
   }
 
+  @Post('translate-analogy')
+  @Throttle({ global: { ttl: 60_000, limit: 30 } })
+  @ApiOperation({ summary: 'Translate cricket analogy to another interest domain (public)' })
+  translateAnalogy(@Body() body: { cricketAnalogy: string; domain: string; conceptName: string; topicName: string }) {
+    return this.aiService.translateAnalogy(body.cricketAnalogy, body.domain, body.conceptName, body.topicName);
+  }
+
   // ── Legacy routes (protected) ──────────────────────────────────────────────────
 
   @Post('evaluate-code')
