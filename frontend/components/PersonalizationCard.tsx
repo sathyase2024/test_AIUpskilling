@@ -15,7 +15,7 @@ const INTEREST_KEY = 'user_interest_domain'
 const CACHE_PREFIX = 'analogy_cache:'
 
 // Retry schedule: wait this many ms before each attempt (index 0 = first attempt, no wait)
-const RETRY_DELAYS = [0, 5_000, 10_000, 20_000]
+const RETRY_DELAYS = [0, 3_000, 8_000, 15_000]
 
 interface Props {
   courseSlug: string
@@ -101,9 +101,10 @@ export default function PersonalizationCard({
     }
 
     async function attempt() {
-      // Stagger start: 1.5s per card index. Cards show cricket instantly so the
-      // wait is invisible to the user; it prevents simultaneous rate-limit pressure.
-      await sleep(sectionIndex * 1_500)
+      // Stagger start: 200ms per card index — just enough to avoid exact-simultaneous
+      // requests. With asyncio.to_thread on the worker all calls run in parallel
+      // anyway, so 8 cards complete within ~5s total rather than 14s.
+      await sleep(sectionIndex * 200)
 
       for (let i = 0; i < RETRY_DELAYS.length; i++) {
         if (ctrl.signal.aborted) return
