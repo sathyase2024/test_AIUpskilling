@@ -43,6 +43,14 @@ export class AiController {
     return this.aiService.pregenerateAll();
   }
 
+  @Post('seed-analogy-cache')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Pre-generate all 12-domain analogies for every lesson and store in DB (background job)' })
+  seedAnalogyCache() {
+    return this.aiService.seedAnalogyCache();
+  }
+
   // ── Public AI tutor routes ────────────────────────────────────────────────────
   // Chat and code review are intentionally public so visitors can try the AI
   // tutor and code reviewer without signing in.

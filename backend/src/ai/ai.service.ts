@@ -68,6 +68,119 @@ export class AiService implements OnApplicationBootstrap {
     return await this.lessonRepo.save(lesson);
   }
 
+  // ── Analogy helpers ──────────────────────────────────────────────────────────
+
+  /** Extract every analogy section from a lesson's contentJson together with
+   *  the concept name derived from the heading immediately above it. */
+  private extractAnalogyContexts(
+    contentJson: Record<string, any>,
+  ): Array<{ conceptId: string; conceptName: string; cricketAnalogy: string }> {
+    const sections: Array<{ type: string; content?: string }> =
+      contentJson?.sections ?? [];
+    const results: Array<{ conceptId: string; conceptName: string; cricketAnalogy: string }> = [];
+    let lastHeading: string = contentJson?.title ?? '';
+
+    for (const s of sections) {
+      if (s.type === 'heading' && s.content) lastHeading = s.content;
+      if (s.type === 'analogy' && s.content?.trim()) {
+        const conceptName = lastHeading;
+        const conceptId = conceptName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '');
+        results.push({ conceptId, conceptName, cricketAnalogy: s.content });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Pre-generate and DB-cache analogies for every domain across every lesson
+   * that has already been generated. Runs entirely in the background — the
+   * caller gets an instant response with a summary of what was queued.
+   *
+   * Cricket analogies are stored directly from the lesson JSON (no AI call).
+   * Each non-cricket domain is generated via the ai-worker and stored with
+   * INSERT OR IGNORE so concurrent runs are safe.
+   */
+  async seedAnalogyCache(): Promise<{ message: string; lessons: number }> {
+    if (!this.workerUrl || /localhost|127\.0\.0\.1/.test(this.workerUrl)) {
+      return {
+        message: 'AI_WORKER_URL not configured — set it to enable seeding.',
+        lessons: 0,
+      };
+    }
+
+    const NON_CRICKET_DOMAINS = [
+      'gaming', 'music', 'photography', 'travel', 'movies',
+      'fitness', 'chess', 'cooking', 'finance', 'business', 'sports',
+    ];
+
+    const lessons = await this.lessonRepo.find({
+      where: { isGenerated: true },
+      relations: { topic: true },
+    });
+
+    this.logger.log(`Analogy seed: ${lessons.length} generated lessons found — starting background job`);
+
+    (async () => {
+      let generated = 0;
+      let skipped = 0;
+      let failed = 0;
+
+      for (const lesson of lessons) {
+        const courseSlug = (lesson as any).topic?.slug;
+        if (!courseSlug || !lesson.contentJson) continue;
+
+        const contexts = this.extractAnalogyContexts(lesson.contentJson as Record<string, any>);
+        if (contexts.length === 0) continue;
+
+        for (const { conceptId, conceptName, cricketAnalogy } of contexts) {
+          // ── Cricket: store from lesson JSON, no AI call ──────────────────
+          await this.analogyCacheRepo
+            .createQueryBuilder()
+            .insert()
+            .into(AnalogyCacheEntry)
+            .values({ courseSlug, conceptId, domain: 'cricket', analogy: cricketAnalogy })
+            .orIgnore()
+            .execute();
+
+          // ── Other domains: generate if not already cached ────────────────
+          for (const domain of NON_CRICKET_DOMAINS) {
+            const exists = await this.analogyCacheRepo.findOne({
+              where: { courseSlug, conceptId, domain },
+            });
+            if (exists) { skipped++; continue; }
+
+            try {
+              await this.translateAnalogy(cricketAnalogy, domain, conceptName, courseSlug, conceptId);
+              generated++;
+            } catch (err) {
+              failed++;
+              this.logger.warn(
+                `Seed failed: ${courseSlug}/${conceptId}/${domain} — ${err.message}`,
+              );
+            }
+
+            // 400 ms between AI calls — keeps us well within Claude rate limits
+            await new Promise(r => setTimeout(r, 400));
+          }
+        }
+
+        this.logger.debug(`Seeded analogies for lesson "${lesson.title}" (${courseSlug})`);
+      }
+
+      this.logger.log(
+        `Analogy seed complete — generated: ${generated}, skipped (already cached): ${skipped}, failed: ${failed}`,
+      );
+    })().catch(err => this.logger.error(`Analogy seed crashed: ${err.message}`));
+
+    return {
+      message: 'Analogy cache seeding started in background. Watch server logs for progress.',
+      lessons: lessons.length,
+    };
+  }
+
   /** Auto-trigger pre-generation 15 s after startup so topic seeding finishes first */
   onApplicationBootstrap() {
     // Skip if no real AI worker is configured — localhost is not reachable on deployed infra.
