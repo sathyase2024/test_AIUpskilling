@@ -179,13 +179,16 @@ export class AiService implements OnApplicationBootstrap {
       let generated = 0;
       let skipped = 0;
       let failed = 0;
+      let lessonsDone = 0;
 
       for (const lesson of lessons) {
         const courseSlug = (lesson as any).topic?.slug;
-        if (!courseSlug || !lesson.contentJson) continue;
+        if (!courseSlug || !lesson.contentJson) { lessonsDone++; continue; }
 
         const contexts = this.extractAnalogyContexts(lesson.contentJson as Record<string, any>);
-        if (contexts.length === 0) continue;
+        if (contexts.length === 0) { lessonsDone++; continue; }
+
+        this.logger.log(`Seed [${lessonsDone + 1}/${lessons.length}] "${lesson.title}" (${courseSlug}) — ${contexts.length} concepts`);
 
         for (const { conceptId, conceptName, cricketAnalogy: rawCricket } of contexts) {
           // ── Step 1: ensure we have a cricket analogy (reference for other domains) ──
@@ -231,6 +234,7 @@ export class AiService implements OnApplicationBootstrap {
 
           const missingDomains = NON_CRICKET_DOMAINS.filter(d => !cachedDomains.has(d));
           if (missingDomains.length > 0) {
+            this.logger.log(`Seed   concept "${conceptName}" — generating ${missingDomains.length} domains (${missingDomains.join(', ')})`);
             // Process in batches of 3 — parallel within each batch, sequential across
             // batches. Prevents the ai-worker from receiving 11 simultaneous Claude
             // calls and timing out on the ones that queue behind the first few.
@@ -252,10 +256,13 @@ export class AiService implements OnApplicationBootstrap {
                 }
               }
             }
+          } else {
+            this.logger.log(`Seed   concept "${conceptName}" — all ${NON_CRICKET_DOMAINS.length} domains already cached`);
           }
         }
 
-        this.logger.debug(`Seeded analogies for lesson "${lesson.title}" (${courseSlug})`);
+        lessonsDone++;
+      }
       }
 
       this.logger.log(
