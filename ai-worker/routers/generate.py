@@ -628,10 +628,18 @@ _DOMAIN_VOCAB = {
     "cooking": (
         "👨‍🍳",
         "cooking",
-        "mise en place, Maillard reaction, emulsification, seasoning layers, reduction, "
-        "knife cuts (brunoise, julienne, chiffonade), caramelisation, rendering fat, "
-        "braising vs sautéing, acidity balance, umami, resting meat, tempering chocolate, "
-        "fermentation, cross-contamination, blind baking, deglazing"
+        "mise en place, Maillard reaction, emulsification, seasoning in layers, reduction, "
+        "knife cuts (brunoise, julienne, chiffonade), caramelisation, deglazing, "
+        "braising vegetables, sautéing aromatics, acidity balance, umami from mushrooms/miso/soy/tomato, "
+        "tempering chocolate, fermentation (sourdough, yogurt, kimchi, idli batter), "
+        "blind baking, resting dough, roasting vegetables, making a roux, emulsifying a vinaigrette, "
+        "folding egg whites, building flavour with aromatics (onion, garlic, ginger), dal tadka, "
+        "pasta-water starch, risotto technique, bread hydration, pastry lamination",
+        "STRICT CONSTRAINT: This is for a vegetarian audience. NEVER reference meat, poultry, "
+        "fish, seafood, or any animal flesh. Use only vegetables, legumes (lentils, chickpeas, beans), "
+        "grains (rice, pasta, bread), dairy, eggs, nuts, and plant-based ingredients. "
+        "If you would normally say 'cooking a steak' or 'braising chicken', replace with "
+        "'roasting cauliflower', 'simmering a dal', 'baking a soufflé', etc."
     ),
     "finance": (
         "📈",
@@ -676,7 +684,8 @@ async def translate_analogy(req: TranslateAnalogyRequest):
     if not entry:
         raise HTTPException(status_code=400, detail=f"Unknown domain: {req.domain}")
 
-    emoji, domain_label, vocab_hint = entry
+    emoji, domain_label, vocab_hint = entry[0], entry[1], entry[2]
+    domain_constraint = entry[3] if len(entry) > 3 else ""
 
     reference_block = (
         f"REFERENCE — a cricket-based analogy for the same concept (use this to understand "
@@ -684,8 +693,10 @@ async def translate_analogy(req: TranslateAnalogyRequest):
         f'"{req.cricket_analogy}"\n\n'
     ) if req.cricket_analogy.strip() else ""
 
-    prompt = f"""You are writing a DEEP, vivid analogy to explain a technical concept to someone who loves {domain_label}.
+    constraint_block = f"\n{domain_constraint}\n" if domain_constraint else ""
 
+    prompt = f"""You are writing a DEEP, vivid analogy to explain a technical concept to someone who loves {domain_label}.
+{constraint_block}
 Concept: "{req.concept_name}" (from the topic "{req.topic_name}")
 {reference_block}Write a fresh analogy in the {domain_label} world. Do NOT translate the cricket analogy — write an original one that captures the same technical insight.
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Loader2 } from 'lucide-react'
 import {
   getCourseAnalogies,
   ALL_DOMAINS,
@@ -14,15 +14,18 @@ import {
 const INTEREST_KEY = 'user_interest_domain'
 const CACHE_PREFIX = 'analogy_cache:'
 
+// Retry schedule: wait this many ms before each attempt (index 0 = first attempt, no wait)
+const RETRY_DELAYS = [0, 5_000, 10_000, 20_000]
+
 interface Props {
   courseSlug: string
   conceptId: string
   conceptName: string
-  /** Cricket analogy text from the lesson JSON — used as cricket display text
-   *  and as reference context when generating other-domain analogies. */
+  /** Cricket analogy text from the lesson JSON — shown instantly as fallback
+   *  while the domain-specific analogy is generated in the background. */
   fallbackText?: string
-  /** Position in the lesson (0-based). Used to stagger API calls so that
-   *  several analogy cards on the same page don't all fire simultaneously. */
+  /** Position in the lesson (0-based). Staggers background API calls so that
+   *  several cards on the same page don't hit the AI worker simultaneously. */
   sectionIndex?: number
 }
 
@@ -33,13 +36,11 @@ export default function PersonalizationCard({
   fallbackText,
   sectionIndex = 0,
 }: Props) {
-  const [analogies, setAnalogies] = useState<CourseAnalogies | null>(null)
-  const [domain, setDomain]       = useState<InterestDomain>('cricket')
-  const [picking, setPicking]     = useState(false)
-  const [translated, setTranslated] = useState<string | null>(null)
-  const [loading, setLoading]     = useState(false)
-  const [failed, setFailed]       = useState(false)
-  // Track which (domain, conceptId) the current translation was generated for
+  const [analogies, setAnalogies]     = useState<CourseAnalogies | null>(null)
+  const [domain, setDomain]           = useState<InterestDomain>('cricket')
+  const [picking, setPicking]         = useState(false)
+  const [translated, setTranslated]   = useState<string | null>(null)
+  const [personalizing, setPersonalizing] = useState(false)
   const translatedFor = useRef<string>('')
 
   useEffect(() => {
@@ -63,30 +64,19 @@ export default function PersonalizationCard({
     slug.includes(c.name.toLowerCase().replace(/\s+/g, '-'))
   )
 
-  // Static analogy: pre-generated data or the raw cricket text (cricket domain only)
   const staticAnalogy =
     (concept ? concept[domain] : null) ??
     (domain === 'cricket' && fallbackText ? fallbackText : null)
 
-  // Fetch a generated analogy from the backend when static data is unavailable
   useEffect(() => {
-    if (domain === 'cricket') {
-      // Cricket is always served from fallbackText — no API needed
+    if (domain === 'cricket' || staticAnalogy !== null) {
       setTranslated(null)
-      setFailed(false)
-      translatedFor.current = ''
-      return
-    }
-    if (staticAnalogy !== null) {
-      // Static pre-generated data covers this domain — no API needed
-      setTranslated(null)
-      setFailed(false)
+      setPersonalizing(false)
       translatedFor.current = ''
       return
     }
 
     const key = `${domain}:${conceptId}`
-    // Already have a fresh translation for this combo
     if (translatedFor.current === key && translated !== null) return
 
     const cacheKey = `${CACHE_PREFIX}${courseSlug}:${conceptId}:${domain}`
@@ -99,61 +89,73 @@ export default function PersonalizationCard({
       }
     }
 
-    // Small stagger (50ms × index) avoids exact-simultaneous requests while
-    // remaining imperceptible now that the DB cache returns in ~10ms.
-    setLoading(true)
-    setFailed(false)
+    setPersonalizing(true)
     const ctrl = new AbortController()
-    const timer = setTimeout(() => {
-      fetch('/api/proxy/ai/translate-analogy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cricketAnalogy: fallbackText ?? '',
-          domain,
-          conceptName,
-          courseSlug,
-          conceptId: slug,
-        }),
-        signal: ctrl.signal,
+
+    // Abortable sleep — rejects immediately when the signal fires
+    function sleep(ms: number): Promise<void> {
+      return new Promise((resolve, reject) => {
+        const t = setTimeout(resolve, ms)
+        ctrl.signal.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')) })
       })
-        .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
-        .then(data => {
-          if (data?.analogy) {
-            if (typeof window !== 'undefined') localStorage.setItem(cacheKey, data.analogy)
-            setTranslated(data.analogy)
-            translatedFor.current = key
+    }
+
+    async function attempt() {
+      // Stagger start: 1.5s per card index. Cards show cricket instantly so the
+      // wait is invisible to the user; it prevents simultaneous rate-limit pressure.
+      await sleep(sectionIndex * 1_500)
+
+      for (let i = 0; i < RETRY_DELAYS.length; i++) {
+        if (ctrl.signal.aborted) return
+        if (i > 0) {
+          try { await sleep(RETRY_DELAYS[i]) } catch { return }
+        }
+        try {
+          const r = await fetch('/api/proxy/ai/translate-analogy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cricketAnalogy: fallbackText ?? '', domain, conceptName, courseSlug, conceptId: slug }),
+            signal: ctrl.signal,
+          })
+          if (!r.ok) throw new Error(`HTTP ${r.status}`)
+          const data = await r.json()
+          if (!data?.analogy) throw new Error('empty response')
+
+          if (typeof window !== 'undefined') localStorage.setItem(cacheKey, data.analogy)
+          setTranslated(data.analogy)
+          translatedFor.current = key
+          setPersonalizing(false)
+          return
+        } catch (err: any) {
+          if (err?.name === 'AbortError') return
+          if (i < RETRY_DELAYS.length - 1) {
+            console.info(`[PersonalizationCard] ${conceptId}/${domain} attempt ${i + 1} failed, retrying — ${err.message}`)
           } else {
-            setFailed(true)
+            console.warn(`[PersonalizationCard] ${conceptId}/${domain} all retries exhausted — ${err.message}`)
+            setPersonalizing(false)
+            // analogy stays as cricket fallback; will retry automatically next page load
           }
-        })
-        .catch(err => {
-          if ((err as { name?: string })?.name !== 'AbortError') {
-            console.warn(`[PersonalizationCard] analogy generation failed for ${conceptId}/${domain}:`, err)
-            setFailed(true)
-          }
-        })
-        .finally(() => setLoading(false))
-    }, sectionIndex * 50)
+        }
+      }
+    }
+
+    attempt()
 
     return () => {
-      clearTimeout(timer)
       ctrl.abort()
+      setPersonalizing(false)
     }
-  // Intentionally omit `translated` from deps — including it would re-run
-  // the effect after every successful translation (the ref guard prevents loops
-  // but the extra execution is wasteful).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domain, staticAnalogy, fallbackText, courseSlug, conceptId, conceptName, sectionIndex])
 
-  // Resolution order: static engine data → live/cached translation →
-  // cricket text from the lesson JSON (when generation failed — the analogy
-  // section must never disappear just because the AI path is down).
-  const cricketFallback = failed && domain !== 'cricket' && fallbackText ? fallbackText : null
-  const analogy = staticAnalogy ?? translated ?? cricketFallback
-  const showingCricketFallback = !staticAnalogy && !translated && cricketFallback !== null
+  // Resolution order:
+  //   1. Static engine data (pre-generated TS file)
+  //   2. DB-cached / live-generated text
+  //   3. Cricket fallback while personalizing (shown instantly, replaced silently)
+  const analogy = staticAnalogy ?? translated ?? (fallbackText || null)
+  const showFallback = personalizing && !staticAnalogy && !translated && !!fallbackText
 
-  if (!analogy && !loading) return null
+  if (!analogy && !personalizing) return null
 
   function pickDomain(d: InterestDomain) {
     setDomain(d)
@@ -175,6 +177,12 @@ export default function PersonalizationCard({
           <span className="text-xs font-semibold text-purple-300/80 uppercase tracking-wider">Analogy</span>
           <span className="text-base leading-none">{DOMAIN_ICONS[domain]}</span>
           <span className="text-xs text-white/40">{DOMAIN_LABELS[domain]}</span>
+          {personalizing && (
+            <span className="flex items-center gap-1 text-[10px] text-purple-400/50">
+              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+              personalizing…
+            </span>
+          )}
         </div>
         <button
           onClick={() => setPicking(v => !v)}
@@ -185,27 +193,25 @@ export default function PersonalizationCard({
         </button>
       </div>
 
-      {/* Body */}
-      {loading ? (
+      {/* Body — always shows content immediately; personalizing is a silent background process */}
+      {analogy ? (
+        <div className="px-5 pb-4">
+          <p className={`text-sm leading-relaxed transition-opacity duration-500 ${showFallback ? 'text-white/50' : 'text-white/75'}`}>
+            {analogy}
+          </p>
+          {showFallback && (
+            <p className="text-[11px] text-white/25 pt-2">
+              🏏 Cricket analogy shown while your {DOMAIN_LABELS[domain]} version generates in the background.
+            </p>
+          )}
+        </div>
+      ) : (
+        /* Only reached when there is no fallbackText at all */
         <div className="px-5 pb-4 space-y-2">
           <div className="h-3 rounded bg-white/[0.06] animate-pulse w-full" />
           <div className="h-3 rounded bg-white/[0.06] animate-pulse w-5/6" />
           <div className="h-3 rounded bg-white/[0.06] animate-pulse w-4/6" />
-          <p className="text-[11px] text-white/25 pt-1">
-            Crafting {DOMAIN_LABELS[domain]} analogy…
-          </p>
-        </div>
-      ) : (
-        <div className="px-5 pb-4">
-          <p className="text-sm text-white/75 leading-relaxed">
-            {analogy}
-          </p>
-          {showingCricketFallback && (
-            <p className="text-[11px] text-white/25 pt-2">
-              🏏 Showing the cricket analogy — your {DOMAIN_LABELS[domain]} version couldn&apos;t be
-              generated right now. It will appear automatically on a future visit.
-            </p>
-          )}
+          <p className="text-[11px] text-white/25 pt-1">Crafting {DOMAIN_LABELS[domain]} analogy…</p>
         </div>
       )}
 
