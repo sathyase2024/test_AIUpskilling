@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -68,7 +68,7 @@ export class AiController {
   }
 
   @Post('translate-analogy')
-  @Throttle({ global: { ttl: 60_000, limit: 30 } })
+  @SkipThrottle()
   @ApiOperation({ summary: 'Return domain-specific analogy for a concept; DB-cached after first generation (public)' })
   translateAnalogy(@Body() body: {
     cricketAnalogy: string;
