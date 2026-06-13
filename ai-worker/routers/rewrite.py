@@ -40,18 +40,30 @@ router = APIRouter(prefix="/rewrite", tags=["rewrite"])
 # ─── Prompts ─────────────────────────────────────────────────────────────────
 
 PARAGRAPH_SYSTEM = """You are an expert technical writer editing AI-generated lesson content.
-Rewrite the given paragraphs for professional readability.
+Rewrite the paragraph content into well-structured paragraphs for professional readability.
+Ensure each paragraph covers a single idea, use logical transitions, preserve all information,
+and maintain a professional tone.
 
 Rules:
-- Each paragraph must cover exactly ONE idea. Split any paragraph that covers multiple ideas.
-- Use logical transitions at the start of each paragraph (e.g. "This means…", "In practice…", "As a result…").
-- Write 2-4 concise sentences per paragraph.
+- Each rewritten paragraph must cover exactly ONE idea. Split any original paragraph that covers
+  multiple ideas into multiple focused paragraphs.
+- Use logical transitions (e.g. "This means…", "In practice…", "As a result…") so paragraphs flow.
 - Preserve ALL technical details, names, examples, and code references. Never omit information.
-- Professional, clear, encouraging tone suited to a developer learning platform.
-- Output only paragraph strings — no bullet lists, no headings.
+- Professional, clear tone suited to a developer learning platform.
+- Output only paragraph prose — no bullet lists, no headings, no code fences.
 
-Output format: a JSON array of strings, one string per paragraph.
-You may return MORE strings than you received (by splitting), but never fewer."""
+INPUT/OUTPUT CONTRACT (critical):
+You receive a JSON array of N original paragraphs.
+Return a JSON array of EXACTLY N elements, positionally aligned to the input.
+Element i corresponds to input paragraph i and is ITSELF an array of one or more rewritten
+paragraph strings:
+- If input paragraph i covers a single idea, return a 1-element array (tightened prose).
+- If it covers multiple ideas, return multiple strings — each a single-idea paragraph.
+Never merge content across different input paragraphs. Never drop a paragraph (no empty arrays).
+Output JSON only — no prose around it.
+
+Example: input ["A big multi-idea para", "A focused para"]
+         output [["First idea rewritten", "Second idea rewritten"], ["Focused para rewritten"]]"""
 
 ANALOGY_SYSTEM = """You are an expert technical writer editing AI-generated lesson analogies.
 Rewrite the given analogy to be punchy, concrete, and immediately clear.
@@ -85,14 +97,38 @@ def _call_rewrite(system: str, user_msg: str) -> list[str]:
     )
     return _parse_json_array(response.content[0].text)
 
-async def _rewrite_paragraphs(title: str, texts: list[str]) -> list[str]:
+def _coerce_groups(result, texts: list[str]) -> list[list[str]]:
+    """Validate Claude's response into N positionally-aligned groups of paragraphs.
+
+    Accepts the expected nested shape (list of N lists of strings). Tolerates a
+    flat list of N strings as a 1:1 fallback. Anything else raises, so the caller
+    skips the lesson unchanged rather than risking misaligned content.
+    """
+    n = len(texts)
+    if not isinstance(result, list) or len(result) != n:
+        raise ValueError(f"expected {n} elements, got {type(result).__name__} "
+                         f"len={len(result) if isinstance(result, list) else 'NA'}")
+
+    groups: list[list[str]] = []
+    for i, elem in enumerate(result):
+        if isinstance(elem, str):                       # flat 1:1 fallback
+            groups.append([elem])
+        elif isinstance(elem, list) and elem and all(isinstance(s, str) for s in elem):
+            groups.append([s for s in elem])
+        else:                                           # empty/malformed → keep original
+            groups.append([texts[i]])
+    return groups
+
+async def _rewrite_paragraphs(title: str, texts: list[str]) -> list[list[str]]:
     user_msg = (
         f"Lesson title: {title}\n\n"
-        f"Original paragraphs (JSON array — rewrite each one):\n"
+        f"Original paragraphs ({len(texts)} items, JSON array):\n"
         f"{json.dumps(texts, ensure_ascii=False, indent=2)}\n\n"
-        "Return ONLY a JSON array of rewritten paragraph strings. No extra text."
+        f"Return ONLY a JSON array of EXACTLY {len(texts)} elements, each an array of one or "
+        "more rewritten paragraph strings, positionally aligned to the input. No extra text."
     )
-    return await asyncio.to_thread(_call_rewrite, PARAGRAPH_SYSTEM, user_msg)
+    result = await asyncio.to_thread(_call_rewrite, PARAGRAPH_SYSTEM, user_msg)
+    return _coerce_groups(result, texts)
 
 async def _rewrite_analogy(title: str, concept: str, text: str) -> str:
     user_msg = (
@@ -115,25 +151,19 @@ def _guess_concept(sections: list, analogy_idx: int, fallback: str) -> str:
             return s.get("content", fallback)
     return fallback
 
-def _apply_paragraph_rewrites(sections: list, orig: list[tuple[int, str]], new_texts: list[str]) -> list:
-    n_o, n_n = len(orig), len(new_texts)
-    if n_n >= n_o:
-        base, rem = divmod(n_n, n_o)
-        assignments, cursor = [], 0
-        for k in range(n_o):
-            cnt = base + (1 if k < rem else 0)
-            assignments.append(new_texts[cursor:cursor + cnt])
-            cursor += cnt
-    else:
-        assignments = [[t] for t in new_texts] + [[t] for _, t in orig[n_n:]]
-
-    result, it = [], iter(zip([i for i, _ in orig], assignments))
-    nxt = next(it, None)
+def _apply_paragraph_rewrites(sections: list, orig: list[tuple[int, str]], new_groups: list[list[str]]) -> list:
+    """Replace each original paragraph section with its aligned group of rewritten
+    paragraphs. Mapping is unambiguous: group k belongs to orig[k]'s section index,
+    so a split paragraph expands in place and never lands under a different heading.
+    Non-paragraph sections (headings, analogies, code) are preserved untouched.
+    """
+    mapping = {idx: group for (idx, _), group in zip(orig, new_groups)}
+    result = []
     for idx, section in enumerate(sections):
-        if nxt and idx == nxt[0]:
-            for chunk in nxt[1]:
+        group = mapping.get(idx)
+        if group is not None:
+            for chunk in group:
                 result.append({**section, "content": chunk})
-            nxt = next(it, None)
         else:
             result.append(section)
     return result
