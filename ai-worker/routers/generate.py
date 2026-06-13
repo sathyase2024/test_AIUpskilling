@@ -107,15 +107,15 @@ def _schema() -> str:
     return (
         "Section types to fill in via the create_lesson tool:\n"
         '- "heading": content=heading text, level=2 or 3\n'
-        '- "paragraph": content=rich explanatory text (minimum 80 words per paragraph, explain WHY not just WHAT)\n'
-        '- "analogy": content=interest-based analogy starting with "🏏 Think of it like [interest]:" that maps the concept just explained to the learner\'s interest domain. Only used when a hobby is specified.\n'
+        '- "paragraph": content=rich explanatory text. PARAGRAPH RULES: (1) cover exactly ONE idea per paragraph — if you have more than one idea, emit multiple paragraph sections; (2) write 2-4 concise sentences per paragraph with logical transitions; (3) never write walls of text — prefer two tight paragraphs over one bloated one; (4) explain WHY not just WHAT, with specifics.\n'
+        '- "analogy": content=interest-based analogy that maps the concept to the learner\'s interest domain. ANALOGY RULES: (1) 4-6 crisp sentences total in exactly 3 parts: Setup (1-2 sentences naming a specific scenario), Parallel (2-3 sentences explicitly mapping each key aspect using "just as X... Y..." form), Insight (1 sentence stating the "aha" — what this parallel reveals about why the concept works this way); (2) start with the domain emoji and "Think of it like [interest]:"; (3) be punchy and concrete — no padding.\n'
         '- "code": content=full working code, language=language name (e.g. "python","java","typescript","bash")\n'
         '- "info_box": content=pro tip or important note starting with "Pro Tip:" or "Note:"\n'
         '- "warning_box": content=common mistake or pitfall starting with "Warning:" or "Common Mistake:"\n'
         '- "key_points": items=array of 5-7 detailed bullet strings (each 15-25 words)\n'
         '- "quiz": content=question, items=4 answer options, answer=correct index (0-3), explanation=why correct (30+ words)\n\n'
         "QUALITY REQUIREMENTS:\n"
-        "- Every paragraph must be at least 80 words with real technical depth\n"
+        "- Every paragraph: 2-4 focused sentences, ONE idea only — split anything larger into multiple paragraph sections\n"
         "- Every code block must be complete, runnable, and well-commented\n"
         "- Include real-world context: where is this used in production, why does it matter\n"
         "- Do NOT use vague phrases like 'this is important' — explain WHY with specifics\n"
@@ -133,16 +133,14 @@ def _build_lesson_prompt(req: LessonRequest) -> str:
         f"\n=== PERSONALISATION RULE (interest: {hobby}) ===\n"
         f"The learning pattern for EVERY concept must follow this exact 3-step sequence:\n"
         f"  STEP 1 — PARAGRAPH: Explain the technical concept precisely. Pure technical content. No {hobby} in the paragraph.\n"
-        f"  STEP 2 — ANALOGY: Immediately after the paragraph, add an 'analogy' section. This is the most important step.\n"
-        f"             The analogy must be DEEP and DETAILED — not a one-liner. Follow this structure:\n"
-        f"             a) First, describe the {hobby} scenario in specific detail (2-3 sentences). Name real players, real situations, real mechanics.\n"
-        f"             b) Then explicitly draw the parallel — map EACH part of the technical concept to its {hobby} equivalent (3-4 sentences).\n"
-        f"             c) End with the insight — what does understanding this {hobby} parallel reveal about the technical concept? (1-2 sentences).\n"
-        f"             Total length: 6-10 sentences. Start with '🏏 Think of it like {hobby}:'.\n"
-        f"             Use precise {hobby} terminology: innings, over, delivery, wicket, run rate, economy, DRS, powerplay,\n"
-        f"             fielding positions, batting order, bowling spell, maiden over, scorecard, duckworth-lewis, etc.\n"
-        f"             The analogy must make someone say 'oh NOW I understand why it works that way' — not just 'that's a bit like cricket'.\n"
-        f"  STEP 3 — CODE: The code example that follows uses {hobby}-themed class names, variable names, and sample data\n"
+        f"             Keep each paragraph to 2-4 focused sentences covering ONE idea. Split larger explanations into multiple paragraph sections.\n"
+        f"  STEP 2 — ANALOGY: Immediately after the paragraph, add an 'analogy' section.\n"
+        f"             Write exactly 4-6 crisp sentences in this 3-part structure:\n"
+        f"             a) SETUP (1-2 sentences): Name a specific {hobby} scenario with real names/terminology. Immersive and concrete.\n"
+        f"             b) PARALLEL (2-3 sentences): Map each key aspect using 'just as [X in {hobby}]... [Y in the concept]...'. One mapping per sentence.\n"
+        f"             c) INSIGHT (1 sentence): State the 'aha' — what this parallel reveals about WHY the concept works this way.\n"
+        f"             Start with '🏏 Think of it like {hobby}:'. Be punchy — no padding, no vague comparisons.\n"
+        f"  STEP 3 — CODE: The code example uses {hobby}-themed class names, variable names, and sample data\n"
         f"             (e.g. CricketPlayer, innings_count, match_id, Rohit Sharma, Jasprit Bumrah) to reinforce BOTH the concept and the analogy.\n"
         f"The paragraph teaches the concept. The analogy makes it click. The code makes it concrete.\n"
         f"Do NOT mix {hobby} into the paragraph text — keep the 3 steps cleanly separated.\n"
@@ -695,30 +693,34 @@ async def translate_analogy(req: TranslateAnalogyRequest):
 
     constraint_block = f"\n{domain_constraint}\n" if domain_constraint else ""
 
-    prompt = f"""You are writing a DEEP, vivid analogy to explain a technical concept to someone who loves {domain_label}.
+    prompt = f"""You are writing a vivid, punchy analogy to explain a technical concept to someone who loves {domain_label}.
 {constraint_block}
 Concept: "{req.concept_name}" (from the topic "{req.topic_name}")
 {reference_block}Write a fresh analogy in the {domain_label} world. Do NOT translate the cricket analogy — write an original one that captures the same technical insight.
 
-You MUST follow this exact 3-part structure:
+Write exactly 4-6 sentences in this 3-part structure — no more, no less:
 
-PART A — Setup (2-3 sentences):
-  Describe a specific, concrete {domain_label} scenario. Use precise {domain_label} terminology.
-  Name real players/artists/films/dishes (whichever applies). Make it immersive and recognisable
-  to someone who knows {domain_label} well. Relevant vocabulary: {vocab_hint}.
+PART A — Setup (1-2 sentences):
+  Name a specific, concrete {domain_label} scenario using precise terminology.
+  Example vocabulary: {vocab_hint}.
+  Be specific — name real people/films/dishes/moves (whichever applies).
 
-PART B — The Parallel (3-4 sentences):
-  Explicitly map EACH key aspect of {req.concept_name} to its {domain_label} equivalent.
-  Use the form "just as [X in {domain_label}]... [Y in {req.concept_name}]..." for each mapping.
-  Cover every important dimension — not just one surface-level similarity.
+PART B — The Parallel (2-3 sentences):
+  Map each key aspect of {req.concept_name} to its {domain_label} equivalent.
+  Use the form "just as [X in {domain_label}], [Y in {req.concept_name}]" — one mapping per sentence.
+  Cover the most important dimensions; skip padding.
 
-PART C — The Insight (1-2 sentences):
-  State what understanding this {domain_label} parallel reveals about WHY {req.concept_name}
-  works the way it does, or why it was designed this way.
+PART C — The Insight (1 sentence):
+  State the "aha" — what this parallel reveals about WHY {req.concept_name} works the way it does.
+  This is the sentence that makes the reader say "oh, NOW I get it."
 
-Total length: 6-10 sentences.
-First word: "{emoji} Think of it like {domain_label}:"
-Output ONLY the analogy text — no preamble, no section labels, no quotation marks."""
+Style rules:
+- Punchy and concrete — every sentence earns its place
+- No vague statements like "it's similar to" without spelling out exactly HOW
+- No section labels in your output
+
+First words must be: "{emoji} Think of it like {domain_label}:"
+Output ONLY the analogy text — no preamble, no labels, no quotation marks."""
 
     def _call_api():
         return get_client().messages.create(

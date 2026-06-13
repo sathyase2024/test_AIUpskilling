@@ -231,9 +231,11 @@ export default function PersonalizationCard({
       {/* Body — always shows content immediately; personalizing is a silent background process */}
       {analogy ? (
         <div className="px-5 pb-4 pt-3">
-          <p className={`text-sm leading-relaxed transition-opacity duration-500 ${showFallback ? 'text-white/50' : 'text-white/75'}`}>
-            {analogy}
-          </p>
+          <div className={`text-[14px] leading-[1.7] space-y-2 transition-opacity duration-500 ${showFallback ? 'text-white/50' : 'text-white/70'}`}>
+            {analogy.split(/\n\n+/).map((para, i) => (
+              <p key={i}>{para.trim()}</p>
+            ))}
+          </div>
           {showFallback && (
             <p className="text-[11px] text-white/25 pt-2">
               🏏 Cricket analogy shown while your {DOMAIN_LABELS[domain]} version generates in the background.
