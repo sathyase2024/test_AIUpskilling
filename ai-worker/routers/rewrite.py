@@ -171,12 +171,11 @@ async def _process_lesson(http: httpx.AsyncClient, backend: str, lesson: dict, m
     if not content_json:
         return f"  {title} — no contentJson"
 
-    sections = content_json.get("sections", [])
     updated = copy.deepcopy(content_json)
     changed = False
 
     if mode in ("paragraphs", "both"):
-        paras = _extract(sections, "paragraph")
+        paras = _extract(updated["sections"], "paragraph")
         if paras:
             try:
                 new_p = await _rewrite_paragraphs(title, [t for _, t in paras])
@@ -186,11 +185,16 @@ async def _process_lesson(http: httpx.AsyncClient, backend: str, lesson: dict, m
                 logger.warning(f"  {title} — paragraph rewrite error: {e}")
 
     if mode in ("analogies", "both"):
-        analogs = _extract(sections, "analogy")
+        # CRITICAL: re-extract against the CURRENT sections. The paragraph pass
+        # above can split one paragraph into several, growing the array and
+        # shifting every later index. Extracting analogy indices from the
+        # original sections here would write analogy text onto the wrong
+        # (shifted) section — corrupting paragraphs with analogy content.
+        analogs = _extract(updated["sections"], "analogy")
         if analogs:
             new_a = []
             for idx, text in analogs:
-                concept = _guess_concept(sections, idx, title)
+                concept = _guess_concept(updated["sections"], idx, title)
                 try:
                     new_a.append(await _rewrite_analogy(title, concept, text))
                 except Exception as e:
