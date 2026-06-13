@@ -63,7 +63,7 @@ def call_claude(model: str, title: str, texts: list) -> str:
     proc = subprocess.run(
         ["claude", "-p", "--model", model, "--output-format", "text",
          "--no-session-persistence"],
-        input=prompt, capture_output=True, text=True, timeout=300,
+        input=prompt, capture_output=True, text=True, timeout=600,
     )
     if proc.returncode != 0:
         raise RuntimeError(f"claude CLI failed: {proc.stderr.strip()[:300]}")
@@ -157,6 +157,7 @@ def main():
         print(f"\n=== {course} — {len(files)} lessons ===", flush=True)
         for path in files:
             name = os.path.basename(path)
+            print(f"  {name:55} ...", flush=True)
             try:
                 result = process_file(path, args.model, args.dry_run)
                 print(f"  {name:55} {result}", flush=True)
