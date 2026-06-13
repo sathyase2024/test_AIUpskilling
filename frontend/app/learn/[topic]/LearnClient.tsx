@@ -122,6 +122,8 @@ export default function LearnClient({ topic }: { topic: string }) {
 
   // ── Analogy domain preference ────────────────────────────────────────────────
   const [activeDomain, setActiveDomain] = useState<InterestDomain>('cricket');
+  const [domainDropdownOpen, setDomainDropdownOpen] = useState(false);
+  const domainDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -130,8 +132,20 @@ export default function LearnClient({ topic }: { topic: string }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (!domainDropdownOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (domainDropdownRef.current && !domainDropdownRef.current.contains(e.target as Node)) {
+        setDomainDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [domainDropdownOpen]);
+
   const handleDomainChange = (d: InterestDomain) => {
     setActiveDomain(d);
+    setDomainDropdownOpen(false);
     if (typeof window !== 'undefined') localStorage.setItem(INTEREST_KEY, d);
   };
 
@@ -579,7 +593,47 @@ export default function LearnClient({ topic }: { topic: string }) {
             {topicData.name || decodedTopic}
           </span>
 
-          <div className="ml-auto flex items-center gap-4">
+          {/* ── Analogy domain dropdown ── */}
+          <div className="relative ml-auto" ref={domainDropdownRef}>
+            <button
+              onClick={() => setDomainDropdownOpen(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 text-xs font-medium hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-all shrink-0"
+              title="Change analogy style"
+            >
+              <Sparkles size={12} />
+              <span>{DOMAIN_ICONS[activeDomain]}</span>
+              <span className="hidden sm:inline">{DOMAIN_LABELS[activeDomain]}</span>
+              <ChevronDown size={12} className={`transition-transform duration-150 ${domainDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {domainDropdownOpen && (
+              <div className="absolute right-0 top-[calc(100%+6px)] z-[60] w-44 bg-white dark:bg-[#1a1a28] border border-slate-200 dark:border-white/15 rounded-xl shadow-2xl overflow-hidden">
+                <div className="px-3 py-2 border-b border-slate-100 dark:border-white/10">
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles size={9} /> Analogy Style
+                  </p>
+                </div>
+                <div className="py-1 max-h-72 overflow-y-auto">
+                  {ALL_DOMAINS.map(d => (
+                    <button
+                      key={d}
+                      onClick={() => handleDomainChange(d)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-all ${
+                        d === activeDomain
+                          ? 'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-medium'
+                          : 'text-slate-600 dark:text-white/70 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <span className="text-base leading-none">{DOMAIN_ICONS[d]}</span>
+                      <span className="flex-1 text-left">{DOMAIN_LABELS[d]}</span>
+                      {d === activeDomain && <CheckCircle2 size={12} className="text-purple-500 dark:text-purple-400 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-4 shrink-0">
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 dark:text-white/40">
               <BookOpen size={13} />
               Lesson {currentIndex + 1} of {totalLessons}
@@ -611,31 +665,6 @@ export default function LearnClient({ topic }: { topic: string }) {
                 className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-500"
                 style={{ width: `${courseProgress}%` }}
               />
-            </div>
-          </div>
-
-          {/* Analogy domain switcher */}
-          <div className="px-4 py-3 border-b border-slate-200 dark:border-white/10 shrink-0">
-            <div className="flex items-center gap-1.5 mb-2">
-              <Sparkles size={10} className="text-purple-500 dark:text-purple-400" />
-              <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wider">Analogy Style</p>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {ALL_DOMAINS.map(d => (
-                <button
-                  key={d}
-                  onClick={() => handleDomainChange(d)}
-                  title={DOMAIN_LABELS[d]}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-all border ${
-                    d === activeDomain
-                      ? 'bg-purple-50 dark:bg-purple-500/20 border-purple-300 dark:border-purple-400/50 text-purple-700 dark:text-purple-300'
-                      : 'bg-white dark:bg-white/[0.04] border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-white/45 hover:text-slate-700 dark:hover:text-white/75 hover:border-slate-300 dark:hover:border-white/20'
-                  }`}
-                >
-                  <span>{DOMAIN_ICONS[d]}</span>
-                  <span>{DOMAIN_LABELS[d]}</span>
-                </button>
-              ))}
             </div>
           </div>
 
@@ -804,30 +833,6 @@ export default function LearnClient({ topic }: { topic: string }) {
                   className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-500"
                   style={{ width: `${courseProgress}%` }}
                 />
-              </div>
-            </div>
-            {/* Mobile domain switcher */}
-            <div className="px-4 py-3 border-b border-slate-200 dark:border-white/10 shrink-0">
-              <div className="flex items-center gap-1.5 mb-2">
-                <Sparkles size={10} className="text-purple-500 dark:text-purple-400" />
-                <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wider">Analogy Style</p>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {ALL_DOMAINS.map(d => (
-                  <button
-                    key={d}
-                    onClick={() => handleDomainChange(d)}
-                    title={DOMAIN_LABELS[d]}
-                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-all border ${
-                      d === activeDomain
-                        ? 'bg-purple-50 dark:bg-purple-500/20 border-purple-300 dark:border-purple-400/50 text-purple-700 dark:text-purple-300'
-                        : 'bg-white dark:bg-white/[0.04] border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-white/45 hover:text-slate-700 dark:hover:text-white/75 hover:border-slate-300 dark:hover:border-white/20'
-                    }`}
-                  >
-                    <span>{DOMAIN_ICONS[d]}</span>
-                    <span>{DOMAIN_LABELS[d]}</span>
-                  </button>
-                ))}
               </div>
             </div>
             <nav className="flex-1 overflow-y-auto p-2">
