@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import generate, review, quiz
+from routers import generate, review, quiz, rewrite
 from config import get_client
 
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +47,7 @@ app.add_middleware(
 app.include_router(generate.router)
 app.include_router(review.router)
 app.include_router(quiz.router)
+app.include_router(rewrite.router)
 
 
 @app.get("/health")
