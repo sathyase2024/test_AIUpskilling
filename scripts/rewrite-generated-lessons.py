@@ -63,6 +63,24 @@ Never merge content across different input paragraphs. Never drop a paragraph (n
 Output JSON only — no prose, no markdown fences around the JSON."""
 
 
+# These env vars route a nested `claude -p` back into the PARENT Claude Code
+# session (it would answer with the parent's conversation context and return
+# empty/garbage under concurrency). Stripping them gives each call a clean,
+# independent subscription-authenticated session.
+_HIJACK_VARS = (
+    "CLAUDE_SESSION_INGRESS_TOKEN_FILE",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_CODE_REMOTE_SESSION_ID",
+)
+
+
+def _clean_env() -> dict:
+    env = os.environ.copy()
+    for v in _HIJACK_VARS:
+        env.pop(v, None)
+    return env
+
+
 def call_claude(model: str, title: str, texts: list) -> str:
     prompt = (
         f"{SYSTEM}\n\n"
@@ -75,11 +93,14 @@ def call_claude(model: str, title: str, texts: list) -> str:
     proc = subprocess.run(
         ["claude", "-p", "--model", model, "--output-format", "text",
          "--no-session-persistence"],
-        input=prompt, capture_output=True, text=True, timeout=600,
+        input=prompt, capture_output=True, text=True, timeout=600, env=_clean_env(),
     )
     if proc.returncode != 0:
         raise RuntimeError(f"claude CLI failed: {proc.stderr.strip()[:300]}")
-    return proc.stdout
+    out = proc.stdout.strip()
+    if not out:
+        raise RuntimeError("claude CLI returned empty output")
+    return out
 
 
 def parse_json_array(raw: str):
