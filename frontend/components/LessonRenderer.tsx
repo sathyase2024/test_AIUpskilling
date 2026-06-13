@@ -216,9 +216,9 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
 
     case 'paragraph':
       return (
-        <p className="text-[15px] text-slate-600 dark:text-white/65 leading-[1.85] mb-5">
+        <div className="text-[15px] text-slate-600 dark:text-white/65 leading-[1.85] mb-5">
           {section.content}
-        </p>
+        </div>
       )
 
     case 'code':
@@ -228,7 +228,7 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
       return (
         <div className="my-4 p-4 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/25 flex gap-3">
           <Lightbulb size={18} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-          <p className="text-blue-900 dark:text-blue-300 text-sm leading-relaxed">{section.content}</p>
+          <div className="text-blue-900 dark:text-blue-300 text-sm leading-relaxed">{section.content}</div>
         </div>
       )
 
@@ -236,7 +236,7 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
       return (
         <div className="my-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 flex gap-3">
           <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-amber-900 dark:text-amber-200 text-sm leading-relaxed">{section.content}</p>
+          <div className="text-amber-900 dark:text-amber-200 text-sm leading-relaxed">{section.content}</div>
         </div>
       )
 
@@ -249,7 +249,7 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
             <Sparkles size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
             <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">Analogy</span>
           </div>
-          <p className="text-slate-700 dark:text-white/75 text-sm leading-relaxed whitespace-pre-wrap">{section.content}</p>
+          <div className="text-slate-700 dark:text-white/75 text-sm leading-relaxed whitespace-pre-wrap">{section.content}</div>
         </div>
       )
 
