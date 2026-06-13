@@ -26,6 +26,18 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+_print_lock = threading.Lock()
+_manifest_lock = threading.Lock()
+
+
+def log(msg: str):
+    with _print_lock:
+        print(msg, flush=True)
 
 SYSTEM = """You are an expert technical writer editing AI-generated lesson content.
 Rewrite the paragraph content into well-structured paragraphs for professional readability.
@@ -112,7 +124,21 @@ def apply_groups(sections: list, para_indices: list, groups: list) -> list:
     return out
 
 
-def process_file(path: str, model: str, dry_run: bool) -> str:
+def atomic_write_json(path: str, data) -> None:
+    """Write JSON to a temp file in the same dir, then atomically rename.
+    A kill mid-write leaves the original file untouched (never a partial file)."""
+    d = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
+def process_file(path: str, model: str, dry_run: bool, retries: int = 3) -> str:
     data = json.load(open(path, encoding="utf-8"))
     sections = data.get("sections", [])
     para_indices = [i for i, s in enumerate(sections) if s.get("type") == "paragraph"]
@@ -120,18 +146,41 @@ def process_file(path: str, model: str, dry_run: bool) -> str:
         return "no paragraphs"
 
     texts = [sections[i]["content"] for i in para_indices]
-    raw = call_claude(model, data.get("title", ""), texts)
-    groups = coerce_groups(parse_json_array(raw), texts)
-    new_sections = apply_groups(sections, para_indices, groups)
 
+    last_err = None
+    for attempt in range(1, retries + 1):
+        try:
+            raw = call_claude(model, data.get("title", ""), texts)
+            groups = coerce_groups(parse_json_array(raw), texts)
+            break
+        except Exception as e:
+            last_err = e
+            if attempt < retries:
+                time.sleep(attempt * 15)  # 15s, 30s — back off on rate limits / flakiness
+            else:
+                raise RuntimeError(f"{type(e).__name__}: {e} (after {retries} attempts)")
+
+    new_sections = apply_groups(sections, para_indices, groups)
     added = len(new_sections) - len(sections)
     if dry_run:
         return f"OK (dry-run) {len(texts)} paras -> {sum(len(g) for g in groups)} (+{added})"
 
     data["sections"] = new_sections
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    atomic_write_json(path, data)
     return f"saved {len(texts)} paras -> {sum(len(g) for g in groups)} (+{added})"
+
+
+def load_manifest(mpath: str) -> set:
+    if not os.path.exists(mpath):
+        return set()
+    with open(mpath, encoding="utf-8") as f:
+        return {ln.strip() for ln in f if ln.strip()}
+
+
+def mark_done(mpath: str, rel: str) -> None:
+    with _manifest_lock:
+        with open(mpath, "a", encoding="utf-8") as f:
+            f.write(rel + "\n")
 
 
 def main():
@@ -142,31 +191,63 @@ def main():
     g.add_argument("--all-courses", action="store_true")
     ap.add_argument("--model", default="sonnet")
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--limit", type=int, default=0, help="max lessons (0 = no limit)")
+    ap.add_argument("--limit", type=int, default=0, help="max lessons per course (0 = no limit)")
+    ap.add_argument("--workers", type=int, default=1, help="concurrent claude CLI calls")
+    ap.add_argument("--manifest", default=None,
+                    help="resume file of completed lesson paths (default <dir>/.rewrite-done)")
     args = ap.parse_args()
+
+    mpath = args.manifest or os.path.join(args.dir, ".rewrite-done")
+    done = load_manifest(mpath)
 
     courses = ([args.course] if args.course
                else sorted(d for d in os.listdir(args.dir)
                            if os.path.isdir(os.path.join(args.dir, d))))
 
-    total_ok = total_fail = 0
+    # Build the full work list, skipping already-completed lessons
+    work = []  # (course, path, rel)
     for course in courses:
         files = sorted(glob.glob(os.path.join(args.dir, course, "lesson_*.json")))
         if args.limit:
             files = files[:args.limit]
-        print(f"\n=== {course} — {len(files)} lessons ===", flush=True)
         for path in files:
-            name = os.path.basename(path)
-            print(f"  {name:55} ...", flush=True)
-            try:
-                result = process_file(path, args.model, args.dry_run)
-                print(f"  {name:55} {result}", flush=True)
-                total_ok += 1
-            except Exception as e:
-                print(f"  {name:55} ERROR: {e}", flush=True)
-                total_fail += 1
+            rel = os.path.relpath(path, args.dir)
+            if rel in done:
+                continue
+            work.append((course, path, rel))
 
-    print(f"\n--- done: {total_ok} ok, {total_fail} failed ---")
+    log(f"=== {len(work)} lessons to process ({len(done)} already done) "
+        f"across {len(courses)} course(s), workers={args.workers} ===")
+
+    total_ok = total_fail = 0
+
+    def run_one(item):
+        course, path, rel = item
+        name = os.path.basename(path)
+        try:
+            result = process_file(path, args.model, args.dry_run)
+            if not args.dry_run and result.startswith("saved"):
+                mark_done(mpath, rel)
+            return (True, f"  {course}/{name:55} {result}")
+        except Exception as e:
+            return (False, f"  {course}/{name:55} ERROR: {e}")
+
+    if args.workers <= 1:
+        results = (run_one(it) for it in work)
+        for ok, line in results:
+            log(line)
+            total_ok += ok
+            total_fail += (not ok)
+    else:
+        with ThreadPoolExecutor(max_workers=args.workers) as ex:
+            futs = {ex.submit(run_one, it): it for it in work}
+            for fut in as_completed(futs):
+                ok, line = fut.result()
+                log(line)
+                total_ok += ok
+                total_fail += (not ok)
+
+    log(f"--- done: {total_ok} ok, {total_fail} failed ---")
     sys.exit(1 if total_fail else 0)
 
 
