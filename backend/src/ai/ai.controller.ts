@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, UseGuards, Headers, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AiService } from './ai.service';
@@ -102,5 +102,37 @@ export class AiController {
   @ApiOperation({ summary: 'Generate lesson content by topic/title (legacy)' })
   generateLessonLegacy(@Body() body: { topicName: string; lessonTitle: string }) {
     return this.aiService.generateLessonContent(body.topicName, body.lessonTitle).then((content) => ({ content }));
+  }
+
+  // ── Internal service-to-service routes (no JWT, shared secret) ───────────────
+  // Used by the ai-worker rewrite job. Skips throttle and JWT; authenticates via
+  // x-internal-key header checked against the INTERNAL_SECRET env var.
+
+  private checkInternalKey(key: string | undefined) {
+    const secret = process.env.INTERNAL_SECRET;
+    if (!secret || !key || key !== secret) throw new ForbiddenException('Invalid internal key');
+  }
+
+  @Get('internal/lessons/:id/content')
+  @SkipThrottle({ global: true, auth: true })
+  @ApiOperation({ summary: 'Fetch lesson content (internal service use only)' })
+  getLessonContentInternal(
+    @Param('id') id: string,
+    @Headers('x-internal-key') key: string,
+  ) {
+    this.checkInternalKey(key);
+    return this.aiService.getLessonContent(id);
+  }
+
+  @Patch('internal/lessons/:id/content')
+  @SkipThrottle({ global: true, auth: true })
+  @ApiOperation({ summary: 'Save lesson content (internal service use only)' })
+  saveLessonContentInternal(
+    @Param('id') id: string,
+    @Headers('x-internal-key') key: string,
+    @Body() body: { contentJson: any; isGenerated?: boolean },
+  ) {
+    this.checkInternalKey(key);
+    return this.aiService.saveLessonContent(id, body);
   }
 }

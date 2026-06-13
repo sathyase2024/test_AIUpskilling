@@ -21,6 +21,7 @@ import asyncio
 import copy
 import json
 import logging
+import os
 import re
 import uuid
 from typing import Optional
@@ -30,6 +31,8 @@ from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 
 from config import get_client
+
+INTERNAL_SECRET = os.getenv("INTERNAL_SECRET", "")
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rewrite", tags=["rewrite"])
@@ -142,6 +145,12 @@ def _apply_analogy_rewrites(sections: list, orig: list[tuple[int, str]], new_tex
 
 # ─── Per-lesson worker ────────────────────────────────────────────────────────
 
+def _internal_headers() -> dict:
+    h = {"Content-Type": "application/json"}
+    if INTERNAL_SECRET:
+        h["x-internal-key"] = INTERNAL_SECRET
+    return h
+
 async def _process_lesson(http: httpx.AsyncClient, backend: str, lesson: dict, mode: str) -> str:
     lid, title = lesson["id"], lesson["title"]
 
@@ -149,7 +158,10 @@ async def _process_lesson(http: httpx.AsyncClient, backend: str, lesson: dict, m
         return f"  {title} — skip (not generated)"
 
     try:
-        r = await http.get(f"{backend}/ai/lessons/{lid}/content")
+        r = await http.get(
+            f"{backend}/ai/internal/lessons/{lid}/content",
+            headers=_internal_headers(),
+        )
         r.raise_for_status()
     except Exception as e:
         return f"  {title} — fetch error: {e}"
@@ -192,8 +204,9 @@ async def _process_lesson(http: httpx.AsyncClient, backend: str, lesson: dict, m
 
     try:
         r = await http.patch(
-            f"{backend}/ai/lessons/{lid}/content",
+            f"{backend}/ai/internal/lessons/{lid}/content",
             json={"contentJson": updated, "isGenerated": True},
+            headers=_internal_headers(),
         )
         r.raise_for_status()
         return f"  {title} — saved"
