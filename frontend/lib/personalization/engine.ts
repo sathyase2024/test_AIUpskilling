@@ -80,6 +80,8 @@ export const DOMAIN_LABELS: Record<InterestDomain, string> = {
   sports:      'Sports',
 }
 
+export const INTEREST_KEY = 'user_interest_domain'
+
 export const DOMAIN_ICONS: Record<InterestDomain, string> = {
   cricket:     '🏏',
   gaming:      '🎮',

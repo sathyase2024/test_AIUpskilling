@@ -7,11 +7,11 @@ import {
   ALL_DOMAINS,
   DOMAIN_LABELS,
   DOMAIN_ICONS,
+  INTEREST_KEY,
   type InterestDomain,
   type CourseAnalogies,
 } from '@/lib/personalization/engine'
 
-const INTEREST_KEY = 'user_interest_domain'
 const CACHE_PREFIX = 'analogy_cache:'
 
 // Retry schedule: wait this many ms before each attempt (index 0 = first attempt, no wait)
@@ -27,6 +27,9 @@ interface Props {
   /** Position in the lesson (0-based). Staggers background API calls so that
    *  several cards on the same page don't hit the AI worker simultaneously. */
   sectionIndex?: number
+  /** Externally controlled domain (from the lesson reader sidebar switcher).
+   *  When provided, overrides the locally stored preference. */
+  activeDomain?: InterestDomain
 }
 
 export default function PersonalizationCard({
@@ -35,6 +38,7 @@ export default function PersonalizationCard({
   conceptName,
   fallbackText,
   sectionIndex = 0,
+  activeDomain,
 }: Props) {
   const [analogies, setAnalogies]     = useState<CourseAnalogies | null>(null)
   const [domain, setDomain]           = useState<InterestDomain>('cricket')
@@ -49,6 +53,15 @@ export default function PersonalizationCard({
       if (saved && ALL_DOMAINS.includes(saved)) setDomain(saved)
     }
   }, [])
+
+  // Sync with external activeDomain (from sidebar switcher)
+  useEffect(() => {
+    if (activeDomain && activeDomain !== domain) {
+      setDomain(activeDomain)
+    }
+  // Only react to activeDomain changes, not domain itself
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDomain])
 
   useEffect(() => {
     getCourseAnalogies(courseSlug).then(setAnalogies)
@@ -101,9 +114,8 @@ export default function PersonalizationCard({
     }
 
     async function attempt() {
-      // Stagger start: 200ms per card index — just enough to avoid exact-simultaneous
-      // requests. With asyncio.to_thread on the worker all calls run in parallel
-      // anyway, so 8 cards complete within ~5s total rather than 14s.
+      // Stagger start: 100ms per card index — just enough to avoid exact-simultaneous
+      // requests without being perceptibly slow.
       await sleep(sectionIndex * 100)
 
       for (let i = 0; i < RETRY_DELAYS.length; i++) {
@@ -194,31 +206,9 @@ export default function PersonalizationCard({
         </button>
       </div>
 
-      {/* Body — always shows content immediately; personalizing is a silent background process */}
-      {analogy ? (
-        <div className="px-5 pb-4">
-          <p className={`text-sm leading-relaxed transition-opacity duration-500 ${showFallback ? 'text-white/50' : 'text-white/75'}`}>
-            {analogy}
-          </p>
-          {showFallback && (
-            <p className="text-[11px] text-white/25 pt-2">
-              🏏 Cricket analogy shown while your {DOMAIN_LABELS[domain]} version generates in the background.
-            </p>
-          )}
-        </div>
-      ) : (
-        /* Only reached when there is no fallbackText at all */
-        <div className="px-5 pb-4 space-y-2">
-          <div className="h-3 rounded bg-white/[0.06] animate-pulse w-full" />
-          <div className="h-3 rounded bg-white/[0.06] animate-pulse w-5/6" />
-          <div className="h-3 rounded bg-white/[0.06] animate-pulse w-4/6" />
-          <p className="text-[11px] text-white/25 pt-1">Crafting {DOMAIN_LABELS[domain]} analogy…</p>
-        </div>
-      )}
-
-      {/* Domain picker */}
+      {/* Domain picker — shown at TOP, between header and body */}
       {picking && (
-        <div className="px-5 pb-4 pt-1 border-t border-white/[0.06]">
+        <div className="px-5 pt-1 pb-3 border-b border-white/[0.06]">
           <div className="flex flex-wrap gap-1.5">
             {ALL_DOMAINS.map(d => (
               <button
@@ -235,6 +225,28 @@ export default function PersonalizationCard({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Body — always shows content immediately; personalizing is a silent background process */}
+      {analogy ? (
+        <div className="px-5 pb-4 pt-3">
+          <p className={`text-sm leading-relaxed transition-opacity duration-500 ${showFallback ? 'text-white/50' : 'text-white/75'}`}>
+            {analogy}
+          </p>
+          {showFallback && (
+            <p className="text-[11px] text-white/25 pt-2">
+              🏏 Cricket analogy shown while your {DOMAIN_LABELS[domain]} version generates in the background.
+            </p>
+          )}
+        </div>
+      ) : (
+        /* Only reached when there is no fallbackText at all */
+        <div className="px-5 pb-4 pt-3 space-y-2">
+          <div className="h-3 rounded bg-white/[0.06] animate-pulse w-full" />
+          <div className="h-3 rounded bg-white/[0.06] animate-pulse w-5/6" />
+          <div className="h-3 rounded bg-white/[0.06] animate-pulse w-4/6" />
+          <p className="text-[11px] text-white/25 pt-1">Crafting {DOMAIN_LABELS[domain]} analogy…</p>
         </div>
       )}
     </div>

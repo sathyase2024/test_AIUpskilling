@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Lightbulb, AlertTriangle, CheckCircle, Code2, BookOpen, HelpCircle, Sparkles, Copy, Check } from 'lucide-react'
 import PersonalizationCard from '@/components/PersonalizationCard'
+import type { InterestDomain } from '@/lib/personalization/engine'
 
 interface LessonSection {
   type: 'heading' | 'paragraph' | 'code' | 'info_box' | 'warning_box' | 'quiz' | 'exercise' | 'key_points' | 'analogy'
@@ -26,6 +27,7 @@ interface LessonContent {
 interface Props {
   content: LessonContent
   courseSlug?: string
+  activeDomain?: InterestDomain
 }
 
 interface SectionProps {
@@ -200,13 +202,13 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
       const level = section.level ?? 2
       if (level === 2) {
         return (
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-white/10 pb-2 mt-8 mb-4">
+          <h2 className="text-[18px] font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-white/10 pb-3 mt-12 mb-5">
             {section.content}
           </h2>
         )
       }
       return (
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-6 mb-3">
+        <h3 className="text-[15px] font-semibold text-slate-800 dark:text-white/90 mt-8 mb-2.5 tracking-tight">
           {section.content}
         </h3>
       )
@@ -214,7 +216,7 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
 
     case 'paragraph':
       return (
-        <p className="text-slate-700 dark:text-white/75 leading-relaxed mb-4">
+        <p className="text-[15px] text-slate-600 dark:text-white/65 leading-[1.85] mb-5">
           {section.content}
         </p>
       )
@@ -253,11 +255,11 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
 
     case 'key_points':
       return (
-        <ul className="my-4 space-y-2">
+        <ul className="my-5 space-y-2.5">
           {section.items?.map((item, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <CheckCircle size={16} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
-              <span className="text-slate-700 dark:text-white/75 text-sm">{item}</span>
+            <li key={i} className="flex items-start gap-2.5">
+              <CheckCircle size={15} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-[3px]" />
+              <span className="text-[14px] text-slate-600 dark:text-white/70 leading-relaxed">{item}</span>
             </li>
           ))}
         </ul>
@@ -421,7 +423,7 @@ function buildRenderItems(content: LessonContent, courseSlug: string | undefined
   return items
 }
 
-export default function LessonRenderer({ content, courseSlug }: Props) {
+export default function LessonRenderer({ content, courseSlug, activeDomain }: Props) {
   const [quizAnswers, setQuizAnswers] = useState<Map<number, number>>(new Map())
 
   const handleQuizAnswer = (sectionIndex: number, optionIndex: number) => {
@@ -446,6 +448,7 @@ export default function LessonRenderer({ content, courseSlug }: Props) {
               conceptName={item.conceptName}
               fallbackText={item.fallbackText}
               sectionIndex={item.analogyIndex}
+              activeDomain={activeDomain}
             />
           )
         }

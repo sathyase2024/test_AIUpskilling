@@ -21,6 +21,7 @@ import {
   GraduationCap,
   Trophy,
   FlaskConical,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -43,6 +44,13 @@ import {
 } from "@/lib/api";
 import { groupLessonsIntoModules } from "@/lib/modules";
 import { matchFAQ, QUICK_REPLIES, DEFLECTION_REPLY, type QuickReply } from "@/lib/course-faq";
+import {
+  ALL_DOMAINS,
+  DOMAIN_ICONS,
+  DOMAIN_LABELS,
+  INTEREST_KEY,
+  type InterestDomain,
+} from "@/lib/personalization/engine";
 
 // ─── Types (shape returned by the backend) ───────────────────────────────────
 
@@ -111,6 +119,21 @@ export default function LearnClient({ topic }: { topic: string }) {
 
   // ── Module challenge navigation ──────────────────────────────────────────────
   const [challengeModuleIndex, setChallengeModuleIndex] = useState<number | null>(null);
+
+  // ── Analogy domain preference ────────────────────────────────────────────────
+  const [activeDomain, setActiveDomain] = useState<InterestDomain>('cricket');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(INTEREST_KEY) as InterestDomain | null
+      if (saved && ALL_DOMAINS.includes(saved)) setActiveDomain(saved)
+    }
+  }, []);
+
+  const handleDomainChange = (d: InterestDomain) => {
+    setActiveDomain(d);
+    if (typeof window !== 'undefined') localStorage.setItem(INTEREST_KEY, d);
+  };
 
   const contentRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -591,6 +614,31 @@ export default function LearnClient({ topic }: { topic: string }) {
             </div>
           </div>
 
+          {/* Analogy domain switcher */}
+          <div className="px-4 py-3 border-b border-slate-200 dark:border-white/10 shrink-0">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Sparkles size={10} className="text-purple-500 dark:text-purple-400" />
+              <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wider">Analogy Style</p>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {ALL_DOMAINS.map(d => (
+                <button
+                  key={d}
+                  onClick={() => handleDomainChange(d)}
+                  title={DOMAIN_LABELS[d]}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-all border ${
+                    d === activeDomain
+                      ? 'bg-purple-50 dark:bg-purple-500/20 border-purple-300 dark:border-purple-400/50 text-purple-700 dark:text-purple-300'
+                      : 'bg-white dark:bg-white/[0.04] border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-white/45 hover:text-slate-700 dark:hover:text-white/75 hover:border-slate-300 dark:hover:border-white/20'
+                  }`}
+                >
+                  <span>{DOMAIN_ICONS[d]}</span>
+                  <span>{DOMAIN_LABELS[d]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <nav className="flex-1 p-3">
             {renderModuleNav(selectLesson, selectChallenge)}
           </nav>
@@ -661,7 +709,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                 </h1>
 
                 {lessonContent ? (
-                  <LessonRenderer content={lessonContent} courseSlug={topic} />
+                  <LessonRenderer content={lessonContent} courseSlug={topic} activeDomain={activeDomain} />
                 ) : (
                   <div className="flex items-center justify-center h-64">
                     <div className="text-center space-y-4">
@@ -756,6 +804,30 @@ export default function LearnClient({ topic }: { topic: string }) {
                   className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-500"
                   style={{ width: `${courseProgress}%` }}
                 />
+              </div>
+            </div>
+            {/* Mobile domain switcher */}
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-white/10 shrink-0">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Sparkles size={10} className="text-purple-500 dark:text-purple-400" />
+                <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wider">Analogy Style</p>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {ALL_DOMAINS.map(d => (
+                  <button
+                    key={d}
+                    onClick={() => handleDomainChange(d)}
+                    title={DOMAIN_LABELS[d]}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-all border ${
+                      d === activeDomain
+                        ? 'bg-purple-50 dark:bg-purple-500/20 border-purple-300 dark:border-purple-400/50 text-purple-700 dark:text-purple-300'
+                        : 'bg-white dark:bg-white/[0.04] border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-white/45 hover:text-slate-700 dark:hover:text-white/75 hover:border-slate-300 dark:hover:border-white/20'
+                    }`}
+                  >
+                    <span>{DOMAIN_ICONS[d]}</span>
+                    <span>{DOMAIN_LABELS[d]}</span>
+                  </button>
+                ))}
               </div>
             </div>
             <nav className="flex-1 overflow-y-auto p-2">
