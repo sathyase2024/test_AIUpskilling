@@ -167,7 +167,7 @@ async def _process_lesson(http: httpx.AsyncClient, backend: str, lesson: dict, m
         return f"  {title} — fetch error: {e}"
 
     data = r.json()
-    content_json = data if isinstance(data, dict) else data.get("contentJson")
+    content_json = data.get("contentJson") if isinstance(data, dict) else None
     if not content_json:
         return f"  {title} — no contentJson"
 
