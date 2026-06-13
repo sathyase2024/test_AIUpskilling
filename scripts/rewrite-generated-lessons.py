@@ -24,6 +24,7 @@ import glob
 import json
 import os
 import re
+import random
 import subprocess
 import sys
 import tempfile
@@ -159,7 +160,7 @@ def atomic_write_json(path: str, data) -> None:
             os.remove(tmp)
 
 
-def process_file(path: str, model: str, dry_run: bool, retries: int = 3) -> str:
+def process_file(path: str, model: str, dry_run: bool, retries: int = 6) -> str:
     data = json.load(open(path, encoding="utf-8"))
     sections = data.get("sections", [])
     para_indices = [i for i, s in enumerate(sections) if s.get("type") == "paragraph"]
@@ -168,16 +169,19 @@ def process_file(path: str, model: str, dry_run: bool, retries: int = 3) -> str:
 
     texts = [sections[i]["content"] for i in para_indices]
 
-    last_err = None
+    # Stagger the very first attempt so a pool of workers doesn't fire simultaneously.
+    time.sleep(random.uniform(0, 8))
+
     for attempt in range(1, retries + 1):
         try:
             raw = call_claude(model, data.get("title", ""), texts)
             groups = coerce_groups(parse_json_array(raw), texts)
             break
         except Exception as e:
-            last_err = e
             if attempt < retries:
-                time.sleep(attempt * 15)  # 15s, 30s — back off on rate limits / flakiness
+                # Long, jittered backoff — empty output means the subscription is
+                # rate-limiting concurrent sessions; give the window time to clear.
+                time.sleep(min(30 * attempt, 120) + random.uniform(0, 20))
             else:
                 raise RuntimeError(f"{type(e).__name__}: {e} (after {retries} attempts)")
 
