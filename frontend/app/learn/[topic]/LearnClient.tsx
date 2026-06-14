@@ -780,22 +780,38 @@ export default function LearnClient({ topic }: { topic: string }) {
                 )}
 
                 {/* Bottom Navigation */}
-                <div className="mt-12 pt-6 border-t border-slate-200 dark:border-white/10 flex items-center justify-between gap-4">
+                <div className="mt-12 pt-6 border-t border-slate-200 dark:border-white/10 flex items-center justify-between gap-3 sm:gap-4">
                   <button
                     onClick={() => prevLesson && selectLesson(prevLesson.id)}
                     disabled={!prevLesson}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-slate-300 dark:border-white/15 text-sm text-slate-700 dark:text-white/90 hover:bg-slate-50 dark:hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed max-w-[45%]"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-slate-300 dark:border-white/15 text-sm text-slate-700 dark:text-white/90 hover:bg-slate-50 dark:hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed shrink-0 max-w-[30%]"
                   >
                     <ArrowLeft size={15} className="shrink-0" />
-                    <span className="truncate">{prevLesson ? prevLesson.title : "Previous"}</span>
+                    <span className="truncate hidden sm:inline">{prevLesson ? prevLesson.title : "Previous"}</span>
+                    <span className="sm:hidden">Previous</span>
                   </button>
+
+                  {/* Center progress indicator (matches lesson footer in design) */}
+                  <div className="flex-1 min-w-0 flex flex-col items-center gap-1.5">
+                    <span className="text-xs font-medium text-slate-500 dark:text-white/50 whitespace-nowrap">
+                      Lesson {currentIndex + 1} of {totalLessons}
+                    </span>
+                    <div className="w-full max-w-[180px] h-1 rounded-full bg-slate-200 dark:bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-500"
+                        style={{ width: `${courseProgress}%` }}
+                      />
+                    </div>
+                    <span className="text-[11px] text-slate-400 dark:text-white/40">{courseProgress}% complete</span>
+                  </div>
 
                   <button
                     onClick={() => nextLesson && selectLesson(nextLesson.id)}
                     disabled={!nextLesson}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-medium hover:from-amber-400 hover:to-amber-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed max-w-[45%]"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-medium hover:from-amber-400 hover:to-amber-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed shrink-0 max-w-[30%]"
                   >
-                    <span className="truncate">{nextLesson ? nextLesson.title : "Next"}</span>
+                    <span className="truncate hidden sm:inline">{nextLesson ? nextLesson.title : "Next"}</span>
+                    <span className="sm:hidden">Next</span>
                     <ArrowRight size={15} className="shrink-0" />
                   </button>
                 </div>
