@@ -28,6 +28,9 @@ interface Props {
   content: LessonContent
   courseSlug?: string
   activeDomain?: InterestDomain
+  /** When true, key_points sections are not rendered in the body — the lesson
+   *  page surfaces them as "Key Concepts" cards above the content instead. */
+  hideKeyPoints?: boolean
 }
 
 interface SectionProps {
@@ -140,7 +143,7 @@ function tokenizeLine(line: string, kw: Set<string>): Token[] {
   return tokens
 }
 
-function SyntaxCode({ code, language }: { code: string; language?: string }) {
+export function SyntaxCode({ code, language }: { code: string; language?: string }) {
   const [copied, setCopied] = useState(false)
   const lang = (language ?? '').toLowerCase()
   const kw = lang === 'python' || lang === 'py' ? PY_KW : JS_KW
@@ -224,13 +227,27 @@ function SectionRenderer({ section, index, quizAnswers, onQuizAnswer }: SectionP
     case 'code':
       return <SyntaxCode code={section.content} language={section.language} />
 
-    case 'info_box':
+    case 'info_box': {
+      const isProTip = section.content.trimStart().toLowerCase().startsWith('pro tip')
+      if (isProTip) {
+        const body = section.content.replace(/^\s*pro\s*tip\s*:?\s*/i, '')
+        return (
+          <div className="my-5 p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 flex gap-3">
+            <Lightbulb size={18} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 mb-1 uppercase tracking-wide">Pro Tip</p>
+              <p className="text-amber-900 dark:text-amber-200/90 text-sm leading-relaxed">{body}</p>
+            </div>
+          </div>
+        )
+      }
       return (
         <div className="my-4 p-4 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/25 flex gap-3">
           <Lightbulb size={18} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
           <p className="text-blue-900 dark:text-blue-300 text-sm leading-relaxed">{section.content}</p>
         </div>
       )
+    }
 
     case 'warning_box':
       return (
@@ -421,7 +438,7 @@ function buildRenderItems(content: LessonContent, courseSlug: string | undefined
   return items
 }
 
-export default function LessonRenderer({ content, courseSlug, activeDomain }: Props) {
+export default function LessonRenderer({ content, courseSlug, activeDomain, hideKeyPoints }: Props) {
   const [quizAnswers, setQuizAnswers] = useState<Map<number, number>>(new Map())
 
   const handleQuizAnswer = (sectionIndex: number, optionIndex: number) => {
@@ -449,6 +466,9 @@ export default function LessonRenderer({ content, courseSlug, activeDomain }: Pr
               activeDomain={activeDomain}
             />
           )
+        }
+        if (hideKeyPoints && item.section.type === 'key_points') {
+          return null
         }
         return (
           <SectionRenderer

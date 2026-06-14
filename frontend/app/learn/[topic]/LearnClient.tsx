@@ -22,9 +22,14 @@ import {
   Trophy,
   FlaskConical,
   Sparkles,
+  FileText,
+  Layers,
+  Target,
+  ListChecks,
+  FolderOpen,
 } from "lucide-react";
 import Link from "next/link";
-import LessonRenderer from "@/components/LessonRenderer";
+import LessonRenderer, { SyntaxCode } from "@/components/LessonRenderer";
 import ModuleChallengeCard from "@/components/ModuleChallengeCard";
 import { getModuleChallenge } from "@/lib/module-challenges";
 import {
@@ -148,6 +153,11 @@ export default function LearnClient({ topic }: { topic: string }) {
     if (typeof window !== 'undefined') localStorage.setItem(INTEREST_KEY, d);
   };
 
+  // ── Lesson tabs (Lesson / Resources / Notes) ─────────────────────────────────
+  const [lessonTab, setLessonTab] = useState<'lesson' | 'resources' | 'notes'>('lesson');
+  const [notes, setNotes] = useState('');
+  const [notesSaved, setNotesSaved] = useState(true);
+
   const contentRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -241,6 +251,61 @@ export default function LearnClient({ topic }: { topic: string }) {
   const totalLessons = lessons.length;
   const courseProgress = totalLessons ? Math.round((completedLessons.length / totalLessons) * 100) : 0;
 
+  // ── Per-lesson notes (persisted to localStorage) ─────────────────────────────
+  const notesKey = currentLesson ? `lesson_notes:${currentLesson.id}` : null;
+
+  useEffect(() => {
+    if (!notesKey || typeof window === 'undefined') { setNotes(''); return; }
+    setNotes(localStorage.getItem(notesKey) ?? '');
+    setNotesSaved(true);
+  }, [notesKey]);
+
+  const handleNotesChange = (value: string) => {
+    setNotes(value);
+    setNotesSaved(false);
+    if (notesKey && typeof window !== 'undefined') {
+      localStorage.setItem(notesKey, value);
+      setNotesSaved(true);
+    }
+  };
+
+  // ── Derived lesson data for tabs ─────────────────────────────────────────────
+  const lessonJson = currentLesson?.contentJson ?? null;
+
+  const keyConcepts = useMemo(() => {
+    const sections = lessonJson?.sections ?? [];
+    const kp = sections.find((s: { type: string }) => s.type === 'key_points');
+    const items: string[] = kp?.items ?? [];
+    return items.slice(0, 6).map((raw) => {
+      const text = raw.trim();
+      // Split a leading concept clause off the explanatory detail.
+      const m = text.match(/^(.*?)(?:\s[—–-]\s|\s+because\s+|,\s+while\s+|\.\s+)(.*)$/i);
+      let title = m ? m[1] : text;
+      let body = m ? m[2] : '';
+      const words = title.split(/\s+/);
+      if (words.length > 9) {
+        body = words.slice(9).join(' ') + (body ? ' ' + body : '');
+        title = words.slice(0, 9).join(' ');
+      }
+      return { title: title.replace(/[.;,:]+$/, ''), body: body.trim() };
+    });
+  }, [lessonJson]);
+
+  const codeSnippets = useMemo(() => {
+    const sections = lessonJson?.sections ?? [];
+    return sections
+      .filter((s: { type: string }) => s.type === 'code')
+      .map((s: { content: string; language?: string }) => ({ code: s.content, language: s.language }));
+  }, [lessonJson]);
+
+  const keyTakeaways = useMemo(() => {
+    const sections = lessonJson?.sections ?? [];
+    const kp = sections.find((s: { type: string }) => s.type === 'key_points');
+    return (kp?.items ?? []) as string[];
+  }, [lessonJson]);
+
+  const CONCEPT_ICONS = [Target, Layers, Sparkles, ListChecks, BookOpen, Zap];
+
   // ── Scroll progress ──────────────────────────────────────────────────────────
   useEffect(() => {
     const el = contentRef.current;
@@ -264,6 +329,7 @@ export default function LearnClient({ topic }: { topic: string }) {
     setChallengeModuleIndex(null);
     setScrollProgress(0);
     setShowXpWidget(false);
+    setLessonTab('lesson');
     contentRef.current?.scrollTo({ top: 0 });
   };
 
@@ -729,22 +795,136 @@ export default function LearnClient({ topic }: { topic: string }) {
                   </span>
                 </div>
 
-                <h1 className="text-3xl font-bold mb-8 leading-tight text-slate-900 dark:text-white">
+                <h1 className="text-3xl font-bold mb-5 leading-tight text-slate-900 dark:text-white">
                   {currentLesson?.title ?? topicData.name}
                 </h1>
 
-                {lessonContent ? (
-                  <LessonRenderer content={lessonContent} courseSlug={topic} activeDomain={activeDomain} />
-                ) : (
-                  <div className="flex items-center justify-center h-64">
-                    <div className="text-center space-y-4">
-                      <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/30 flex items-center justify-center mx-auto">
-                        <Brain className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                {/* ── Tabs: Lesson / Resources / Notes ── */}
+                <div className="flex items-center gap-1 border-b border-slate-200 dark:border-white/10 mb-8">
+                  {([
+                    { id: 'lesson', label: 'Lesson', Icon: BookOpen },
+                    { id: 'resources', label: 'Resources', Icon: FolderOpen },
+                    { id: 'notes', label: 'Notes', Icon: FileText },
+                  ] as const).map(({ id, label, Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => setLessonTab(id)}
+                      className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all ${
+                        lessonTab === id
+                          ? 'border-amber-500 text-amber-700 dark:text-amber-300'
+                          : 'border-transparent text-slate-500 dark:text-white/50 hover:text-slate-800 dark:hover:text-white/80'
+                      }`}
+                    >
+                      <Icon size={15} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* ── Lesson tab ── */}
+                {lessonTab === 'lesson' && (
+                  lessonContent ? (
+                    <>
+                      {keyConcepts.length > 0 && (
+                        <div className="mb-10">
+                          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Key Concepts</h2>
+                          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {keyConcepts.map((c, i) => {
+                              const Icon = CONCEPT_ICONS[i % CONCEPT_ICONS.length];
+                              return (
+                                <div key={i} className="p-4 rounded-xl bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 hover:border-amber-300 dark:hover:border-amber-500/30 transition-all">
+                                  <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 flex items-center justify-center mb-2.5">
+                                    <Icon size={15} className="text-amber-600 dark:text-amber-400" />
+                                  </div>
+                                  <p className="text-sm font-semibold text-slate-900 dark:text-white leading-snug">{c.title}</p>
+                                  {c.body && <p className="text-xs text-slate-500 dark:text-white/50 mt-1 leading-relaxed line-clamp-3">{c.body}</p>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      <LessonRenderer content={lessonContent} courseSlug={topic} activeDomain={activeDomain} hideKeyPoints />
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-64">
+                      <div className="text-center space-y-4">
+                        <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-500/15 border border-amber-300 dark:border-amber-500/30 flex items-center justify-center mx-auto">
+                          <Brain className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                        </div>
+                        <p className="text-slate-500 dark:text-white/50 text-sm">
+                          Content for this lesson hasn&apos;t been generated yet.
+                        </p>
                       </div>
-                      <p className="text-slate-500 dark:text-white/50 text-sm">
-                        Content for this lesson hasn&apos;t been generated yet.
-                      </p>
                     </div>
+                  )
+                )}
+
+                {/* ── Resources tab ── */}
+                {lessonTab === 'resources' && (
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="p-4 rounded-xl bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/10">
+                        <Clock size={15} className="text-amber-600 dark:text-amber-400 mb-2" />
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">{currentLesson?.durationMinutes ?? 15}<span className="text-xs font-normal text-slate-400 dark:text-white/40"> min</span></p>
+                        <p className="text-xs text-slate-400 dark:text-white/40">Estimated time</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/10">
+                        <Zap size={15} className="text-amber-600 dark:text-amber-400 mb-2" />
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">{currentLesson?.xpReward ?? 50}<span className="text-xs font-normal text-slate-400 dark:text-white/40"> XP</span></p>
+                        <p className="text-xs text-slate-400 dark:text-white/40">On completion</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/10">
+                        <FolderOpen size={15} className="text-amber-600 dark:text-amber-400 mb-2" />
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">{codeSnippets.length}</p>
+                        <p className="text-xs text-slate-400 dark:text-white/40">Code snippet{codeSnippets.length === 1 ? '' : 's'}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Code from this lesson</h2>
+                      {codeSnippets.length > 0 ? (
+                        codeSnippets.map((c: { code: string; language?: string }, i: number) => (
+                          <SyntaxCode key={i} code={c.code} language={c.language} />
+                        ))
+                      ) : (
+                        <p className="text-sm text-slate-400 dark:text-white/40">This lesson has no code snippets.</p>
+                      )}
+                    </div>
+
+                    {keyTakeaways.length > 0 && (
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Key Takeaways</h2>
+                        <ul className="space-y-2.5">
+                          {keyTakeaways.map((t, i) => (
+                            <li key={i} className="flex items-start gap-2.5">
+                              <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+                              <span className="text-sm text-slate-700 dark:text-white/75 leading-relaxed">{t}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Notes tab ── */}
+                {lessonTab === 'notes' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">Your Notes</h2>
+                      <span className={`flex items-center gap-1.5 text-xs ${notesSaved ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-white/40'}`}>
+                        <CheckCircle2 size={13} />
+                        {notesSaved ? 'Saved' : 'Saving…'}
+                      </span>
+                    </div>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => handleNotesChange(e.target.value)}
+                      placeholder="Write your notes for this lesson — questions, summaries, things to revisit…"
+                      className="w-full min-h-[320px] p-4 rounded-xl bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-sm text-slate-700 dark:text-white/80 leading-relaxed resize-y focus:outline-none focus:border-amber-400 dark:focus:border-amber-500/40 placeholder:text-slate-400 dark:placeholder:text-white/30"
+                    />
+                    <p className="mt-2 text-xs text-slate-400 dark:text-white/40">Notes are saved on this device for this lesson.</p>
                   </div>
                 )}
 
