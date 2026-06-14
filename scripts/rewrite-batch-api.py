@@ -27,6 +27,7 @@ REPO = Path(__file__).resolve().parent.parent
 LESSONS_DIR = REPO / "generated_lessons"
 MANIFEST = LESSONS_DIR / ".rewrite-done"
 BATCH_ID_FILE = Path("/tmp/rewrite_batch_id.txt")
+BATCH_MAP_FILE = Path("/tmp/rewrite_batch_map.json")
 
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 8192
@@ -85,13 +86,10 @@ def get_remaining_lessons():
     return lessons
 
 
-def rel_to_cid(rel: str) -> str:
-    # Replace / with __ to make a valid custom_id (no slashes allowed)
-    return rel.replace("/", "__")
-
-
-def cid_to_rel(cid: str) -> str:
-    return cid.replace("__", "/", 1)
+def load_batch_map() -> dict:
+    if BATCH_MAP_FILE.exists():
+        return json.loads(BATCH_MAP_FILE.read_text())
+    return {}
 
 
 def build_user_prompt(path: Path):
@@ -205,10 +203,11 @@ def poll_batch(client: anthropic.Anthropic, batch_id: str):
 
 
 def apply_batch_results(client: anthropic.Anthropic, batch_id: str, dry_run: bool):
+    cid_map = load_batch_map()
     ok = fail = skipped = 0
     for result in client.beta.messages.batches.results(batch_id):
         cid = result.custom_id
-        rel = cid_to_rel(cid)
+        rel = cid_map.get(cid, cid.replace("__", "/", 1))
         path = LESSONS_DIR / rel
 
         if not path.exists():
@@ -272,6 +271,8 @@ def main():
     if args.resume:
         batch_id = args.resume
         BATCH_ID_FILE.write_text(batch_id)
+        if not BATCH_MAP_FILE.exists():
+            print(f"WARNING: {BATCH_MAP_FILE} missing — custom_id→path mapping unavailable")
         print(f"Resuming batch {batch_id}")
         poll_batch(client, batch_id)
         ok, _ = apply_batch_results(client, batch_id, args.dry_run)
@@ -292,7 +293,8 @@ def main():
     print(f"Lessons remaining: {len(lessons)}")
 
     requests = []
-    for path in lessons:
+    cid_map = {}  # cid -> rel path
+    for idx, path in enumerate(lessons):
         prompt, para_indices, texts = build_user_prompt(path)
         if prompt is None:
             rel = path.relative_to(LESSONS_DIR).as_posix()
@@ -301,7 +303,8 @@ def main():
             continue
 
         rel = path.relative_to(LESSONS_DIR).as_posix()
-        cid = rel_to_cid(rel)
+        cid = f"lesson-{idx:04d}"  # ≤12 chars, well within 64 limit
+        cid_map[cid] = rel
         requests.append({
             "custom_id": cid,
             "params": {
@@ -339,6 +342,9 @@ def main():
     if args.dry_run:
         print("\n--dry-run: skipping submission.")
         return
+
+    # Save mapping so we can recover after container restart
+    BATCH_MAP_FILE.write_text(json.dumps(cid_map))
 
     # Submit batch
     print(f"\nSubmitting {len(requests)} requests to Anthropic Messages Batch API...")
