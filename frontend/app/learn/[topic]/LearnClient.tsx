@@ -21,6 +21,7 @@ import {
   GraduationCap,
   Trophy,
   FlaskConical,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import LessonRenderer from "@/components/LessonRenderer";
@@ -42,6 +43,13 @@ import {
 } from "@/lib/api";
 import { groupLessonsIntoModules } from "@/lib/modules";
 import { matchFAQ, QUICK_REPLIES, DEFLECTION_REPLY, type QuickReply } from "@/lib/course-faq";
+import {
+  ALL_DOMAINS,
+  DOMAIN_ICONS,
+  DOMAIN_LABELS,
+  INTEREST_KEY,
+  type InterestDomain,
+} from "@/lib/personalization/engine";
 
 // ─── Types (shape returned by the backend) ───────────────────────────────────
 
@@ -110,6 +118,35 @@ export default function LearnClient({ topic }: { topic: string }) {
 
   // ── Module challenge navigation ──────────────────────────────────────────────
   const [challengeModuleIndex, setChallengeModuleIndex] = useState<number | null>(null);
+
+  // ── Analogy domain preference ────────────────────────────────────────────────
+  const [activeDomain, setActiveDomain] = useState<InterestDomain>('cricket');
+  const [domainDropdownOpen, setDomainDropdownOpen] = useState(false);
+  const domainDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(INTEREST_KEY) as InterestDomain | null
+      if (saved && ALL_DOMAINS.includes(saved)) setActiveDomain(saved)
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!domainDropdownOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (domainDropdownRef.current && !domainDropdownRef.current.contains(e.target as Node)) {
+        setDomainDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [domainDropdownOpen]);
+
+  const handleDomainChange = (d: InterestDomain) => {
+    setActiveDomain(d);
+    setDomainDropdownOpen(false);
+    if (typeof window !== 'undefined') localStorage.setItem(INTEREST_KEY, d);
+  };
 
   const contentRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -552,7 +589,47 @@ export default function LearnClient({ topic }: { topic: string }) {
             {topicData.name || decodedTopic}
           </span>
 
-          <div className="ml-auto flex items-center gap-4">
+          {/* ── Analogy domain dropdown ── */}
+          <div className="relative ml-auto" ref={domainDropdownRef}>
+            <button
+              onClick={() => setDomainDropdownOpen(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-500/30 bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 text-xs font-medium hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-all shrink-0"
+              title="Change analogy style"
+            >
+              <Sparkles size={12} />
+              <span>{DOMAIN_ICONS[activeDomain]}</span>
+              <span className="hidden sm:inline">{DOMAIN_LABELS[activeDomain]}</span>
+              <ChevronDown size={12} className={`transition-transform duration-150 ${domainDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {domainDropdownOpen && (
+              <div className="absolute right-0 top-[calc(100%+6px)] z-[60] w-44 bg-white dark:bg-[#1a1a28] border border-slate-200 dark:border-white/15 rounded-xl shadow-2xl overflow-hidden">
+                <div className="px-3 py-2 border-b border-slate-100 dark:border-white/10">
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles size={9} /> Analogy Style
+                  </p>
+                </div>
+                <div className="py-1 max-h-72 overflow-y-auto">
+                  {ALL_DOMAINS.map(d => (
+                    <button
+                      key={d}
+                      onClick={() => handleDomainChange(d)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-all ${
+                        d === activeDomain
+                          ? 'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-medium'
+                          : 'text-slate-600 dark:text-white/70 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <span className="text-base leading-none">{DOMAIN_ICONS[d]}</span>
+                      <span className="flex-1 text-left">{DOMAIN_LABELS[d]}</span>
+                      {d === activeDomain && <CheckCircle2 size={12} className="text-purple-500 dark:text-purple-400 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-4 shrink-0">
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 dark:text-white/40">
               <BookOpen size={13} />
               Lesson {currentIndex + 1} of {totalLessons}
@@ -657,7 +734,7 @@ export default function LearnClient({ topic }: { topic: string }) {
                 </h1>
 
                 {lessonContent ? (
-                  <LessonRenderer content={lessonContent} />
+                  <LessonRenderer content={lessonContent} courseSlug={topic} activeDomain={activeDomain} />
                 ) : (
                   <div className="flex items-center justify-center h-64">
                     <div className="text-center space-y-4">
